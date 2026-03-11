@@ -1,0 +1,1055 @@
+import { useState, useEffect, useCallback, useRef, Component } from "react";
+import {
+  getSourceStatus, healthPing, getApiUsage,
+  getHealthHistory,
+} from "./dataServices.js";
+
+// ─── SHARED STYLES ───────────────────────────────────────────────────────────
+
+const mono = "'JetBrains Mono', monospace";
+const sans = "'DM Sans', sans-serif";
+
+// ─── ERROR BOUNDARY ─────────────────────────────────────────────────────────
+
+class PanelErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error("[DataPointPanel crash]", error, info.componentStack);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: "32px 20px", textAlign: "center" }}>
+          <div style={{ fontFamily: mono, fontSize: 11, color: "#FF5252", marginBottom: 12 }}>
+            Something went wrong loading this data point. Please try again.
+          </div>
+          <button
+            onClick={() => this.setState({ hasError: false, error: null })}
+            style={{
+              fontFamily: mono, fontSize: 10, color: "var(--c-text-2)",
+              background: "var(--c-surface)", border: "1px solid var(--c-border)",
+              borderRadius: 6, padding: "6px 16px", cursor: "pointer",
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ─── SOURCE CONFIG ───────────────────────────────────────────────────────────
+
+const SOURCE_COLORS = {
+  yahoo:        "#7B1FA2",
+  finnhub:      "#00BCD4",
+  alphaVantage: "#FF9100",
+  fred:         "#1565C0",
+  coingecko:    "#8BC34A",
+  fmp:          "#E91E63",
+  brapi:        "#009C3B",
+  bcb:          "#003087",
+  awesomeapi:   "#FF6B00",
+};
+
+const SOURCE_LABELS = {
+  yahoo:        "Yahoo Finance",
+  finnhub:      "Finnhub",
+  alphaVantage: "Alpha Vantage",
+  fred:         "FRED",
+  coingecko:    "CoinGecko",
+  fmp:          "FMP",
+  brapi:        "BRAPI",
+  bcb:          "BCB",
+  awesomeapi:   "AwesomeAPI",
+};
+
+const ALL_SOURCES = ["yahoo", "finnhub", "alphaVantage", "fred", "coingecko", "fmp", "brapi", "bcb", "awesomeapi"];
+
+const SOURCE_META = {
+  yahoo: {
+    rateLimit: "Unlimited (proxy)", rateLimitMax: null, rateLimitPer: null,
+    coverage: "US & global equities, indices, FX", freshness: "Real-time",
+    assetClasses: ["Equities", "Indices", "Forex"], geo: "Global",
+    docUrl: "https://finance.yahoo.com",
+    healthEndpoint: "/api/yahoo/v7/finance/quote?symbols=AAPL",
+    note: "Unofficial scraping-based source — may break without notice",
+    fallbackSuggestion: "Finnhub for equity quotes, FMP for fundamentals",
+  },
+  finnhub: {
+    rateLimit: "60 calls/min", rateLimitMax: 60, rateLimitPer: "minute",
+    coverage: "US equities", freshness: "Real-time",
+    assetClasses: ["Equities", "Sentiment", "News"], geo: "US",
+    docUrl: "https://finnhub.io/docs/api",
+    keyRegistrationUrl: "https://finnhub.io",
+    healthEndpoint: "/api/finnhub/quote?symbol=AAPL",
+    note: null, fallbackSuggestion: null,
+  },
+  alphaVantage: {
+    rateLimit: "25 calls/day", rateLimitMax: 25, rateLimitPer: "day",
+    coverage: "US equities technicals", freshness: "15min delay",
+    assetClasses: ["Technicals"], geo: "US",
+    docUrl: "https://www.alphavantage.co/documentation/",
+    keyRegistrationUrl: "https://www.alphavantage.co/support/#api-key",
+    healthEndpoint: "/api/alphavantage/query?function=GLOBAL_QUOTE&symbol=AAPL",
+    note: "On-demand only — never called on page load", fallbackSuggestion: null,
+  },
+  fred: {
+    rateLimit: "Unlimited", rateLimitMax: null, rateLimitPer: null,
+    coverage: "US macroeconomic data", freshness: "Daily / Monthly",
+    assetClasses: ["Macro"], geo: "US",
+    docUrl: "https://fred.stlouisfed.org/docs/api/fred/",
+    keyRegistrationUrl: "https://fred.stlouisfed.org/docs/api/api_key.html",
+    healthEndpoint: "/api/fred/series/observations?series_id=DGS10&limit=1",
+    note: "Most reliable source — unlimited calls, high availability",
+    fallbackSuggestion: null,
+  },
+  coingecko: {
+    rateLimit: "30 calls/min", rateLimitMax: 30, rateLimitPer: "minute",
+    coverage: "Cryptocurrency markets", freshness: "Real-time",
+    assetClasses: ["Crypto"], geo: "Global",
+    docUrl: "https://www.coingecko.com/api/documentation",
+    healthEndpoint: "/api/coingecko/ping",
+    note: "No API key required", fallbackSuggestion: null,
+  },
+  fmp: {
+    rateLimit: "250 calls/day", rateLimitMax: 250, rateLimitPer: "day",
+    coverage: "US equities fundamentals", freshness: "Daily",
+    assetClasses: ["Fundamentals", "Valuation"], geo: "US",
+    docUrl: "https://financialmodelingprep.com/developer/docs",
+    keyRegistrationUrl: "https://financialmodelingprep.com/developer",
+    healthEndpoint: "/api/fmp/profile?symbol=AAPL",
+    note: null, fallbackSuggestion: null,
+  },
+  brapi: {
+    rateLimit: "Free tier", rateLimitMax: null, rateLimitPer: null,
+    coverage: "Brazil B3 equities", freshness: "Real-time",
+    assetClasses: ["Equities", "Fundamentals"], geo: "Brazil",
+    docUrl: "https://brapi.dev/docs",
+    keyRegistrationUrl: "https://brapi.dev",
+    healthEndpoint: "/api/brapi/quote/PETR4",
+    note: "Primary source for Brazilian B3 stock quotes and fundamentals",
+    fallbackSuggestion: "Yahoo Finance with .SA suffix",
+  },
+  bcb: {
+    rateLimit: "Unlimited", rateLimitMax: null, rateLimitPer: null,
+    coverage: "Brazilian macro indicators — SELIC, IPCA, CDI", freshness: "Daily (SELIC), Monthly (IPCA, CDI)",
+    assetClasses: ["Macro"], geo: "Brazil",
+    docUrl: "https://dadosabertos.bcb.gov.br",
+    keyRegistrationUrl: "https://dadosabertos.bcb.gov.br",
+    healthEndpoint: "/api/bcb/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json",
+    note: "Official Brazilian Central Bank API — no key required, unlimited access",
+    fallbackSuggestion: null,
+  },
+  awesomeapi: {
+    rateLimit: "Free, no key required", rateLimitMax: null, rateLimitPer: null,
+    coverage: "Brazilian Real exchange rates — USD/BRL, EUR/BRL", freshness: "Real-time (15min local cache)",
+    assetClasses: ["FX"], geo: "Brazil",
+    docUrl: "https://docs.awesomeapi.com.br",
+    keyRegistrationUrl: "https://docs.awesomeapi.com.br",
+    healthEndpoint: "/api/awesomeapi/last/USD-BRL",
+    note: "Unauthenticated requests cached 1 minute by provider — no key required",
+    fallbackSuggestion: null,
+  },
+};
+
+// ─── CATALOG DATA ────────────────────────────────────────────────────────────
+
+const CATALOG = [
+  {
+    category: "Market Data", icon: "📈",
+    items: [
+      { name: "Real-time Price", source: "yahoo", fallback: "finnhub", rateLimit: "Proxy: unlimited / Finnhub: 60/min", frequency: "Real-time (30s poll)", coverage: "Global equities, indices, FX", status: "active", description: "Current market price for all tracked assets, polled every 30 seconds via Yahoo Finance with Finnhub as fallback for US equities.", groups: ["All equity groups", "Indices", "FX"], component: "Dashboard cards, Detail panel", endpoint: "/v7/finance/quote?symbols=...", fetchMode: "Page load" },
+      { name: "Daily Volume", source: "yahoo", fallback: null, rateLimit: "Proxy: unlimited", frequency: "Real-time (30s poll)", coverage: "Equities and indices", status: "active", description: "Trading volume for the current session, updated with each price refresh.", groups: ["All equity groups", "Indices"], component: "Dashboard cards", endpoint: "/v7/finance/quote", fetchMode: "Page load" },
+      { name: "Day Change (%)", source: "yahoo", fallback: "finnhub", rateLimit: "Proxy: unlimited", frequency: "Real-time (30s poll)", coverage: "All tracked assets", status: "active", description: "Percentage change from previous close, drives heat bars and sentiment indicators.", groups: ["All groups"], component: "Dashboard cards, Sentiment bar, Top movers", endpoint: "/v7/finance/quote", fetchMode: "Page load" },
+      { name: "Market Capitalization", source: "yahoo", fallback: "fmp", rateLimit: "Proxy: unlimited / FMP: 250/day", frequency: "Real-time", coverage: "US equities", status: "active", description: "Total market value of outstanding shares.", groups: ["All equity groups"], component: "Detail panel", endpoint: "/v7/finance/quote", fetchMode: "Page load" },
+      { name: "52-Week High / Low", source: "yahoo", fallback: null, rateLimit: "Proxy: unlimited", frequency: "Real-time", coverage: "Equities and indices", status: "active", description: "Highest and lowest prices in the past 52 weeks.", groups: ["All equity groups", "Indices"], component: "Detail panel", endpoint: "/v7/finance/quote", fetchMode: "Page load" },
+      { name: "Historical Price Chart", source: "yahoo", fallback: null, rateLimit: "Proxy: unlimited", frequency: "On demand (per tab)", coverage: "All tracked assets", status: "active", description: "Historical OHLC data for 9 timeframes (1D to MAX) rendered as area charts in the detail panel.", groups: ["All groups"], component: "Detail panel chart", endpoint: "/v8/finance/chart/{symbol}?range=...&interval=...", fetchMode: "On demand" },
+      { name: "Intraday Sparkline", source: "yahoo", fallback: null, rateLimit: "Proxy: unlimited", frequency: "Derived from live data", coverage: "All tracked assets", status: "active", description: "Rolling 30-point sparkline derived from live price updates.", groups: ["All groups"], component: "Dashboard cards", endpoint: "Derived", fetchMode: "Computed" },
+    ],
+  },
+  {
+    category: "Fundamentals", icon: "📊",
+    items: [
+      { name: "P/E Ratio", source: "fmp", fallback: "yahoo", rateLimit: "250 calls/day", frequency: "On demand (panel open)", coverage: "US equities", status: "active", description: "Price-to-earnings ratio from FMP company profile.", groups: ["All equity groups"], component: "Detail panel Fundamentals", endpoint: "/profile?symbol={symbol}", fetchMode: "On demand" },
+      { name: "Earnings Per Share", source: "fmp", fallback: "yahoo", rateLimit: "250 calls/day", frequency: "On demand (panel open)", coverage: "US equities", status: "active", description: "EPS from the latest reported quarter.", groups: ["All equity groups"], component: "Detail panel Fundamentals", endpoint: "/profile?symbol={symbol}", fetchMode: "On demand" },
+      { name: "Profit Margin", source: "fmp", fallback: null, rateLimit: "250 calls/day", frequency: "On demand (panel open)", coverage: "US equities", status: "active", description: "Net profit margin TTM from FMP financial ratios.", groups: ["All equity groups"], component: "Detail panel Fundamentals", endpoint: "/ratios-ttm?symbol={symbol}", fetchMode: "On demand" },
+      { name: "Debt / Equity", source: "fmp", fallback: null, rateLimit: "250 calls/day", frequency: "On demand (panel open)", coverage: "US equities", status: "active", description: "Debt-to-equity ratio TTM, key leverage indicator.", groups: ["Financials", "EVs & Clean Energy"], component: "Detail panel Fundamentals", endpoint: "/ratios-ttm?symbol={symbol}", fetchMode: "On demand" },
+      { name: "Return on Equity", source: "fmp", fallback: null, rateLimit: "250 calls/day", frequency: "On demand (panel open)", coverage: "US equities", status: "active", description: "ROE TTM — how efficiently the company generates profit from equity.", groups: ["All equity groups"], component: "Detail panel Fundamentals", endpoint: "/ratios-ttm?symbol={symbol}", fetchMode: "On demand" },
+      { name: "Beta", source: "fmp", fallback: null, rateLimit: "250 calls/day", frequency: "On demand (panel open)", coverage: "US equities", status: "active", description: "Volatility relative to the overall market (S&P 500 benchmark).", groups: ["All equity groups"], component: "Detail panel Fundamentals", endpoint: "/profile?symbol={symbol}", fetchMode: "On demand" },
+      { name: "Dividend Yield", source: "fmp", fallback: null, rateLimit: "250 calls/day", frequency: "Background (batch profile)", coverage: "US equities", status: "active", description: "Annual dividend yield computed from last dividend and price. Used to populate the Dividends & Income group dynamically (threshold: >3%).", groups: ["Dividends & Income"], component: "Dividends group assignment", endpoint: "/profile/{symbols} (batch)", fetchMode: "Background" },
+      { name: "DCF Valuation", source: "fmp", fallback: null, rateLimit: "250 calls/day", frequency: "On demand", coverage: "US equities", status: "planned", description: "Discounted cash flow intrinsic value estimate.", groups: ["All equity groups"], component: "Detail panel", endpoint: "/discounted-cash-flow?symbol={symbol}", fetchMode: "On demand" },
+    ],
+  },
+  {
+    category: "Technical Indicators", icon: "📐",
+    items: [
+      { name: "RSI — 14 Day", source: "alphaVantage", fallback: null, rateLimit: "25 calls/day — on demand only", frequency: "On demand (user action)", coverage: "US equities", status: "active", description: "Relative Strength Index with 14-day lookback. Cached for 24 hours to preserve quota.", groups: ["All equity groups"], component: "Future: Detail panel technicals", endpoint: "/query?function=RSI&symbol=...&time_period=14", fetchMode: "On demand" },
+      { name: "MACD", source: "alphaVantage", fallback: null, rateLimit: "25 calls/day — on demand only", frequency: "On demand (user action)", coverage: "US equities", status: "active", description: "Moving Average Convergence Divergence with signal line and histogram.", groups: ["All equity groups"], component: "Future: Detail panel technicals", endpoint: "/query?function=MACD&symbol=...", fetchMode: "On demand" },
+      { name: "Bollinger Bands", source: "alphaVantage", fallback: null, rateLimit: "25 calls/day — on demand only", frequency: "On demand", coverage: "US equities", status: "planned", description: "Upper, middle, and lower Bollinger Bands for volatility analysis.", groups: ["All equity groups"], component: "Planned", endpoint: "/query?function=BBANDS", fetchMode: "On demand" },
+      { name: "Moving Averages", source: "alphaVantage", fallback: null, rateLimit: "25 calls/day — on demand only", frequency: "On demand", coverage: "US equities", status: "planned", description: "Simple and exponential moving averages (SMA, EMA).", groups: ["All equity groups"], component: "Planned", endpoint: "/query?function=SMA", fetchMode: "On demand" },
+    ],
+  },
+  {
+    category: "Macro Economics", icon: "🏛",
+    items: [
+      { name: "CPI (All Urban)", source: "fred", fallback: null, rateLimit: "Unlimited", frequency: "Hourly cache", coverage: "United States", status: "active", description: "Consumer Price Index for All Urban Consumers — primary US inflation gauge.", groups: ["Macro context"], component: "Future: Macro dashboard", endpoint: "/series/observations?series_id=CPIAUCSL", fetchMode: "Cached" },
+      { name: "GDP (Quarterly)", source: "fred", fallback: null, rateLimit: "Unlimited", frequency: "Hourly cache", coverage: "United States", status: "active", description: "Gross Domestic Product, seasonally adjusted quarterly.", groups: ["Macro context"], component: "Future: Macro dashboard", endpoint: "/series/observations?series_id=GDP", fetchMode: "Cached" },
+      { name: "Fed Funds Rate", source: "fred", fallback: null, rateLimit: "Unlimited", frequency: "Hourly cache", coverage: "United States", status: "active", description: "Effective Federal Funds Rate — displayed as macro context banner for Financials & Banks group.", groups: ["Financials & Banks"], component: "Group macro banner", endpoint: "/series/observations?series_id=FEDFUNDS", fetchMode: "Cached" },
+      { name: "Unemployment Rate", source: "fred", fallback: null, rateLimit: "Unlimited", frequency: "Hourly cache", coverage: "United States", status: "active", description: "US civilian unemployment rate, seasonally adjusted.", groups: ["Macro context"], component: "Future: Macro dashboard", endpoint: "/series/observations?series_id=UNRATE", fetchMode: "Cached" },
+      { name: "10-Year Treasury Yield", source: "fred", fallback: null, rateLimit: "Unlimited", frequency: "Hourly cache", coverage: "United States", status: "active", description: "10Y constant maturity Treasury yield — macro context banner for EVs & Clean Energy group.", groups: ["EVs & Clean Energy"], component: "Group macro banner", endpoint: "/series/observations?series_id=DGS10", fetchMode: "Cached" },
+      { name: "2-Year Treasury Yield", source: "fred", fallback: null, rateLimit: "Unlimited", frequency: "Hourly cache", coverage: "United States", status: "active", description: "2Y constant maturity Treasury yield — used for yield curve analysis.", groups: ["Macro context"], component: "Future: Macro dashboard", endpoint: "/series/observations?series_id=DGS2", fetchMode: "Cached" },
+      { name: "30-Year Mortgage Rate", source: "fred", fallback: null, rateLimit: "Unlimited", frequency: "Hourly cache", coverage: "United States", status: "active", description: "30Y fixed-rate mortgage average — macro context banner for REITs & Real Estate group.", groups: ["REITs & Real Estate"], component: "Group macro banner", endpoint: "/series/observations?series_id=MORTGAGE30US", fetchMode: "Cached" },
+      { name: "Consumer Sentiment", source: "fred", fallback: null, rateLimit: "Unlimited", frequency: "Hourly cache", coverage: "United States", status: "active", description: "University of Michigan Consumer Sentiment Index — macro context banner for Consumer & Retail group.", groups: ["Consumer & Retail"], component: "Group macro banner", endpoint: "/series/observations?series_id=UMCSENT", fetchMode: "Cached" },
+    ],
+  },
+  {
+    category: "Sentiment & Events", icon: "📰",
+    items: [
+      { name: "Analyst Recommendations", source: "finnhub", fallback: null, rateLimit: "60 calls/min (queued)", frequency: "On demand (panel open)", coverage: "US equities", status: "active", description: "Buy/Hold/Sell consensus from sell-side analysts, rendered as a stacked bar in the detail panel.", groups: ["All equity groups"], component: "Detail panel Analyst Consensus", endpoint: "/stock/recommendation?symbol=...", fetchMode: "On demand" },
+      { name: "Company News", source: "finnhub", fallback: null, rateLimit: "60 calls/min (queued)", frequency: "On demand (10min cache)", coverage: "US equities", status: "active", description: "Latest 5 company news headlines from the past 7 days.", groups: ["All equity groups"], component: "Detail panel Recent News", endpoint: "/company-news?symbol=...&from=...&to=...", fetchMode: "On demand" },
+      { name: "Insider Sentiment", source: "finnhub", fallback: null, rateLimit: "60 calls/min (queued)", frequency: "On demand", coverage: "US equities", status: "planned", description: "Aggregate insider trading sentiment data.", groups: ["Healthcare & Pharma"], component: "Planned", endpoint: "/stock/insider-sentiment?symbol=...", fetchMode: "On demand" },
+      { name: "Earnings Calendar", source: "finnhub", fallback: null, rateLimit: "60 calls/min (queued)", frequency: "On demand", coverage: "US equities", status: "planned", description: "Upcoming and recent earnings dates and EPS estimates.", groups: ["Financials", "Defense"], component: "Planned", endpoint: "/stock/earnings?symbol=...", fetchMode: "On demand" },
+    ],
+  },
+  {
+    category: "Crypto", icon: "🪙",
+    items: [
+      { name: "Crypto Price (USD)", source: "coingecko", fallback: null, rateLimit: "30 calls/min — no key", frequency: "2-minute cache", coverage: "Top cryptocurrencies", status: "active", description: "USD price for BTC, ETH, SOL via CoinGecko simple/price endpoint.", groups: ["Crypto Assets"], component: "Dashboard crypto cards", endpoint: "/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd", fetchMode: "Page load" },
+      { name: "Crypto Market Cap", source: "coingecko", fallback: null, rateLimit: "30 calls/min — no key", frequency: "2-minute cache", coverage: "Top cryptocurrencies", status: "active", description: "Total market capitalization in USD for each tracked cryptocurrency.", groups: ["Crypto Assets"], component: "Detail panel", endpoint: "/simple/price?...&include_market_cap=true", fetchMode: "Page load" },
+      { name: "Crypto 24h Volume", source: "coingecko", fallback: null, rateLimit: "30 calls/min — no key", frequency: "2-minute cache", coverage: "Top cryptocurrencies", status: "active", description: "24-hour trading volume in USD.", groups: ["Crypto Assets"], component: "Dashboard cards", endpoint: "/simple/price?...&include_24hr_vol=true", fetchMode: "Page load" },
+      { name: "Trending Coins", source: "coingecko", fallback: null, rateLimit: "30 calls/min — no key", frequency: "5-minute cache", coverage: "Global crypto", status: "active", description: "Top trending coins by search activity on CoinGecko.", groups: ["Crypto Assets"], component: "Future feature", endpoint: "/search/trending", fetchMode: "On demand" },
+    ],
+  },
+  {
+    category: "Brasil — B3", icon: "🇧🇷",
+    items: [
+      { name: "B3 Real-time Price", source: "brapi", fallback: "yahoo", rateLimit: "Free tier", frequency: "Real-time (30s poll)", coverage: "Brazil B3 equities", status: "active", description: "Current market price in BRL for all tracked B3 assets via BRAPI, with Yahoo Finance (.SA suffix) as fallback.", groups: ["Brasil — B3"], component: "Dashboard cards, Detail panel", endpoint: "/quote/{tickers}?token=...", fetchMode: "Page load" },
+      { name: "B3 Day Change (%)", source: "brapi", fallback: "yahoo", rateLimit: "Free tier", frequency: "Real-time (30s poll)", coverage: "Brazil B3 equities", status: "active", description: "Percentage change from previous close for B3 stocks.", groups: ["Brasil — B3"], component: "Dashboard cards", endpoint: "/quote/{tickers}", fetchMode: "Page load" },
+      { name: "B3 Volume", source: "brapi", fallback: "yahoo", rateLimit: "Free tier", frequency: "Real-time (30s poll)", coverage: "Brazil B3 equities", status: "active", description: "Trading volume for B3 stocks in the current session.", groups: ["Brasil — B3"], component: "Dashboard cards", endpoint: "/quote/{tickers}", fetchMode: "Page load" },
+      { name: "SELIC Rate", source: "bcb", fallback: null, rateLimit: "Unlimited — no key", frequency: "1-hour cache", coverage: "Brazil", status: "active", description: "Brazilian base interest rate (equivalent to Fed Funds Rate), from BCB SGS series 432.", groups: ["Brasil — B3"], component: "Group macro banner", endpoint: "/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json", fetchMode: "Cached" },
+      { name: "IPCA (Inflation)", source: "bcb", fallback: null, rateLimit: "Unlimited — no key", frequency: "1-hour cache", coverage: "Brazil", status: "active", description: "Brazilian inflation index (equivalent to CPI), from BCB SGS series 433.", groups: ["Brasil — B3"], component: "Group macro banner", endpoint: "/dados/serie/bcdata.sgs.433/dados/ultimos/1?formato=json", fetchMode: "Cached" },
+      { name: "CDI Rate", source: "bcb", fallback: null, rateLimit: "Unlimited — no key", frequency: "1-hour cache", coverage: "Brazil", status: "active", description: "CDI (Certificado de Depósito Interbancário) rate, from BCB SGS series 4389.", groups: ["Brasil — B3"], component: "Group macro banner", endpoint: "/dados/serie/bcdata.sgs.4389/dados/ultimos/1?formato=json", fetchMode: "Cached" },
+      { name: "USD/BRL Rate", source: "awesomeapi", fallback: null, rateLimit: "Free — no key", frequency: "15-minute cache", coverage: "Brazil", status: "active", description: "Real-time USD/BRL exchange rate with bid/ask and percentage change from AwesomeAPI.", groups: ["Brasil — B3"], component: "Group macro banner", endpoint: "/last/USD-BRL", fetchMode: "Cached" },
+    ],
+  },
+];
+
+const ASSET_GROUPS = [
+  { name: "Big Tech",              icon: "⚡", assetCount: "8 tickers",          assignment: "Manual ticker list",                sources: ["yahoo", "finnhub", "fmp"],               macroBanner: null },
+  { name: "Big Oil & Energy",      icon: "🛢", assetCount: "8 tickers",          assignment: "Manual ticker list",                sources: ["yahoo", "finnhub", "fmp"],               macroBanner: null },
+  { name: "Financials & Banks",    icon: "🏦", assetCount: "8 tickers",          assignment: "Manual ticker list",                sources: ["yahoo", "finnhub", "fmp", "fred"],       macroBanner: "Fed Funds Rate (FRED)" },
+  { name: "Healthcare & Pharma",   icon: "💊", assetCount: "6 tickers",          assignment: "Manual ticker list",                sources: ["yahoo", "finnhub", "fmp"],               macroBanner: null },
+  { name: "Semiconductors",        icon: "🔬", assetCount: "6 + cross-listed",   assignment: "Manual + cross-list from Big Tech", sources: ["yahoo", "finnhub", "fmp"],               macroBanner: null },
+  { name: "Consumer & Retail",     icon: "🛒", assetCount: "5 + cross-listed",   assignment: "Manual + cross-list from Big Tech", sources: ["yahoo", "finnhub", "fmp", "fred"],       macroBanner: "Consumer Sentiment (FRED)" },
+  { name: "Defense & Aerospace",   icon: "🛡", assetCount: "5 tickers",          assignment: "Manual ticker list",                sources: ["yahoo", "finnhub", "fmp"],               macroBanner: null },
+  { name: "EVs & Clean Energy",    icon: "🔋", assetCount: "5 + cross-listed",   assignment: "Manual + cross-list from Big Tech", sources: ["yahoo", "finnhub", "fmp", "fred"],       macroBanner: "10Y Treasury Yield (FRED)" },
+  { name: "REITs & Real Estate",   icon: "🏢", assetCount: "4 tickers",          assignment: "Manual ticker list",                sources: ["yahoo", "finnhub", "fmp", "fred"],       macroBanner: "30-Year Mortgage Rate (FRED)" },
+  { name: "Dividends & Income",    icon: "💰", assetCount: "Dynamic",            assignment: "FMP dividend yield > 3%",           sources: ["yahoo", "fmp"],                          macroBanner: null },
+  { name: "Emerging Markets",      icon: "🌍", assetCount: "4 ETFs",             assignment: "Manual ETF list",                   sources: ["yahoo", "finnhub"],                      macroBanner: null },
+  { name: "Crypto Assets",         icon: "🪙", assetCount: "3 coins",            assignment: "CoinGecko price data exclusively",  sources: ["coingecko"],                             macroBanner: null },
+  { name: "Global Indices",        icon: "🌐", assetCount: "8 indices",          assignment: "Manual ticker list",                sources: ["yahoo"],                                 macroBanner: null },
+  { name: "Major Currencies",      icon: "💱", assetCount: "8 pairs",            assignment: "Manual ticker list",                sources: ["yahoo"],                                 macroBanner: null },
+  { name: "Brasil — B3",          icon: "🇧🇷", assetCount: "17 tickers",         assignment: "Manual ticker list",                sources: ["brapi", "bcb", "awesomeapi"],             macroBanner: "SELIC, IPCA, CDI (BCB) + USD/BRL (AwesomeAPI)" },
+];
+
+const STATUS_BADGE = {
+  operational: { label: "OPERATIONAL", color: "#00E676", bg: "rgba(0,230,118,0.1)", border: "rgba(0,230,118,0.3)" },
+  degraded:    { label: "DEGRADED",    color: "#FFD740", bg: "rgba(255,215,64,0.1)", border: "rgba(255,215,64,0.3)" },
+  outage:      { label: "OUTAGE",      color: "#FF5252", bg: "rgba(255,82,82,0.1)",  border: "rgba(255,82,82,0.3)" },
+};
+
+const ITEM_STATUS_STYLES = {
+  active:    { label: "ACTIVE",    color: "#00E676", bg: "rgba(0,230,118,0.1)",  border: "rgba(0,230,118,0.3)" },
+  planned:   { label: "PLANNED",   color: "#FFD740", bg: "rgba(255,215,64,0.1)", border: "rgba(255,215,64,0.3)" },
+};
+
+// ─── SMALL COMPONENTS ────────────────────────────────────────────────────────
+
+function SourceBadge({ source, style: extra }) {
+  const color = SOURCE_COLORS[source] || "#9E9E9E";
+  const label = SOURCE_LABELS[source] || source;
+  return (
+    <span style={{ fontFamily: mono, fontSize: 9, fontWeight: 700, letterSpacing: "0.5px", color, background: color + "18", border: `1px solid ${color}30`, borderRadius: 3, padding: "2px 7px", whiteSpace: "nowrap", ...extra }}>
+      {label}
+    </span>
+  );
+}
+
+function StatusBadge({ status }) {
+  const s = STATUS_BADGE[status] || STATUS_BADGE.outage;
+  return (
+    <span style={{ fontFamily: mono, fontSize: 9, fontWeight: 700, letterSpacing: "0.8px", color: s.color, background: s.bg, border: `1px solid ${s.border}`, borderRadius: 10, padding: "3px 10px" }}>
+      {s.label}
+    </span>
+  );
+}
+
+function ItemStatusDot({ status }) {
+  const s = ITEM_STATUS_STYLES[status] || ITEM_STATUS_STYLES.planned;
+  return (
+    <span style={{ fontFamily: mono, fontSize: 8, fontWeight: 700, letterSpacing: "0.8px", color: s.color, background: s.bg, border: `1px solid ${s.border}`, borderRadius: 10, padding: "2px 8px" }}>
+      {s.label}
+    </span>
+  );
+}
+
+function MetricRow({ label, value, valueColor }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between" }}>
+      <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "0.5px" }}>{label}</span>
+      <span style={{ fontFamily: mono, fontSize: 9, color: valueColor || "var(--c-text-2)" }}>{value}</span>
+    </div>
+  );
+}
+
+function MetricBox({ label, value, valueColor }) {
+  return (
+    <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 6, padding: "10px 12px" }}>
+      <div style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "1px", marginBottom: 4 }}>{label}</div>
+      <div style={{ fontFamily: mono, fontSize: 14, fontWeight: 700, color: valueColor || "var(--c-text)" }}>{value}</div>
+    </div>
+  );
+}
+
+function SuccessRateDots({ history }) {
+  const dots = [];
+  for (let i = 0; i < 10; i++) {
+    const val = history[i];
+    dots.push(
+      <div key={i} style={{
+        width: 8, height: 8, borderRadius: "50%",
+        background: val === undefined ? "var(--c-border)" : val ? "#00E676" : "#FF5252",
+        transition: "background 0.3s ease",
+      }} />
+    );
+  }
+  return <div style={{ display: "flex", gap: 3, alignItems: "center" }}>{dots}</div>;
+}
+
+function UsageBar({ used, max, per }) {
+  if (!max) return <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)" }}>No limit</span>;
+  const pct = Math.min((used / max) * 100, 100);
+  const barColor = pct > 90 ? "#FF5252" : pct > 70 ? "#FFD740" : "#00E676";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
+      <div style={{ flex: 1, height: 4, background: "var(--c-border)", borderRadius: 2, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: barColor, borderRadius: 2, transition: "width 0.5s ease" }} />
+      </div>
+      <span style={{ fontFamily: mono, fontSize: 9, color: barColor, whiteSpace: "nowrap" }}>
+        {used}/{max} {per ? `per ${per}` : ""}
+      </span>
+    </div>
+  );
+}
+
+function TimeAgo({ timestamp }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  if (!timestamp) return <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)" }}>Not checked</span>;
+  const secs = Math.round((now - timestamp) / 1000);
+  const isPulsing = secs < 60;
+  return (
+    <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", display: "flex", alignItems: "center", gap: 4 }}>
+      <span style={{
+        width: 5, height: 5, borderRadius: "50%",
+        background: isPulsing ? "#00E676" : "var(--c-text-3)",
+        animation: isPulsing ? "pulse 2s ease-in-out infinite" : "none",
+      }} />
+      {secs < 5 ? "just now" : `${secs}s ago`}
+    </span>
+  );
+}
+
+// ─── SOURCE HEALTH CARD ─────────────────────────────────────────────────────
+
+function SourceHealthCard({ source, health, usage, onRefresh }) {
+  const [hovered, setHovered] = useState(false);
+  const meta = SOURCE_META[source];
+  const color = SOURCE_COLORS[source];
+  const history = getHealthHistory(source);
+  const successCount = history.filter(Boolean).length;
+  const totalChecks = history.length;
+  const configured = getSourceStatus()[source];
+  const isConfigured = configured?.hasKey || !configured?.keyRequired;
+  const checking = health?.checking;
+
+  const statusKey = health?.status || (isConfigured ? "operational" : "outage");
+
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: hovered ? `linear-gradient(135deg,${color}08,rgba(13,15,24,0.95))` : "var(--c-surface)",
+        border: `1px solid ${hovered ? color + "40" : "var(--c-border)"}`,
+        borderRadius: 10, padding: "16px 18px",
+        transition: "all 0.25s ease", position: "relative",
+        opacity: checking ? 0.7 : 1,
+      }}
+    >
+      {checking && (
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "10px 10px 0 0", overflow: "hidden" }}>
+          <div style={{ height: "100%", width: "60%", background: `linear-gradient(90deg,transparent,${color},transparent)`, animation: "scanline 1.5s ease-in-out infinite" }} />
+        </div>
+      )}
+
+      {/* Header: source name + refresh */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <div style={{ width: 4, height: 20, borderRadius: 2, background: color }} />
+            <span style={{ fontFamily: sans, fontSize: 15, fontWeight: 700, color: "var(--c-text)" }}>
+              {SOURCE_LABELS[source]}
+            </span>
+          </div>
+          <StatusBadge status={statusKey} />
+        </div>
+        <button
+          onClick={() => onRefresh(source)}
+          title="Refresh health check"
+          style={{
+            background: "transparent", border: `1px solid var(--c-border)`, borderRadius: 6,
+            cursor: "pointer", padding: "5px 8px", color: "var(--c-text-3)", fontSize: 12,
+            transition: "all 0.15s ease",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = color; e.currentTarget.style.color = color; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--c-border)"; e.currentTarget.style.color = "var(--c-text-3)"; }}
+        >
+          ↻
+        </button>
+      </div>
+
+      {/* Response time + last checked */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        {health?.responseTime != null ? (
+          <span style={{ fontFamily: mono, fontSize: 18, fontWeight: 700, color: health.responseTime > 3000 ? "#FF5252" : health.responseTime > 1000 ? "#FFD740" : "var(--c-text)" }}>
+            {health.responseTime}ms
+          </span>
+        ) : (
+          <span style={{ fontFamily: mono, fontSize: 14, color: "var(--c-text-3)" }}>—</span>
+        )}
+        <TimeAgo timestamp={health?.timestamp} />
+      </div>
+
+      {/* Success rate */}
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+          <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "0.5px" }}>SUCCESS RATE</span>
+          {totalChecks > 0 && <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-2)" }}>{successCount}/{totalChecks}</span>}
+        </div>
+        <SuccessRateDots history={history} />
+      </div>
+
+      {/* Error / missing key message */}
+      {!isConfigured && (
+        <div style={{ background: "rgba(255,215,64,0.08)", border: "1px solid rgba(255,215,64,0.25)", borderRadius: 4, padding: "8px 10px", marginBottom: 10 }}>
+          <div style={{ fontFamily: mono, fontSize: 9, color: "#FFD740", marginBottom: 4, fontWeight: 600 }}>API key not configured</div>
+          {meta.keyRegistrationUrl && (
+            <a href={meta.keyRegistrationUrl} target="_blank" rel="noopener noreferrer"
+              style={{ fontFamily: mono, fontSize: 9, color: color, textDecoration: "none" }}>
+              Get your free key →
+            </a>
+          )}
+        </div>
+      )}
+      {isConfigured && health?.error && (
+        <div style={{ background: "rgba(255,82,82,0.08)", border: "1px solid rgba(255,82,82,0.2)", borderRadius: 4, padding: "6px 10px", marginBottom: 10 }}>
+          <span style={{ fontFamily: mono, fontSize: 9, color: "#FF5252" }}>{health.error}</span>
+        </div>
+      )}
+
+      {/* Rate limit usage */}
+      <div style={{ marginBottom: 10 }}>
+        <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "0.5px" }}>RATE LIMIT: {meta.rateLimit}</span>
+        <div style={{ marginTop: 4 }}>
+          <UsageBar used={usage || 0} max={meta.rateLimitMax} per={meta.rateLimitPer} />
+        </div>
+      </div>
+
+      {/* Coverage & freshness */}
+      <div style={{ display: "grid", gap: 3 }}>
+        <MetricRow label="COVERAGE" value={meta.geo} />
+        <MetricRow label="FRESHNESS" value={meta.freshness} />
+        <MetricRow label="ASSET CLASSES" value={meta.assetClasses.join(", ")} />
+      </div>
+
+      {/* Yahoo-specific warning */}
+      {source === "yahoo" && statusKey !== "operational" && meta.fallbackSuggestion && (
+        <div style={{ background: "rgba(255,82,82,0.06)", border: "1px solid rgba(255,82,82,0.15)", borderRadius: 4, padding: "6px 10px", marginTop: 8 }}>
+          <span style={{ fontFamily: mono, fontSize: 8, color: "#FF5252", letterSpacing: "0.3px" }}>
+            Yahoo is unofficial and may break. Fallback: {meta.fallbackSuggestion}
+          </span>
+        </div>
+      )}
+
+      {/* Notes */}
+      {meta.note && (
+        <div style={{ fontFamily: sans, fontSize: 10, color: "var(--c-text-3)", marginTop: 8, lineHeight: 1.4 }}>
+          {meta.note}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── ENHANCED CATALOG CARD ───────────────────────────────────────────────────
+
+function CatalogCard({ item, sourceHealth, onClick }) {
+  const [hovered, setHovered] = useState(false);
+  const sourceStatus = sourceHealth?.[item.source]?.status;
+  const isOutage = sourceStatus === "outage";
+  const statusColor = sourceStatus === "operational" ? "#00E676" : sourceStatus === "degraded" ? "#FFD740" : sourceStatus === "outage" ? "#FF5252" : "var(--c-text-3)";
+
+  return (
+    <div
+      onClick={() => onClick(item)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: isOutage
+          ? "rgba(255,82,82,0.03)"
+          : hovered ? "rgba(255,255,255,0.04)" : "var(--c-surface)",
+        border: `1px solid ${hovered ? "rgba(255,255,255,0.15)" : "var(--c-border)"}`,
+        borderRadius: 8, padding: "14px 16px",
+        transition: "all 0.2s ease", cursor: "pointer",
+        opacity: isOutage ? 0.6 : 1,
+        position: "relative",
+      }}
+    >
+      {/* Outage overlay icon */}
+      {isOutage && (
+        <div style={{ position: "absolute", top: 8, right: 10, fontFamily: mono, fontSize: 10, color: "#FF5252", opacity: 0.7 }}>
+          ⚠
+        </div>
+      )}
+
+      {/* Row 1: Name + Status */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+        <div style={{ fontFamily: sans, fontSize: 13, fontWeight: 700, color: "var(--c-text)", lineHeight: 1.3, flex: 1, marginRight: 8 }}>
+          {item.name}
+        </div>
+        <ItemStatusDot status={item.status} />
+      </div>
+
+      {/* Row 2: Source badges + live dot */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center", marginBottom: 10 }}>
+        <div style={{
+          width: 6, height: 6, borderRadius: "50%",
+          background: statusColor,
+          boxShadow: sourceStatus === "operational" ? `0 0 4px ${statusColor}66` : "none",
+        }} />
+        <SourceBadge source={item.source} />
+        {item.fallback && <SourceBadge source={item.fallback} style={{ opacity: 0.5 }} />}
+      </div>
+
+      {/* Row 3: Details */}
+      <div style={{ display: "grid", gap: 4 }}>
+        <MetricRow label="RATE LIMIT" value={item.rateLimit} />
+        <MetricRow label="FREQUENCY" value={item.frequency} />
+        <MetricRow label="COVERAGE" value={item.coverage} />
+      </div>
+    </div>
+  );
+}
+
+// ─── DATA POINT DETAIL PANEL ─────────────────────────────────────────────────
+
+function DataPointPanel({ item, sourceHealth, onClose }) {
+  const [sampleData, setSampleData] = useState({ status: "loading", data: null, error: null });
+
+  // Escape key
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  // Fetch live sample on panel open
+  const itemSource = item?.source;
+  const itemName = item?.name;
+  useEffect(() => {
+    if (!itemSource) return;
+    let cancelled = false;
+    setSampleData({ status: "loading", data: null, error: null });
+    (async () => {
+      const result = await healthPing(itemSource);
+      if (!cancelled) {
+        if (result.status === "operational") {
+          setSampleData({ status: "ok", data: result, error: null });
+        } else {
+          setSampleData({ status: "error", data: result, error: result.error });
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [itemSource, itemName]);
+
+  if (!item) return null;
+
+  const meta = SOURCE_META[item.source];
+  const color = SOURCE_COLORS[item.source];
+  const health = sourceHealth?.[item.source];
+  const history = getHealthHistory(item.source);
+  const successCount = history.filter(Boolean).length;
+  const avgTime = health?.responseTime || 0;
+
+
+  return (
+    <>
+      {/* Sticky header */}
+      <div style={{
+          display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+          padding: "20px 20px 16px", borderBottom: "1px solid var(--c-border)",
+          position: "sticky", top: 0, background: "var(--c-panel)", zIndex: 1,
+        }}>
+          <div>
+            <div style={{ fontFamily: sans, fontSize: 18, fontWeight: 700, color: "var(--c-text)", marginBottom: 4 }}>
+              {item.name}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <SourceBadge source={item.source} style={{ fontSize: 10, padding: "2px 8px" }} />
+              <ItemStatusDot status={item.status} />
+            </div>
+          </div>
+          <button onClick={onClose}
+            style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 6, cursor: "pointer", color: "var(--c-text-2)", fontSize: 16, padding: "6px 10px", transition: "all 0.15s ease" }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#FF5252"; e.currentTarget.style.color = "#FF5252"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--c-border)"; e.currentTarget.style.color = "var(--c-text-2)"; }}>
+            ✕
+          </button>
+        </div>
+
+        <div style={{ padding: "16px 20px" }}>
+
+          {/* Description */}
+          <div style={{ fontFamily: sans, fontSize: 13, color: "var(--c-text-2)", lineHeight: 1.6, marginBottom: 16 }}>
+            {item.description || "No description available."}
+          </div>
+
+          {/* Data Point Identity */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontFamily: mono, fontSize: 10, color: "var(--c-text-3)", letterSpacing: "1.5px", marginBottom: 8 }}>IDENTITY</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <MetricBox label="CATEGORY" value={CATALOG.find(c => c.items.includes(item))?.category || "—"} />
+              <MetricBox label="FETCH MODE" value={item.fetchMode || "—"} />
+            </div>
+            {item.component && (
+              <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 6, padding: "10px 12px", marginTop: 8 }}>
+                <div style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "1px", marginBottom: 4 }}>DISPLAYED IN</div>
+                <div style={{ fontFamily: mono, fontSize: 12, color: "var(--c-text)" }}>{item.component}</div>
+              </div>
+            )}
+          </div>
+
+          {/* Asset Groups */}
+          {item.groups && item.groups.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontFamily: mono, fontSize: 10, color: "var(--c-text-3)", letterSpacing: "1.5px", marginBottom: 8 }}>USED BY GROUPS</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                {item.groups.map(g => (
+                  <span key={g} style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-2)", background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 10, padding: "3px 10px" }}>
+                    {g}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Source Information */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+              <div style={{ fontFamily: mono, fontSize: 10, color: "var(--c-text-3)", letterSpacing: "1.5px" }}>SOURCE DETAILS</div>
+              <SourceBadge source={item.source} />
+            </div>
+            <div style={{ display: "grid", gap: 3, background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 6, padding: "10px 14px" }}>
+              <MetricRow label="API ENDPOINT" value={item.endpoint || "—"} />
+              <MetricRow label="RATE LIMIT" value={meta?.rateLimit || item.rateLimit} />
+              <MetricRow label="COVERAGE" value={meta?.coverage || item.coverage} />
+              <MetricRow label="FRESHNESS" value={meta?.freshness || item.frequency} />
+              {meta?.docUrl && (
+                <MetricRow label="DOCS" value={
+                  <a href={meta.docUrl} target="_blank" rel="noopener noreferrer" style={{ color, textDecoration: "none", fontSize: 9 }}>
+                    {meta.docUrl.replace(/https?:\/\//, "").split("/")[0]} ↗
+                  </a>
+                } />
+              )}
+            </div>
+          </div>
+
+          {/* Live Data Sample */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontFamily: mono, fontSize: 10, color: "var(--c-text-3)", letterSpacing: "1.5px", marginBottom: 8 }}>LIVE DATA SAMPLE</div>
+            <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 6, padding: "12px 14px" }}>
+              {sampleData.status === "loading" && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0" }}>
+                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: color, animation: "pulse 1.2s ease-in-out infinite" }} />
+                  <span style={{ fontFamily: mono, fontSize: 10, color: "var(--c-text-3)" }}>Fetching sample...</span>
+                </div>
+              )}
+              {sampleData.status === "ok" && sampleData.data && (
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                    <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)" }}>RAW VALUE</span>
+                    <span style={{ fontFamily: mono, fontSize: 16, fontWeight: 700, color: "#00E676" }}>
+                      {sampleData.data.rawValue != null ? String(sampleData.data.rawValue) : "null"}
+                    </span>
+                  </div>
+                  <MetricRow label="RESPONSE TIME" value={`${sampleData.data.responseTime}ms`} valueColor={sampleData.data.responseTime > 2000 ? "#FFD740" : "#00E676"} />
+                  <MetricRow label="TIMESTAMP" value={new Date(sampleData.data.timestamp).toLocaleTimeString("en-US", { hour12: false, fractionalSecondDigits: 0 })} />
+                  <MetricRow label="SAMPLE TICKER" value={item.source === "coingecko" ? "ping" : item.source === "fred" ? "DGS10" : "AAPL"} />
+                </div>
+              )}
+              {sampleData.status === "error" && (
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                    <span style={{ fontFamily: mono, fontSize: 10, color: "#FF5252" }}>Fetch failed</span>
+                  </div>
+                  <div style={{ fontFamily: mono, fontSize: 9, color: "#FF5252", background: "rgba(255,82,82,0.08)", borderRadius: 4, padding: "6px 10px" }}>
+                    {sampleData.error || "Unknown error"}
+                  </div>
+                  {item.fallback && (
+                    <div style={{ fontFamily: mono, fontSize: 9, color: "#FFD740", marginTop: 6 }}>
+                      Fallback available: {SOURCE_LABELS[item.fallback]}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Reliability History */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontFamily: mono, fontSize: 10, color: "var(--c-text-3)", letterSpacing: "1.5px", marginBottom: 8 }}>RELIABILITY</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+              <MetricBox label="SUCCESS RATE" value={history.length > 0 ? `${successCount}/${history.length}` : "—"} valueColor={successCount === history.length ? "#00E676" : "#FFD740"} />
+              <MetricBox label="AVG RESPONSE" value={avgTime > 0 ? `${avgTime}ms` : "—"} valueColor={avgTime > 2000 ? "#FF5252" : avgTime > 500 ? "#FFD740" : "var(--c-text)"} />
+            </div>
+            <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 6, padding: "10px 14px" }}>
+              <div style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "0.5px", marginBottom: 6 }}>LAST 10 CHECKS</div>
+              <SuccessRateDots history={history} />
+            </div>
+            {item.source === "yahoo" && (
+              <div style={{ fontFamily: sans, fontSize: 10, color: "var(--c-text-3)", marginTop: 6, lineHeight: 1.4 }}>
+                Yahoo Finance is an unofficial API based on web scraping. It may experience intermittent outages or structural changes without notice.
+              </div>
+            )}
+          </div>
+
+          {/* Fallback Information */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontFamily: mono, fontSize: 10, color: "var(--c-text-3)", letterSpacing: "1.5px", marginBottom: 8 }}>FALLBACK</div>
+            {item.fallback ? (
+              <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 6, padding: "10px 14px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                  <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)" }}>FALLBACK SOURCE:</span>
+                  <SourceBadge source={item.fallback} />
+                </div>
+                <div style={{ fontFamily: sans, fontSize: 11, color: "var(--c-text-2)", lineHeight: 1.4 }}>
+                  If {SOURCE_LABELS[item.source]} is unavailable, this data point will automatically attempt to load from {SOURCE_LABELS[item.fallback]}.
+                </div>
+              </div>
+            ) : (
+              <div style={{ background: "rgba(255,215,64,0.06)", border: "1px solid rgba(255,215,64,0.15)", borderRadius: 6, padding: "10px 14px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontFamily: mono, fontSize: 9, color: "#FFD740", letterSpacing: "0.5px" }}>SINGLE POINT OF FAILURE</span>
+                </div>
+                <div style={{ fontFamily: sans, fontSize: 11, color: "var(--c-text-3)", marginTop: 4, lineHeight: 1.4 }}>
+                  No fallback source is configured. If {SOURCE_LABELS[item.source]} goes down, this data point will be unavailable.
+                </div>
+              </div>
+            )}
+          </div>
+
+        </div>
+    </>
+  );
+}
+
+// ─── MAIN CATALOG PAGE ───────────────────────────────────────────────────────
+
+export default function CatalogPage() {
+  const [sourceFilter, setSourceFilter] = useState("all");
+  const [issuesOnly, setIssuesOnly] = useState(false);
+  const [sourceHealth, setSourceHealth] = useState({});
+  const [selectedItem, setSelectedItem] = useState(null);
+  const healthCacheRef = useRef(null);
+
+  // Run all health checks on mount (with 60s sessionStorage cache)
+  const runHealthCheck = useCallback(async (source) => {
+    setSourceHealth(prev => ({ ...prev, [source]: { ...prev[source], checking: true } }));
+    const result = await healthPing(source);
+    setSourceHealth(prev => ({ ...prev, [source]: { ...result, checking: false } }));
+    // Update cache
+    try {
+      const raw = sessionStorage.getItem("catalog:health");
+      const cache = raw ? JSON.parse(raw) : {};
+      cache[source] = result;
+      cache._ts = Date.now();
+      sessionStorage.setItem("catalog:health", JSON.stringify(cache));
+    } catch { /* ignore */ }
+  }, []);
+
+  const runAllHealthChecks = useCallback(() => {
+    ALL_SOURCES.forEach(src => runHealthCheck(src));
+  }, [runHealthCheck]);
+
+  useEffect(() => {
+    // Check sessionStorage cache first (60s TTL)
+    try {
+      const raw = sessionStorage.getItem("catalog:health");
+      if (raw) {
+        const cache = JSON.parse(raw);
+        if (cache._ts && Date.now() - cache._ts < 60000) {
+          const restored = {};
+          ALL_SOURCES.forEach(src => {
+            if (cache[src]) restored[src] = { ...cache[src], checking: false };
+          });
+          if (Object.keys(restored).length === ALL_SOURCES.length) {
+            setSourceHealth(restored);
+            healthCacheRef.current = true;
+            return;
+          }
+        }
+      }
+    } catch { /* ignore */ }
+    runAllHealthChecks();
+  }, [runAllHealthChecks]);
+
+  const usage = getApiUsage();
+
+  const filteredCatalog = CATALOG.map(cat => ({
+    ...cat,
+    items: cat.items.filter(item => {
+      if (sourceFilter !== "all" && item.source !== sourceFilter && item.fallback !== sourceFilter) return false;
+      if (issuesOnly) {
+        const srcStatus = sourceHealth[item.source]?.status;
+        return srcStatus === "degraded" || srcStatus === "outage";
+      }
+      return true;
+    }),
+  })).filter(cat => cat.items.length > 0);
+
+  const totalActive = CATALOG.flatMap(c => c.items).filter(i => i.status === "active").length;
+  const totalPlanned = CATALOG.flatMap(c => c.items).filter(i => i.status === "planned").length;
+  const totalPoints = CATALOG.flatMap(c => c.items).length;
+  const issueCount = CATALOG.flatMap(c => c.items).filter(i => {
+    const s = sourceHealth[i.source]?.status;
+    return s === "degraded" || s === "outage";
+  }).length;
+
+  return (
+    <div style={{ maxWidth: 1400, margin: "0 auto", padding: "0 20px 40px" }}>
+      {/* Header */}
+      <div style={{ padding: "24px 0 20px", borderBottom: "1px solid var(--c-border)" }}>
+        <div style={{ fontSize: 26, fontWeight: 700, color: "var(--c-text)", letterSpacing: "-0.5px" }}>Data Catalog</div>
+        <div style={{ fontFamily: sans, fontSize: 13, color: "var(--c-text-2)", marginTop: 4 }}>
+          Source health, data coverage, and reliability for every data point
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 12, fontFamily: mono, fontSize: 11 }}>
+          <span style={{ color: "var(--c-text-3)" }}>{totalPoints} data points</span>
+          <span style={{ color: "#00E676" }}>{totalActive} active</span>
+          <span style={{ color: "#FFD740" }}>{totalPlanned} planned</span>
+          {issueCount > 0 && <span style={{ color: "#FF5252" }}>{issueCount} issues</span>}
+        </div>
+      </div>
+
+      {/* ── PHASE 1: SOURCE HEALTH DASHBOARD ── */}
+      <div style={{ padding: "20px 0", borderBottom: "1px solid var(--c-border)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <div style={{ fontFamily: mono, fontSize: 10, color: "var(--c-text-3)", letterSpacing: "1.5px" }}>SOURCE HEALTH</div>
+          <button
+            onClick={runAllHealthChecks}
+            style={{
+              fontFamily: mono, fontSize: 10, fontWeight: 600, color: "var(--c-text-2)",
+              background: "transparent", border: "1px solid var(--c-border)", borderRadius: 6,
+              padding: "5px 14px", cursor: "pointer", letterSpacing: "0.5px", transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => { e.target.style.borderColor = "#00E676"; e.target.style.color = "#00E676"; }}
+            onMouseLeave={(e) => { e.target.style.borderColor = "var(--c-border)"; e.target.style.color = "var(--c-text-2)"; }}
+          >
+            REFRESH ALL
+          </button>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 12 }}>
+          {ALL_SOURCES.map(src => (
+            <SourceHealthCard
+              key={src}
+              source={src}
+              health={sourceHealth[src]}
+              usage={usage[src] || 0}
+              onRefresh={runHealthCheck}
+            />
+          ))}
+        </div>
+
+        {/* Yahoo-specific global warning */}
+        {sourceHealth.yahoo?.status === "outage" && (
+          <div style={{ background: "rgba(255,82,82,0.06)", border: "1px solid rgba(255,82,82,0.2)", borderRadius: 6, padding: "10px 16px", marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 16 }}>⚠</span>
+            <div>
+              <div style={{ fontFamily: mono, fontSize: 10, color: "#FF5252", fontWeight: 700, letterSpacing: "0.5px" }}>YAHOO FINANCE UNAVAILABLE</div>
+              <div style={{ fontFamily: sans, fontSize: 11, color: "var(--c-text-3)", marginTop: 2 }}>
+                Yahoo is an unofficial API and may break without notice. Finnhub and FMP are available as alternatives for equity data.
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Rate limit warnings */}
+        {ALL_SOURCES.filter(src => {
+          const m = SOURCE_META[src];
+          return m.rateLimitMax && (usage[src] || 0) > m.rateLimitMax * 0.7;
+        }).map(src => {
+          const m = SOURCE_META[src];
+          const u = usage[src] || 0;
+          const isRed = u > m.rateLimitMax * 0.9;
+          return (
+            <div key={src} style={{
+              background: isRed ? "rgba(255,82,82,0.06)" : "rgba(255,215,64,0.06)",
+              border: `1px solid ${isRed ? "rgba(255,82,82,0.2)" : "rgba(255,215,64,0.2)"}`,
+              borderRadius: 6, padding: "8px 16px", marginTop: 8,
+              display: "flex", alignItems: "center", gap: 10,
+            }}>
+              <SourceBadge source={src} />
+              <span style={{ fontFamily: mono, fontSize: 10, color: isRed ? "#FF5252" : "#FFD740" }}>
+                {u}/{m.rateLimitMax} calls used this session ({m.rateLimitPer})
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── FILTER BAR ── */}
+      <div style={{ padding: "12px 0", borderBottom: "1px solid var(--c-border)", display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+        <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "1px", marginRight: 4 }}>FILTER:</span>
+        <button
+          onClick={() => { setSourceFilter("all"); setIssuesOnly(false); }}
+          style={{
+            fontFamily: sans, fontSize: 12, fontWeight: 600,
+            color: sourceFilter === "all" && !issuesOnly ? "#00E676" : "var(--c-text-2)",
+            background: sourceFilter === "all" && !issuesOnly ? "rgba(0,230,118,0.08)" : "var(--c-surface)",
+            border: `1px solid ${sourceFilter === "all" && !issuesOnly ? "#00E67640" : "var(--c-border)"}`,
+            borderRadius: 20, padding: "5px 14px", cursor: "pointer", transition: "all 0.15s ease",
+          }}
+        >
+          All Sources
+        </button>
+        {ALL_SOURCES.map(src => {
+          const active = sourceFilter === src;
+          const c = SOURCE_COLORS[src];
+          const srcStatus = sourceHealth[src]?.status;
+          const dotColor = srcStatus === "operational" ? "#00E676" : srcStatus === "degraded" ? "#FFD740" : srcStatus === "outage" ? "#FF5252" : "var(--c-text-3)";
+          return (
+            <button key={src} onClick={() => { setSourceFilter(src); setIssuesOnly(false); }}
+              style={{
+                fontFamily: mono, fontSize: 10, fontWeight: 700,
+                color: active ? c : "var(--c-text-3)",
+                background: active ? c + "18" : "var(--c-surface)",
+                border: `1px solid ${active ? c + "50" : "var(--c-border)"}`,
+                borderRadius: 20, padding: "5px 12px", cursor: "pointer",
+                letterSpacing: "0.3px", transition: "all 0.15s ease",
+                display: "flex", alignItems: "center", gap: 5,
+              }}
+            >
+              <span style={{ width: 5, height: 5, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
+              {SOURCE_LABELS[src]}
+            </button>
+          );
+        })}
+        <div style={{ width: 1, height: 20, background: "var(--c-border)", margin: "0 2px" }} />
+        <button
+          onClick={() => { setIssuesOnly(!issuesOnly); setSourceFilter("all"); }}
+          style={{
+            fontFamily: mono, fontSize: 10, fontWeight: 700,
+            color: issuesOnly ? "#FF5252" : "var(--c-text-3)",
+            background: issuesOnly ? "rgba(255,82,82,0.1)" : "var(--c-surface)",
+            border: `1px solid ${issuesOnly ? "rgba(255,82,82,0.4)" : "var(--c-border)"}`,
+            borderRadius: 20, padding: "5px 12px", cursor: "pointer",
+            letterSpacing: "0.3px", transition: "all 0.15s ease",
+          }}
+        >
+          Issues only {issueCount > 0 ? `(${issueCount})` : ""}
+        </button>
+      </div>
+
+      {/* ── DATA POINT CARDS ── */}
+      {filteredCatalog.map((cat, idx) => (
+        <div key={cat.category} style={{ marginTop: 24, animation: "slideUp 0.4s ease both", animationDelay: `${idx * 0.06}s` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <span style={{ fontSize: 16 }}>{cat.icon}</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: "var(--c-text)", letterSpacing: "0.3px" }}>{cat.category}</span>
+            <span style={{ fontFamily: mono, fontSize: 10, color: "var(--c-text-3)" }}>({cat.items.length})</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
+            {cat.items.map(item => (
+              <CatalogCard key={item.name} item={item} sourceHealth={sourceHealth} onClick={setSelectedItem} />
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {/* ── ASSET GROUPS ── */}
+      <div style={{ marginTop: 32 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+          <span style={{ fontSize: 16 }}>📂</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "var(--c-text)", letterSpacing: "0.3px" }}>Asset Groups</span>
+          <span style={{ fontFamily: mono, fontSize: 10, color: "var(--c-text-3)" }}>({ASSET_GROUPS.length})</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
+          {ASSET_GROUPS.map(g => (
+            <div key={g.name} style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 8, padding: "14px 16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 16 }}>{g.icon}</span>
+                <span style={{ fontFamily: sans, fontSize: 13, fontWeight: 700, color: "var(--c-text)" }}>{g.name}</span>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 }}>
+                {g.sources.map(s => <SourceBadge key={s} source={s} />)}
+              </div>
+              <div style={{ display: "grid", gap: 3 }}>
+                <MetricRow label="ASSETS" value={g.assetCount} />
+                <MetricRow label="ASSIGNMENT" value={g.assignment} />
+                {g.macroBanner && <MetricRow label="MACRO BANNER" value={g.macroBanner} valueColor="#1565C0" />}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── FOOTER ── */}
+      <div style={{ borderTop: "1px solid var(--c-border)", paddingTop: 14, marginTop: 32, fontFamily: mono, fontSize: 10, color: "var(--c-text-3)", letterSpacing: "0.5px" }}>
+        9 SOURCES · {totalPoints} DATA POINTS · {totalActive} ACTIVE · {totalPlanned} PLANNED · {ASSET_GROUPS.length} GROUPS
+      </div>
+
+      {/* ── SLIDE-IN PANEL ── */}
+      {selectedItem && (
+        <>
+          <div onClick={() => setSelectedItem(null)} style={{ position: "fixed", inset: 0, background: "var(--c-overlay)", zIndex: 300 }} />
+          <div style={{
+            position: "fixed", top: 0, right: 0, bottom: 0,
+            width: "min(480px, 100vw)",
+            background: "var(--c-panel)", borderLeft: "1px solid var(--c-border)",
+            zIndex: 301, overflowY: "auto",
+            animation: "slideInRight 0.3s cubic-bezier(0.4,0,0.2,1) both",
+          }}>
+            <PanelErrorBoundary>
+              <DataPointPanel item={selectedItem} sourceHealth={sourceHealth} onClose={() => setSelectedItem(null)} />
+            </PanelErrorBoundary>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
