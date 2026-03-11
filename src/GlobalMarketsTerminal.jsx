@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
-  hasFinnhubKey, finnhubQuote, finnhubNews, finnhubRecommendation,
+  hasFinnhubKey, finnhubNews, finnhubRecommendation,
   hasFmpKey, fmpProfile, fmpRatios, fmpBatchProfile,
   hasFredKey, fredSeries, fredAllMacro, getFredSeriesConfig,
   hasAlphaVantageKey, alphaVantageRSI, alphaVantageMACD,
   coingeckoPrices,
-  hasBrapiToken, brapiQuote,
   bcbMacro, awesomeFx,
   getSourceStatus,
+  fetchYahooMarketData,
+  fetchB3MarketData,
+  fetchYahooChartData,
 } from "./dataServices.js";
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
@@ -252,84 +254,10 @@ function generateSparkline(basePrice, vol, points = 30) {
   return arr;
 }
 
-function parseYahooResults(results, prevData) {
-  const data = {};
-  results.forEach((q) => {
-    const sym = q.symbol;
-    if (!ASSETS[sym]) return;
-    const prevSparkline = prevData?.[sym]?.sparkline;
-    let sparkline;
-    if (prevSparkline && prevSparkline.length >= 30) {
-      sparkline = [...prevSparkline.slice(1), q.regularMarketPrice];
-    } else {
-      sparkline = generateSparkline(
-        q.regularMarketPreviousClose || q.regularMarketPrice,
-        VOLATILITY[ASSETS[sym].cat] * 0.3
-      );
-      sparkline[sparkline.length - 1] = q.regularMarketPrice;
-    }
-    data[sym] = {
-      price:            q.regularMarketPrice,
-      change:           q.regularMarketChange,
-      changePct:        q.regularMarketChangePercent,
-      prevClose:        q.regularMarketPreviousClose,
-      high:             q.regularMarketDayHigh,
-      low:              q.regularMarketDayLow,
-      volume:           q.regularMarketVolume,
-      marketCap:        q.marketCap,
-      fiftyTwoWeekHigh: q.fiftyTwoWeekHigh,
-      fiftyTwoWeekLow:  q.fiftyTwoWeekLow,
-      sparkline,
-    };
-  });
-  return data;
-}
-
 async function fetchMarketData(prevData) {
   // Exclude crypto (CoinGecko) and B3 (BRAPI) — they use dedicated sources
   const yahooSymbols = Object.keys(ASSETS).filter(s => !ASSETS[s].isCrypto && !ASSETS[s].isB3);
-  const symbols   = yahooSymbols.join(",");
-  const yahooPath = `/v7/finance/quote?symbols=${encodeURIComponent(symbols)}`;
-  const yahooUrl  = `https://query1.finance.yahoo.com${yahooPath}`;
-  const urls = [
-    `/api/yahoo${yahooPath}`,
-    `https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`,
-  ];
-  for (const url of urls) {
-    try {
-      const res     = await fetch(url, { signal: AbortSignal.timeout(12000) });
-      if (!res.ok) continue;
-      const json    = await res.json();
-      const results = json?.quoteResponse?.result;
-      if (!results || !results.length) continue;
-      const data    = parseYahooResults(results, prevData);
-      if (Object.keys(data).length >= 20) return { data, source: "live" };
-    } catch (_) { /* try next */ }
-  }
-
-  // Finnhub fallback: fetch key equities (indices/fx/crypto not supported on free tier)
-  if (hasFinnhubKey()) {
-    try {
-      const equitySymbols = Object.keys(ASSETS).filter(s => isEquityCat(ASSETS[s].cat));
-      const fbData = {};
-      for (const sym of equitySymbols.slice(0, 24)) {
-        const q = await finnhubQuote(sym);
-        if (q && q.c) {
-          const prev = q.pc || q.c;
-          fbData[sym] = {
-            price: q.c, change: q.d || (q.c - prev), changePct: q.dp || ((q.c - prev) / prev * 100),
-            prevClose: prev, high: q.h || q.c, low: q.l || q.c,
-            volume: null, marketCap: null, fiftyTwoWeekHigh: null, fiftyTwoWeekLow: null,
-            sparkline: generateSparkline(prev, (VOLATILITY[ASSETS[sym].cat] || 0.015) * 0.3),
-          };
-        }
-      }
-      if (Object.keys(fbData).length >= 8) return { data: fbData, source: "finnhub-fallback" };
-    } catch (_) { /* Finnhub fallback also failed */ }
-  }
-
-  return { data: null, source: "unavailable" };
+  return fetchYahooMarketData(yahooSymbols, prevData, { assets: ASSETS, volatility: VOLATILITY, isEquityCat });
 }
 
 // Fetch crypto data from CoinGecko and merge into the same data shape
@@ -367,102 +295,11 @@ async function fetchCryptoData() {
 // Fetch B3 data from BRAPI, with Yahoo .SA suffix fallback
 async function fetchB3Data() {
   const b3Assets = Object.entries(ASSETS).filter(([, a]) => a.isB3);
-  if (b3Assets.length === 0) return {};
-
-  // Try BRAPI first
-  if (hasBrapiToken()) {
-    const tickers = b3Assets.map(([sym]) => sym);
-    const data = await brapiQuote(tickers);
-    if (data && Object.keys(data).length > 0) {
-      const result = {};
-      for (const [sym] of b3Assets) {
-        const q = data[sym];
-        if (!q) continue;
-        const prevClose = q.prevClose || q.price;
-        result[sym] = {
-          price:            q.price,
-          change:           q.change ?? (q.price - prevClose),
-          changePct:        q.changePct ?? ((q.price - prevClose) / prevClose * 100),
-          prevClose,
-          high:             q.high || q.price,
-          low:              q.low || q.price,
-          volume:           q.volume || null,
-          marketCap:        q.marketCap || null,
-          fiftyTwoWeekHigh: q.fiftyTwoWeekHigh || null,
-          fiftyTwoWeekLow:  q.fiftyTwoWeekLow || null,
-          sparkline:        generateSparkline(prevClose, (VOLATILITY.brasil || 0.018) * 0.3),
-          source:           "brapi",
-        };
-      }
-      if (Object.keys(result).length >= 5) return result;
-    }
-  }
-
-  // Fallback: Yahoo Finance with .SA suffix
-  try {
-    const saSymbols = b3Assets.map(([sym]) => sym + ".SA").join(",");
-    const yahooPath = `/v7/finance/quote?symbols=${encodeURIComponent(saSymbols)}`;
-    const res = await fetch(`/api/yahoo${yahooPath}`, { signal: AbortSignal.timeout(12000) });
-    if (res.ok) {
-      const json = await res.json();
-      const results = json?.quoteResponse?.result;
-      if (results && results.length > 0) {
-        const data = {};
-        results.forEach(q => {
-          const sym = q.symbol.replace(".SA", "");
-          if (!ASSETS[sym]) return;
-          data[sym] = {
-            price:            q.regularMarketPrice,
-            change:           q.regularMarketChange,
-            changePct:        q.regularMarketChangePercent,
-            prevClose:        q.regularMarketPreviousClose,
-            high:             q.regularMarketDayHigh,
-            low:              q.regularMarketDayLow,
-            volume:           q.regularMarketVolume,
-            marketCap:        q.marketCap || null,
-            fiftyTwoWeekHigh: q.fiftyTwoWeekHigh || null,
-            fiftyTwoWeekLow:  q.fiftyTwoWeekLow || null,
-            sparkline:        generateSparkline(q.regularMarketPreviousClose || q.regularMarketPrice, (VOLATILITY.brasil || 0.018) * 0.3),
-            source:           "yahoo-sa",
-          };
-        });
-        return data;
-      }
-    }
-  } catch (_) { /* Yahoo fallback failed */ }
-
-  return {};
+  return fetchB3MarketData(b3Assets, { assets: ASSETS, volatility: VOLATILITY });
 }
 
 async function fetchChartData(symbol, range, interval) {
-  // B3 stocks need .SA suffix for Yahoo chart data
-  const chartSymbol = ASSETS[symbol]?.isB3 ? symbol + ".SA" : symbol;
-  const yahooPath = `/v8/finance/chart/${encodeURIComponent(chartSymbol)}?range=${range}&interval=${interval}`;
-  const yahooUrl  = `https://query1.finance.yahoo.com${yahooPath}`;
-  const urls = [
-    `/api/yahoo/v8/finance/chart?symbol=${encodeURIComponent(symbol)}&range=${range}&interval=${interval}`,
-    `https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`,
-  ];
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
-      if (!res.ok) continue;
-      const json = await res.json();
-      const result = json?.chart?.result?.[0];
-      if (!result) continue;
-      const timestamps = result.timestamp || [];
-      const closes = result.indicators?.quote?.[0]?.close || [];
-      const points = timestamps
-        .map((t, i) => ({ t: t * 1000, v: closes[i] }))
-        .filter((p) => p.v != null);
-      if (points.length < 2) continue;
-      const first = points[0].v;
-      const last  = points[points.length - 1].v;
-      return { points, change: last - first, changePct: ((last - first) / first) * 100 };
-    } catch (_) { /* try next */ }
-  }
-  throw new Error("Chart data unavailable");
+  return fetchYahooChartData(symbol, range, interval, { assets: ASSETS });
 }
 
 // ─── SPARKLINE ────────────────────────────────────────────────────────────────
@@ -865,8 +702,10 @@ function HamburgerMenu({ open, onClose, activeFilter, onFilterChange, activeExch
         <div style={{ padding: "16px 18px" }}>
           <SectionLabel>PAGES</SectionLabel>
           {[
-            { key: "dashboard", label: "Dashboard", icon: "📊" },
-            { key: "catalog",   label: "Data Catalog", icon: "📋" },
+            { key: "dashboard", label: "Dashboard",     icon: "📊" },
+            { key: "heatmap",   label: "Market Heatmap", icon: "🔥" },
+            { key: "news",      label: "Market News",   icon: "📰" },
+            { key: "catalog",   label: "Data Catalog",  icon: "📋" },
           ].map(pg => {
             const active = currentView === pg.key;
             return (
@@ -1279,7 +1118,7 @@ function DetailPanel({ symbol, data, onClose }) {
 }
 
 // ─── MAIN DASHBOARD ───────────────────────────────────────────────────────────
-export default function GlobalMarketsTerminal({ currentView = "dashboard", onNavigate, catalogPage }) {
+export default function GlobalMarketsTerminal({ currentView = "dashboard", onNavigate, catalogPage, newsPage, heatmapPage }) {
   const [marketData,      setMarketData]      = useState(null);
   const [loading,         setLoading]         = useState(true);
   const [lastUpdate,      setLastUpdate]       = useState(null);
@@ -1299,6 +1138,7 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
     try { return JSON.parse(sessionStorage.getItem("collapsedGroups")) || {}; }
     catch { return {}; }
   });
+  const [expandedCards, setExpandedCards] = useState(new Set());
   const prevDataRef  = useRef(null);
   const intervalRef  = useRef(null);
 
@@ -1317,7 +1157,15 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
   };
   const expandAll = () => {
     setCollapsedGroups({});
+    setExpandedCards(new Set());
     sessionStorage.setItem("collapsedGroups", JSON.stringify({}));
+  };
+  const toggleCard = (catKey) => {
+    setExpandedCards(prev => {
+      const next = new Set(prev);
+      next.has(catKey) ? next.delete(catKey) : next.add(catKey);
+      return next;
+    });
   };
 
   const loadData = useCallback(async () => {
@@ -1494,6 +1342,21 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
     return arr;
   }, [visibleCats, groupSort, groupDir, getGroupAvgPct]);
 
+  // Check if all visible groups are collapsed → triggers card grid mode
+  const allCollapsed = useMemo(() => {
+    return visibleCats.length > 0 && visibleCats.every(k => collapsedGroups[k]);
+  }, [visibleCats, collapsedGroups]);
+
+  // Compute group stats for collapsed card grid
+  const getGroupStats = useCallback((catKey) => {
+    const syms = getGroupSymbols(catKey);
+    const pcts = syms.map(s => marketData?.[s]?.changePct ?? 0);
+    const avgPct = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : 0;
+    // Sum market caps for total value
+    const totalMcap = syms.reduce((sum, s) => sum + (marketData?.[s]?.marketCap ?? 0), 0);
+    return { avgPct, totalMcap, count: syms.length };
+  }, [getGroupSymbols, marketData]);
+
   const filterButtons = Object.entries(CATEGORIES).map(([key, cat]) => ({
     key, label: cat.label,
   }));
@@ -1611,6 +1474,12 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
 
         {/* ── CATALOG VIEW ── */}
         {currentView === "catalog" && catalogPage}
+
+        {/* ── NEWS VIEW ── */}
+        {currentView === "news" && newsPage}
+
+        {/* ── HEATMAP VIEW ── (renders as fixed full-screen overlay) */}
+        {currentView === "heatmap" && heatmapPage}
 
         {/* ── LOADING ── */}
         {currentView === "dashboard" && loading && (
@@ -1796,7 +1665,148 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
                   </div>
                 )}
               </div>
+            ) : allCollapsed ? (
+              /* ── COLLAPSED CARD GRID MODE ── */
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10, marginTop: 8 }}>
+                {sortedCats.map((catKey) => {
+                  const cat = CATEGORIES[catKey];
+                  const stats = getGroupStats(catKey);
+                  if (stats.count === 0) return null;
+                  const isOpen = expandedCards.has(catKey);
+                  const pctColor = stats.avgPct > 0 ? "#00E676" : stats.avgPct < 0 ? "#FF5252" : "var(--c-text-3)";
+                  const pctArrow = stats.avgPct > 0 ? "↑" : stats.avgPct < 0 ? "↓" : "";
+                  const borderAccent = stats.avgPct >= 0 ? "#00E676" : "#FF5252";
+
+                  // Gather symbols for expanded view
+                  let symbols = null;
+                  if (isOpen) {
+                    if (catKey === "dividends") {
+                      symbols = dividendSymbols.filter(s => marketData[s]);
+                    } else {
+                      symbols = Object.keys(ASSETS).filter(s => {
+                        const a = ASSETS[s];
+                        const inCat = a.cat === catKey || (a.alsoIn && a.alsoIn.includes(catKey));
+                        return inCat && marketData[s];
+                      });
+                    }
+                    if (activeExchanges.size > 0) {
+                      symbols = symbols.filter(s => activeExchanges.has(ASSETS[s]?.exchange));
+                    }
+                    if (sortMode !== "default") {
+                      symbols = [...symbols].sort((a, b) =>
+                        sortMode === "gainers"
+                          ? (marketData[b]?.changePct ?? 0) - (marketData[a]?.changePct ?? 0)
+                          : (marketData[a]?.changePct ?? 0) - (marketData[b]?.changePct ?? 0)
+                      );
+                    }
+                  }
+
+                  return (
+                    <div
+                      key={catKey}
+                      className="section-animate"
+                      style={{
+                        gridColumn: isOpen ? "1 / -1" : undefined,
+                        background: isOpen ? "rgba(0,200,255,0.03)" : "rgba(255,255,255,0.02)",
+                        border: `1px solid ${isOpen ? "#00BCD444" : "var(--c-border)"}`,
+                        borderLeft: `3px solid ${isOpen ? "#00BCD4" : borderAccent}`,
+                        borderRadius: 2,
+                        padding: "14px 16px",
+                        cursor: "pointer",
+                        transition: "all 0.15s ease",
+                        position: "relative",
+                      }}
+                      onClick={() => !isOpen && toggleCard(catKey)}
+                      onMouseEnter={e => { if (!isOpen) { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; } }}
+                      onMouseLeave={e => { if (!isOpen) { e.currentTarget.style.background = "rgba(255,255,255,0.02)"; e.currentTarget.style.borderColor = "var(--c-border)"; } }}
+                    >
+                      {/* Close button for expanded state */}
+                      {isOpen && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleCard(catKey); }}
+                          style={{
+                            position: "absolute", top: 10, right: 12,
+                            fontFamily: "'JetBrains Mono', monospace", fontSize: 14, lineHeight: 1,
+                            color: "var(--c-text-3)", background: "transparent",
+                            border: "1px solid var(--c-border)", borderRadius: 4,
+                            padding: "2px 8px", cursor: "pointer",
+                            transition: "all 0.15s ease",
+                          }}
+                          onMouseEnter={e => { e.target.style.color = "#FF5252"; e.target.style.borderColor = "#FF5252"; }}
+                          onMouseLeave={e => { e.target.style.color = "var(--c-text-3)"; e.target.style.borderColor = "var(--c-border)"; }}
+                        >✕</button>
+                      )}
+
+                      {/* Card header / summary */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: isOpen ? 14 : 10 }}>
+                        <span style={{ fontSize: 16 }}>{cat.icon}</span>
+                        <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, color: "var(--c-text)", letterSpacing: "0.3px" }}>
+                          {cat.label}
+                        </span>
+                      </div>
+
+                      {/* Daily return */}
+                      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 16, fontWeight: 700, color: pctColor, marginBottom: 6 }}>
+                        {pctArrow}{stats.avgPct >= 0 ? "+" : ""}{stats.avgPct.toFixed(2)}%
+                      </div>
+
+                      {/* Total value */}
+                      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--c-text-2)", marginBottom: 4 }}>
+                        {stats.totalMcap > 0 ? formatMarketCap(stats.totalMcap) : "—"}
+                      </div>
+
+                      {/* Stock count */}
+                      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", marginBottom: isOpen ? 12 : 6 }}>
+                        {stats.count} {stats.count === 1 ? "stock" : "stocks"}
+                      </div>
+
+                      {/* Expand hint when collapsed */}
+                      {!isOpen && (
+                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "var(--c-text-3)", letterSpacing: "0.5px", opacity: 0.6 }}>
+                          VIEW GROUP ›
+                        </div>
+                      )}
+
+                      {/* Expanded content: full list view */}
+                      {isOpen && symbols && (
+                        <div style={{
+                          borderTop: "1px solid var(--c-border)", paddingTop: 12,
+                          overflow: "hidden",
+                          maxHeight: 4000,
+                          transition: "max-height 0.25s ease",
+                        }}>
+                          <MacroBanner macroData={macroData} catKey={catKey} />
+                          {catKey === "brasil" && <BrasilMacroBanner brasilMacro={brasilMacro} />}
+                          {catKey === "dividends" && (
+                            <div style={{
+                              display: "flex", alignItems: "center", gap: 10,
+                              background: "rgba(255,193,7,0.08)", border: "1px solid rgba(255,193,7,0.2)",
+                              borderRadius: 6, padding: "8px 14px", marginBottom: 10,
+                            }}>
+                              <SourceBadge source="fmp" />
+                              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--c-text-2)" }}>
+                                Assets with dividend yield &gt; 3% (via FMP profile data)
+                              </span>
+                            </div>
+                          )}
+                          {viewMode === "list" && <ListColumnHeader />}
+                          {viewMode === "cards" ? (
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
+                              {symbols.map(sym => <AssetCard key={sym} symbol={sym} data={marketData[sym]} onClick={() => setSelectedAsset(sym)} />)}
+                            </div>
+                          ) : (
+                            <div style={{ border: "1px solid var(--c-border)", borderRadius: 8, overflow: "hidden" }}>
+                              {symbols.map((sym, i) => <AssetRow key={sym} symbol={sym} data={marketData[sym]} rank={i + 1} onClick={() => setSelectedAsset(sym)} />)}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
+              /* ── NORMAL EXPANDED GROUP VIEW ── */
               <div style={{ marginTop: 8 }}>
                 {sortedCats.map((catKey, idx) => {
                   const cat = CATEGORIES[catKey];

@@ -3,6 +3,10 @@ import {
   getSourceStatus, healthPing, getApiUsage,
   getHealthHistory,
 } from "./dataServices.js";
+import { quotaTracker } from './services/quotaTracker.js';
+import { getCacheStats } from './services/apiCache.js';
+import { apiClient } from './services/apiClient.js';
+import { getAllApiIds, getApiDef, getDormantEndpoints } from './services/apiRegistry.js';
 
 // ─── SHARED STYLES ───────────────────────────────────────────────────────────
 
@@ -85,7 +89,7 @@ const SOURCE_META = {
     fallbackSuggestion: "Finnhub for equity quotes, FMP for fundamentals",
   },
   finnhub: {
-    rateLimit: "60 calls/min", rateLimitMax: 60, rateLimitPer: "minute",
+    rateLimit: "60 calls/min", rateLimitMax: getApiDef('finnhub')?.limits.perMinute ?? 60, rateLimitPer: "minute",
     coverage: "US equities", freshness: "Real-time",
     assetClasses: ["Equities", "Sentiment", "News"], geo: "US",
     docUrl: "https://finnhub.io/docs/api",
@@ -94,7 +98,7 @@ const SOURCE_META = {
     note: null, fallbackSuggestion: null,
   },
   alphaVantage: {
-    rateLimit: "25 calls/day", rateLimitMax: 25, rateLimitPer: "day",
+    rateLimit: "25 calls/day", rateLimitMax: getApiDef('alphavantage')?.limits.perDay ?? 25, rateLimitPer: "day",
     coverage: "US equities technicals", freshness: "15min delay",
     assetClasses: ["Technicals"], geo: "US",
     docUrl: "https://www.alphavantage.co/documentation/",
@@ -113,7 +117,7 @@ const SOURCE_META = {
     fallbackSuggestion: null,
   },
   coingecko: {
-    rateLimit: "30 calls/min", rateLimitMax: 30, rateLimitPer: "minute",
+    rateLimit: "30 calls/min", rateLimitMax: getApiDef('coingecko')?.limits.perMinute ?? 30, rateLimitPer: "minute",
     coverage: "Cryptocurrency markets", freshness: "Real-time",
     assetClasses: ["Crypto"], geo: "Global",
     docUrl: "https://www.coingecko.com/api/documentation",
@@ -121,7 +125,7 @@ const SOURCE_META = {
     note: "No API key required", fallbackSuggestion: null,
   },
   fmp: {
-    rateLimit: "250 calls/day", rateLimitMax: 250, rateLimitPer: "day",
+    rateLimit: "250 calls/day", rateLimitMax: getApiDef('fmp')?.limits.perDay ?? 250, rateLimitPer: "day",
     coverage: "US equities fundamentals", freshness: "Daily",
     assetClasses: ["Fundamentals", "Valuation"], geo: "US",
     docUrl: "https://financialmodelingprep.com/developer/docs",
@@ -158,6 +162,133 @@ const SOURCE_META = {
     healthEndpoint: "/api/awesomeapi/last/USD-BRL",
     note: "Unauthenticated requests cached 1 minute by provider — no key required",
     fallbackSuggestion: null,
+  },
+};
+
+// ─── SOURCE DETAIL DATA (mock — replace fields with real API calls later) ────
+// Each entry maps a source key to extended metadata shown in the detail drawer.
+const SOURCE_DETAIL_DATA = {
+  yahoo: {
+    description: "Yahoo Finance is an unofficial, scraping-based market data source accessed via a local Express proxy server. It provides real-time equity prices, volume, day change, market cap, 52-week ranges, and historical OHLC data for US and global equities, major indices, and FX pairs. Because it has no official API contract, the response schema may change without notice.",
+    type: "HTTP REST (Unofficial / Proxy)", owner: "Yahoo Finance (Verizon Media)", domain: "Market Data",
+    tags: ["Equities", "Indices", "Forex", "Real-time", "Charts", "Unofficial"],
+    endpoint: "http://localhost:3001 → finance.yahoo.com", authType: "None (proxy tunnels requests)",
+    refreshCadence: "Every 30s on page load", lastSuccessfulSync: "Continuous (30s interval)",
+    uptime7d: 94.2, uptime30d: 91.8, avgLatencyMs: 380,
+    nullRate: 2.1, duplicateRate: 0.0, schemaDriftEvents: 4, failedSyncAttempts: 12,
+    dataVolumeGB: null, downstreamDeps: 14, upstreamSources: 0, downstreamConsumers: 6,
+    incidents: [
+      { date: "2025-02-18", type: "Schema Change", description: "Yahoo changed v7 response structure for pre/post-market fields — regularMarketChangePercent key renamed.", severity: "medium", resolved: true },
+      { date: "2025-01-30", type: "Downtime", description: "Proxy returned 429 Too Many Requests for ~40 minutes, affecting all equity cards.", severity: "high", resolved: true },
+      { date: "2025-01-12", type: "Latency Spike", description: "Average response time exceeded 2,000ms for ~2 hours during US market open.", severity: "low", resolved: true },
+      { date: "2024-12-10", type: "Schema Change", description: "v8 chart endpoint changed interval param naming — sparkline data temporarily broken.", severity: "medium", resolved: true },
+    ],
+  },
+  finnhub: {
+    description: "Finnhub is a professional-grade market data REST API providing real-time US equity quotes, analyst consensus recommendations, company news, insider sentiment, and earnings calendars. It serves as the primary fallback for Yahoo Finance quote failures and is the sole source for analyst and news data in the detail panel. API key required.",
+    type: "HTTP REST API", owner: "Finnhub.io", domain: "Market Data / Sentiment",
+    tags: ["Equities", "Sentiment", "News", "Real-time", "Analyst", "Fallback"],
+    endpoint: "https://finnhub.io/api/v1 (via Vite proxy)", authType: "API Key (query param: token=...)",
+    refreshCadence: "On demand; queue limited to 1 req/sec", lastSuccessfulSync: "On demand",
+    uptime7d: 99.2, uptime30d: 99.0, avgLatencyMs: 220,
+    nullRate: 0.8, duplicateRate: 0.0, schemaDriftEvents: 0, failedSyncAttempts: 3,
+    dataVolumeGB: null, downstreamDeps: 6, upstreamSources: 0, downstreamConsumers: 3,
+    incidents: [
+      { date: "2025-01-22", type: "Rate Limit", description: "Concurrent panel opens exhausted 60 calls/min limit — subsequent requests queued for 60s.", severity: "low", resolved: true },
+      { date: "2024-11-05", type: "Auth Failure", description: "Stale API key returned 401 — resolved by key rotation.", severity: "high", resolved: true },
+    ],
+  },
+  alphaVantage: {
+    description: "Alpha Vantage provides US equity technical indicators including RSI, MACD, Bollinger Bands, and moving averages with a 25-call daily quota on the free tier. To preserve this strict quota, it is never called automatically on page load — all calls are triggered explicitly by user actions in the detail panel. Results are cached in sessionStorage for 24 hours.",
+    type: "HTTP REST API", owner: "Alpha Vantage Inc.", domain: "Technical Indicators",
+    tags: ["Technicals", "RSI", "MACD", "On-demand", "Cached"],
+    endpoint: "https://www.alphavantage.co/query (via Vite proxy)", authType: "API Key (query param: apikey=...)",
+    refreshCadence: "On demand only — never auto-called", lastSuccessfulSync: "Session cached (24h TTL)",
+    uptime7d: 99.8, uptime30d: 99.5, avgLatencyMs: 1150,
+    nullRate: 0.2, duplicateRate: 0.0, schemaDriftEvents: 0, failedSyncAttempts: 1,
+    dataVolumeGB: null, downstreamDeps: 2, upstreamSources: 0, downstreamConsumers: 1,
+    incidents: [
+      { date: "2024-10-14", type: "Rate Limit", description: "Daily 25-call limit exhausted during testing — all subsequent technical indicator requests returned 429 until midnight UTC.", severity: "medium", resolved: true },
+    ],
+  },
+  fred: {
+    description: "The Federal Reserve Economic Data (FRED) API is maintained by the St. Louis Fed and provides thousands of US macroeconomic time series — including CPI, GDP, Federal Funds Rate, unemployment, Treasury yields, mortgage rates, and consumer sentiment. It is the most reliable source in this stack, with unlimited access and official government uptime guarantees.",
+    type: "HTTP REST API (Government)", owner: "Federal Reserve Bank of St. Louis", domain: "Macroeconomics",
+    tags: ["Macro", "US", "CPI", "GDP", "Interest Rates", "Official", "Unlimited"],
+    endpoint: "https://api.stlouisfed.org/fred (via Vite proxy)", authType: "API Key (query param: api_key=...)",
+    refreshCadence: "Hourly sessionStorage cache", lastSuccessfulSync: "Within last hour",
+    uptime7d: 99.9, uptime30d: 99.9, avgLatencyMs: 175,
+    nullRate: 0.0, duplicateRate: 0.0, schemaDriftEvents: 0, failedSyncAttempts: 0,
+    dataVolumeGB: null, downstreamDeps: 5, upstreamSources: 0, downstreamConsumers: 4,
+    incidents: [],
+  },
+  coingecko: {
+    description: "CoinGecko is the leading public cryptocurrency data API, providing real-time prices, 24h changes, market caps, and trading volumes for the top cryptocurrencies. No API key is required on the free tier. The dashboard tracks Bitcoin, Ethereum, and Solana, with 2-minute caching to stay within the 30 calls/min free limit. Also used for trending coins data.",
+    type: "HTTP REST API (Public)", owner: "CoinGecko Pte. Ltd.", domain: "Cryptocurrency",
+    tags: ["Crypto", "Real-time", "No Auth", "Market Cap", "Volume", "Trending"],
+    endpoint: "https://api.coingecko.com/api/v3 (via Vite proxy)", authType: "None (public endpoint)",
+    refreshCadence: "2-minute cache for prices; 5-minute for trending", lastSuccessfulSync: "Within last 2 min",
+    uptime7d: 97.1, uptime30d: 96.5, avgLatencyMs: 450,
+    nullRate: 0.5, duplicateRate: 0.0, schemaDriftEvents: 1, failedSyncAttempts: 5,
+    dataVolumeGB: null, downstreamDeps: 3, upstreamSources: 0, downstreamConsumers: 1,
+    incidents: [
+      { date: "2025-02-03", type: "Rate Limit", description: "CoinGecko free tier temporarily reduced to 10 calls/min — crypto cards showed stale data for ~20 minutes.", severity: "medium", resolved: true },
+      { date: "2025-01-09", type: "Latency Spike", description: "CoinGecko API averaged 3,200ms response time during high traffic following crypto market volatility.", severity: "low", resolved: true },
+    ],
+  },
+  fmp: {
+    description: "Financial Modeling Prep (FMP) provides comprehensive US equity fundamentals including P/E ratio, EPS, profit margin, debt/equity, ROE, beta, dividend yield, and DCF valuations. It is the primary source for all fundamentals data in the asset detail panel. With 250 free calls/day, it is used on-demand only (when the user opens the detail panel) and for a background batch profile call at startup.",
+    type: "HTTP REST API", owner: "Financial Modeling Prep", domain: "Fundamentals / Valuation",
+    tags: ["Fundamentals", "P/E", "EPS", "DCF", "Dividends", "Valuation"],
+    endpoint: "https://financialmodelingprep.com/stable (via Vite proxy)", authType: "API Key (query param: apikey=...)",
+    refreshCadence: "On demand (panel open) + 1 batch call on page load", lastSuccessfulSync: "On demand",
+    uptime7d: 98.5, uptime30d: 98.2, avgLatencyMs: 320,
+    nullRate: 3.2, duplicateRate: 0.1, schemaDriftEvents: 1, failedSyncAttempts: 4,
+    dataVolumeGB: null, downstreamDeps: 8, upstreamSources: 0, downstreamConsumers: 2,
+    incidents: [
+      { date: "2025-02-11", type: "Schema Change", description: "FMP /stable/profile endpoint renamed marketCapTTM field — dividend yield calculation broke for 6 hours.", severity: "medium", resolved: true },
+      { date: "2024-12-18", type: "Rate Limit", description: "250 daily calls exhausted by end of afternoon — fundamentals panel returned empty for remainder of trading day.", severity: "high", resolved: true },
+    ],
+  },
+  brapi: {
+    description: "BRAPI (Brazilian API) is the primary source for B3 (Bovespa) equity data, providing real-time prices in BRL, day change percentages, and trading volumes for all tracked Brazilian stocks. It is the first choice for B3 data, with Yahoo Finance (.SA suffix) used as fallback. A BRAPI token is required for higher rate limits.",
+    type: "HTTP REST API", owner: "BRAPI (Community)", domain: "Brazil — B3 Equities",
+    tags: ["Brasil", "B3", "Equities", "BRL", "Real-time"],
+    endpoint: "https://brapi.dev/api (via Vite proxy)", authType: "Bearer Token (query param: token=...)",
+    refreshCadence: "Every 30s on page load (with Yahoo fallback)", lastSuccessfulSync: "Continuous (30s interval)",
+    uptime7d: 96.8, uptime30d: 95.1, avgLatencyMs: 290,
+    nullRate: 1.8, duplicateRate: 0.0, schemaDriftEvents: 0, failedSyncAttempts: 7,
+    dataVolumeGB: null, downstreamDeps: 3, upstreamSources: 0, downstreamConsumers: 1,
+    incidents: [
+      { date: "2025-02-20", type: "Downtime", description: "BRAPI returned 503 Service Unavailable outside Brazilian market hours — Yahoo .SA fallback activated.", severity: "low", resolved: true },
+      { date: "2025-01-14", type: "Latency Spike", description: "Response time exceeded 2,000ms for 30 minutes at B3 market open — rate of B3 card updates reduced.", severity: "low", resolved: true },
+    ],
+  },
+  bcb: {
+    description: "The Banco Central do Brasil (BCB) Open Data API is the official source for Brazilian macroeconomic indicators, including the SELIC base interest rate, IPCA inflation index, and CDI interbank rate. Access is completely free with no API key required. Data is sourced from the BCB's SGS (Sistema Gerenciador de Séries Temporais) time series platform.",
+    type: "HTTP REST API (Government)", owner: "Banco Central do Brasil", domain: "Brazilian Macro",
+    tags: ["Brasil", "Macro", "SELIC", "IPCA", "CDI", "Official", "No Auth"],
+    endpoint: "https://api.bcb.gov.br (via Vite proxy)", authType: "None (public government endpoint)",
+    refreshCadence: "1-hour sessionStorage cache", lastSuccessfulSync: "Within last hour",
+    uptime7d: 99.5, uptime30d: 99.3, avgLatencyMs: 420,
+    nullRate: 0.0, duplicateRate: 0.0, schemaDriftEvents: 0, failedSyncAttempts: 1,
+    dataVolumeGB: null, downstreamDeps: 3, upstreamSources: 0, downstreamConsumers: 1,
+    incidents: [
+      { date: "2024-11-20", type: "Downtime", description: "BCB API returned timeout errors for ~15 minutes during scheduled government maintenance window.", severity: "low", resolved: true },
+    ],
+  },
+  awesomeapi: {
+    description: "AwesomeAPI is a free, keyless Brazilian currency exchange rate API providing real-time USD/BRL and EUR/BRL rates with bid/ask spreads and 24h percentage change. It serves as the data source for the USD/BRL macro context banner in the Brasil — B3 group. Provider-side responses are cached for 1 minute; the dashboard adds a 15-minute sessionStorage cache on top.",
+    type: "HTTP REST API (Public)", owner: "AwesomeAPI (Community)", domain: "FX / Currency",
+    tags: ["Brasil", "FX", "USD/BRL", "EUR/BRL", "No Auth", "Real-time"],
+    endpoint: "https://economia.awesomeapi.com.br (via Vite proxy)", authType: "None (public endpoint)",
+    refreshCadence: "15-minute sessionStorage cache", lastSuccessfulSync: "Within last 15 min",
+    uptime7d: 98.0, uptime30d: 97.5, avgLatencyMs: 185,
+    nullRate: 0.0, duplicateRate: 0.0, schemaDriftEvents: 0, failedSyncAttempts: 2,
+    dataVolumeGB: null, downstreamDeps: 1, upstreamSources: 0, downstreamConsumers: 1,
+    incidents: [
+      { date: "2025-01-05", type: "Latency Spike", description: "AwesomeAPI returned 1,800ms responses for ~1 hour, causing USD/BRL banner to show stale cached data.", severity: "low", resolved: true },
+    ],
   },
 };
 
@@ -262,9 +393,10 @@ const ASSET_GROUPS = [
 ];
 
 const STATUS_BADGE = {
-  operational: { label: "OPERATIONAL", color: "#00E676", bg: "rgba(0,230,118,0.1)", border: "rgba(0,230,118,0.3)" },
-  degraded:    { label: "DEGRADED",    color: "#FFD740", bg: "rgba(255,215,64,0.1)", border: "rgba(255,215,64,0.3)" },
-  outage:      { label: "OUTAGE",      color: "#FF5252", bg: "rgba(255,82,82,0.1)",  border: "rgba(255,82,82,0.3)" },
+  operational:   { label: "OPERATIONAL",  color: "#00E676", bg: "rgba(0,230,118,0.1)",  border: "rgba(0,230,118,0.3)" },
+  degraded:      { label: "DEGRADED",     color: "#FFD740", bg: "rgba(255,215,64,0.1)", border: "rgba(255,215,64,0.3)" },
+  outage:        { label: "OUTAGE",       color: "#FF5252", bg: "rgba(255,82,82,0.1)",  border: "rgba(255,82,82,0.3)" },
+  "rate-limited":{ label: "RATE LIMITED", color: "#FF9800", bg: "rgba(255,152,0,0.1)",  border: "rgba(255,152,0,0.3)" },
 };
 
 const ITEM_STATUS_STYLES = {
@@ -372,9 +504,319 @@ function TimeAgo({ timestamp }) {
   );
 }
 
+// ─── SOURCE DETAIL PANEL ─────────────────────────────────────────────────────
+
+const SEVERITY_STYLES = {
+  high:   { color: "#FF5252", bg: "rgba(255,82,82,0.1)",   border: "rgba(255,82,82,0.25)" },
+  medium: { color: "#FFD740", bg: "rgba(255,215,64,0.1)",  border: "rgba(255,215,64,0.25)" },
+  low:    { color: "#00BCD4", bg: "rgba(0,188,212,0.1)",   border: "rgba(0,188,212,0.25)" },
+};
+
+function DetailSection({ title, children }) {
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{
+        fontFamily: mono, fontSize: 9, letterSpacing: "1.5px", color: "var(--c-text-3)",
+        textTransform: "uppercase", marginBottom: 10, paddingBottom: 6,
+        borderBottom: "1px solid var(--c-border)",
+      }}>
+        {title}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function StatGrid({ children }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+      {children}
+    </div>
+  );
+}
+
+function StatCard({ label, value, valueColor, sub }) {
+  return (
+    <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 6, padding: "10px 12px" }}>
+      <div style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "1px", marginBottom: 5 }}>{label}</div>
+      <div style={{ fontFamily: mono, fontSize: 15, fontWeight: 700, color: valueColor || "var(--c-text)", lineHeight: 1 }}>
+        {value ?? "—"}
+      </div>
+      {sub && <div style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", marginTop: 3 }}>{sub}</div>}
+    </div>
+  );
+}
+
+function UptimeBar({ pct }) {
+  if (pct == null) return <span style={{ fontFamily: mono, fontSize: 11, color: "var(--c-text-3)" }}>—</span>;
+  const color = pct >= 99 ? "#00E676" : pct >= 95 ? "#FFD740" : "#FF5252";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ flex: 1, height: 5, background: "var(--c-border)", borderRadius: 3, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 3 }} />
+      </div>
+      <span style={{ fontFamily: mono, fontSize: 11, fontWeight: 700, color, minWidth: 42, textAlign: "right" }}>{pct}%</span>
+    </div>
+  );
+}
+
+function IncidentRow({ incident }) {
+  const sev = SEVERITY_STYLES[incident.severity] || SEVERITY_STYLES.low;
+  return (
+    <div style={{
+      background: sev.bg, border: `1px solid ${sev.border}`, borderRadius: 6,
+      padding: "10px 12px", marginBottom: 7,
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+          <span style={{
+            fontFamily: mono, fontSize: 9, fontWeight: 700, letterSpacing: "0.5px",
+            color: sev.color, background: sev.bg, border: `1px solid ${sev.border}`,
+            borderRadius: 3, padding: "2px 7px",
+          }}>
+            {incident.type.toUpperCase()}
+          </span>
+          <span style={{
+            fontFamily: mono, fontSize: 9, letterSpacing: "0.5px",
+            color: incident.resolved ? "#00E676" : "#FFD740",
+          }}>
+            {incident.resolved ? "✓ Resolved" : "⚠ Open"}
+          </span>
+        </div>
+        <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)" }}>{incident.date}</span>
+      </div>
+      <div style={{ fontFamily: sans, fontSize: 11, color: "var(--c-text-2)", lineHeight: 1.5 }}>
+        {incident.description}
+      </div>
+    </div>
+  );
+}
+
+function SourceDetailPanel({ source, health, onClose }) {
+  const meta    = SOURCE_META[source];
+  const detail  = SOURCE_DETAIL_DATA[source];
+  const color   = SOURCE_COLORS[source];
+  const label   = SOURCE_LABELS[source];
+  const history = getHealthHistory(source);
+  const successCount = history.filter(Boolean).length;
+  const totalChecks  = history.length;
+  const configured   = getSourceStatus()[source];
+  const isConfigured = configured?.hasKey || !configured?.keyRequired;
+  const statusKey    = health?.status || (isConfigured ? "operational" : "outage");
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+
+      {/* ── Sticky header ── */}
+      <div style={{
+        position: "sticky", top: 0, zIndex: 1,
+        background: "var(--c-panel)", borderBottom: "1px solid var(--c-border)",
+        padding: "18px 20px 14px",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              <div style={{ width: 5, height: 26, borderRadius: 3, background: color, flexShrink: 0 }} />
+              <span style={{ fontFamily: sans, fontSize: 20, fontWeight: 700, color: "var(--c-text)", letterSpacing: "-0.3px" }}>
+                {label}
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <StatusBadge status={statusKey} />
+              <TimeAgo timestamp={health?.timestamp} />
+              {health?.responseTime != null && (
+                <span style={{
+                  fontFamily: mono, fontSize: 9, color: health.responseTime > 3000 ? "#FF5252" : health.responseTime > 1000 ? "#FFD740" : "#00E676",
+                }}>
+                  {health.responseTime}ms
+                </span>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: "transparent", border: "1px solid var(--c-border)", borderRadius: 6,
+              cursor: "pointer", padding: "6px 10px", color: "var(--c-text-3)", fontSize: 14,
+              transition: "all 0.15s ease", flexShrink: 0,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = color; e.currentTarget.style.color = color; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--c-border)"; e.currentTarget.style.color = "var(--c-text-3)"; }}
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+
+      {/* ── Scrollable body ── */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
+
+        {/* Overview */}
+        <DetailSection title="Overview">
+          <p style={{ fontFamily: sans, fontSize: 12, color: "var(--c-text-2)", lineHeight: 1.65, margin: "0 0 12px" }}>
+            {detail.description}
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 12 }}>
+            {detail.tags.map(tag => (
+              <span key={tag} style={{
+                fontFamily: mono, fontSize: 9, letterSpacing: "0.3px",
+                color, background: color + "15", border: `1px solid ${color}30`,
+                borderRadius: 3, padding: "3px 8px",
+              }}>
+                {tag}
+              </span>
+            ))}
+          </div>
+          <div style={{ display: "grid", gap: 4 }}>
+            <MetricRow label="DOMAIN"  value={detail.domain} />
+            <MetricRow label="OWNER"   value={detail.owner} />
+            <MetricRow label="GEO"     value={meta.geo} />
+            <MetricRow label="FRESHNESS" value={meta.freshness} />
+            <MetricRow label="ASSET CLASSES" value={meta.assetClasses.join(", ")} />
+          </div>
+        </DetailSection>
+
+        {/* Connection & Configuration */}
+        <DetailSection title="Connection & Configuration">
+          <div style={{ display: "grid", gap: 4 }}>
+            <MetricRow label="TYPE"           value={detail.type} />
+            <MetricRow label="AUTH"           value={detail.authType} />
+            <MetricRow label="ENDPOINT"       value={detail.endpoint} />
+            <MetricRow label="HEALTH CHECK"   value={meta.healthEndpoint} />
+            <MetricRow label="RATE LIMIT"     value={meta.rateLimit} />
+            <MetricRow label="REFRESH"        value={detail.refreshCadence} />
+            <MetricRow label="LAST SYNC"      value={detail.lastSuccessfulSync} />
+            <MetricRow label="KEY REQUIRED"   value={configured?.keyRequired ? "Yes" : "No"} />
+            <MetricRow label="KEY CONFIGURED" value={isConfigured ? "Yes" : "No"} valueColor={isConfigured ? "#00E676" : "#FFD740"} />
+          </div>
+          {meta.keyRegistrationUrl && (
+            <div style={{ marginTop: 10 }}>
+              <a href={meta.keyRegistrationUrl} target="_blank" rel="noopener noreferrer"
+                style={{ fontFamily: mono, fontSize: 9, color, textDecoration: "none" }}>
+                Get API key →
+              </a>
+              <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", marginLeft: 12 }}>
+                <a href={meta.docUrl} target="_blank" rel="noopener noreferrer"
+                  style={{ color: "var(--c-text-3)", textDecoration: "none" }}>
+                  Documentation →
+                </a>
+              </span>
+            </div>
+          )}
+          {!meta.keyRegistrationUrl && (
+            <div style={{ marginTop: 10 }}>
+              <a href={meta.docUrl} target="_blank" rel="noopener noreferrer"
+                style={{ fontFamily: mono, fontSize: 9, color, textDecoration: "none" }}>
+                Documentation →
+              </a>
+            </div>
+          )}
+        </DetailSection>
+
+        {/* Health Metrics */}
+        <DetailSection title="Health Metrics">
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "0.5px", marginBottom: 5 }}>UPTIME — 7 DAYS</div>
+            <UptimeBar pct={detail.uptime7d} />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "0.5px", marginBottom: 5 }}>UPTIME — 30 DAYS</div>
+            <UptimeBar pct={detail.uptime30d} />
+          </div>
+          <StatGrid>
+            <StatCard
+              label="AVG LATENCY"
+              value={health?.responseTime != null ? `${health.responseTime}ms` : detail.avgLatencyMs ? `~${detail.avgLatencyMs}ms` : "—"}
+              valueColor={
+                (health?.responseTime ?? detail.avgLatencyMs) > 3000 ? "#FF5252" :
+                (health?.responseTime ?? detail.avgLatencyMs) > 1000 ? "#FFD740" : "#00E676"
+              }
+            />
+            <StatCard
+              label="SUCCESS RATE"
+              value={totalChecks > 0 ? `${Math.round(successCount / totalChecks * 100)}%` : "—"}
+              sub={totalChecks > 0 ? `${successCount}/${totalChecks} checks` : null}
+              valueColor={totalChecks > 0 ? (successCount / totalChecks >= 0.9 ? "#00E676" : "#FFD740") : undefined}
+            />
+            <StatCard label="NULL RATE"       value={detail.nullRate != null ? `${detail.nullRate}%` : "—"} />
+            <StatCard label="DUPLICATE RATE"  value={detail.duplicateRate != null ? `${detail.duplicateRate}%` : "—"} />
+            <StatCard label="SCHEMA DRIFTS"   value={detail.schemaDriftEvents} sub="last 30 days"
+              valueColor={detail.schemaDriftEvents > 2 ? "#FFD740" : undefined} />
+            <StatCard label="FAILED SYNCS"    value={detail.failedSyncAttempts} sub="last 30 days"
+              valueColor={detail.failedSyncAttempts > 5 ? "#FF5252" : detail.failedSyncAttempts > 2 ? "#FFD740" : undefined} />
+            <StatCard label="DOWNSTREAM DEPS" value={detail.downstreamDeps} sub="data points" />
+            <StatCard label="DATA VOLUME"     value={detail.dataVolumeGB != null ? `${detail.dataVolumeGB} GB` : "—"} />
+          </StatGrid>
+
+          {totalChecks > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "0.5px", marginBottom: 6 }}>
+                RECENT CHECKS ({totalChecks})
+              </div>
+              <SuccessRateDots history={history} />
+            </div>
+          )}
+        </DetailSection>
+
+        {/* Recent Incidents */}
+        <DetailSection title={`Recent Incidents (${detail.incidents.length})`}>
+          {detail.incidents.length === 0 ? (
+            <div style={{
+              padding: "14px 12px", background: "rgba(0,230,118,0.06)",
+              border: "1px solid rgba(0,230,118,0.2)", borderRadius: 6, textAlign: "center",
+            }}>
+              <div style={{ fontFamily: mono, fontSize: 11, color: "#00E676" }}>No incidents recorded</div>
+              <div style={{ fontFamily: sans, fontSize: 11, color: "var(--c-text-3)", marginTop: 4 }}>
+                This source has a clean operational history.
+              </div>
+            </div>
+          ) : (
+            detail.incidents.map((incident, i) => <IncidentRow key={i} incident={incident} />)
+          )}
+        </DetailSection>
+
+        {/* Lineage */}
+        <DetailSection title="Lineage & Usage">
+          <div style={{ display: "grid", gap: 4, marginBottom: 12 }}>
+            <MetricRow label="UPSTREAM SOURCES"      value={detail.upstreamSources} />
+            <MetricRow label="DOWNSTREAM CONSUMERS"  value={detail.downstreamConsumers} />
+            <MetricRow label="DOWNSTREAM DATA POINTS" value={detail.downstreamDeps} />
+          </div>
+          <div style={{
+            fontFamily: sans, fontSize: 11, color: "var(--c-text-3)", lineHeight: 1.5,
+            background: "var(--c-surface)", border: "1px solid var(--c-border)",
+            borderRadius: 6, padding: "10px 12px",
+          }}>
+            Full data lineage graph coming soon — connect a lineage backend to populate this section.
+          </div>
+        </DetailSection>
+
+        {/* Notes */}
+        {meta.note && (
+          <DetailSection title="Notes">
+            <div style={{
+              fontFamily: sans, fontSize: 11, color: "var(--c-text-2)", lineHeight: 1.6,
+              background: "rgba(255,215,64,0.06)", border: "1px solid rgba(255,215,64,0.2)",
+              borderRadius: 6, padding: "10px 12px",
+            }}>
+              {meta.note}
+            </div>
+            {meta.fallbackSuggestion && (
+              <div style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", marginTop: 8 }}>
+                FALLBACK: {meta.fallbackSuggestion}
+              </div>
+            )}
+          </DetailSection>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
 // ─── SOURCE HEALTH CARD ─────────────────────────────────────────────────────
 
-function SourceHealthCard({ source, health, usage, onRefresh }) {
+function SourceHealthCard({ source, health, usage, onRefresh, onSelect }) {
   const [hovered, setHovered] = useState(false);
   const meta = SOURCE_META[source];
   const color = SOURCE_COLORS[source];
@@ -389,14 +831,19 @@ function SourceHealthCard({ source, health, usage, onRefresh }) {
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onClick={(e) => { if (e.target.closest("button") || e.target.closest("a")) return; onSelect?.(source); }}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect?.(source); } }}
       style={{
         background: hovered ? `linear-gradient(135deg,${color}08,rgba(13,15,24,0.95))` : "var(--c-surface)",
         border: `1px solid ${hovered ? color + "40" : "var(--c-border)"}`,
         borderRadius: 10, padding: "16px 18px",
         transition: "all 0.25s ease", position: "relative",
         opacity: checking ? 0.7 : 1,
+        cursor: "pointer",
       }}
     >
       {checking && (
@@ -465,8 +912,12 @@ function SourceHealthCard({ source, health, usage, onRefresh }) {
         </div>
       )}
       {isConfigured && health?.error && (
-        <div style={{ background: "rgba(255,82,82,0.08)", border: "1px solid rgba(255,82,82,0.2)", borderRadius: 4, padding: "6px 10px", marginBottom: 10 }}>
-          <span style={{ fontFamily: mono, fontSize: 9, color: "#FF5252" }}>{health.error}</span>
+        <div style={{
+          background: health.status === "rate-limited" ? "rgba(255,152,0,0.08)" : "rgba(255,82,82,0.08)",
+          border: `1px solid ${health.status === "rate-limited" ? "rgba(255,152,0,0.3)" : "rgba(255,82,82,0.2)"}`,
+          borderRadius: 4, padding: "6px 10px", marginBottom: 10,
+        }}>
+          <span style={{ fontFamily: mono, fontSize: 9, color: health.status === "rate-limited" ? "#FF9800" : "#FF5252" }}>{health.error}</span>
         </div>
       )}
 
@@ -500,6 +951,47 @@ function SourceHealthCard({ source, health, usage, onRefresh }) {
           {meta.note}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── ASSET GROUP CARD ────────────────────────────────────────────────────────
+
+function AssetGroupCard({ group, onFilter }) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onFilter(group.sources[0])}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onFilter(group.sources[0]); } }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: hovered ? "rgba(255,255,255,0.04)" : "var(--c-surface)",
+        border: `1px solid ${hovered ? "rgba(255,255,255,0.15)" : "var(--c-border)"}`,
+        borderRadius: 8, padding: "14px 16px",
+        transition: "all 0.2s ease", cursor: "pointer",
+      }}
+    >
+      {/* Row 1: Icon + Name */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <span style={{ fontSize: 16 }}>{group.icon}</span>
+        <span style={{ fontFamily: sans, fontSize: 13, fontWeight: 700, color: "var(--c-text)" }}>{group.name}</span>
+      </div>
+
+      {/* Row 2: Source badges */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 10 }}>
+        {group.sources.map(src => <SourceBadge key={src} source={src} />)}
+      </div>
+
+      {/* Row 3: Metrics */}
+      <div style={{ display: "grid", gap: 4 }}>
+        <MetricRow label="ASSETS" value={group.assetCount} />
+        <MetricRow label="ASSIGNMENT" value={group.assignment} />
+        {group.macroBanner && <MetricRow label="MACRO" value={group.macroBanner} />}
+      </div>
     </div>
   );
 }
@@ -777,6 +1269,394 @@ function DataPointPanel({ item, sourceHealth, onClose }) {
   );
 }
 
+// ─── QUOTA DASHBOARD ─────────────────────────────────────────────────────────
+
+const QUOTA_HEALTH_COLORS = {
+  healthy:   { color: "#00E676", bg: "rgba(0,230,118,0.1)",  border: "rgba(0,230,118,0.3)"  },
+  warning:   { color: "#FFD740", bg: "rgba(255,215,64,0.1)", border: "rgba(255,215,64,0.3)" },
+  critical:  { color: "#FF9800", bg: "rgba(255,152,0,0.1)",  border: "rgba(255,152,0,0.3)"  },
+  exhausted: { color: "#FF5252", bg: "rgba(255,82,82,0.1)",  border: "rgba(255,82,82,0.3)"  },
+};
+
+function QuotaDashboard() {
+  const [quotaStatus, setQuotaStatus]   = useState({});
+  const [cacheStats, setCacheStats]     = useState({ byApi: {}, global: { hits: 0, misses: 0, hitRate: 0, totalEntries: 0 } });
+  const [deferredSizes, setDeferredSizes] = useState({});
+  const [expanded, setExpanded]         = useState({});
+  const [showAdmin, setShowAdmin]       = useState(false);
+
+  const refresh = useCallback(() => {
+    setQuotaStatus(quotaTracker.getAllQuotaStatus());
+    setCacheStats(getCacheStats());
+    setDeferredSizes(apiClient.getDeferredQueueSizes());
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    const id = setInterval(refresh, 10_000);
+    return () => clearInterval(id);
+  }, [refresh]);
+
+  const allApiIds         = getAllApiIds();
+  const dormantEndpoints  = getDormantEndpoints();
+  const globalHits        = cacheStats.global?.hits ?? 0;
+  const globalMisses      = cacheStats.global?.misses ?? 0;
+  const globalHitRate     = cacheStats.global?.hitRate ?? 0;
+  const globalEntries     = cacheStats.global?.totalEntries ?? 0;
+
+  const criticalApis = allApiIds.filter(id => {
+    const h = quotaStatus[id]?.health;
+    return h === "critical" || h === "exhausted";
+  });
+
+  function toggleExpand(apiId) {
+    setExpanded(prev => ({ ...prev, [apiId]: !prev[apiId] }));
+  }
+
+  return (
+    <div style={{ padding: "20px 0", borderBottom: "1px solid var(--c-border)" }}>
+
+      {/* ── Header ── */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ fontFamily: mono, fontSize: 10, color: "var(--c-text-3)", letterSpacing: "1.5px" }}>
+            API QUOTA MANAGEMENT
+          </div>
+          {globalHits > 0 && (
+            <span style={{ fontFamily: mono, fontSize: 9, color: "#00E676" }}>
+              ↑ {globalHits} calls saved by cache
+            </span>
+          )}
+          {globalHits === 0 && globalMisses > 0 && (
+            <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)" }}>
+              {Math.round(globalHitRate * 100)}% cache hit rate
+            </span>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => setShowAdmin(v => !v)}
+            style={{
+              fontFamily: mono, fontSize: 9, fontWeight: 600,
+              color: showAdmin ? "#FF9800" : "var(--c-text-3)",
+              background: showAdmin ? "rgba(255,152,0,0.08)" : "transparent",
+              border: `1px solid ${showAdmin ? "rgba(255,152,0,0.4)" : "var(--c-border)"}`,
+              borderRadius: 6, padding: "4px 10px", cursor: "pointer", letterSpacing: "0.5px",
+            }}
+          >
+            ADMIN
+          </button>
+          <button
+            onClick={refresh}
+            style={{
+              fontFamily: mono, fontSize: 10, fontWeight: 600, color: "var(--c-text-2)",
+              background: "transparent", border: "1px solid var(--c-border)", borderRadius: 6,
+              padding: "5px 14px", cursor: "pointer", letterSpacing: "0.5px", transition: "all 0.2s ease",
+            }}
+            onMouseEnter={e => { e.target.style.borderColor = "#00E676"; e.target.style.color = "#00E676"; }}
+            onMouseLeave={e => { e.target.style.borderColor = "var(--c-border)"; e.target.style.color = "var(--c-text-2)"; }}
+          >
+            REFRESH
+          </button>
+        </div>
+      </div>
+
+      {/* ── Global Critical CTA ── */}
+      {criticalApis.length > 0 && (
+        <div style={{
+          background: "rgba(255,82,82,0.06)", border: "1px solid rgba(255,82,82,0.25)",
+          borderRadius: 6, padding: "10px 16px", marginBottom: 12,
+          display: "flex", alignItems: "flex-start", gap: 10,
+        }}>
+          <span style={{ fontSize: 14, lineHeight: 1.4 }}>⚠</span>
+          <div>
+            <div style={{ fontFamily: mono, fontSize: 10, color: "#FF5252", fontWeight: 700, letterSpacing: "0.5px", marginBottom: 3 }}>
+              QUOTA CRITICAL
+            </div>
+            <div style={{ fontFamily: sans, fontSize: 11, color: "var(--c-text-3)", lineHeight: 1.5 }}>
+              {criticalApis.map(id => getApiDef(id)?.name || id).join(", ")} — at critical or exhausted quota.
+              Consider upgrading your plan or reducing call frequency.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Per-API rows ── */}
+      <div style={{ display: "grid", gap: 6 }}>
+        {allApiIds.map(apiId => {
+          const api         = getApiDef(apiId);
+          const status      = quotaStatus[apiId] ?? {};
+          const cache       = cacheStats.byApi?.[apiId];
+          const deferred    = deferredSizes[apiId] ?? 0;
+          const health      = status.health ?? "healthy";
+          const hc          = QUOTA_HEALTH_COLORS[health];
+          const isExpanded  = !!expanded[apiId];
+          const isUnmetered = !api?.limits?.perDay && !api?.limits?.perMinute;
+          const color       = SOURCE_COLORS[apiId] || "#9E9E9E";
+          const apiHitRate  = cache?.totals?.hitRate ?? 0;
+          const apiHits     = cache?.totals?.hits ?? 0;
+
+          const dayPct  = status.perDayLimit  ? Math.min((status.perDayUsed  / status.perDayLimit)  * 100, 100) : 0;
+          const minPct  = status.perMinuteLimit ? Math.min((status.perMinuteUsed / status.perMinuteLimit) * 100, 100) : 0;
+          const showDay = !!status.perDayLimit;
+          const showMin = !showDay && !!status.perMinuteLimit;
+          const barPct  = showDay ? dayPct : showMin ? minPct : 0;
+          const barLabel = showDay
+            ? `${status.perDayUsed}/${status.perDayLimit} /day`
+            : showMin
+              ? `${status.perMinuteUsed}/${status.perMinuteLimit} /min`
+              : null;
+
+          return (
+            <div key={apiId} style={{
+              background: "var(--c-surface)",
+              border: `1px solid ${isExpanded ? color + "50" : "var(--c-border)"}`,
+              borderRadius: 8, overflow: "hidden", transition: "border-color 0.2s ease",
+            }}>
+
+              {/* ── Row header (clickable) ── */}
+              <div
+                role="button" tabIndex={0}
+                onClick={() => toggleExpand(apiId)}
+                onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleExpand(apiId); } }}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "180px 1fr 100px 80px 100px 28px",
+                  gap: 10, alignItems: "center",
+                  padding: "10px 14px", cursor: "pointer",
+                }}
+              >
+                {/* API name */}
+                <span style={{ fontFamily: mono, fontSize: 10, fontWeight: 700, color, letterSpacing: "0.3px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {api?.name || apiId}
+                </span>
+
+                {/* Quota bar or UNMETERED */}
+                {isUnmetered ? (
+                  <span style={{
+                    fontFamily: mono, fontSize: 9, letterSpacing: "0.6px",
+                    color: "#00BCD4", background: "rgba(0,188,212,0.1)",
+                    border: "1px solid rgba(0,188,212,0.3)",
+                    borderRadius: 3, padding: "2px 8px", justifySelf: "start",
+                  }}>
+                    UNMETERED
+                  </span>
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ flex: 1, height: 4, background: "var(--c-border)", borderRadius: 2, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${barPct}%`, background: hc.color, borderRadius: 2, transition: "width 0.5s ease" }} />
+                    </div>
+                    {barLabel && (
+                      <span style={{ fontFamily: mono, fontSize: 9, color: hc.color, whiteSpace: "nowrap" }}>
+                        {barLabel}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Health badge */}
+                <span style={{
+                  fontFamily: mono, fontSize: 8, fontWeight: 700, letterSpacing: "0.8px",
+                  color: hc.color, background: hc.bg, border: `1px solid ${hc.border}`,
+                  borderRadius: 10, padding: "2px 8px", whiteSpace: "nowrap", textAlign: "center",
+                }}>
+                  {health.toUpperCase()}
+                </span>
+
+                {/* Cache hit rate */}
+                <span style={{ fontFamily: mono, fontSize: 9, color: apiHits > 0 ? "#00E676" : "var(--c-text-3)", whiteSpace: "nowrap", textAlign: "right" }}>
+                  {apiHits > 0 ? `${Math.round(apiHitRate * 100)}% cache` : "—"}
+                </span>
+
+                {/* Deferred badge */}
+                <div style={{ textAlign: "right" }}>
+                  {deferred > 0 && (
+                    <span style={{
+                      fontFamily: mono, fontSize: 8, color: "#FF9800",
+                      background: "rgba(255,152,0,0.1)", border: "1px solid rgba(255,152,0,0.3)",
+                      borderRadius: 10, padding: "2px 7px",
+                    }}>
+                      {deferred} def
+                    </span>
+                  )}
+                </div>
+
+                {/* Expand arrow */}
+                <span style={{
+                  fontFamily: mono, fontSize: 9, color: "var(--c-text-3)",
+                  transition: "transform 0.2s ease", display: "inline-block",
+                  transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
+                  textAlign: "center",
+                }}>▶</span>
+              </div>
+
+              {/* ── Expanded breakdown ── */}
+              {isExpanded && (
+                <div style={{ borderTop: "1px solid var(--c-border)", padding: "12px 14px", background: "rgba(0,0,0,0.12)" }}>
+
+                  {/* Quota summary boxes */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 8, marginBottom: 12 }}>
+                    {status.perDayLimit != null && (
+                      <>
+                        <MetricBox label="USED / DAY"      value={`${status.perDayUsed}/${status.perDayLimit}`}  valueColor={hc.color} />
+                        <MetricBox label="REMAINING / DAY" value={status.perDayRemaining ?? "—"} valueColor={status.perDayRemaining <= 0 ? "#FF5252" : hc.color} />
+                      </>
+                    )}
+                    {status.perMinuteLimit != null && (
+                      <>
+                        <MetricBox label="USED / MIN"  value={`${status.perMinuteUsed}/${status.perMinuteLimit}`} valueColor={hc.color} />
+                        <MetricBox label="REM / MIN"   value={status.perMinuteRemaining ?? "—"} />
+                      </>
+                    )}
+                    <MetricBox label="SESSION CALLS" value={status.sessionTotal ?? 0} />
+                    {cache?.totals && (
+                      <MetricBox
+                        label="CACHE HITS"
+                        value={`${cache.totals.hits} / ${cache.totals.hits + cache.totals.misses}`}
+                        valueColor={cache.totals.hits > 0 ? "#00E676" : "var(--c-text-3)"}
+                      />
+                    )}
+                    {deferred > 0 && (
+                      <MetricBox label="DEFERRED" value={deferred} valueColor="#FF9800" />
+                    )}
+                  </div>
+
+                  {/* Exhausted notice */}
+                  {status.exhausted && status.exhaustedUntilISO && (
+                    <div style={{
+                      background: "rgba(255,82,82,0.08)", border: "1px solid rgba(255,82,82,0.2)",
+                      borderRadius: 4, padding: "6px 10px", marginBottom: 10,
+                    }}>
+                      <span style={{ fontFamily: mono, fontSize: 9, color: "#FF5252" }}>
+                        EXHAUSTED — resets at {new Date(status.exhaustedUntilISO).toLocaleTimeString()}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Per-endpoint table */}
+                  {api?.endpoints.filter(ep => ep.status !== "dormant").length > 0 && (
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ fontFamily: mono, fontSize: 8, color: "var(--c-text-3)", letterSpacing: "1px", marginBottom: 6 }}>
+                        ENDPOINTS
+                      </div>
+                      {api.endpoints.filter(ep => ep.status !== "dormant").map(ep => {
+                        const epCache    = cache?.byEndpoint?.[ep.id];
+                        const sessionCalls = status.sessionByEndpoint?.[ep.id] ?? 0;
+                        const epHitRate  = epCache ? Math.round(epCache.hitRate * 100) : null;
+                        return (
+                          <div key={ep.id} style={{
+                            display: "grid", gridTemplateColumns: "130px 60px 60px 1fr",
+                            gap: 8, alignItems: "center",
+                            padding: "5px 0", borderBottom: "1px solid rgba(255,255,255,0.04)",
+                          }}>
+                            <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-2)" }}>{ep.id}</span>
+                            <span style={{ fontFamily: mono, fontSize: 9, color: sessionCalls > 0 ? "var(--c-text-2)" : "var(--c-text-3)" }}>
+                              {sessionCalls} calls
+                            </span>
+                            <span style={{ fontFamily: mono, fontSize: 9, color: epHitRate != null && epHitRate > 0 ? "#00E676" : "var(--c-text-3)" }}>
+                              {epHitRate != null ? `${epHitRate}% hit` : "—"}
+                            </span>
+                            <span style={{
+                              fontFamily: mono, fontSize: 8, color: "var(--c-text-3)",
+                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                            }}>
+                              {ep.callsNote}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Upgrade CTA */}
+                  {(health === "critical" || health === "exhausted") && api?.upgradeUrl && (
+                    <div style={{
+                      padding: "8px 10px", marginTop: 4,
+                      background: "rgba(255,152,0,0.06)", border: "1px solid rgba(255,152,0,0.25)", borderRadius: 6,
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                        <span style={{ fontFamily: mono, fontSize: 9, color: "#FF9800", fontWeight: 700 }}>
+                          UPGRADE RECOMMENDED
+                        </span>
+                        <a href={api.upgradeUrl} target="_blank" rel="noopener noreferrer"
+                          style={{ fontFamily: mono, fontSize: 9, color: "#FF9800", textDecoration: "none" }}>
+                          View plans →
+                        </a>
+                      </div>
+                      {api.tierOptions?.[1] && (
+                        <div style={{ fontFamily: sans, fontSize: 10, color: "var(--c-text-3)", lineHeight: 1.4 }}>
+                          <strong style={{ color: "var(--c-text-2)" }}>{api.tierOptions[1].name}</strong>
+                          {" — "}
+                          {api.tierOptions[1].notes}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Admin: raw session log */}
+                  {showAdmin && (
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ fontFamily: mono, fontSize: 8, color: "var(--c-text-3)", letterSpacing: "1px", marginBottom: 4 }}>
+                        RAW SESSION LOG
+                      </div>
+                      <pre style={{
+                        fontFamily: mono, fontSize: 9, color: "var(--c-text-3)",
+                        background: "rgba(0,0,0,0.2)", borderRadius: 4, padding: "8px 10px",
+                        maxHeight: 80, overflowY: "auto", margin: 0,
+                      }}>
+                        {JSON.stringify(status.sessionByEndpoint ?? {}, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Dormant endpoints ── */}
+      {dormantEndpoints.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "1px", marginBottom: 7 }}>
+            DORMANT ({dormantEndpoints.length}) — defined in dataServices.js, not wired to any component
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+            {dormantEndpoints.map(({ apiId, apiName, endpoint }) => (
+              <span key={`${apiId}:${endpoint.id}`} style={{
+                fontFamily: mono, fontSize: 9, letterSpacing: "0.3px",
+                color: "var(--c-text-3)", background: "rgba(255,255,255,0.02)",
+                border: "1px solid var(--c-border)", borderRadius: 4, padding: "3px 10px",
+              }}>
+                {apiName} · {endpoint.id}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Global stats footer ── */}
+      <div style={{ display: "flex", gap: 20, marginTop: 14, flexWrap: "wrap" }}>
+        <span style={{ fontFamily: mono, fontSize: 9, color: "#00E676" }}>
+          ↑ {globalHits} calls served from cache
+        </span>
+        <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)" }}>
+          {globalHits} hits · {globalMisses} misses · {Math.round(globalHitRate * 100)}% hit rate
+        </span>
+        <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)" }}>
+          {globalEntries} entries cached
+        </span>
+        {(cacheStats.global?.staleServed ?? 0) > 0 && (
+          <span style={{ fontFamily: mono, fontSize: 9, color: "#FFD740" }}>
+            {cacheStats.global.staleServed} stale-served
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN CATALOG PAGE ───────────────────────────────────────────────────────
 
 export default function CatalogPage() {
@@ -784,7 +1664,15 @@ export default function CatalogPage() {
   const [issuesOnly, setIssuesOnly] = useState(false);
   const [sourceHealth, setSourceHealth] = useState({});
   const [selectedItem, setSelectedItem] = useState(null);
+  const [selectedSource, setSelectedSource] = useState(null);
   const healthCacheRef = useRef(null);
+
+  // Close source detail drawer on Escape
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") setSelectedSource(null); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   // Run all health checks on mount (with 60s sessionStorage cache)
   const runHealthCheck = useCallback(async (source) => {
@@ -811,7 +1699,7 @@ export default function CatalogPage() {
       const raw = sessionStorage.getItem("catalog:health");
       if (raw) {
         const cache = JSON.parse(raw);
-        if (cache._ts && Date.now() - cache._ts < 60000) {
+        if (cache._ts && Date.now() - cache._ts < 300_000) { // 5min TTL
           const restored = {};
           ALL_SOURCES.forEach(src => {
             if (cache[src]) restored[src] = { ...cache[src], checking: false };
@@ -835,7 +1723,7 @@ export default function CatalogPage() {
       if (sourceFilter !== "all" && item.source !== sourceFilter && item.fallback !== sourceFilter) return false;
       if (issuesOnly) {
         const srcStatus = sourceHealth[item.source]?.status;
-        return srcStatus === "degraded" || srcStatus === "outage";
+        return srcStatus === "degraded" || srcStatus === "outage" || srcStatus === "rate-limited";
       }
       return true;
     }),
@@ -846,7 +1734,7 @@ export default function CatalogPage() {
   const totalPoints = CATALOG.flatMap(c => c.items).length;
   const issueCount = CATALOG.flatMap(c => c.items).filter(i => {
     const s = sourceHealth[i.source]?.status;
-    return s === "degraded" || s === "outage";
+    return s === "degraded" || s === "outage" || s === "rate-limited";
   }).length;
 
   return (
@@ -891,6 +1779,7 @@ export default function CatalogPage() {
               health={sourceHealth[src]}
               usage={usage[src] || 0}
               onRefresh={runHealthCheck}
+              onSelect={setSelectedSource}
             />
           ))}
         </div>
@@ -1003,29 +1892,28 @@ export default function CatalogPage() {
 
       {/* ── ASSET GROUPS ── */}
       <div style={{ marginTop: 32 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
           <span style={{ fontSize: 16 }}>📂</span>
           <span style={{ fontSize: 15, fontWeight: 700, color: "var(--c-text)", letterSpacing: "0.3px" }}>Asset Groups</span>
           <span style={{ fontFamily: mono, fontSize: 10, color: "var(--c-text-3)" }}>({ASSET_GROUPS.length})</span>
         </div>
+        <div style={{ fontFamily: sans, fontSize: 11, color: "var(--c-text-3)", marginBottom: 14 }}>
+          Click a group to filter data points by its primary source.
+        </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
           {ASSET_GROUPS.map(g => (
-            <div key={g.name} style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 8, padding: "14px 16px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <span style={{ fontSize: 16 }}>{g.icon}</span>
-                <span style={{ fontFamily: sans, fontSize: 13, fontWeight: 700, color: "var(--c-text)" }}>{g.name}</span>
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 }}>
-                {g.sources.map(s => <SourceBadge key={s} source={s} />)}
-              </div>
-              <div style={{ display: "grid", gap: 3 }}>
-                <MetricRow label="ASSETS" value={g.assetCount} />
-                <MetricRow label="ASSIGNMENT" value={g.assignment} />
-                {g.macroBanner && <MetricRow label="MACRO BANNER" value={g.macroBanner} valueColor="#1565C0" />}
-              </div>
-            </div>
+            <AssetGroupCard
+              key={g.name}
+              group={g}
+              onFilter={(src) => { setSourceFilter(src); setIssuesOnly(false); }}
+            />
           ))}
         </div>
+      </div>
+
+      {/* ── QUOTA MANAGEMENT ── */}
+      <div style={{ marginTop: 32 }}>
+        <QuotaDashboard />
       </div>
 
       {/* ── FOOTER ── */}
@@ -1033,7 +1921,7 @@ export default function CatalogPage() {
         9 SOURCES · {totalPoints} DATA POINTS · {totalActive} ACTIVE · {totalPlanned} PLANNED · {ASSET_GROUPS.length} GROUPS
       </div>
 
-      {/* ── SLIDE-IN PANEL ── */}
+      {/* ── DATA POINT SLIDE-IN PANEL ── */}
       {selectedItem && (
         <>
           <div onClick={() => setSelectedItem(null)} style={{ position: "fixed", inset: 0, background: "var(--c-overlay)", zIndex: 300 }} />
@@ -1046,6 +1934,31 @@ export default function CatalogPage() {
           }}>
             <PanelErrorBoundary>
               <DataPointPanel item={selectedItem} sourceHealth={sourceHealth} onClose={() => setSelectedItem(null)} />
+            </PanelErrorBoundary>
+          </div>
+        </>
+      )}
+
+      {/* ── SOURCE DETAIL DRAWER ── */}
+      {selectedSource && (
+        <>
+          <div
+            onClick={() => setSelectedSource(null)}
+            style={{ position: "fixed", inset: 0, background: "var(--c-overlay)", zIndex: 300 }}
+          />
+          <div style={{
+            position: "fixed", top: 0, right: 0, bottom: 0,
+            width: "min(520px, 100vw)",
+            background: "var(--c-panel)", borderLeft: "1px solid var(--c-border)",
+            zIndex: 301, overflowY: "auto",
+            animation: "slideInRight 0.3s cubic-bezier(0.4,0,0.2,1) both",
+          }}>
+            <PanelErrorBoundary>
+              <SourceDetailPanel
+                source={selectedSource}
+                health={sourceHealth[selectedSource]}
+                onClose={() => setSelectedSource(null)}
+              />
             </PanelErrorBoundary>
           </div>
         </>
