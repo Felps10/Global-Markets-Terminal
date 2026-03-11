@@ -76,6 +76,12 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/awesomeapi/, ''),
       },
+
+      // --- Admin API: taxonomy management backend (local) ---
+      '/api/v1': {
+        target: 'http://localhost:4000',
+        changeOrigin: true,
+      },
     },
   },
 })

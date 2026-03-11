@@ -6,14 +6,22 @@
   "scripts": {
     "dev": "vite",
     "server": "node --max-http-header-size=65536 proxy-server.js",
+    "start:server": "node server/index.js",
     "start": "concurrently -n proxy,vite -c cyan,green \"npm run server\" \"npm run dev\"",
+    "start:full": "concurrently -n proxy,api,vite -c cyan,magenta,green \"npm run server\" \"npm run start:server\" \"npm run dev\"",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.5.0",
+    "cors": "^2.8.5",
     "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0",
     "styled-components": "^6.3.11"
   },
   "devDependencies": {

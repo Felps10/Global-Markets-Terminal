@@ -1,0 +1,199 @@
+// SOURCE OF TRUTH: backend database (seeded from this file)
+// This file is used for: initial seed + offline fallback only
+// Do not edit manually — use the admin UI at /admin/taxonomy
+
+export const SUBGROUPS = [
+  // ── Equities — US GICS Sectors ────────────────────────────────────────────
+  {
+    id:           "aerospace",
+    display_name: "Aerospace & Defense",
+    description:  "GICS: Industrials / A&D sub-industry",
+    slug:         "aerospace",
+    group_id:     "equities",
+    icon:         "🛡",
+    color:        "#607D8B",
+  },
+  {
+    id:           "cleanenergy",
+    display_name: "Clean Energy",
+    description:  "Thematic: EVs + renewables + utilities",
+    slug:         "cleanenergy",
+    group_id:     "equities",
+    icon:         "🔋",
+    color:        "#66BB6A",
+  },
+  {
+    id:           "consumer",
+    display_name: "Consumer",
+    description:  "GICS: Consumer Discretionary + Staples",
+    slug:         "consumer",
+    group_id:     "equities",
+    icon:         "🛒",
+    color:        "#FF7043",
+  },
+  {
+    id:           "financials",
+    display_name: "Financials",
+    description:  "GICS: Financials",
+    slug:         "financials",
+    group_id:     "equities",
+    icon:         "🏦",
+    color:        "#4CAF50",
+  },
+  {
+    id:           "healthcare",
+    display_name: "Health Care",
+    description:  "GICS: Health Care — official two-word form",
+    slug:         "healthcare",
+    group_id:     "equities",
+    icon:         "💊",
+    color:        "#E91E63",
+  },
+  {
+    id:           "oil-gas",
+    display_name: "Oil & Gas",
+    description:  "GICS: Energy",
+    slug:         "oil-gas",
+    group_id:     "equities",
+    icon:         "🛢",
+    color:        "#FF9100",
+  },
+  {
+    id:           "reits",
+    display_name: "Real Estate",
+    description:  "GICS: Real Estate",
+    slug:         "reits",
+    group_id:     "equities",
+    icon:         "🏢",
+    color:        "#AB47BC",
+  },
+  {
+    id:           "semiconductors",
+    display_name: "Semiconductors",
+    description:  "GICS: IT / Semiconductors sub-industry",
+    slug:         "semiconductors",
+    group_id:     "equities",
+    icon:         "🔬",
+    color:        "#26C6DA",
+  },
+  {
+    id:           "technology",
+    display_name: "Technology",
+    description:  "GICS: Information Technology + Comm. Svcs.",
+    slug:         "technology",
+    group_id:     "equities",
+    icon:         "⚡",
+    color:        "#00BCD4",
+  },
+
+  // ── Equities — International ───────────────────────────────────────────────
+  {
+    id:           "brazil",
+    display_name: "Brazil Equities",
+    description:  "B3 / Bovespa — kept distinct from Emerging Markets",
+    slug:         "brazil",
+    group_id:     "equities",
+    icon:         "🇧🇷",
+    color:        "#009C3B",
+  },
+  {
+    id:           "emerging",
+    display_name: "Emerging Markets",
+    description:  "EM ETFs: EWZ, INDA, MCHI, EWY",
+    slug:         "emerging",
+    group_id:     "equities",
+    icon:         "🌍",
+    color:        "#26A69A",
+  },
+
+  // ── Currencies ────────────────────────────────────────────────────────────
+  {
+    id:           "fx",
+    display_name: "Foreign Exchange",
+    description:  "8 major currency pairs via Yahoo Finance",
+    slug:         "fx",
+    group_id:     "currencies",
+    icon:         "💱",
+    color:        "#FFD740",
+  },
+
+  // ── Indices ───────────────────────────────────────────────────────────────
+  {
+    id:           "indices",
+    display_name: "Global Indices",
+    description:  "8 global benchmark indices via Yahoo Finance",
+    slug:         "indices",
+    group_id:     "indices",
+    icon:         "🌐",
+    color:        "#7C4DFF",
+  },
+
+  // ── Digital Assets ────────────────────────────────────────────────────────
+  {
+    id:           "crypto",
+    display_name: "Crypto",
+    description:  "BTC, ETH, SOL via CoinGecko",
+    slug:         "crypto",
+    group_id:     "digital-assets",
+    icon:         "🪙",
+    color:        "#F9A825",
+  },
+
+  // ── Commodities ───────────────────────────────────────────────────────────
+  {
+    id:           "precious-metals",
+    display_name: "Precious Metals",
+    description:  "Gold, silver, platinum ETFs and futures",
+    slug:         "precious-metals",
+    group_id:     "commodities",
+    icon:         "🥇",
+    color:        "#FFD700",
+  },
+  {
+    id:           "energy-commodities",
+    display_name: "Energy Commodities",
+    description:  "Crude oil, natural gas ETFs and futures",
+    slug:         "energy-commodities",
+    group_id:     "commodities",
+    icon:         "🛢",
+    color:        "#FF6F00",
+  },
+  {
+    id:           "agriculture",
+    display_name: "Agriculture",
+    description:  "Corn, wheat, soybean commodity ETFs",
+    slug:         "agriculture",
+    group_id:     "commodities",
+    icon:         "🌾",
+    color:        "#8BC34A",
+  },
+
+  // ── Fixed Income ──────────────────────────────────────────────────────────
+  {
+    id:           "dividend-income",
+    display_name: "Dividend Income",
+    description:  "High-yield dividend ETFs and income strategies",
+    slug:         "dividend-income",
+    group_id:     "fixed-income",
+    icon:         "💰",
+    color:        "#FFC107",
+  },
+  {
+    id:           "treasuries",
+    display_name: "Treasuries",
+    description:  "US Treasury bond ETFs across maturity spectrum",
+    slug:         "treasuries",
+    group_id:     "fixed-income",
+    icon:         "🏛",
+    color:        "#5C6BC0",
+  },
+  {
+    id:           "bonds",
+    display_name: "Bonds",
+    description:  "Investment-grade and high-yield corporate bond ETFs",
+    slug:         "bonds",
+    group_id:     "fixed-income",
+    icon:         "📄",
+    color:        "#78909C",
+  },
+];

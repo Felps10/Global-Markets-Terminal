@@ -19,3 +19,8 @@ Thumbs.db
 
 # Logs
 *.log
+
+# SQLite database (generated at runtime)
+server/data/*.db
+server/data/*.db-wal
+server/data/*.db-shm

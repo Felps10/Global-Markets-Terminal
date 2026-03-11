@@ -11,27 +11,97 @@ import {
   fetchB3MarketData,
   fetchYahooChartData,
 } from "./dataServices.js";
+import { SUBGROUPS as STATIC_SUBGROUPS_ARRAY } from './data/subgroups.js';
+import { ASSETS    as STATIC_ASSETS_ARRAY    } from './data/assets.js';
+import { useTaxonomy } from './context/TaxonomyContext.jsx';
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 const REFRESH_INTERVAL = 30000;
 
-const CATEGORIES = {
-  tech:       { label: "Big Tech",              icon: "⚡", color: "#00BCD4" },
-  energy:     { label: "Big Oil & Energy",      icon: "🛢", color: "#FF9100" },
-  financials: { label: "Financials & Banks",    icon: "🏦", color: "#4CAF50" },
-  healthcare: { label: "Healthcare & Pharma",   icon: "💊", color: "#E91E63" },
-  semis:      { label: "Semiconductors",        icon: "🔬", color: "#26C6DA" },
-  consumer:   { label: "Consumer & Retail",     icon: "🛒", color: "#FF7043" },
-  defense:    { label: "Defense & Aerospace",   icon: "🛡", color: "#607D8B" },
-  ev:         { label: "EVs & Clean Energy",    icon: "🔋", color: "#66BB6A" },
-  reits:      { label: "REITs & Real Estate",   icon: "🏢", color: "#AB47BC" },
-  dividends:  { label: "Dividends & Income",    icon: "💰", color: "#FFC107" },
-  emerging:   { label: "Emerging Markets",      icon: "🌍", color: "#26A69A" },
-  crypto:     { label: "Crypto Assets",         icon: "🪙", color: "#F9A825" },
-  indices:    { label: "Global Indices",        icon: "🌐", color: "#7C4DFF" },
-  fx:         { label: "Major Currencies",      icon: "💱", color: "#FFD740" },
-  brasil:     { label: "Brasil — B3",           icon: "🇧🇷", color: "#009C3B" },
-};
+// ─────────────────────────────────────────────────────────────────────────────
+// MARKET GROUP CONFIGURATION
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Structure: flat alphabetical list (no section headers in data — sections are
+// logical only). The display order in the UI is driven by the sort controls.
+//
+// Naming convention: institutional-grade labels aligned with GICS, Bloomberg
+// Terminal, MSCI index families, and S&P Global sector classifications.
+//
+// ── LOGICAL SECTIONS (informational) ────────────────────────────────────────
+//
+//  EQUITIES — US SECTORS (GICS-aligned)
+//    aerospace      Aerospace & Defense     (GICS: Industrials / A&D sub-industry)
+//    cleanenergy    Clean Energy            (Thematic: EVs + renewables + utilities)
+//    consumer       Consumer                (GICS: Consumer Discretionary + Staples)
+//    oil-gas        Oil & Gas               (GICS: Energy)
+//    financials     Financials              (GICS: Financials)
+//    healthcare     Health Care             (GICS: Health Care — official two-word form)
+//    reits          Real Estate             (GICS: Real Estate)
+//    semiconductors Semiconductors          (GICS: IT / Semiconductors sub-industry)
+//    technology     Technology              (GICS: Information Technology + Comm. Svcs.)
+//
+//  EQUITIES — STRATEGIES / SCREENS
+//    dividends      Dividend Income         (Strategy screen: FMP dividend yield > 3%)
+//
+//  EQUITIES — INTERNATIONAL
+//    brazil         Brazil Equities         (B3 / Bovespa — kept distinct, not merged
+//                                            into Emerging Markets, for specificity)
+//    emerging       Emerging Markets        (EM ETFs: EWZ, INDA, MCHI, EWY)
+//
+//  DIGITAL ASSETS
+//    crypto         Crypto                  (BTC, ETH, SOL via CoinGecko)
+//
+//  MACRO / BENCHMARKS
+//    fx             Foreign Exchange        (8 major currency pairs via Yahoo)
+//    indices        Global Indices          (8 global benchmark indices via Yahoo)
+//
+// ── RENAME / MERGE / SPLIT LOG ───────────────────────────────────────────────
+//
+//  Old Name               → New Name              Key change
+//  ─────────────────────────────────────────────────────────
+//  "Big Tech"             → "Technology"           tech → technology
+//  "Big Oil & Energy"     → "Energy"               energy (key unchanged)
+//  "Energy"               → "Oil & Gas"            energy → oil-gas
+//  "Digital Assets"       → "Crypto"               crypto (key unchanged)
+//  "Financials & Banks"   → "Financials"           financials (key unchanged)
+//  "Healthcare & Pharma"  → "Health Care"          healthcare (key unchanged)
+//  "Semiconductors"       → "Semiconductors"       semis → semiconductors
+//  "Consumer & Retail"    → "Consumer"             consumer (key unchanged)
+//  "Defense & Aerospace"  → "Aerospace & Defense"  defense → aerospace
+//  "EVs & Clean Energy"   → "Clean Energy"         ev → cleanenergy
+//  "REITs & Real Estate"  → "Real Estate"          reits (key unchanged)
+//  "Dividends & Income"   → "Dividend Income"      dividends (key unchanged)
+//  "Emerging Markets"     → "Emerging Markets"     emerging (key unchanged)
+//  "Crypto Assets"        → "Digital Assets"       crypto (key unchanged)  [see below]
+//  "Global Indices"       → "Global Indices"       indices (key unchanged)
+//  "Major Currencies"     → "Foreign Exchange"     fx (key unchanged)
+//  "Brasil — B3"          → "Brazil Equities"      brasil → brazil
+//
+//  Notes:
+//  • "Big Tech" and "Semiconductors" kept separate — NVDA cross-listed in both.
+//  • "EVs & Clean Energy" kept as thematic group ("Clean Energy") rather than
+//    splitting into Energy/Industrials, because its assets span multiple GICS
+//    sectors (NEE=Utilities, ENPH/FSLR=Tech, RIVN/BYDDY=Industrials/Consumer).
+//  • "Brazil Equities" is NOT merged into "Emerging Markets" — B3 has its own
+//    macro banner (SELIC, IPCA, CDI, USD/BRL) and dedicated data source (BRAPI).
+//  • No groups were deleted — all 15 groups are preserved.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Static fallback maps — built from src/data/ files (same source as DB seed)
+const STATIC_CATEGORIES = Object.fromEntries(
+  STATIC_SUBGROUPS_ARRAY.map(s => [s.id, { label: s.display_name, icon: s.icon, color: s.color }])
+);
+
+const STATIC_ASSETS_MAP = Object.fromEntries(
+  STATIC_ASSETS_ARRAY.map(a => [a.symbol, {
+    name:     a.name,
+    cat:      a.subgroup_id,
+    exchange: a.exchange || 'NASDAQ',
+    type:     a.type,
+    ...(a.meta || {}),
+  }])
+);
 
 const EXCHANGE_COLORS = {
   NASDAQ: "#00BCD4",
@@ -58,143 +128,33 @@ const SOURCE_COLORS = {
   awesomeapi:   "#FF6B00",
 };
 
-const ASSETS = {
-  // ── Big Tech ──
-  AAPL:  { name: "Apple",            cat: "tech",    exchange: "NASDAQ" },
-  MSFT:  { name: "Microsoft",        cat: "tech",    exchange: "NASDAQ" },
-  GOOGL: { name: "Alphabet",         cat: "tech",    exchange: "NASDAQ" },
-  AMZN:  { name: "Amazon",           cat: "tech",    exchange: "NASDAQ", alsoIn: ["consumer"] },
-  NVDA:  { name: "NVIDIA",           cat: "tech",    exchange: "NASDAQ", alsoIn: ["semis"] },
-  META:  { name: "Meta Platforms",   cat: "tech",    exchange: "NASDAQ" },
-  TSLA:  { name: "Tesla",            cat: "tech",    exchange: "NASDAQ", alsoIn: ["ev"] },
-  ORCL:  { name: "Oracle",           cat: "tech",    exchange: "NYSE"   },
-  // ── Big Oil & Energy ──
-  XOM:   { name: "ExxonMobil",       cat: "energy",  exchange: "NYSE" },
-  CVX:   { name: "Chevron",          cat: "energy",  exchange: "NYSE" },
-  SHEL:  { name: "Shell",            cat: "energy",  exchange: "NYSE" },
-  TTE:   { name: "TotalEnergies",    cat: "energy",  exchange: "NYSE" },
-  COP:   { name: "ConocoPhillips",   cat: "energy",  exchange: "NYSE" },
-  BP:    { name: "BP",               cat: "energy",  exchange: "NYSE" },
-  ENB:   { name: "Enbridge",         cat: "energy",  exchange: "NYSE" },
-  SLB:   { name: "Schlumberger",     cat: "energy",  exchange: "NYSE" },
-  // ── Financials & Banks ──
-  JPM:   { name: "JPMorgan Chase",   cat: "financials", exchange: "NYSE" },
-  GS:    { name: "Goldman Sachs",    cat: "financials", exchange: "NYSE" },
-  BAC:   { name: "Bank of America",  cat: "financials", exchange: "NYSE" },
-  WFC:   { name: "Wells Fargo",      cat: "financials", exchange: "NYSE" },
-  MS:    { name: "Morgan Stanley",   cat: "financials", exchange: "NYSE" },
-  V:     { name: "Visa",             cat: "financials", exchange: "NYSE" },
-  MA:    { name: "Mastercard",       cat: "financials", exchange: "NYSE" },
-  BLK:   { name: "BlackRock",        cat: "financials", exchange: "NYSE" },
-  // ── Healthcare & Pharma ──
-  JNJ:   { name: "Johnson & Johnson",cat: "healthcare", exchange: "NYSE" },
-  PFE:   { name: "Pfizer",           cat: "healthcare", exchange: "NYSE" },
-  UNH:   { name: "UnitedHealth",     cat: "healthcare", exchange: "NYSE" },
-  LLY:   { name: "Eli Lilly",        cat: "healthcare", exchange: "NYSE" },
-  ABT:   { name: "Abbott Labs",      cat: "healthcare", exchange: "NYSE" },
-  MRNA:  { name: "Moderna",          cat: "healthcare", exchange: "NASDAQ" },
-  // ── Semiconductors ──
-  AMD:   { name: "AMD",              cat: "semis",   exchange: "NASDAQ" },
-  INTC:  { name: "Intel",            cat: "semis",   exchange: "NASDAQ" },
-  TSM:   { name: "TSMC",             cat: "semis",   exchange: "NYSE" },
-  QCOM:  { name: "Qualcomm",         cat: "semis",   exchange: "NASDAQ" },
-  AVGO:  { name: "Broadcom",         cat: "semis",   exchange: "NASDAQ" },
-  ASML:  { name: "ASML",             cat: "semis",   exchange: "NASDAQ" },
-  // ── Consumer & Retail ──
-  WMT:   { name: "Walmart",          cat: "consumer", exchange: "NYSE" },
-  TGT:   { name: "Target",           cat: "consumer", exchange: "NYSE" },
-  COST:  { name: "Costco",           cat: "consumer", exchange: "NASDAQ" },
-  NKE:   { name: "Nike",             cat: "consumer", exchange: "NYSE" },
-  LVMUY: { name: "LVMH",             cat: "consumer", exchange: "NYSE" },
-  // ── Defense & Aerospace ──
-  LMT:   { name: "Lockheed Martin",  cat: "defense",  exchange: "NYSE" },
-  RTX:   { name: "Raytheon",         cat: "defense",  exchange: "NYSE" },
-  NOC:   { name: "Northrop Grumman", cat: "defense",  exchange: "NYSE" },
-  BA:    { name: "Boeing",           cat: "defense",  exchange: "NYSE" },
-  GD:    { name: "General Dynamics", cat: "defense",  exchange: "NYSE" },
-  // ── EVs & Clean Energy ──
-  RIVN:  { name: "Rivian",           cat: "ev",       exchange: "NASDAQ" },
-  BYDDY: { name: "BYD",              cat: "ev",       exchange: "NYSE" },
-  NEE:   { name: "NextEra Energy",   cat: "ev",       exchange: "NYSE" },
-  ENPH:  { name: "Enphase Energy",   cat: "ev",       exchange: "NASDAQ" },
-  FSLR:  { name: "First Solar",      cat: "ev",       exchange: "NASDAQ" },
-  // ── REITs & Real Estate ──
-  PLD:   { name: "Prologis",         cat: "reits",    exchange: "NYSE" },
-  AMT:   { name: "American Tower",   cat: "reits",    exchange: "NYSE" },
-  EQIX:  { name: "Equinix",          cat: "reits",    exchange: "NASDAQ" },
-  SPG:   { name: "Simon Property",   cat: "reits",    exchange: "NYSE" },
-  // ── Emerging Markets (ETFs) ──
-  EWZ:   { name: "Brazil ETF",       cat: "emerging", exchange: "NYSE" },
-  INDA:  { name: "India ETF",        cat: "emerging", exchange: "NASDAQ" },
-  MCHI:  { name: "China ETF",        cat: "emerging", exchange: "NASDAQ" },
-  EWY:   { name: "South Korea ETF",  cat: "emerging", exchange: "NYSE" },
-  // ── Crypto (CoinGecko only) ──
-  BTC:   { name: "Bitcoin",   display: "BTC", cat: "crypto", exchange: "CRYPTO", cgId: "bitcoin",  isCrypto: true },
-  ETH:   { name: "Ethereum",  display: "ETH", cat: "crypto", exchange: "CRYPTO", cgId: "ethereum", isCrypto: true },
-  SOL:   { name: "Solana",    display: "SOL", cat: "crypto", exchange: "CRYPTO", cgId: "solana",   isCrypto: true },
-  // ── Global Indices ──
-  "^GSPC":    { name: "S&P 500",      display: "SPX",     cat: "indices", exchange: "INDEX" },
-  "^DJI":     { name: "Dow Jones",    display: "DJIA",    cat: "indices", exchange: "INDEX" },
-  "^IXIC":    { name: "NASDAQ Comp.", display: "IXIC",    cat: "indices", exchange: "INDEX" },
-  "^FTSE":    { name: "FTSE 100",     display: "FTSE",    cat: "indices", exchange: "LSE"   },
-  "^GDAXI":   { name: "DAX",          display: "DAX",     cat: "indices", exchange: "XETRA" },
-  "^N225":    { name: "Nikkei 225",   display: "N225",    cat: "indices", exchange: "TSE"   },
-  "^HSI":     { name: "Hang Seng",    display: "HSI",     cat: "indices", exchange: "HKEX"  },
-  "^BVSP":    { name: "Ibovespa",     display: "IBOV",    cat: "indices", exchange: "B3"    },
-  // ── Major Currencies ──
-  "EURUSD=X": { name: "Euro / US Dollar",              display: "EUR/USD", cat: "fx", exchange: "FOREX" },
-  "GBPUSD=X": { name: "British Pound / US Dollar",     display: "GBP/USD", cat: "fx", exchange: "FOREX" },
-  "USDJPY=X": { name: "US Dollar / Japanese Yen",      display: "USD/JPY", cat: "fx", exchange: "FOREX" },
-  "USDCNY=X": { name: "US Dollar / Chinese Yuan",      display: "USD/CNY", cat: "fx", exchange: "FOREX" },
-  "USDCHF=X": { name: "US Dollar / Swiss Franc",       display: "USD/CHF", cat: "fx", exchange: "FOREX" },
-  "USDBRL=X": { name: "US Dollar / Brazilian Real",    display: "USD/BRL", cat: "fx", exchange: "FOREX" },
-  "AUDUSD=X": { name: "Australian Dollar / US Dollar", display: "AUD/USD", cat: "fx", exchange: "FOREX" },
-  "USDCAD=X": { name: "US Dollar / Canadian Dollar",   display: "USD/CAD", cat: "fx", exchange: "FOREX" },
-  // ── Brasil — B3 (via BRAPI) ──
-  PETR4:  { name: "Petrobras PN",             cat: "brasil", exchange: "B3", isB3: true },
-  PETR3:  { name: "Petrobras ON",             cat: "brasil", exchange: "B3", isB3: true },
-  VALE3:  { name: "Vale",                     cat: "brasil", exchange: "B3", isB3: true },
-  ITUB4:  { name: "Itaú Unibanco",            cat: "brasil", exchange: "B3", isB3: true },
-  BBDC4:  { name: "Bradesco",                 cat: "brasil", exchange: "B3", isB3: true },
-  BBAS3:  { name: "Banco do Brasil",          cat: "brasil", exchange: "B3", isB3: true },
-  SANB11: { name: "Santander Brasil",         cat: "brasil", exchange: "B3", isB3: true },
-  MGLU3:  { name: "Magazine Luiza",           cat: "brasil", exchange: "B3", isB3: true },
-  RENT3:  { name: "Localiza",                 cat: "brasil", exchange: "B3", isB3: true },
-  LREN3:  { name: "Lojas Renner",             cat: "brasil", exchange: "B3", isB3: true },
-  VIVT3:  { name: "Vivo / Telefônica Brasil", cat: "brasil", exchange: "B3", isB3: true },
-  ELET3:  { name: "Eletrobras",               cat: "brasil", exchange: "B3", isB3: true },
-  SBSP3:  { name: "Sabesp",                   cat: "brasil", exchange: "B3", isB3: true },
-  CSNA3:  { name: "CSN",                      cat: "brasil", exchange: "B3", isB3: true },
-  GGBR4:  { name: "Gerdau",                   cat: "brasil", exchange: "B3", isB3: true },
-  SLCE3:  { name: "SLC Agrícola",             cat: "brasil", exchange: "B3", isB3: true },
-  AGRO3:  { name: "BrasilAgro",               cat: "brasil", exchange: "B3", isB3: true },
-};
 
 // Macro context banners: which FRED series to show for each group
 const GROUP_MACRO = {
-  financials: { fredKey: "fedRate",           label: "Fed Funds Rate" },
-  consumer:   { fredKey: "consumerSentiment", label: "Consumer Sentiment" },
-  ev:         { fredKey: "treasury10y",       label: "10Y Treasury Yield" },
-  reits:      { fredKey: "mortgage30y",       label: "30-Year Mortgage Rate" },
+  financials:  { fredKey: "fedRate",           label: "Fed Funds Rate" },
+  consumer:    { fredKey: "consumerSentiment", label: "Consumer Sentiment" },
+  cleanenergy: { fredKey: "treasury10y",       label: "10Y Treasury Yield" },
+  reits:       { fredKey: "mortgage30y",       label: "30-Year Mortgage Rate" },
 };
 
 // Cross-listing: find all assets that belong to a given category (primary or alsoIn)
+// Used at module level by fetchMarketData. Component uses the shadowed useCallback version.
 function assetsInCategory(catKey) {
-  return Object.keys(ASSETS).filter(s => {
-    const a = ASSETS[s];
+  return Object.keys(STATIC_ASSETS_MAP).filter(s => {
+    const a = STATIC_ASSETS_MAP[s];
     return a.cat === catKey || (a.alsoIn && a.alsoIn.includes(catKey));
   });
 }
 
 // All equity symbols (for FMP batch, Finnhub fallback, etc.)
-const EQUITY_CATS = new Set(["tech", "energy", "financials", "healthcare", "semis", "consumer", "defense", "ev", "reits", "emerging"]);
+const EQUITY_CATS = new Set(["technology", "oil-gas", "financials", "healthcare", "semiconductors", "consumer", "aerospace", "cleanenergy", "reits", "emerging"]);
 function isEquityCat(cat) { return EQUITY_CATS.has(cat); }
 
 const VOLATILITY = {
-  tech: 0.018, energy: 0.014, financials: 0.012, healthcare: 0.014,
-  semis: 0.020, consumer: 0.010, defense: 0.010, ev: 0.025,
+  technology: 0.018, "oil-gas": 0.014, financials: 0.012, healthcare: 0.014,
+  semiconductors: 0.020, consumer: 0.010, aerospace: 0.010, cleanenergy: 0.025,
   reits: 0.012, emerging: 0.016, crypto: 0.035, indices: 0.01, fx: 0.004,
-  brasil: 0.018,
+  brazil: 0.018,
 };
 
 const TIMEFRAMES = [
@@ -228,7 +188,7 @@ function formatMarketCap(mc) {
 
 function formatPrice(symbol, price) {
   if (price == null) return "—";
-  const asset = ASSETS[symbol];
+  const asset = STATIC_ASSETS_MAP[symbol];
   if (!asset) return String(price);
   if (asset.isB3) return "R$ " + price.toFixed(2);
   if (asset.cat === "fx") return price.toFixed(4);
@@ -256,13 +216,13 @@ function generateSparkline(basePrice, vol, points = 30) {
 
 async function fetchMarketData(prevData) {
   // Exclude crypto (CoinGecko) and B3 (BRAPI) — they use dedicated sources
-  const yahooSymbols = Object.keys(ASSETS).filter(s => !ASSETS[s].isCrypto && !ASSETS[s].isB3);
-  return fetchYahooMarketData(yahooSymbols, prevData, { assets: ASSETS, volatility: VOLATILITY, isEquityCat });
+  const yahooSymbols = Object.keys(STATIC_ASSETS_MAP).filter(s => !STATIC_ASSETS_MAP[s].isCrypto && !STATIC_ASSETS_MAP[s].isB3);
+  return fetchYahooMarketData(yahooSymbols, prevData, { assets: STATIC_ASSETS_MAP, volatility: VOLATILITY, isEquityCat });
 }
 
 // Fetch crypto data from CoinGecko and merge into the same data shape
 async function fetchCryptoData() {
-  const cryptoAssets = Object.entries(ASSETS).filter(([, a]) => a.isCrypto);
+  const cryptoAssets = Object.entries(STATIC_ASSETS_MAP).filter(([, a]) => a.isCrypto);
   if (cryptoAssets.length === 0) return {};
   const ids = cryptoAssets.map(([, a]) => a.cgId).join(",");
   const data = await coingeckoPrices(ids);
@@ -294,12 +254,12 @@ async function fetchCryptoData() {
 
 // Fetch B3 data from BRAPI, with Yahoo .SA suffix fallback
 async function fetchB3Data() {
-  const b3Assets = Object.entries(ASSETS).filter(([, a]) => a.isB3);
-  return fetchB3MarketData(b3Assets, { assets: ASSETS, volatility: VOLATILITY });
+  const b3Assets = Object.entries(STATIC_ASSETS_MAP).filter(([, a]) => a.isB3);
+  return fetchB3MarketData(b3Assets, { assets: STATIC_ASSETS_MAP, volatility: VOLATILITY });
 }
 
 async function fetchChartData(symbol, range, interval) {
-  return fetchYahooChartData(symbol, range, interval, { assets: ASSETS });
+  return fetchYahooChartData(symbol, range, interval, { assets: STATIC_ASSETS_MAP });
 }
 
 // ─── SPARKLINE ────────────────────────────────────────────────────────────────
@@ -488,7 +448,7 @@ function BrasilMacroBanner({ brasilMacro }) {
 
 // ─── CROSS-LIST BADGE ────────────────────────────────────────────────────────
 function CrossListBadge({ symbol }) {
-  const asset = ASSETS[symbol];
+  const asset = STATIC_ASSETS_MAP[symbol];
   if (!asset?.alsoIn || asset.alsoIn.length === 0) return null;
   return (
     <span style={{
@@ -497,7 +457,7 @@ function CrossListBadge({ symbol }) {
       background: "rgba(120,144,156,0.12)", border: "1px solid rgba(120,144,156,0.25)",
       borderRadius: 3, padding: "1px 5px", whiteSpace: "nowrap",
     }}>
-      +{asset.alsoIn.map(c => CATEGORIES[c]?.label?.split(" ")[0] || c).join(",")}
+      +{asset.alsoIn.map(c => STATIC_CATEGORIES[c]?.label?.split(" ")[0] || c).join(",")}
     </span>
   );
 }
@@ -505,7 +465,7 @@ function CrossListBadge({ symbol }) {
 // ─── ASSET CARD ───────────────────────────────────────────────────────────────
 function AssetCard({ symbol, data, onClick }) {
   const [hovered, setHovered] = useState(false);
-  const asset = ASSETS[symbol];
+  const asset = STATIC_ASSETS_MAP[symbol];
   if (!asset || !data) return null;
 
   const positive     = data.changePct >= 0;
@@ -599,14 +559,14 @@ function ListColumnHeader() {
 // ─── ASSET ROW ────────────────────────────────────────────────────────────────
 function AssetRow({ symbol, data, rank, onClick }) {
   const [hovered, setHovered] = useState(false);
-  const asset = ASSETS[symbol];
+  const asset = STATIC_ASSETS_MAP[symbol];
   if (!asset || !data) return null;
 
   const positive     = data.changePct >= 0;
   const color        = positive ? "#00E676" : "#FF5252";
   const sign         = positive ? "+" : "";
   const displayTicker = asset.display || symbol;
-  const catInfo      = CATEGORIES[asset.cat];
+  const catInfo      = STATIC_CATEGORIES[asset.cat];
 
   return (
     <div
@@ -655,22 +615,22 @@ function HamburgerMenu({ open, onClose, activeFilter, onFilterChange, activeExch
   }, [open, onClose]);
 
   const navItems = [
-    { key: "all",        label: "All Markets",      icon: "🌍" },
-    { key: "tech",       label: "Big Tech",         icon: "⚡" },
-    { key: "energy",     label: "Big Oil",          icon: "🛢" },
-    { key: "financials", label: "Financials",       icon: "🏦" },
-    { key: "healthcare", label: "Healthcare",       icon: "💊" },
-    { key: "semis",      label: "Semiconductors",   icon: "🔬" },
-    { key: "consumer",   label: "Consumer",         icon: "🛒" },
-    { key: "defense",    label: "Defense",          icon: "🛡" },
-    { key: "ev",         label: "EVs & Clean",      icon: "🔋" },
-    { key: "reits",      label: "REITs",            icon: "🏢" },
-    { key: "dividends",  label: "Dividends",        icon: "💰" },
-    { key: "emerging",   label: "Emerging",         icon: "🌍" },
-    { key: "crypto",     label: "Crypto",           icon: "🪙" },
-    { key: "indices",    label: "Indices",          icon: "🌐" },
-    { key: "fx",         label: "FX",               icon: "💱" },
-    { key: "brasil",     label: "Brasil — B3",      icon: "🇧🇷" },
+    { key: "all",           label: "All Markets",        icon: "🌍" },
+    { key: "aerospace",     label: "Aerospace & Defense", icon: "🛡" },
+    { key: "brazil",        label: "Brazil Equities",    icon: "🇧🇷" },
+    { key: "cleanenergy",   label: "Clean Energy",       icon: "🔋" },
+    { key: "consumer",      label: "Consumer",           icon: "🛒" },
+    { key: "crypto",        label: "Crypto",             icon: "🪙" },
+    { key: "dividends",     label: "Dividend Income",    icon: "💰" },
+    { key: "emerging",      label: "Emerging Markets",   icon: "🌍" },
+    { key: "oil-gas",       label: "Oil & Gas",          icon: "🛢" },
+    { key: "financials",    label: "Financials",         icon: "🏦" },
+    { key: "fx",            label: "Foreign Exchange",   icon: "💱" },
+    { key: "healthcare",    label: "Health Care",        icon: "💊" },
+    { key: "indices",       label: "Global Indices",     icon: "🌐" },
+    { key: "reits",         label: "Real Estate",        icon: "🏢" },
+    { key: "semiconductors",label: "Semiconductors",     icon: "🔬" },
+    { key: "technology",    label: "Technology",         icon: "⚡" },
   ];
 
   const SectionLabel = ({ children }) => (
@@ -833,7 +793,7 @@ function HamburgerMenu({ open, onClose, activeFilter, onFilterChange, activeExch
             </div>
           )}
           <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", marginTop: 4, letterSpacing: "0.5px" }}>
-            {Object.keys(ASSETS).length} assets · {Object.keys(CATEGORIES).length} groups · 9 sources
+            {Object.keys(STATIC_ASSETS_MAP).length} assets · {Object.keys(STATIC_CATEGORIES).length} groups · 9 sources
           </div>
         </div>
       </div>
@@ -843,7 +803,7 @@ function HamburgerMenu({ open, onClose, activeFilter, onFilterChange, activeExch
 
 // ─── DETAIL PANEL ─────────────────────────────────────────────────────────────
 function DetailPanel({ symbol, data, onClose }) {
-  const asset = ASSETS[symbol];
+  const asset = STATIC_ASSETS_MAP[symbol];
   if (!asset || !data) return null;
 
   const [activeRange, setActiveRange] = useState("1D");
@@ -852,7 +812,7 @@ function DetailPanel({ symbol, data, onClose }) {
   const [chartState, setChartState] = useState({ status: "loading", data: null, error: "" });
 
   const displayTicker = asset.display || symbol;
-  const catInfo       = CATEGORIES[asset.cat];
+  const catInfo       = STATIC_CATEGORIES[asset.cat];
   const showVolume    = asset.cat !== "fx";
 
   // Escape key
@@ -1141,6 +1101,40 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
   const [expandedCards, setExpandedCards] = useState(new Set());
   const prevDataRef  = useRef(null);
   const intervalRef  = useRef(null);
+
+  // ── Taxonomy from TaxonomyContext (falls back to static data) ────────────────
+  const { subgroups: ctxSubgroups, assets: ctxAssets, error: taxError } = useTaxonomy() ?? {};
+
+  const CATEGORIES = useMemo(() => {
+    if (ctxSubgroups?.length) {
+      return Object.fromEntries(
+        ctxSubgroups.map(s => [s.id, { label: s.display_name, icon: s.icon, color: s.color }])
+      );
+    }
+    return STATIC_CATEGORIES;
+  }, [ctxSubgroups]);
+
+  const ASSETS = useMemo(() => {
+    if (ctxAssets?.length) {
+      return Object.fromEntries(
+        ctxAssets.map(a => [a.symbol, {
+          name:     a.name,
+          cat:      a.subgroup_id,
+          exchange: a.exchange || 'NASDAQ',
+          type:     a.type,
+          ...(a.meta ? (typeof a.meta === 'string' ? JSON.parse(a.meta) : a.meta) : {}),
+        }])
+      );
+    }
+    return STATIC_ASSETS_MAP;
+  }, [ctxAssets]);
+
+  const assetsInCategory = useCallback((catKey) => {
+    return Object.keys(ASSETS).filter(s => {
+      const a = ASSETS[s];
+      return a.cat === catKey || (a.alsoIn && a.alsoIn.includes(catKey));
+    });
+  }, [ASSETS]);
 
   const toggleGroup = (catKey) => {
     setCollapsedGroups(prev => {
@@ -1665,6 +1659,116 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
                   </div>
                 )}
               </div>
+            ) : allCollapsed && viewMode === "list" ? (
+              /* ── COLLAPSED LIST MODE ── */
+              <div style={{ marginTop: 8, border: "1px solid var(--c-border)", borderRadius: 8, overflow: "hidden" }}>
+                {sortedCats.map((catKey) => {
+                  const cat = CATEGORIES[catKey];
+                  const stats = getGroupStats(catKey);
+                  if (stats.count === 0) return null;
+                  const isOpen = expandedCards.has(catKey);
+                  const pctColor = stats.avgPct > 0 ? "#00E676" : stats.avgPct < 0 ? "#FF5252" : "var(--c-text-3)";
+                  const pctSign = stats.avgPct > 0 ? "+" : stats.avgPct < 0 ? "−" : "";
+                  const pctArrow = stats.avgPct > 0 ? "↑" : stats.avgPct < 0 ? "↓" : "";
+                  const borderAccent = stats.avgPct >= 0 ? "#00E676" : "#FF5252";
+
+                  // Gather symbols for the expanded inline view (same logic as collapsed card mode)
+                  let symbols = null;
+                  if (isOpen) {
+                    if (catKey === "dividends") {
+                      symbols = dividendSymbols.filter(s => marketData[s]);
+                    } else {
+                      symbols = Object.keys(ASSETS).filter(s => {
+                        const a = ASSETS[s];
+                        const inCat = a.cat === catKey || (a.alsoIn && a.alsoIn.includes(catKey));
+                        return inCat && marketData[s];
+                      });
+                    }
+                    if (activeExchanges.size > 0) {
+                      symbols = symbols.filter(s => activeExchanges.has(ASSETS[s]?.exchange));
+                    }
+                    if (sortMode !== "default") {
+                      symbols = [...symbols].sort((a, b) =>
+                        sortMode === "gainers"
+                          ? (marketData[b]?.changePct ?? 0) - (marketData[a]?.changePct ?? 0)
+                          : (marketData[a]?.changePct ?? 0) - (marketData[b]?.changePct ?? 0)
+                      );
+                    }
+                  }
+
+                  return (
+                    <div key={catKey} style={{ borderBottom: "1px solid var(--c-border)" }}>
+                      {/* Row header — always visible, click to expand/collapse */}
+                      <div
+                        onClick={() => toggleCard(catKey)}
+                        style={{
+                          display: "flex", alignItems: "center",
+                          height: 40, padding: "0 16px",
+                          borderLeft: `3px solid ${isOpen ? "#00BCD4" : borderAccent}`,
+                          cursor: "pointer",
+                          transition: "background 0.15s ease",
+                          userSelect: "none",
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                      >
+                        <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 600, color: "var(--c-text)", flex: 1 }}>
+                          {cat.icon} {cat.label}
+                        </span>
+                        <span style={{
+                          fontFamily: "'JetBrains Mono', monospace",
+                          fontSize: 13, fontWeight: 700,
+                          color: pctColor,
+                          marginRight: 12,
+                        }}>
+                          {pctArrow} {pctSign}{Math.abs(stats.avgPct).toFixed(2)}%
+                        </span>
+                        <span style={{
+                          fontFamily: "'JetBrains Mono', monospace",
+                          fontSize: 16, lineHeight: 1,
+                          color: isOpen ? "#00BCD4" : "var(--c-text-3)",
+                          transition: "transform 0.25s ease, color 0.15s ease",
+                          transform: isOpen ? "rotate(90deg)" : "rotate(0deg)",
+                          display: "inline-block",
+                        }}>›</span>
+                      </div>
+
+                      {/* Expanded inline content — slides in below the row header */}
+                      <div style={{
+                        overflow: "hidden",
+                        maxHeight: isOpen ? 4000 : 0,
+                        opacity: isOpen ? 1 : 0,
+                        transition: "max-height 0.25s ease, opacity 0.2s ease",
+                      }}>
+                        <div style={{ borderTop: "1px solid var(--c-border)", padding: "12px 0" }}>
+                          <MacroBanner macroData={macroData} catKey={catKey} />
+                          {catKey === "brazil" && <BrasilMacroBanner brasilMacro={brasilMacro} />}
+                          {catKey === "dividends" && (
+                            <div style={{
+                              display: "flex", alignItems: "center", gap: 10,
+                              background: "rgba(255,193,7,0.08)", border: "1px solid rgba(255,193,7,0.2)",
+                              borderRadius: 6, padding: "8px 14px", marginBottom: 10, marginLeft: 3, marginRight: 3,
+                            }}>
+                              <SourceBadge source="fmp" />
+                              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--c-text-2)" }}>
+                                Assets with dividend yield &gt; 3% (via FMP profile data)
+                              </span>
+                            </div>
+                          )}
+                          {symbols && (
+                            <>
+                              <ListColumnHeader />
+                              <div style={{ border: "1px solid var(--c-border)", borderRadius: 8, overflow: "hidden" }}>
+                                {symbols.map((sym, i) => <AssetRow key={sym} symbol={sym} data={marketData[sym]} rank={i + 1} onClick={() => setSelectedAsset(sym)} />)}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             ) : allCollapsed ? (
               /* ── COLLAPSED CARD GRID MODE ── */
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10, marginTop: 8 }}>
@@ -1776,7 +1880,7 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
                           transition: "max-height 0.25s ease",
                         }}>
                           <MacroBanner macroData={macroData} catKey={catKey} />
-                          {catKey === "brasil" && <BrasilMacroBanner brasilMacro={brasilMacro} />}
+                          {catKey === "brazil" && <BrasilMacroBanner brasilMacro={brasilMacro} />}
                           {catKey === "dividends" && (
                             <div style={{
                               display: "flex", alignItems: "center", gap: 10,
@@ -1858,7 +1962,7 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
                       </div>
                       <div style={{ overflow: "hidden", maxHeight: collapsedGroups[catKey] ? 0 : 2000, opacity: collapsedGroups[catKey] ? 0 : 1, transition: "max-height 0.3s ease, opacity 0.2s ease" }}>
                         <MacroBanner macroData={macroData} catKey={catKey} />
-                        {catKey === "brasil" && <BrasilMacroBanner brasilMacro={brasilMacro} />}
+                        {catKey === "brazil" && <BrasilMacroBanner brasilMacro={brasilMacro} />}
                         {/* Dividend yield info for dividends group */}
                         {catKey === "dividends" && (
                           <div style={{
