@@ -23,6 +23,15 @@ export async function login(email, password) {
   return handleResponse(res);
 }
 
+export async function register(name, email, password, confirmPassword) {
+  const res = await fetch(`${BASE}/auth/register`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ name, email, password, confirmPassword }),
+  });
+  return handleResponse(res);
+}
+
 export async function getMe(token) {
   const res = await fetch(`${BASE}/auth/me`, { headers: authHeaders(token) });
   return handleResponse(res);

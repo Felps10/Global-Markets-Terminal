@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "./hooks/useAuth.js";
 import {
   hasFinnhubKey, finnhubNews, finnhubRecommendation,
   hasFmpKey, fmpProfile, fmpRatios, fmpBatchProfile,
@@ -1079,6 +1081,8 @@ function DetailPanel({ symbol, data, onClose }) {
 
 // ─── MAIN DASHBOARD ───────────────────────────────────────────────────────────
 export default function GlobalMarketsTerminal({ currentView = "dashboard", onNavigate, catalogPage, newsPage, heatmapPage }) {
+  const navigate                          = useNavigate();
+  const { user, logout }                  = useAuth();
   const [marketData,      setMarketData]      = useState(null);
   const [loading,         setLoading]         = useState(true);
   const [lastUpdate,      setLastUpdate]       = useState(null);
@@ -1463,6 +1467,35 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
               onMouseLeave={(e) => { e.target.style.borderColor = "var(--c-border)"; e.target.style.color = "var(--c-text-2)"; }}>
               REFRESH
             </button>
+            {/* ── User badge ── */}
+            {user && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, borderLeft: "1px solid var(--c-border)", paddingLeft: 16 }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: "50%",
+                  background: "linear-gradient(135deg, #00BCD4, #7C4DFF)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 700,
+                  color: "#fff", flexShrink: 0,
+                }}>
+                  {(user.name || user.email).charAt(0).toUpperCase()}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                  <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "var(--c-text)", fontWeight: 500, lineHeight: 1 }}>
+                    {user.name ? user.name.split(" ")[0] : user.email.split("@")[0]}
+                  </span>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: user.role === "admin" ? "#00BCD4" : "var(--c-text-3)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                    {user.role}
+                  </span>
+                </div>
+                <button
+                  onClick={() => { logout(); navigate("/"); }}
+                  style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", background: "transparent", border: "none", cursor: "pointer", padding: "4px 6px", letterSpacing: "0.06em", transition: "color 0.15s" }}
+                  onMouseEnter={(e) => { e.target.style.color = "#FF5252"; }}
+                  onMouseLeave={(e) => { e.target.style.color = "var(--c-text-3)"; }}>
+                  SIGN OUT
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

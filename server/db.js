@@ -25,7 +25,8 @@ export function initSchema() {
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       email       TEXT    UNIQUE NOT NULL,
       password    TEXT    NOT NULL,
-      role        TEXT    NOT NULL CHECK(role IN ('admin','viewer')),
+      name        TEXT    NOT NULL DEFAULT '',
+      role        TEXT    NOT NULL DEFAULT 'user' CHECK(role IN ('admin','user')),
       created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 

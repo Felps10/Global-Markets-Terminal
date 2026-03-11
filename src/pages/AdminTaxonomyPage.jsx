@@ -418,7 +418,7 @@ export default function AdminTaxonomyPage() {
           <Breadcrumb>Settings <span>›</span> Taxonomy</Breadcrumb>
           <PageTitle>Taxonomy Manager</PageTitle>
           <TopBarRight>
-            <UserEmail>{user?.email}</UserEmail>
+            <UserEmail>{user?.name || user?.email}</UserEmail>
             <AdminBadge>Admin</AdminBadge>
             <LogoutBtn onClick={handleLogout}>Log out</LogoutBtn>
           </TopBarRight>

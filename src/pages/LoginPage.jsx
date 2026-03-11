@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import styled, { keyframes } from 'styled-components';
 import { useAuth } from '../hooks/useAuth.js';
 
@@ -153,6 +153,20 @@ const Footer = styled.p`
   letter-spacing: 0.05em;
 `;
 
+const SignupFooter = styled.p`
+  text-align: center;
+  font-size: 11px;
+  color: #4A5568;
+  margin-top: 16px;
+  letter-spacing: 0.04em;
+`;
+
+const InlineLink = styled(Link)`
+  color: #00BCD4;
+  text-decoration: none;
+  &:hover { color: #26C6DA; }
+`;
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function LoginPage() {
   const { login }   = useAuth();
@@ -167,8 +181,8 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
-      navigate('/admin/taxonomy', { replace: true });
+      const data = await login(email, password);
+      navigate(data.user?.role === 'admin' ? '/admin/taxonomy' : '/app', { replace: true });
     } catch (err) {
       setError(err?.message || 'Invalid credentials');
     } finally {
@@ -218,7 +232,11 @@ export default function LoginPage() {
           </SubmitBtn>
         </Form>
 
-        <Footer>No registration — accounts are managed by the system administrator</Footer>
+        <Footer>Admin access — for system administrators only</Footer>
+        <SignupFooter>
+          Don&apos;t have an account?{' '}
+          <InlineLink to="/register">Sign up →</InlineLink>
+        </SignupFooter>
       </Panel>
     </Page>
   );

@@ -5,6 +5,8 @@ import CatalogPage from './CatalogPage';
 import NewsPage from './NewsPage';
 import MarketHeatmapPage from './MarketHeatmapPage';
 import LoginPage from './pages/LoginPage.jsx';
+import LandingPage from './pages/LandingPage.jsx';
+import RegisterPage from './pages/RegisterPage.jsx';
 import AdminTaxonomyPage from './pages/AdminTaxonomyPage.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
@@ -25,10 +27,22 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public routes */}
-        <Route path="/login" element={<LoginPage />} />
+        {/* Public */}
+        <Route path="/"          element={<LandingPage />} />
+        <Route path="/login"     element={<LoginPage />} />
+        <Route path="/register"  element={<RegisterPage />} />
 
-        {/* Admin routes */}
+        {/* Dashboard — any authenticated user */}
+        <Route
+          path="/app"
+          element={
+            <ProtectedRoute requiredRole={null}>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Admin */}
         <Route
           path="/admin/taxonomy"
           element={
@@ -38,8 +52,6 @@ export default function App() {
           }
         />
 
-        {/* Dashboard (default) */}
-        <Route path="/" element={<Dashboard />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

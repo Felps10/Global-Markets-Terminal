@@ -10,8 +10,9 @@ export default function ProtectedRoute({ children, requiredRole = 'admin' }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (requiredRole && user?.role !== requiredRole) {
-    return <Navigate to="/" replace />;
+  // requiredRole={null} means any authenticated user may pass
+  if (requiredRole != null && user?.role !== requiredRole) {
+    return <Navigate to="/app" replace />;
   }
 
   return children;
