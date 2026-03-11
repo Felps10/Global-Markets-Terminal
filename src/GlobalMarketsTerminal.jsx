@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./hooks/useAuth.js";
+import GMTHeader from "./components/GMTHeader.jsx";
 import {
   hasFinnhubKey, finnhubNews, finnhubRecommendation,
   hasFmpKey, fmpProfile, fmpRatios, fmpBatchProfile,
@@ -16,6 +17,7 @@ import {
 import { SUBGROUPS as STATIC_SUBGROUPS_ARRAY } from './data/subgroups.js';
 import { ASSETS    as STATIC_ASSETS_ARRAY    } from './data/assets.js';
 import { useTaxonomy } from './context/TaxonomyContext.jsx';
+import { isExhausted } from './services/quotaTracker.js';
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 const REFRESH_INTERVAL = 30000;
@@ -208,6 +210,7 @@ function formatPrice(symbol, price) {
 }
 
 function generateSparkline(basePrice, vol, points = 30) {
+  if (!basePrice || !isFinite(basePrice)) return [];
   const arr = [basePrice];
   for (let i = 1; i < points; i++) {
     const prev = arr[i - 1];
@@ -267,12 +270,14 @@ async function fetchChartData(symbol, range, interval) {
 // ─── SPARKLINE ────────────────────────────────────────────────────────────────
 function Sparkline({ data, positive, width = 80, height = 28 }) {
   if (!data || data.length < 2) return null;
-  const min   = Math.min(...data);
-  const max   = Math.max(...data);
+  const clean = data.filter(v => isFinite(v) && !isNaN(v));
+  if (clean.length < 2) return null;
+  const min   = Math.min(...clean);
+  const max   = Math.max(...clean);
   const range = max - min || 1;
   const pad   = 2;
-  const pts   = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * width;
+  const pts   = clean.map((v, i) => {
+    const x = (i / (clean.length - 1)) * width;
     const y = pad + ((max - v) / range) * (height - pad * 2);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   });
@@ -1105,9 +1110,14 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
   const [expandedCards, setExpandedCards] = useState(new Set());
   const prevDataRef  = useRef(null);
   const intervalRef  = useRef(null);
+  const mountedRef   = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   // ── Taxonomy from TaxonomyContext (falls back to static data) ────────────────
-  const { subgroups: ctxSubgroups, assets: ctxAssets, error: taxError } = useTaxonomy() ?? {};
+  const { subgroups: ctxSubgroups, assets: ctxAssets, error: taxError, loading: taxLoading } = useTaxonomy() ?? {};
 
   const CATEGORIES = useMemo(() => {
     if (ctxSubgroups?.length) {
@@ -1168,23 +1178,38 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
 
   const loadData = useCallback(async () => {
     // Fetch Yahoo data + CoinGecko crypto + BRAPI B3 in parallel
-    const [result, cryptoData, b3Data] = await Promise.all([
-      fetchMarketData(prevDataRef.current),
-      fetchCryptoData(),
-      fetchB3Data(),
-    ]);
-    const merged = { ...(result.data || {}), ...cryptoData, ...b3Data };
-    if (Object.keys(merged).length > 0) prevDataRef.current = merged;
-    setMarketData(Object.keys(merged).length > 0 ? merged : null);
-    setLastUpdate(new Date());
-    setLoading(false);
+    try {
+      const [result, cryptoData, b3Data] = await Promise.all([
+        fetchMarketData(prevDataRef.current),
+        fetchCryptoData(),
+        fetchB3Data(),
+      ]);
+      if (!mountedRef.current) return;
+      const merged = { ...(result.data || {}), ...cryptoData, ...b3Data };
+      if (Object.keys(merged).length > 0) {
+        prevDataRef.current = merged;
+        setMarketData(merged);
+      } else if (prevDataRef.current && Object.keys(prevDataRef.current).length > 0) {
+        setMarketData(prevDataRef.current);
+      } else {
+        setMarketData(null);
+      }
+      setLastUpdate(new Date());
+    } catch (err) {
+      if (!mountedRef.current) return;
+      console.error('[GMT] loadData error:', err);
+      if (prevDataRef.current) setMarketData(prevDataRef.current);
+    } finally {
+      if (mountedRef.current) setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
+    if (taxLoading) return;
     loadData();
     intervalRef.current = setInterval(loadData, REFRESH_INTERVAL);
     return () => clearInterval(intervalRef.current);
-  }, [loadData]);
+  }, [taxLoading, loadData]);
 
   // Load FRED macro context data for group banners (once, after initial load)
   useEffect(() => {
@@ -1205,6 +1230,10 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
   // Load FMP batch profiles for dividend screening (once, after initial load)
   useEffect(() => {
     if (!hasFmpKey() || !marketData) return;
+    if (isExhausted('fmp')) {
+      console.log('[GMT] FMP quota exhausted — skipping batchProfile');
+      return;
+    }
     let cancelled = false;
     (async () => {
       const equitySyms = Object.keys(ASSETS).filter(s => isEquityCat(ASSETS[s].cat));
@@ -1360,7 +1389,33 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
   }));
   filterButtons.unshift({ key: "all", label: "All Markets" });
 
+  const tickerItems = useMemo(() => {
+    if (!marketData) return [];
+    return Object.entries(marketData)
+      .filter(([, d]) => d?.price != null)
+      .slice(0, 24)
+      .map(([sym, d]) => ({
+        ticker: ASSETS[sym]?.display || sym,
+        price:  d.price,
+        change: d.changePct ?? 0,
+      }));
+  }, [marketData, ASSETS]);
+
   return (
+    <>
+    <GMTHeader
+      activePage={currentView === 'dashboard' ? 'terminal' : currentView}
+      user={user}
+      onNav={(pageKey) => {
+        if (pageKey.startsWith('/')) { navigate(pageKey); return; }
+        onNavigate(pageKey);
+      }}
+      onLogout={() => { logout(); navigate("/"); }}
+      onAssetClick={(item) => setSelectedAsset(item.ticker)}
+      onMenuOpen={() => setMenuOpen(true)}
+      showTicker={currentView === 'dashboard'}
+      tickerItems={tickerItems}
+    />
     <div
       data-theme={theme}
       style={{ minHeight: "100vh", background: "var(--c-bg-root)", color: "var(--c-text)", fontFamily: "'DM Sans', sans-serif", position: "relative", overflow: "hidden" }}
@@ -1426,77 +1481,24 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
 
       <div style={{ position: "relative", zIndex: 1, maxWidth: 1400, margin: "0 auto", padding: "0 20px 40px" }}>
 
-        {/* ── HEADER ── */}
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", padding: "20px 0 16px", borderBottom: "1px solid var(--c-border)", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            {/* Hamburger */}
-            <button
-              onClick={() => setMenuOpen(true)}
-              title="Menu"
-              style={{ background: "transparent", border: "1px solid var(--c-border)", borderRadius: 6, cursor: "pointer", padding: "8px 10px", display: "flex", flexDirection: "column", gap: 4, transition: "border-color 0.2s ease" }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#00E676"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--c-border)"; }}
-            >
-              <div style={{ width: 18, height: 2, background: "var(--c-text-2)", borderRadius: 1 }} />
-              <div style={{ width: 18, height: 2, background: "var(--c-text-2)", borderRadius: 1 }} />
-              <div style={{ width: 13, height: 2, background: "var(--c-text-2)", borderRadius: 1 }} />
-            </button>
-
-            <div style={{ width: 6, height: 48, borderRadius: 3, background: "linear-gradient(180deg, #00E676, #00BCD4)" }} />
-            <div>
-              <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.5px", lineHeight: 1.1, color: "var(--c-text)" }}>Global Markets Terminal</div>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--c-text-2)", marginTop: 4, letterSpacing: "1.5px" }}>
-                EQUITIES · CRYPTO · INDICES · FX · B3 — LIVE MARKET DATA
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#00E676", animation: "pulse 2s ease-in-out infinite", boxShadow: "0 0 8px #00E67666" }} />
-              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#00E676", fontWeight: 600, letterSpacing: "1px" }}>LIVE</span>
-              {lastUpdate && (
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--c-text-2)" }}>
-                  {lastUpdate.toLocaleTimeString("en-US", { hour12: false })}
-                </span>
-              )}
-            </div>
-            <button onClick={loadData}
-              style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 600, color: "var(--c-text-2)", background: "transparent", border: "1px solid var(--c-border)", borderRadius: 6, padding: "6px 14px", cursor: "pointer", letterSpacing: "0.5px", transition: "all 0.2s ease" }}
-              onMouseEnter={(e) => { e.target.style.borderColor = "#00E676"; e.target.style.color = "#00E676"; }}
-              onMouseLeave={(e) => { e.target.style.borderColor = "var(--c-border)"; e.target.style.color = "var(--c-text-2)"; }}>
-              REFRESH
-            </button>
-            {/* ── User badge ── */}
-            {user && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, borderLeft: "1px solid var(--c-border)", paddingLeft: 16 }}>
-                <div style={{
-                  width: 28, height: 28, borderRadius: "50%",
-                  background: "linear-gradient(135deg, #00BCD4, #7C4DFF)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 700,
-                  color: "#fff", flexShrink: 0,
-                }}>
-                  {(user.name || user.email).charAt(0).toUpperCase()}
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                  <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "var(--c-text)", fontWeight: 500, lineHeight: 1 }}>
-                    {user.name ? user.name.split(" ")[0] : user.email.split("@")[0]}
-                  </span>
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: user.role === "admin" ? "#00BCD4" : "var(--c-text-3)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                    {user.role}
-                  </span>
-                </div>
-                <button
-                  onClick={() => { logout(); navigate("/"); }}
-                  style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", background: "transparent", border: "none", cursor: "pointer", padding: "4px 6px", letterSpacing: "0.06em", transition: "color 0.15s" }}
-                  onMouseEnter={(e) => { e.target.style.color = "#FF5252"; }}
-                  onMouseLeave={(e) => { e.target.style.color = "var(--c-text-3)"; }}>
-                  SIGN OUT
-                </button>
-              </div>
+        {/* ── STATUS BAR ── */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid var(--c-border)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#00E676", animation: "pulse 2s ease-in-out infinite", boxShadow: "0 0 6px #00E67666" }} />
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "#00E676", fontWeight: 600, letterSpacing: "1px" }}>LIVE</span>
+            {lastUpdate && (
+              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)" }}>
+                {lastUpdate.toLocaleTimeString("en-US", { hour12: false })}
+              </span>
             )}
           </div>
+          <button
+            onClick={loadData}
+            style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 600, color: "var(--c-text-2)", background: "transparent", border: "1px solid var(--c-border)", borderRadius: 6, padding: "5px 12px", cursor: "pointer", letterSpacing: "0.5px", transition: "all 0.2s ease" }}
+            onMouseEnter={(e) => { e.target.style.borderColor = "#00E676"; e.target.style.color = "#00E676"; }}
+            onMouseLeave={(e) => { e.target.style.borderColor = "var(--c-border)"; e.target.style.color = "var(--c-text-2)"; }}>
+            REFRESH
+          </button>
         </div>
 
         {/* ── CATALOG VIEW ── */}
@@ -2036,5 +2038,6 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
         )}
       </div>
     </div>
+    </>
   );
 }

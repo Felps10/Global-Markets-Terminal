@@ -194,6 +194,19 @@ async function fetchWithRetry(apiId, endpointId, fetcher) {
 
         // ── 429 — Rate limited: backoff retry, then mark exhausted ────────────
         if (status === 429) {
+          // Per-day APIs (perDay set, no perMinute) have daily quotas that don't
+          // recover within seconds — retrying just burns more quota. Treat the
+          // first 429 as immediate daily exhaustion for these APIs.
+          const apiDef = getApiDef(apiId);
+          const isDailyOnlyQuota = apiDef?.limits.perDay !== null && apiDef?.limits.perMinute === null;
+          if (isDailyOnlyQuota) {
+            console.warn(
+              `[ApiClient] ${apiId}/${endpointId} HTTP 429 — daily quota exhausted, stopping immediately`
+            );
+            quotaTracker.markExhausted(apiId);
+            return { ok: false, data: null, errorType: "quota", status, retryAfterSec, exhausted: true };
+          }
+
           const backoffMs = retryAfterSec
             ? retryAfterSec * 1000
             : BACKOFF_MS[attempt] ?? BACKOFF_MS[BACKOFF_MS.length - 1];

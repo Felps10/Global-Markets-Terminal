@@ -7,18 +7,25 @@ import MarketHeatmapPage from './MarketHeatmapPage';
 import LoginPage from './pages/LoginPage.jsx';
 import LandingPage from './pages/LandingPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
-import AdminTaxonomyPage from './pages/AdminTaxonomyPage.jsx';
+import AdminPanel from './pages/AdminPanel.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
+const VALID_VIEWS = ['dashboard', 'catalog', 'news', 'heatmap'];
+
 function Dashboard() {
-  const [view, setView] = useState("dashboard");
+  const [view, setView] = useState('dashboard');
+
+  const handleNavigate = (nextView) => {
+    setView(VALID_VIEWS.includes(nextView) ? nextView : 'dashboard');
+  };
+
   return (
     <GlobalMarketsTerminal
       currentView={view}
-      onNavigate={setView}
+      onNavigate={handleNavigate}
       catalogPage={<CatalogPage />}
       newsPage={<NewsPage />}
-      heatmapPage={<MarketHeatmapPage onNavigate={setView} />}
+      heatmapPage={<MarketHeatmapPage onNavigate={handleNavigate} />}
     />
   );
 }
@@ -44,13 +51,14 @@ export default function App() {
 
         {/* Admin */}
         <Route
-          path="/admin/taxonomy"
+          path="/admin"
           element={
             <ProtectedRoute requiredRole="admin">
-              <AdminTaxonomyPage />
+              <AdminPanel />
             </ProtectedRoute>
           }
         />
+        <Route path="/admin/taxonomy" element={<Navigate to="/admin" replace />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import styled, { keyframes, createGlobalStyle } from 'styled-components';
 import { useAuth } from '../hooks/useAuth.js';
 import { coingeckoPrices } from '../dataServices.js';
+import { GMTPublicHeader } from '../components/GMTHeader.jsx';
 
 // ─── FONTS ────────────────────────────────────────────────────────────────────
 const GlobalFonts = createGlobalStyle`
@@ -62,84 +63,6 @@ const Page = styled.div`
   overflow-x: hidden;
 `;
 
-// ── Navbar
-const NavBar = styled.header`
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  height: 56px;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 40px;
-  background: ${p => p.$scrolled
-    ? 'rgba(4,8,16,0.98)'
-    : 'rgba(4,8,16,0.6)'};
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid ${p => p.$scrolled ? C.border : 'transparent'};
-  transition: background 0.3s, border-color 0.3s;
-
-  @media (max-width: 600px) { padding: 0 20px; }
-`;
-
-const NavLogo = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-`;
-
-const LogoMark = styled.svg`
-  flex-shrink: 0;
-`;
-
-const LogoText = styled.span`
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.18em;
-  color: ${C.text};
-  text-transform: uppercase;
-
-  @media (max-width: 500px) { display: none; }
-`;
-
-const LaunchBtn = styled.button`
-  background: ${C.accent};
-  border: none;
-  border-radius: 2px;
-  color: #040810;
-  cursor: pointer;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  padding: 8px 18px;
-  text-transform: uppercase;
-  transition: background 0.15s, transform 0.1s, opacity 0.15s;
-  white-space: nowrap;
-
-  &:hover  { background: #26D4FF; transform: translateY(-1px); }
-  &:active { transform: translateY(0); }
-`;
-
-const SignUpBtn = styled.button`
-  background: transparent;
-  border: 1px solid ${C.accent};
-  border-radius: 2px;
-  color: ${C.accent};
-  cursor: pointer;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  padding: 7px 16px;
-  text-transform: uppercase;
-  transition: background 0.15s, color 0.15s;
-  white-space: nowrap;
-
-  &:hover  { background: ${C.accentDim}; }
-`;
 
 // ── Hero
 const Hero = styled.section`
@@ -545,7 +468,6 @@ const CRYPTO_IDS = { BTC: 'bitcoin', ETH: 'ethereum', SOL: 'solana' };
 export default function LandingPage() {
   const navigate         = useNavigate();
   const { isAuthenticated } = useAuth();
-  const [scrolled, setScrolled]   = useState(false);
   const [tickerData, setTickerData] = useState({});
   const featuresRef = useRef(null);
 
@@ -553,13 +475,6 @@ export default function LandingPage() {
   useEffect(() => {
     if (isAuthenticated) navigate('/app', { replace: true });
   }, [isAuthenticated, navigate]);
-
-  // Scroll detection for navbar
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
 
   // Fetch ticker prices
   const fetchTicker = useCallback(async () => {
@@ -627,17 +542,11 @@ export default function LandingPage() {
       <GlobalFonts />
       <Page>
 
-        {/* ── NAVBAR ────────────────────────────────────────────────────────── */}
-        <NavBar $scrolled={scrolled}>
-          <NavLogo onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-            <GmtMark size={28} />
-            <LogoText>Global Markets Terminal</LogoText>
-          </NavLogo>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {!isAuthenticated && <SignUpBtn onClick={signUp}>Sign Up</SignUpBtn>}
-            <LaunchBtn onClick={launch}>Launch Terminal</LaunchBtn>
-          </div>
-        </NavBar>
+        {/* ── HEADER ────────────────────────────────────────────────────────── */}
+        <GMTPublicHeader
+          onSignIn={() => navigate('/login')}
+          onSignUp={() => navigate('/register')}
+        />
 
         {/* ── HERO ──────────────────────────────────────────────────────────── */}
         <Hero>

@@ -7,6 +7,7 @@ import groupRoutes    from './routes/groups.js';
 import subgroupRoutes from './routes/subgroups.js';
 import assetRoutes    from './routes/assets.js';
 import taxonomyRoutes from './routes/taxonomy.js';
+import usersRouter    from './routes/users.js';
 
 const PORT = process.env.PORT || 4000;
 const app  = express();
@@ -21,6 +22,7 @@ app.use('/api/v1/groups',    groupRoutes);
 app.use('/api/v1/subgroups', subgroupRoutes);
 app.use('/api/v1/assets',    assetRoutes);
 app.use('/api/v1/taxonomy',  taxonomyRoutes);
+app.use('/api/v1/users',     usersRouter);
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/api/v1/health', (_req, res) => res.json({ status: 'ok', ts: Date.now() }));

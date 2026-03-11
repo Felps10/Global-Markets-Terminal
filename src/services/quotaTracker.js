@@ -427,6 +427,14 @@ const quotaTracker = {
     const api = getApiDef(apiId);
     const duration = overrideDurationMs ?? (api ? computeExhaustedDuration(api) : 60_000);
     exhaustedUntil[apiId] = Date.now() + duration;
+    // For per-day APIs, persist exhaustion to localStorage so it survives page reload.
+    // Setting the day counter to the limit causes getQuotaHealth() to return 'exhausted'
+    // on subsequent loads until the UTC date key rolls over at midnight.
+    if (api?.limits.perDay != null) {
+      try {
+        localStorage.setItem(getDayStorageKey(apiId), String(api.limits.perDay));
+      } catch { /* localStorage unavailable — in-memory exhaustion still applies this session */ }
+    }
     console.warn(
       `[QuotaTracker] "${apiId}" marked EXHAUSTED. ` +
       `Calls blocked until ${new Date(exhaustedUntil[apiId]).toISOString()}.`
@@ -652,3 +660,15 @@ const quotaTracker = {
 };
 
 export { quotaTracker };
+
+/**
+ * Quick pre-flight check: is this API currently exhausted or near-depleted?
+ * Returns true when health is 'exhausted' — either explicitly marked after a 429
+ * or because < 5% of the daily/minute quota remains.
+ *
+ * @param {string} apiId
+ * @returns {boolean}
+ */
+export function isExhausted(apiId) {
+  return quotaTracker.getQuotaHealth(apiId) === 'exhausted';
+}

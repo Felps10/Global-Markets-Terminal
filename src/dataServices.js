@@ -529,37 +529,55 @@ export async function fmpBatchProfile(symbols) {
 
 export function hasBrapiToken() { return !!BRAPI_TOKEN; }
 
+async function brapiQuoteSingle(ticker) {
+  const res = await fetch(
+    `/api/brapi/quote/${ticker}`,
+    {
+      signal:  AbortSignal.timeout(10000),
+      headers: { 'Authorization': `Bearer ${BRAPI_TOKEN}` },
+    }
+  );
+  if (!res.ok) {
+    let body = '';
+    try { body = await res.text(); } catch {}
+    throw new ApiHttpError(res.status, body || res.statusText);
+  }
+  const data = await res.json();
+  const q = data?.results?.[0];
+  if (!q?.symbol) return null;
+  return {
+    symbol: q.symbol,
+    quote: {
+      price:            q.regularMarketPrice,
+      change:           q.regularMarketChange,
+      changePct:        q.regularMarketChangePercent,
+      prevClose:        q.regularMarketPreviousClose,
+      high:             q.regularMarketDayHigh,
+      low:              q.regularMarketDayLow,
+      volume:           q.regularMarketVolume,
+      marketCap:        q.marketCap || null,
+      fiftyTwoWeekHigh: q.fiftyTwoWeekHigh || null,
+      fiftyTwoWeekLow:  q.fiftyTwoWeekLow || null,
+      longName:         q.longName || q.shortName || null,
+      currency:         q.currency || "BRL",
+    },
+  };
+}
+
 export async function brapiQuote(tickers) {
   if (!BRAPI_TOKEN || !tickers.length) return null;
   const sorted = [...tickers].sort();
-  const tickerStr = tickers.join(",");
   const response = await apiClient.call('brapi', 'quote', { tickers: sorted }, {
     fetcher: async () => {
-      const res = await fetch(
-        `/api/brapi/quote/${encodeURIComponent(tickerStr)}?token=${BRAPI_TOKEN}`,
-        { signal: AbortSignal.timeout(10000) }
-      );
-      if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
-      const data = await res.json();
-      if (!data?.results?.length) throw new ApiHttpError(204, 'No quote results');
       const result = {};
-      data.results.forEach(q => {
-        if (!q.symbol) return;
-        result[q.symbol] = {
-          price:            q.regularMarketPrice,
-          change:           q.regularMarketChange,
-          changePct:        q.regularMarketChangePercent,
-          prevClose:        q.regularMarketPreviousClose,
-          high:             q.regularMarketDayHigh,
-          low:              q.regularMarketDayLow,
-          volume:           q.regularMarketVolume,
-          marketCap:        q.marketCap || null,
-          fiftyTwoWeekHigh: q.fiftyTwoWeekHigh || null,
-          fiftyTwoWeekLow:  q.fiftyTwoWeekLow || null,
-          longName:         q.longName || q.shortName || null,
-          currency:         q.currency || "BRL",
-        };
-      });
+      for (const ticker of sorted) {
+        try {
+          const entry = await brapiQuoteSingle(ticker);
+          if (entry) result[entry.symbol] = entry.quote;
+        } catch (err) {
+          console.warn(`[BRAPI] failed for ${ticker}:`, err?.message);
+        }
+      }
       if (!Object.keys(result).length) throw new ApiHttpError(204, 'No usable quote data');
       return result;
     },
@@ -669,6 +687,7 @@ export async function awesomeFx() {
 // Step B will wrap the Yahoo fetch calls with apiClient.call('yahoo', 'quote', ...).
 
 function generateSparkline(basePrice, vol, points = 30) {
+  if (!basePrice || !isFinite(basePrice)) return [];
   const arr = [basePrice];
   for (let i = 1; i < points; i++) {
     const prev = arr[i - 1];

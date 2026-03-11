@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import styled, { keyframes, createGlobalStyle } from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
+import GMTHeader from '../components/GMTHeader.jsx';
 import {
   fetchGroups, fetchSubgroups, fetchAssets,
 } from '../services/taxonomyService.js';
@@ -414,15 +415,12 @@ export default function AdminTaxonomyPage() {
       <GlobalStyle />
       <Page>
         {/* ── Top bar ── */}
-        <TopBar>
-          <Breadcrumb>Settings <span>›</span> Taxonomy</Breadcrumb>
-          <PageTitle>Taxonomy Manager</PageTitle>
-          <TopBarRight>
-            <UserEmail>{user?.name || user?.email}</UserEmail>
-            <AdminBadge>Admin</AdminBadge>
-            <LogoutBtn onClick={handleLogout}>Log out</LogoutBtn>
-          </TopBarRight>
-        </TopBar>
+        <GMTHeader
+          activePage="terminal"
+          user={user}
+          onNav={navigate}
+          onLogout={handleLogout}
+        />
 
         {/* ── Three-column body ── */}
         <Body>
