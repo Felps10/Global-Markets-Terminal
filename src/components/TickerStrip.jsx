@@ -7,8 +7,8 @@ function injectStyles() {
   const el = document.createElement('style');
   el.id = STYLE_ID;
   el.textContent = `
-    @keyframes tickerScrollLeft  { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-    @keyframes tickerScrollRight { 0% { transform: translateX(-50%); } 100% { transform: translateX(0); } }
+    @keyframes tickerScrollLeft  { 0% { transform: translateX(0); } 100% { transform: translateX(var(--ticker-translate, -25%)); } }
+    @keyframes tickerScrollRight { 0% { transform: translateX(var(--ticker-translate, -25%)); } 100% { transform: translateX(0); } }
   `;
   document.head.appendChild(el);
 }
@@ -37,7 +37,12 @@ export default function TickerStrip({
 
   if (!items.length) return null;
 
-  const doubled   = [...items, ...items];
+  const ITEM_WIDTH_ESTIMATE = 140;
+  const MIN_STRIP_PX = 7680;
+  const tilesNeeded = Math.max(4, Math.ceil(MIN_STRIP_PX / (items.length * ITEM_WIDTH_ESTIMATE)));
+  const tiled = Array.from({ length: tilesNeeded }, () => items).flat();
+  const translatePct = (100 / tilesNeeded).toFixed(4);
+
   const duration  = (items.length * 120) / speed;
   const animation = direction >= 0
     ? `tickerScrollLeft  ${duration}s linear infinite`
@@ -54,8 +59,9 @@ export default function TickerStrip({
         animation,
         animationPlayState: paused ? 'paused' : 'running',
         willChange: 'transform',
+        '--ticker-translate': `-${translatePct}%`,
       }}>
-        {doubled.map((item, i) => {
+        {tiled.map((item, i) => {
           const chg   = item.change ?? 0;
           const chgUp = chg > 0;
           const chgDn = chg < 0;

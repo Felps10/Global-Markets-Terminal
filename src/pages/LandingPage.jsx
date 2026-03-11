@@ -388,6 +388,10 @@ const FooterLink = styled.button`
 `;
 
 // ─── SVG LOGO MARK ────────────────────────────────────────────────────────────
+const LogoMark = styled.svg`
+  flex-shrink: 0;
+`;
+
 function GmtMark({ size = 28 }) {
   return (
     <LogoMark width={size} height={size} viewBox="0 0 28 28" fill="none">

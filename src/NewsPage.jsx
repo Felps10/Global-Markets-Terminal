@@ -821,6 +821,209 @@ function SymbolNewsFeed({ symbol, onBack }) {
   );
 }
 
+// ─── SMART FILTER ─────────────────────────────────────────────────────────────
+
+function SmartFilter({
+  searchQuery, onSearchChange,
+  activeCat,   onCatChange,
+  activeSource, onSourceChange,
+  selectedSymbol, onSymbolSelect,
+  openDropdown, onOpenDropdown,
+}) {
+  const barRef = useRef(null);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!openDropdown) return;
+    function onDown(e) {
+      if (barRef.current && !barRef.current.contains(e.target)) onOpenDropdown(null);
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [openDropdown, onOpenDropdown]);
+
+  function toggle(name) {
+    onOpenDropdown(openDropdown === name ? null : name);
+  }
+
+  const catEntry = activeCat    !== "all" ? CATEGORIES[activeCat]      : null;
+  const srcEntry = activeSource !== "all" ? NEWS_SOURCES[activeSource] : null;
+
+  const visibleTickers = Object.keys(ASSETS).filter(
+    s => activeCat === "all" || ASSETS[s].cat === activeCat
+  );
+
+  function btnStyle(name, isValueSet) {
+    const isOpen   = openDropdown === name;
+    const isActive = isOpen || isValueSet;
+    return {
+      flexShrink: 0, position: "relative",
+      display: "inline-flex", alignItems: "center", gap: 5,
+      fontFamily: mono, fontSize: 10, fontWeight: 600, letterSpacing: "0.5px",
+      color: isActive ? "#00E676" : "var(--c-text-2)",
+      background: isActive ? "rgba(0,230,118,0.08)" : "transparent",
+      border: `1px solid ${isActive ? "rgba(0,230,118,0.3)" : "var(--c-border)"}`,
+      borderRadius: 6, padding: "4px 12px", cursor: "pointer",
+      transition: "all 0.15s ease", whiteSpace: "nowrap",
+    };
+  }
+
+  function panelStyle(name, minWidth) {
+    const isOpen = openDropdown === name;
+    return {
+      position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 200,
+      minWidth, background: "var(--c-panel, #0e1016)",
+      border: "1px solid rgba(0,230,118,0.25)", borderRadius: 8,
+      padding: isOpen ? 14 : 0,
+      overflow: "hidden",
+      maxHeight: isOpen ? 400 : 0,
+      opacity: isOpen ? 1 : 0,
+      transition: "max-height 0.2s ease, opacity 0.18s ease, padding 0.2s ease",
+      pointerEvents: isOpen ? "auto" : "none",
+    };
+  }
+
+  function SectionLabel({ children }) {
+    return (
+      <div style={{
+        fontFamily: mono, fontSize: 8, color: "var(--c-text-3)",
+        letterSpacing: "1.5px", marginBottom: 8,
+      }}>
+        {children}
+      </div>
+    );
+  }
+
+  return (
+    <div ref={barRef} style={{ position: "relative", marginBottom: 20 }}>
+      <div style={{
+        display: "flex", alignItems: "center", gap: 8,
+        background: "var(--c-surface)",
+        border: (catEntry || srcEntry || selectedSymbol)
+          ? "1px solid rgba(0,230,118,0.2)"
+          : "1px solid var(--c-border)",
+        borderRadius: 8, padding: "10px 14px", boxSizing: "border-box",
+        transition: "border-color 0.2s ease",
+      }}>
+
+        {/* Search */}
+        <span style={{ color: "var(--c-text-3)", fontSize: 13, flexShrink: 0, userSelect: "none", lineHeight: 1 }}>🔍</span>
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={e => onSearchChange(e.target.value)}
+          placeholder="Search sectors, sources, tickers, headlines…"
+          style={{
+            flex: 1, minWidth: 0, background: "transparent",
+            border: "none", outline: "none",
+            fontFamily: sans, fontSize: 13, color: "var(--c-text)",
+          }}
+        />
+
+        {/* Divider */}
+        <div style={{ width: 1, height: 18, background: "var(--c-border)", flexShrink: 0 }} />
+
+        {/* ── SECTOR button + panel ── */}
+        <div style={{ position: "relative", flexShrink: 0 }}>
+          <button onClick={() => toggle("sector")} style={btnStyle("sector", !!catEntry)}>
+            {catEntry ? <>{catEntry.icon} {catEntry.label.split(" ")[0]}</> : "SECTOR"}
+            {" "}{openDropdown === "sector" ? "▲" : "▼"}
+          </button>
+          <div style={panelStyle("sector", 360)}>
+            <SectionLabel>SECTOR</SectionLabel>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              <button onClick={() => { onCatChange("all"); onOpenDropdown(null); }} style={{
+                fontFamily: mono, fontSize: 10, fontWeight: activeCat === "all" ? 700 : 400,
+                color: activeCat === "all" ? "#00E676" : "var(--c-text-3)",
+                background: activeCat === "all" ? "rgba(0,230,118,0.1)" : "transparent",
+                border: `1px solid ${activeCat === "all" ? "rgba(0,230,118,0.35)" : "var(--c-border)"}`,
+                borderRadius: 10, padding: "4px 12px", cursor: "pointer", transition: "all 0.15s ease",
+              }}>All</button>
+              {Object.entries(CATEGORIES).map(([key, cat]) => {
+                const a = activeCat === key;
+                return (
+                  <button key={key} onClick={() => { onCatChange(a ? "all" : key); onOpenDropdown(null); }} style={{
+                    display: "flex", alignItems: "center", gap: 4,
+                    fontFamily: mono, fontSize: 10, fontWeight: a ? 700 : 400,
+                    color: a ? cat.color : "var(--c-text-3)",
+                    background: a ? cat.color + "14" : "transparent",
+                    border: `1px solid ${a ? cat.color + "45" : "var(--c-border)"}`,
+                    borderRadius: 10, padding: "4px 12px", cursor: "pointer", transition: "all 0.15s ease",
+                  }}>
+                    <span style={{ fontSize: 10 }}>{cat.icon}</span>
+                    {cat.label.split(" ")[0]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* ── SOURCE button + panel ── */}
+        <div style={{ position: "relative", flexShrink: 0 }}>
+          <button onClick={() => toggle("source")} style={btnStyle("source", !!srcEntry)}>
+            {srcEntry ? srcEntry.label : "SOURCE"}
+            {" "}{openDropdown === "source" ? "▲" : "▼"}
+          </button>
+          <div style={panelStyle("source", 380)}>
+            <SectionLabel>SOURCE</SectionLabel>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              <button onClick={() => { onSourceChange("all"); onOpenDropdown(null); }} style={{
+                fontFamily: mono, fontSize: 9, fontWeight: activeSource === "all" ? 700 : 400,
+                color: activeSource === "all" ? "#00E676" : "var(--c-text-3)",
+                background: activeSource === "all" ? "rgba(0,230,118,0.1)" : "transparent",
+                border: `1px solid ${activeSource === "all" ? "rgba(0,230,118,0.35)" : "var(--c-border)"}`,
+                borderRadius: 4, padding: "3px 10px", cursor: "pointer", transition: "all 0.15s ease",
+              }}>All</button>
+              {Object.entries(NEWS_SOURCES).map(([key, src]) => {
+                const a = activeSource === key;
+                return (
+                  <button key={key} onClick={() => { onSourceChange(a ? "all" : key); onOpenDropdown(null); }} style={{
+                    fontFamily: mono, fontSize: 9, fontWeight: a ? 700 : 400,
+                    color: a ? src.color : "var(--c-text-3)",
+                    background: a ? src.color + "12" : "transparent",
+                    border: `1px solid ${a ? src.color + "40" : "var(--c-border)"}`,
+                    borderRadius: 4, padding: "3px 10px", cursor: "pointer", transition: "all 0.15s ease",
+                  }}>{src.label}</button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* ── TICKERS button + panel ── */}
+        <div style={{ position: "relative", flexShrink: 0 }}>
+          <button onClick={() => toggle("tickers")} style={btnStyle("tickers", !!selectedSymbol)}>
+            {selectedSymbol || "TICKERS"}
+            {" "}{openDropdown === "tickers" ? "▲" : "▼"}
+          </button>
+          <div style={panelStyle("tickers", 380)}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <SectionLabel>
+                TICKERS{catEntry && <span style={{ color: catEntry.color, marginLeft: 6 }}>— {catEntry.label}</span>}
+              </SectionLabel>
+              <span style={{ fontFamily: mono, fontSize: 8, color: "var(--c-text-3)", marginBottom: 8 }}>
+                {visibleTickers.length} · click for feed
+              </span>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5, maxHeight: 200, overflowY: "auto" }}>
+              {visibleTickers.map(sym => (
+                <AssetChip
+                  key={sym}
+                  symbol={sym}
+                  active={selectedSymbol === sym}
+                  onClick={() => { onSymbolSelect(sym); onOpenDropdown(null); }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN NEWSPAGE ────────────────────────────────────────────────────────────
 
 export default function NewsPage() {
@@ -834,6 +1037,7 @@ export default function NewsPage() {
   const [lastUpdate,    setLastUpdate]    = useState(null);
   const [collapsedCats, setCollapsedCats] = useState({});
   const [viewMode,      setViewMode]      = useState("by-category"); // "by-category" | "feed"
+  const [openDropdown,  setOpenDropdown]  = useState(null); // "sector" | "source" | "tickers" | null
   const hasFinnhub = hasFinnhubKey();
 
   // Load news for all categories on mount
@@ -910,11 +1114,16 @@ export default function NewsPage() {
     }
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      const inHeadline = a.headline?.toLowerCase().includes(q);
-      const inSource   = a.source?.toLowerCase().includes(q);
-      const inSymbol   = a.relatedSymbol?.toLowerCase().includes(q);
-      const inName     = asset?.name?.toLowerCase().includes(q);
-      if (!inHeadline && !inSource && !inSymbol && !inName) return false;
+      const catLabel = CATEGORIES[asset?.cat]?.label?.toLowerCase() || "";
+      const srcLabel = Object.values(NEWS_SOURCES).find(s =>
+        a.source?.toLowerCase().includes(s.label.toLowerCase())
+      )?.label?.toLowerCase() || a.source?.toLowerCase() || "";
+      if (
+        !a.headline?.toLowerCase().includes(q) &&
+        !a.relatedSymbol?.toLowerCase().includes(q) &&
+        !catLabel.includes(q) &&
+        !srcLabel.includes(q)
+      ) return false;
     }
     return true;
   });
@@ -1105,122 +1314,13 @@ export default function NewsPage() {
             </div>
           </div>
 
-          {/* ── FILTER BAR ── */}
-          <div style={{
-            background: "var(--c-surface)", border: "1px solid var(--c-border)",
-            borderRadius: 8, padding: "14px 16px", marginBottom: 20,
-          }}>
-            {/* Search */}
-            <div style={{ position: "relative", marginBottom: 12 }}>
-              <span style={{
-                position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)",
-                color: "var(--c-text-3)", fontSize: 13, pointerEvents: "none",
-              }}>🔍</span>
-              <input
-                type="text"
-                placeholder="Search headlines, tickers, sources…"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                style={{
-                  width: "100%", background: "rgba(255,255,255,0.03)",
-                  border: "1px solid var(--c-border)", borderRadius: 6,
-                  padding: "8px 12px 8px 36px",
-                  fontFamily: sans, fontSize: 13, color: "var(--c-text)",
-                  outline: "none", boxSizing: "border-box",
-                  transition: "border-color 0.2s ease",
-                }}
-                onFocus={e => e.target.style.borderColor = "#00E676"}
-                onBlur={e => e.target.style.borderColor = "var(--c-border)"}
-              />
-            </div>
-
-            {/* Category filter */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
-              <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "1px", alignSelf: "center", marginRight: 2 }}>SECTOR:</span>
-              <button
-                onClick={() => setActiveCat("all")}
-                style={{
-                  fontFamily: mono, fontSize: 10, fontWeight: activeCat === "all" ? 700 : 400,
-                  color: activeCat === "all" ? "#00E676" : "var(--c-text-3)",
-                  background: activeCat === "all" ? "rgba(0,230,118,0.1)" : "transparent",
-                  border: `1px solid ${activeCat === "all" ? "#00E67640" : "var(--c-border)"}`,
-                  borderRadius: 10, padding: "4px 12px", cursor: "pointer",
-                  transition: "all 0.15s ease",
-                }}
-              >All</button>
-              {Object.entries(CATEGORIES).map(([key, cat]) => {
-                const active = activeCat === key;
-                return (
-                  <button key={key} onClick={() => setActiveCat(key)}
-                    style={{
-                      fontFamily: mono, fontSize: 10, fontWeight: active ? 700 : 400,
-                      color: active ? cat.color : "var(--c-text-3)",
-                      background: active ? cat.color + "14" : "transparent",
-                      border: `1px solid ${active ? cat.color + "45" : "var(--c-border)"}`,
-                      borderRadius: 10, padding: "4px 12px", cursor: "pointer",
-                      transition: "all 0.15s ease", display: "flex", alignItems: "center", gap: 4,
-                    }}
-                  >
-                    <span style={{ fontSize: 10 }}>{cat.icon}</span> {cat.label.split(" ")[0]}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Source filter */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "1px", alignSelf: "center", marginRight: 2 }}>SOURCE:</span>
-              <button
-                onClick={() => setActiveSource("all")}
-                style={{
-                  fontFamily: mono, fontSize: 9, fontWeight: activeSource === "all" ? 700 : 400,
-                  color: activeSource === "all" ? "#00E676" : "var(--c-text-3)",
-                  background: activeSource === "all" ? "rgba(0,230,118,0.1)" : "transparent",
-                  border: `1px solid ${activeSource === "all" ? "#00E67640" : "var(--c-border)"}`,
-                  borderRadius: 4, padding: "3px 10px", cursor: "pointer", transition: "all 0.15s ease",
-                }}
-              >All</button>
-              {Object.entries(NEWS_SOURCES).map(([key, src]) => {
-                const active = activeSource === key;
-                return (
-                  <button key={key} onClick={() => setActiveSource(key)}
-                    style={{
-                      fontFamily: mono, fontSize: 9, fontWeight: active ? 700 : 400,
-                      color: active ? src.color : "var(--c-text-3)",
-                      background: active ? src.color + "12" : "transparent",
-                      border: `1px solid ${active ? src.color + "40" : "var(--c-border)"}`,
-                      borderRadius: 4, padding: "3px 10px", cursor: "pointer", transition: "all 0.15s ease",
-                    }}
-                  >
-                    {src.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* ── ASSET QUICK-JUMP ── */}
-          <div style={{
-            background: "var(--c-surface)", border: "1px solid var(--c-border)",
-            borderRadius: 8, padding: "12px 16px", marginBottom: 20,
-          }}>
-            <div style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "1.2px", marginBottom: 8 }}>
-              QUICK JUMP — CLICK ANY TICKER FOR DEDICATED NEWS FEED
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {Object.keys(ASSETS)
-                .filter(s => activeCat === "all" || ASSETS[s].cat === activeCat)
-                .slice(0, 40)
-                .map(sym => (
-                <AssetChip
-                  key={sym}
-                  symbol={sym}
-                  active={selectedSymbol === sym}
-                  onClick={() => setSelectedSymbol(sym)}
-                />
-              ))}
-            </div>
-          </div>
+          <SmartFilter
+            searchQuery={searchQuery}       onSearchChange={setSearchQuery}
+            activeCat={activeCat}           onCatChange={setActiveCat}
+            activeSource={activeSource}     onSourceChange={setActiveSource}
+            selectedSymbol={selectedSymbol} onSymbolSelect={setSelectedSymbol}
+            openDropdown={openDropdown}     onOpenDropdown={setOpenDropdown}
+          />
 
           {/* ── LOADING ── */}
           {loading && (
