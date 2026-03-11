@@ -10,7 +10,7 @@ const router = Router();
 // ── Rate limiter for registration ──────────────────────────────────────────────
 const registerLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  limit: 5,
   standardHeaders: true,
   legacyHeaders: false,
   handler: (_req, res) =>

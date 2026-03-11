@@ -16,7 +16,8 @@
       "Bash(npx vite:*)",
       "Bash(find /Users/macbook/Library/CloudStorage/OneDrive-Personal/Documents/Personal/Claude/markets-dashboard -type f \\\\\\(-name *.js -o -name *.jsx -o -name *.ts -o -name *.tsx -o -name .env* -o -name *.config.js -o -name *.config.ts -o -name package.json -o -name *.md \\\\\\))",
       "Bash(npx vitest:*)",
-      "Bash(vitest --version)"
+      "Bash(vitest --version)",
+      "Bash(git add:*)"
     ]
   }
 }

@@ -44,9 +44,9 @@ export async function seedIfEmpty() {
   const seedAssets = db.transaction((rows) => {
     for (const row of rows) {
       insertAsset.run({
-        currency: null,
-        meta:     row.meta ? JSON.stringify(row.meta) : null,
         ...row,
+        currency: row.currency ?? null,
+        meta:     row.meta ? JSON.stringify(row.meta) : null,
       });
     }
   });
