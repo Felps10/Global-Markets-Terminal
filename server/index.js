@@ -65,19 +65,6 @@ async function start() {
   initSchema();
   await seedIfEmpty();
 
-  // Verify Supabase connectivity before accepting traffic
-  const { error: pingError } = await supabase.from('groups').select('id').limit(1);
-  if (pingError) {
-    console.error('[startup] Supabase connectivity check FAILED:', pingError.message);
-    console.error('[startup] Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your environment.');
-    process.exit(1);
-  }
-  console.log('[startup] Supabase connectivity check — OK');
-
-  if (process.env.NODE_ENV !== 'production') {
-    await seedClubeDemo();
-  }
-
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log('');
     console.log('┌──────────────────────────────────────────────────────┐');
@@ -108,6 +95,19 @@ async function start() {
     console.log('└──────────────────────────────────────────────────────┘');
     console.log('');
   });
+
+  // Verify Supabase connectivity after binding — so Railway healthcheck can reach /api/v1/health
+  const { error: pingError } = await supabase.from('groups').select('id').limit(1);
+  if (pingError) {
+    console.error('[startup] Supabase connectivity check FAILED:', pingError.message);
+    console.error('[startup] Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your environment.');
+    process.exit(1);
+  }
+  console.log('[startup] Supabase connectivity check — OK');
+
+  if (process.env.NODE_ENV !== 'production') {
+    await seedClubeDemo();
+  }
 
   // Graceful shutdown — Railway sends SIGTERM before stopping a deployment
   process.on('SIGTERM', () => {
