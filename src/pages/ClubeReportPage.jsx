@@ -190,7 +190,7 @@ export default function ClubeReportPage() {
         if (!token) throw new Error('Sessão expirada. Faça login novamente.');
         const headers = { Authorization: `Bearer ${token}` };
 
-        const clubesRes = await fetch('/api/v1/clubes', { headers });
+        const clubesRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes`, { headers });
         if (!clubesRes.ok) throw new Error('Erro ao carregar clube.');
         const clubesData = await clubesRes.json();
         const c = Array.isArray(clubesData) ? clubesData[0] : null;
@@ -198,9 +198,9 @@ export default function ClubeReportPage() {
         setClube(c);
 
         const [posicoesRes, cotistasRes, navRes] = await Promise.all([
-          fetch(`/api/v1/clubes/${c.id}/posicoes`, { headers }),
-          fetch(`/api/v1/clubes/${c.id}/cotistas`, { headers }),
-          fetch(`/api/v1/clubes/${c.id}/nav`,      { headers }),
+          fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes/${c.id}/posicoes`, { headers }),
+          fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes/${c.id}/cotistas`, { headers }),
+          fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes/${c.id}/nav`,      { headers }),
         ]);
 
         const posicoesData = posicoesRes.ok ? await posicoesRes.json() : [];

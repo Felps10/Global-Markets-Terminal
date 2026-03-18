@@ -19,7 +19,7 @@ export function WatchlistProvider({ children }) {
     setLoading(true);
     try {
       const token = await getToken();
-      const res   = await fetch('/api/v1/watchlist', {
+      const res   = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/watchlist`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Failed to fetch watchlist');
@@ -37,7 +37,7 @@ export function WatchlistProvider({ children }) {
 
   const pin = useCallback(async (type, target_id) => {
     const token = await getToken();
-    const res   = await fetch('/api/v1/watchlist', {
+    const res   = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/watchlist`, {
       method:  'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -59,7 +59,7 @@ export function WatchlistProvider({ children }) {
 
   const unpin = useCallback(async (type, target_id) => {
     const token = await getToken();
-    const res   = await fetch(`/api/v1/watchlist/${type}/${target_id}`, {
+    const res   = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/watchlist/${type}/${target_id}`, {
       method:  'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     });

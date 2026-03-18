@@ -501,7 +501,7 @@ export default function ClubePage() {
       const headers = { Authorization: `Bearer ${token}` };
 
       // Step 1: list clubes
-      const clubesRes = await fetch('/api/v1/clubes', { headers });
+      const clubesRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes`, { headers });
       if (!clubesRes.ok) throw new Error(`Erro ao carregar clubes (${clubesRes.status})`);
       const clubesList = await clubesRes.json();
 
@@ -516,10 +516,10 @@ export default function ClubePage() {
 
       // Step 2: parallel detail fetches
       const [posRes, cotRes, navRes, compRes] = await Promise.allSettled([
-        fetch(`/api/v1/clubes/${c.id}/posicoes`,   { headers }),
-        fetch(`/api/v1/clubes/${c.id}/cotistas`,   { headers }),
-        fetch(`/api/v1/clubes/${c.id}/nav`,        { headers }),
-        fetch(`/api/v1/clubes/${c.id}/compliance`, { headers }),
+        fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes/${c.id}/posicoes`,   { headers }),
+        fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes/${c.id}/cotistas`,   { headers }),
+        fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes/${c.id}/nav`,        { headers }),
+        fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes/${c.id}/compliance`, { headers }),
       ]);
 
       const posicoesData = posRes.status === 'fulfilled' && posRes.value.ok
@@ -669,7 +669,7 @@ export default function ClubePage() {
       setNavSubmitError(null);
 
       const token = await getToken();
-      const res   = await fetch(`/api/v1/clubes/${clube.id}/nav`, {
+      const res   = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes/${clube.id}/nav`, {
         method:  'POST',
         headers: {
           'Content-Type':  'application/json',

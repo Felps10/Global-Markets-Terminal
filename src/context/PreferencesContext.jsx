@@ -34,7 +34,7 @@ export function PreferencesProvider({ children }) {
       setLoading(true);
       try {
         const token = await getToken();
-        const res   = await fetch('/api/v1/preferences', {
+        const res   = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/preferences`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) throw new Error('Failed to fetch preferences');
@@ -59,7 +59,7 @@ export function PreferencesProvider({ children }) {
 
     try {
       const token = await getToken();
-      const res   = await fetch('/api/v1/preferences', {
+      const res   = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/preferences`, {
         method:  'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -74,7 +74,7 @@ export function PreferencesProvider({ children }) {
       console.error('PreferencesContext updatePrefs error:', err);
       // Revert on failure by re-fetching
       const token = await getToken();
-      const res   = await fetch('/api/v1/preferences', {
+      const res   = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/preferences`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
