@@ -12,6 +12,8 @@ function mapUser(supabaseUser) {
   };
 }
 
+const API_URL = import.meta.env.VITE_API_URL || '';
+
 export function AuthProvider({ children }) {
   const [user,    setUser]    = useState(null);
   const [session, setSession] = useState(null);
@@ -53,7 +55,7 @@ export function AuthProvider({ children }) {
   const register = useCallback(async (name, email, password, confirmPassword) => {
     try {
       // Express handles password validation + admin.createUser
-      const res = await fetch('/api/v1/auth/register', {
+      const res = await fetch(`${API_URL}/api/v1/auth/register`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ name, email, password, confirmPassword }),

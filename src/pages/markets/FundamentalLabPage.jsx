@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTaxonomy } from '../../context/TaxonomyContext.jsx';
-import { fmpProfile, fmpRatios, hasFmpKey } from '../../dataServices.js';
+import { API_BASE, fmpProfile, fmpRatios, hasFmpKey } from '../../dataServices.js';
 import { isExhausted } from '../../services/quotaTracker.js';
 
 // ─── Colors (match ResearchTerminalPage / ChartCenterPage) ────────────────────
@@ -352,7 +352,7 @@ export default function FundamentalLabPage() {
   const fetchYahooQuote = useCallback(async symbol => {
     try {
       const res  = await fetch(
-        `/api/yahoo/v7/finance/quote?symbols=${encodeURIComponent(symbol)}`,
+        `${API_BASE}/proxy/yahoo/v7/finance/quote?symbols=${encodeURIComponent(symbol)}`,
         { signal: AbortSignal.timeout(8000) }
       );
       const json = await res.json();

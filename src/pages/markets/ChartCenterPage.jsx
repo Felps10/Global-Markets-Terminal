@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { createChart, LineSeries, CandlestickSeries, AreaSeries } from 'lightweight-charts';
 import { useTaxonomy } from '../../context/TaxonomyContext.jsx';
-import { fetchYahooOHLCV, fmpProfile } from '../../dataServices.js';
+import { API_BASE, fetchYahooOHLCV, fmpProfile } from '../../dataServices.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -67,7 +67,7 @@ function normalizeToPercent(candles) {
 async function fetchSingleQuote(symbol) {
   try {
     const res = await fetch(
-      `/api/yahoo/v7/finance/quote?symbols=${encodeURIComponent(symbol)}`,
+      `${API_BASE}/proxy/yahoo/v7/finance/quote?symbols=${encodeURIComponent(symbol)}`,
       { signal: AbortSignal.timeout(8000) }
     );
     if (!res.ok) return null;

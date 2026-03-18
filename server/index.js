@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors    from 'cors';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 import { supabase, initSchema, seedIfEmpty } from './db.js';
 import { seedClubeDemo } from './seed.js';
 import authRoutes     from './routes/auth.js';
@@ -57,6 +58,21 @@ app.get('/api/v1/health', (_req, res) => res.json({ status: 'ok', ts: Date.now()
 
 app.use('/api/v1/clubes', clubeRoutes);
 
+// ── External API Proxies (production CORS bypass) ─────────────────────────────
+// Yahoo Finance — crumb/cookie session logic lives in server/routes/yahoo.js
+app.use('/proxy/yahoo', yahooRoutes);
+
+// Simple pass-through proxies — Express strips the mount prefix from req.url
+// before passing to the middleware, so no pathRewrite is needed.
+app.use('/proxy/finnhub',      createProxyMiddleware({ target: 'https://finnhub.io/api/v1',                    changeOrigin: true }));
+app.use('/proxy/coingecko',    createProxyMiddleware({ target: 'https://api.coingecko.com/api/v3',             changeOrigin: true }));
+app.use('/proxy/fmp',          createProxyMiddleware({ target: 'https://financialmodelingprep.com/stable',     changeOrigin: true }));
+app.use('/proxy/brapi',        createProxyMiddleware({ target: 'https://brapi.dev/api',                        changeOrigin: true }));
+app.use('/proxy/bcb',          createProxyMiddleware({ target: 'https://api.bcb.gov.br',                       changeOrigin: true }));
+app.use('/proxy/awesomeapi',   createProxyMiddleware({ target: 'https://economia.awesomeapi.com.br',           changeOrigin: true }));
+app.use('/proxy/alphavantage', createProxyMiddleware({ target: 'https://www.alphavantage.co',                  changeOrigin: true }));
+app.use('/proxy/fred',         createProxyMiddleware({ target: 'https://api.stlouisfed.org/fred',              changeOrigin: true }));
+
 // ── 404 ───────────────────────────────────────────────────────────────────────
 app.use((_req, res) => res.status(404).json({ error: 'NOT_FOUND' }));
 
@@ -89,6 +105,15 @@ async function start() {
     console.log('│    POST   /api/v1/clubes                             │');
     console.log('│    GET    /api/yahoo/v7/finance/quote                │');
     console.log('│    GET    /api/yahoo/v8/finance/chart                │');
+    console.log('│    ANY    /proxy/yahoo/*  (Yahoo crumb/cookie proxy) │');
+    console.log('│    ANY    /proxy/finnhub/*                           │');
+    console.log('│    ANY    /proxy/coingecko/*                         │');
+    console.log('│    ANY    /proxy/fmp/*                               │');
+    console.log('│    ANY    /proxy/brapi/*                             │');
+    console.log('│    ANY    /proxy/bcb/*                               │');
+    console.log('│    ANY    /proxy/awesomeapi/*                        │');
+    console.log('│    ANY    /proxy/alphavantage/*                      │');
+    console.log('│    ANY    /proxy/fred/*                              │');
     console.log('├──────────────────────────────────────────────────────┤');
     console.log('│  Database: Supabase (hosted Postgres)                │');
     console.log(`│  CORS origins: ${ALLOWED_ORIGINS.join(', ')}`);

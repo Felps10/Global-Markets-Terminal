@@ -13,6 +13,8 @@ import {
 } from '../services/portfolioEngine.js';
 import { ASSETS as STATIC_ASSETS_MAP } from '../data/assets.js';
 
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 // ── Colors ────────────────────────────────────────────────────────────────────
 const BG_PAGE  = '#080f1a';
 const BG_HEAD  = '#0a1628';
@@ -417,7 +419,7 @@ export default function ClubePage() {
       try {
         const symbolsStr = yahooSyms.join(',');
         const res = await fetch(
-          `/api/yahoo/v7/finance/quote?symbols=${encodeURIComponent(symbolsStr)}`,
+          `${API_BASE}/proxy/yahoo/v7/finance/quote?symbols=${encodeURIComponent(symbolsStr)}`,
           { signal: AbortSignal.timeout(12000) }
         );
         if (res.ok) {
@@ -447,7 +449,7 @@ export default function ClubePage() {
       for (const symbol of b3Syms) {
         try {
           const res = await fetch(
-            `/api/brapi/quote/${encodeURIComponent(symbol)}?token=${BRAPI_TOKEN}`,
+            `${API_BASE}/proxy/brapi/quote/${encodeURIComponent(symbol)}?token=${BRAPI_TOKEN}`,
             { signal: AbortSignal.timeout(12000) }
           );
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -607,7 +609,7 @@ export default function ClubePage() {
     let retornoCdi = null;
     try {
       const bcbRes = await fetch(
-        '/api/bcb/dados/serie/bcdata.sgs.4389/dados/ultimos/1?formato=json',
+        `${API_BASE}/proxy/bcb/dados/serie/bcdata.sgs.4389/dados/ultimos/1?formato=json`,
         { signal: AbortSignal.timeout(8000) }
       );
       if (bcbRes.ok) {

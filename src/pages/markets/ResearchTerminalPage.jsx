@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { createChart, AreaSeries } from 'lightweight-charts';
 import { useTaxonomy } from '../../context/TaxonomyContext.jsx';
 import {
+  API_BASE,
   fetchYahooOHLCV,
   fmpProfile, fmpRatios,
   finnhubNews, finnhubRecommendation,
@@ -120,7 +121,7 @@ function valDot(key, value) {
 async function fetchAssetQuote(symbol) {
   try {
     const res = await fetch(
-      `/api/yahoo/v7/finance/quote?symbols=${encodeURIComponent(symbol)}`,
+      `${API_BASE}/proxy/yahoo/v7/finance/quote?symbols=${encodeURIComponent(symbol)}`,
       { signal: AbortSignal.timeout(8000) }
     );
     if (!res.ok) return null;

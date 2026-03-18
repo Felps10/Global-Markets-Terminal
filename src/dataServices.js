@@ -11,7 +11,7 @@ const FRED_KEY      = import.meta.env.VITE_FRED_KEY     || "";
 const FMP_KEY       = import.meta.env.VITE_FMP_KEY      || "";
 const BRAPI_TOKEN   = import.meta.env.VITE_BRAPI_TOKEN  || "";
 
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+export const API_BASE = import.meta.env.VITE_API_URL || '';
 
 // ─── STARTUP VALIDATION ─────────────────────────────────────────────────────
 const KEY_CONFIG = [
@@ -95,7 +95,7 @@ export async function finnhubQuote(symbol) {
   const response = await apiClient.call('finnhub', 'quote', { symbol }, {
     fetcher: async () => {
       const res = await fetch(
-        `/api/finnhub/quote?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_KEY}`,
+        `${API_BASE}/proxy/finnhub/quote?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_KEY}`,
         { signal: AbortSignal.timeout(10000) }
       );
       if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
@@ -115,7 +115,7 @@ export async function finnhubEarnings(symbol) {
   const cached = cacheGet(cacheKey);
   if (cached) return cached;
   const data = await finnhubFetch(
-    `/api/finnhub/stock/earnings?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_KEY}`
+    `${API_BASE}/proxy/finnhub/stock/earnings?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_KEY}`
   );
   if (data && Array.isArray(data)) {
     cacheSet(cacheKey, data, 3600_000); // 1hr cache
@@ -132,7 +132,7 @@ export async function finnhubNews(symbol) {
   const response = await apiClient.call('finnhub', 'news', { symbol, from, to }, {
     fetcher: async () => {
       const res = await fetch(
-        `/api/finnhub/company-news?symbol=${encodeURIComponent(symbol)}&from=${from}&to=${to}&token=${FINNHUB_KEY}`,
+        `${API_BASE}/proxy/finnhub/company-news?symbol=${encodeURIComponent(symbol)}&from=${from}&to=${to}&token=${FINNHUB_KEY}`,
         { signal: AbortSignal.timeout(10000) }
       );
       if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
@@ -153,7 +153,7 @@ export async function finnhubInsiderSentiment(symbol) {
   const cached = cacheGet(cacheKey);
   if (cached) return cached;
   const data = await finnhubFetch(
-    `/api/finnhub/stock/insider-sentiment?symbol=${encodeURIComponent(symbol)}&from=2024-01-01&token=${FINNHUB_KEY}`
+    `${API_BASE}/proxy/finnhub/stock/insider-sentiment?symbol=${encodeURIComponent(symbol)}&from=2024-01-01&token=${FINNHUB_KEY}`
   );
   if (data && data.data) {
     cacheSet(cacheKey, data.data, 3600_000);
@@ -167,7 +167,7 @@ export async function finnhubRecommendation(symbol) {
   const response = await apiClient.call('finnhub', 'recommendation', { symbol }, {
     fetcher: async () => {
       const res = await fetch(
-        `/api/finnhub/stock/recommendation?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_KEY}`,
+        `${API_BASE}/proxy/finnhub/stock/recommendation?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_KEY}`,
         { signal: AbortSignal.timeout(10000) }
       );
       if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
@@ -190,7 +190,7 @@ export async function alphaVantageRSI(symbol, interval = "daily", timePeriod = 1
   const response = await apiClient.call('alphaVantage', 'rsi', { symbol, interval, timePeriod }, {
     fetcher: async () => {
       const res = await fetch(
-        `/api/alphavantage/query?function=RSI&symbol=${encodeURIComponent(symbol)}&interval=${interval}&time_period=${timePeriod}&series_type=close&apikey=${AV_KEY}`,
+        `${API_BASE}/proxy/alphavantage/query?function=RSI&symbol=${encodeURIComponent(symbol)}&interval=${interval}&time_period=${timePeriod}&series_type=close&apikey=${AV_KEY}`,
         { signal: AbortSignal.timeout(15000) }
       );
       if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
@@ -209,7 +209,7 @@ export async function alphaVantageMACD(symbol, interval = "daily") {
   const response = await apiClient.call('alphaVantage', 'macd', { symbol, interval }, {
     fetcher: async () => {
       const res = await fetch(
-        `/api/alphavantage/query?function=MACD&symbol=${encodeURIComponent(symbol)}&interval=${interval}&series_type=close&apikey=${AV_KEY}`,
+        `${API_BASE}/proxy/alphavantage/query?function=MACD&symbol=${encodeURIComponent(symbol)}&interval=${interval}&series_type=close&apikey=${AV_KEY}`,
         { signal: AbortSignal.timeout(15000) }
       );
       if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
@@ -253,7 +253,7 @@ export async function fredSeries(seriesKey) {
   const response = await apiClient.call('fred', 'seriesObservations', { seriesKey }, {
     fetcher: async () => {
       const res = await fetch(
-        `/api/fred/series/observations?series_id=${cfg.id}&sort_order=desc&limit=12&file_type=json&api_key=${FRED_KEY}`,
+        `${API_BASE}/proxy/fred/series/observations?series_id=${cfg.id}&sort_order=desc&limit=12&file_type=json&api_key=${FRED_KEY}`,
         { signal: AbortSignal.timeout(10000) }
       );
       if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
@@ -292,7 +292,7 @@ export async function fredReleases() {
   const response = await apiClient.call('fred', 'releases', {}, {
     fetcher: async () => {
       const res = await fetch(
-        `/api/fred/releases?api_key=${FRED_KEY}&file_type=json`,
+        `${API_BASE}/proxy/fred/releases?api_key=${FRED_KEY}&file_type=json`,
         { signal: AbortSignal.timeout(10000) }
       );
       if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
@@ -321,7 +321,7 @@ export async function fredReleaseDates(startDate, endDate) {
   const response = await apiClient.call('fred', 'releaseDates', { s, e }, {
     fetcher: async () => {
       const url =
-        `/api/fred/releases/dates?api_key=${FRED_KEY}&file_type=json` +
+        `${API_BASE}/proxy/fred/releases/dates?api_key=${FRED_KEY}&file_type=json` +
         `&realtime_start=${s}&realtime_end=${e}` +
         `&include_release_dates_with_no_data=true&limit=1000`;
       const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
@@ -344,7 +344,7 @@ export async function coingeckoPrices(ids = "bitcoin,ethereum,solana") {
   const response = await apiClient.call('coingecko', 'prices', { ids }, {
     fetcher: async () => {
       const res = await fetch(
-        `/api/coingecko/simple/price?ids=${ids}&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true`,
+        `${API_BASE}/proxy/coingecko/simple/price?ids=${ids}&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true`,
         { signal: AbortSignal.timeout(10000) }
       );
       if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
@@ -362,7 +362,7 @@ export async function coingeckoTrending() {
   const cacheKey = "cg:trending";
   const cached = cacheGet(cacheKey);
   if (cached) return cached;
-  const data = await safeFetch("/api/coingecko/search/trending", {}, "CoinGecko");
+  const data = await safeFetch(`${API_BASE}/proxy/coingecko/search/trending`, {}, "CoinGecko");
   if (data && data.coins) {
     const result = data.coins.slice(0, 6).map(c => c.item);
     cacheSet(cacheKey, result, 300_000); // 5min cache
@@ -456,7 +456,7 @@ export async function fmpProfile(symbol) {
   const response = await apiClient.call('fmp', 'profile', { symbol }, {
     fetcher: async () => {
       const res = await fetch(
-        `/api/fmp/profile?symbol=${encodeURIComponent(symbol)}&apikey=${FMP_KEY}`,
+        `${API_BASE}/proxy/fmp/profile?symbol=${encodeURIComponent(symbol)}&apikey=${FMP_KEY}`,
         { signal: AbortSignal.timeout(10000) }
       );
       if (res.status === 429) {
@@ -488,7 +488,7 @@ export async function fmpRatios(symbol) {
   const response = await apiClient.call('fmp', 'ratiosTTM', { symbol }, {
     fetcher: async () => {
       const res = await fetch(
-        `/api/fmp/ratios-ttm?symbol=${encodeURIComponent(symbol)}&apikey=${FMP_KEY}`,
+        `${API_BASE}/proxy/fmp/ratios-ttm?symbol=${encodeURIComponent(symbol)}&apikey=${FMP_KEY}`,
         { signal: AbortSignal.timeout(10000) }
       );
       if (res.status === 429) {
@@ -520,7 +520,7 @@ export async function fmpDCF(symbol) {
   const cached = cacheGet(cacheKey);
   if (cached) return cached;
   const data = await fmpFetch(
-    `/api/fmp/discounted-cash-flow?symbol=${encodeURIComponent(symbol)}&apikey=${FMP_KEY}`
+    `${API_BASE}/proxy/fmp/discounted-cash-flow?symbol=${encodeURIComponent(symbol)}&apikey=${FMP_KEY}`
   );
   if (data && !data._rateLimited && Array.isArray(data) && data.length > 0) {
     cacheSet(cacheKey, data[0], 21_600_000); // 6hr
@@ -541,7 +541,7 @@ export async function fmpBatchProfile(symbols) {
       // Serialize requests — 1 per second to avoid FMP burst 429s
       for (const sym of symbols) {
         const res = await fetch(
-          `/api/fmp/profile?symbol=${encodeURIComponent(sym)}&apikey=${FMP_KEY}`,
+          `${API_BASE}/proxy/fmp/profile?symbol=${encodeURIComponent(sym)}&apikey=${FMP_KEY}`,
           { signal: AbortSignal.timeout(10000) }
         );
         if (res.status === 429) {
@@ -586,7 +586,7 @@ export function hasBrapiToken() { return !!BRAPI_TOKEN; }
 
 async function brapiQuoteSingle(ticker) {
   const res = await fetch(
-    `/api/brapi/quote/${ticker}`,
+    `${API_BASE}/proxy/brapi/quote/${ticker}`,
     {
       signal:  AbortSignal.timeout(10000),
       headers: { 'Authorization': `Bearer ${BRAPI_TOKEN}` },
@@ -656,7 +656,7 @@ export async function bcbMacro() {
     apiClient.call('bcb', 'selic', {}, {
       fetcher: async () => {
         const res = await fetch(
-          `/api/bcb/dados/serie/bcdata.sgs.${BCB_SERIES.selic}/dados/ultimos/1?formato=json`,
+          `${API_BASE}/proxy/bcb/dados/serie/bcdata.sgs.${BCB_SERIES.selic}/dados/ultimos/1?formato=json`,
           { signal: AbortSignal.timeout(10000) }
         );
         if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
@@ -668,7 +668,7 @@ export async function bcbMacro() {
     apiClient.call('bcb', 'ipca', {}, {
       fetcher: async () => {
         const res = await fetch(
-          `/api/bcb/dados/serie/bcdata.sgs.${BCB_SERIES.ipca}/dados/ultimos/1?formato=json`,
+          `${API_BASE}/proxy/bcb/dados/serie/bcdata.sgs.${BCB_SERIES.ipca}/dados/ultimos/1?formato=json`,
           { signal: AbortSignal.timeout(10000) }
         );
         if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
@@ -680,7 +680,7 @@ export async function bcbMacro() {
     apiClient.call('bcb', 'cdi', {}, {
       fetcher: async () => {
         const res = await fetch(
-          `/api/bcb/dados/serie/bcdata.sgs.${BCB_SERIES.cdi}/dados/ultimos/1?formato=json`,
+          `${API_BASE}/proxy/bcb/dados/serie/bcdata.sgs.${BCB_SERIES.cdi}/dados/ultimos/1?formato=json`,
           { signal: AbortSignal.timeout(10000) }
         );
         if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
@@ -714,7 +714,7 @@ export async function awesomeFx() {
   const response = await apiClient.call('awesomeapi', 'fx', {}, {
     fetcher: async () => {
       const res = await fetch(
-        `/api/awesomeapi/last/USD-BRL,EUR-BRL`,
+        `${API_BASE}/proxy/awesomeapi/last/USD-BRL,EUR-BRL`,
         { signal: AbortSignal.timeout(10000) }
       );
       if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
@@ -804,7 +804,7 @@ export async function fetchYahooMarketData(yahooSymbols, prevData, { assets, vol
   const response = await apiClient.call('yahoo', 'quote', { symbols: sorted }, {
     fetcher: async () => {
       const urls = [
-        `/api/yahoo${yahooPath}`,
+        `${API_BASE}/proxy/yahoo${yahooPath}`,
         `https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`,
         `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`,
       ];
@@ -900,7 +900,7 @@ export async function fetchB3MarketData(b3Assets, { assets, volatility }) {
     const yahooPath = `/v7/finance/quote?symbols=${encodeURIComponent(saSymbols)}`;
     const response  = await apiClient.call('yahoo', 'quote', { symbols: saSorted }, {
       fetcher: async () => {
-        const res = await fetch(`/api/yahoo${yahooPath}`, { signal: AbortSignal.timeout(12000) });
+        const res = await fetch(`${API_BASE}/proxy/yahoo${yahooPath}`, { signal: AbortSignal.timeout(12000) });
         if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
         const json    = await res.json();
         const results = json?.quoteResponse?.result;
@@ -957,7 +957,7 @@ export async function fetchYahooChartData(symbol, range, interval, { assets }) {
   const response = await apiClient.call('yahoo', 'chart', { symbol, range, interval }, {
     fetcher: async () => {
       const urls = [
-        `/api/yahoo/v8/finance/chart?symbol=${encodeURIComponent(symbol)}&range=${range}&interval=${interval}`,
+        `${API_BASE}/proxy/yahoo/v8/finance/chart?symbol=${encodeURIComponent(symbol)}&range=${range}&interval=${interval}`,
         `https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`,
         `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`,
       ];
@@ -1019,7 +1019,7 @@ export async function fetchYahooOHLCV(symbol, timeframe = '1M', { assets = {} } 
   const response = await apiClient.call('yahoo', 'chart', { symbol, range, interval }, {
     fetcher: async () => {
       const urls = [
-        `/api/yahoo/v8/finance/chart?symbol=${encodeURIComponent(chartSymbol)}&range=${range}&interval=${interval}`,
+        `${API_BASE}/proxy/yahoo/v8/finance/chart?symbol=${encodeURIComponent(chartSymbol)}&range=${range}&interval=${interval}`,
         `https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`,
         `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`,
       ];
@@ -1107,15 +1107,15 @@ export function pushHealthHistory(source, success) {
 // healthPing calls are tracked via trackApiCall() for display only — not quota-managed.
 export async function healthPing(source) {
   const endpoints = {
-    yahoo:        "/api/yahoo/v7/finance/quote?symbols=AAPL",
-    finnhub:      FINNHUB_KEY ? `/api/finnhub/quote?symbol=AAPL&token=${FINNHUB_KEY}` : null,
-    alphaVantage: AV_KEY ? `/api/alphavantage/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=${AV_KEY}` : null,
-    fred:         FRED_KEY ? `/api/fred/series/observations?series_id=DGS10&sort_order=desc&limit=1&file_type=json&api_key=${FRED_KEY}` : null,
-    coingecko:    "/api/coingecko/ping",
-    fmp:          FMP_KEY ? `/api/fmp/profile?symbol=AAPL&apikey=${FMP_KEY}` : null,
-    brapi:        BRAPI_TOKEN ? `/api/brapi/quote/PETR4?token=${BRAPI_TOKEN}` : null,
-    bcb:          "/api/bcb/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json",
-    awesomeapi:   "/api/awesomeapi/last/USD-BRL",
+    yahoo:        `${API_BASE}/proxy/yahoo/v7/finance/quote?symbols=AAPL`,
+    finnhub:      FINNHUB_KEY ? `${API_BASE}/proxy/finnhub/quote?symbol=AAPL&token=${FINNHUB_KEY}` : null,
+    alphaVantage: AV_KEY ? `${API_BASE}/proxy/alphavantage/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=${AV_KEY}` : null,
+    fred:         FRED_KEY ? `${API_BASE}/proxy/fred/series/observations?series_id=DGS10&sort_order=desc&limit=1&file_type=json&api_key=${FRED_KEY}` : null,
+    coingecko:    `${API_BASE}/proxy/coingecko/ping`,
+    fmp:          FMP_KEY ? `${API_BASE}/proxy/fmp/profile?symbol=AAPL&apikey=${FMP_KEY}` : null,
+    brapi:        BRAPI_TOKEN ? `${API_BASE}/proxy/brapi/quote/PETR4?token=${BRAPI_TOKEN}` : null,
+    bcb:          `${API_BASE}/proxy/bcb/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json`,
+    awesomeapi:   `${API_BASE}/proxy/awesomeapi/last/USD-BRL`,
   };
   const url = endpoints[source];
   if (!url) {
