@@ -1,0 +1,29 @@
+# ─── Cloudflare Pages _redirects ──────────────────────────────────────────
+# Docs: https://developers.cloudflare.com/pages/configuration/redirects/
+#
+# SETUP REQUIRED: Replace every instance of https://global-markets-terminal.up.railway.app
+# with your actual Railway deployment URL before deploying.
+# Example: https://gmt-production.up.railway.app
+#
+# This file proxies all /api/* requests to the Railway backend at the
+# Cloudflare edge so the browser never exposes the Railway URL.
+# The /* catch-all at the bottom enables React Router client-side routing.
+# ──────────────────────────────────────────────────────────────────────────
+
+# GMT API proxy rules — all /api/* traffic forwarded to Railway backend
+# RAILWAY_BACKEND is set as an environment variable in Cloudflare Pages dashboard
+# Format: /api/path/*  https://your-app.up.railway.app/api/path/:splat  200
+
+/api/v1/*           https://global-markets-terminal.up.railway.app/api/v1/:splat           200
+/api/yahoo/*        https://global-markets-terminal.up.railway.app/api/yahoo/:splat        200
+/api/finnhub/*      https://global-markets-terminal.up.railway.app/api/finnhub/:splat      200
+/api/alphavantage/* https://global-markets-terminal.up.railway.app/api/alphavantage/:splat 200
+/api/fred/*         https://global-markets-terminal.up.railway.app/api/fred/:splat         200
+/api/coingecko/*    https://global-markets-terminal.up.railway.app/api/coingecko/:splat    200
+/api/fmp/*          https://global-markets-terminal.up.railway.app/api/fmp/*               200
+/api/brapi/*        https://global-markets-terminal.up.railway.app/api/brapi/:splat        200
+/api/bcb/*          https://global-markets-terminal.up.railway.app/api/bcb/:splat          200
+/api/awesomeapi/*   https://global-markets-terminal.up.railway.app/api/awesomeapi/:splat   200
+
+# SPA catch-all — serve index.html for all unmatched routes (React Router)
+/*                  /index.html                                       200
