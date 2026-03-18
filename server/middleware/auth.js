@@ -1,26 +1,40 @@
-import jwt from 'jsonwebtoken';
+import { supabase } from '../db.js';
 
-export const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
-export const JWT_EXPIRES_IN = '8h';
-
-export function authenticate(req, res, next) {
+export async function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Missing or invalid Authorization header' });
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({
+      error:   'UNAUTHORIZED',
+      message: 'Missing or invalid Authorization header',
+    });
   }
+
   const token = authHeader.slice(7);
-  try {
-    const payload = jwt.verify(token, JWT_SECRET);
-    req.user = payload;
-    next();
-  } catch {
-    return res.status(401).json({ error: 'TOKEN_INVALID', message: 'Token is invalid or expired' });
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+
+  if (error || !user) {
+    return res.status(401).json({
+      error:   'TOKEN_INVALID',
+      message: 'Token is invalid or expired',
+    });
   }
+
+  req.user = {
+    id:    user.id,
+    email: user.email,
+    name:  user.user_metadata?.name || '',
+    role:  user.user_metadata?.role || 'user',
+  };
+
+  next();
 }
 
 export function requireAdmin(req, res, next) {
   if (!req.user || req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'FORBIDDEN', message: 'Admin role required' });
+    return res.status(403).json({
+      error:   'FORBIDDEN',
+      message: 'Admin role required',
+    });
   }
   next();
 }

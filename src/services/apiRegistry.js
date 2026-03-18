@@ -224,8 +224,8 @@ export const API_REGISTRY = {
     notes:
       "Free tier: 25 calls/day hard limit, 5 calls/min. " +
       "⚠ ON-DEMAND ONLY — never call on page load or in polling loops. " +
-      "Defined in dataServices.js but currently not called from any component (dead UI code). " +
-      "24hr cache preserves quota when eventually activated.",
+      "Used by SignalEnginePage (RSI + MACD panels, subgroup scanner). " +
+      "24hr cache preserves quota across sessions.",
     tierOptions: [
       {
         name: "Free (current)",
@@ -259,24 +259,22 @@ export const API_REGISTRY = {
         path: "/query", // function=RSI
         callsPerRequest: 1,
         callsNote:
-          "1 call per symbol+interval+timePeriod combination. Defined but not yet used in the UI.",
+          "1 call per symbol+interval+timePeriod combination. Used by SignalEnginePage single-asset analysis and subgroup scanner.",
         cacheTTL: 86400, // 24hr — mandatory for 25/day budget
         priority: "medium",
         canDefer: true,
         canBatch: false,
-        status: "dormant",
       },
       {
         id: "macd",
         path: "/query", // function=MACD
         callsPerRequest: 1,
         callsNote:
-          "1 call per symbol+interval combination. Defined but not yet used in the UI.",
+          "1 call per symbol+interval combination. Used by SignalEnginePage single-asset analysis.",
         cacheTTL: 86400,
         priority: "medium",
         canDefer: true,
         canBatch: false,
-        status: "dormant",
       },
     ],
   },
@@ -314,6 +312,28 @@ export const API_REGISTRY = {
           "1 call per FRED series ID. Currently fetches: fedRate, consumerSentiment (per group macro banners). " +
           "fredAllMacro() fetches all 9 series sequentially — used only on explicit user action.",
         cacheTTL: 3600, // 1hr — economic data updates daily or monthly
+        priority: "medium",
+        canDefer: true,
+        canBatch: false,
+      },
+      {
+        id: "releases",
+        path: "/releases",
+        callsPerRequest: 1,
+        callsNote: "Fetches list of all FRED release series with metadata. Used by fredReleases().",
+        cacheTTL: 3600, // 1hr
+        priority: "medium",
+        canDefer: true,
+        canBatch: false,
+      },
+      {
+        id: "releaseDates",
+        path: "/releases/dates",
+        callsPerRequest: 1,
+        callsNote:
+          "Fetches scheduled release dates for a configurable date range. " +
+          "Powers the Economic Calendar in MacroHubPage. 30min cache — dates can shift.",
+        cacheTTL: 1800, // 30min
         priority: "medium",
         canDefer: true,
         canBatch: false,

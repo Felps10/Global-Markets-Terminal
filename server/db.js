@@ -1,73 +1,46 @@
-import Database from 'better-sqlite3';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+// server/db.js
+// ─── Supabase client ─────────────────────────────────────────────────────────
+// Single shared client for all server-side database access.
+// Schema is managed in the Supabase dashboard — no local migrations.
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname  = dirname(__filename);
+import { createClient } from '@supabase/supabase-js';
 
-const DB_PATH = join(__dirname, 'data', 'taxonomy.db');
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-let _db = null;
-
-export function getDb() {
-  if (_db) return _db;
-  _db = new Database(DB_PATH);
-  _db.pragma('journal_mode = WAL');
-  _db.pragma('foreign_keys = ON');
-  return _db;
+if (!supabaseUrl) {
+  throw new Error(
+    '[db] Missing SUPABASE_URL — set it in your .env file.\n' +
+    '     Find it in: Supabase dashboard → Settings → API → Project URL'
+  );
 }
 
+if (!supabaseKey) {
+  throw new Error(
+    '[db] Missing SUPABASE_SERVICE_ROLE_KEY — set it in your .env file.\n' +
+    '     Find it in: Supabase dashboard → Settings → API → service_role (secret) key\n' +
+    '     ⚠ Never expose this key to the browser.'
+  );
+}
+
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: { persistSession: false }, // server-side client never persists sessions
+});
+
+console.log(`[db] Supabase client initialized — project: ${supabaseUrl.slice(0, 20)}`);
+
+// Default export — same client instance
+export default supabase;
+
+// ── No-op lifecycle hooks ─────────────────────────────────────────────────────
+// These are called from server/index.js start(). They are intentional no-ops:
+// schema is managed in the Supabase dashboard and seeding is run manually via
+// `npm run seed` rather than on every server boot.
+
 export function initSchema() {
-  const db = getDb();
+  console.log('[db] Supabase — schema managed by Supabase dashboard, no local migration needed.');
+}
 
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      email       TEXT    UNIQUE NOT NULL,
-      password    TEXT    NOT NULL,
-      name        TEXT    NOT NULL DEFAULT '',
-      role        TEXT    NOT NULL DEFAULT 'user' CHECK(role IN ('admin','user')),
-      created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS groups (
-      id           TEXT PRIMARY KEY,
-      display_name TEXT    NOT NULL,
-      description  TEXT,
-      slug         TEXT    UNIQUE NOT NULL,
-      created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS subgroups (
-      id           TEXT PRIMARY KEY,
-      display_name TEXT    NOT NULL,
-      description  TEXT,
-      slug         TEXT    UNIQUE NOT NULL,
-      group_id     TEXT    NOT NULL REFERENCES groups(id),
-      icon         TEXT,
-      color        TEXT,
-      created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS assets (
-      id           TEXT PRIMARY KEY,
-      symbol       TEXT    NOT NULL,
-      name         TEXT    NOT NULL,
-      subgroup_id  TEXT    NOT NULL REFERENCES subgroups(id),
-      group_id     TEXT    NOT NULL REFERENCES groups(id),
-      type         TEXT    NOT NULL,
-      currency     TEXT,
-      exchange     TEXT,
-      active       INTEGER DEFAULT 1,
-      meta         TEXT,
-      created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_subgroups_group_id  ON subgroups(group_id);
-    CREATE INDEX IF NOT EXISTS idx_assets_subgroup_id  ON assets(subgroup_id);
-    CREATE INDEX IF NOT EXISTS idx_assets_group_id     ON assets(group_id);
-  `);
+export async function seedIfEmpty() {
+  console.log('[db] Supabase — run `npm run seed` manually to seed taxonomy data.');
 }

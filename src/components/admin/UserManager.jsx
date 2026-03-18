@@ -242,7 +242,7 @@ function fmtDate(iso) {
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
-export default function UserManager({ token, currentUserId }) {
+export default function UserManager({ currentUserId }) {
   const { toasts, push } = useToast();
 
   const [users,   setUsers]   = useState([]);
@@ -258,14 +258,14 @@ export default function UserManager({ token, currentUserId }) {
     setLoading(true);
     setError(null);
     try {
-      const data = await getUsers(token);
+      const data = await getUsers();
       setUsers(data);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, []);
 
   // Re-fetch every time this tab mounts
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
@@ -275,7 +275,7 @@ export default function UserManager({ token, currentUserId }) {
     setDeleteLoading(true);
     setDeleteError(null);
     try {
-      await deleteUser(token, confirming.id);
+      await deleteUser(confirming.id);
       setUsers((prev) => prev.filter((u) => u.id !== confirming.id));
       push(`User ${confirming.email} deleted`);
       setConfirming(null);

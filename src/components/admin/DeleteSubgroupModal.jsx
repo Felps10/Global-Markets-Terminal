@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import styled from 'styled-components';
 import { bulkRelocateAssets, deleteSubgroup } from '../../services/taxonomyService.js';
-import { useAuth } from '../../hooks/useAuth.js';
 
 const Overlay = styled.div`
   position: fixed; inset: 0;
@@ -101,7 +100,6 @@ const ActionBtn = styled(Btn)`
 const OptGroup = styled.optgroup`color: #8892A4;`;
 
 export default function DeleteSubgroupModal({ subgroup, assets = [], allSubgroups = [], onClose, onDeleted }) {
-  const { token }             = useAuth();
   const hasAssets             = assets.length > 0;
   const [targetId, setTargetId] = useState('');
   const [error, setError]     = useState('');
@@ -123,9 +121,9 @@ export default function DeleteSubgroupModal({ subgroup, assets = [], allSubgroup
     try {
       if (hasAssets) {
         const assetIds = assets.map((a) => a.id);
-        await bulkRelocateAssets(assetIds, targetId, token);
+        await bulkRelocateAssets(assetIds, targetId);
       }
-      await deleteSubgroup(subgroup.id, token);
+      await deleteSubgroup(subgroup.id);
       const target = allSubgroups.find((s) => s.id === targetId);
       onDeleted({
         moved:       hasAssets ? assets.length : 0,

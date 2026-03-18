@@ -1,19 +1,38 @@
+import 'dotenv/config';
 import express from 'express';
 import cors    from 'cors';
-import { initSchema } from './db.js';
-import { seedIfEmpty, logTaxonomyCounts } from './seed.js';
+import { supabase, initSchema, seedIfEmpty } from './db.js';
+import { seedClubeDemo } from './seed.js';
 import authRoutes     from './routes/auth.js';
 import groupRoutes    from './routes/groups.js';
 import subgroupRoutes from './routes/subgroups.js';
 import assetRoutes    from './routes/assets.js';
 import taxonomyRoutes from './routes/taxonomy.js';
-import usersRouter    from './routes/users.js';
+import usersRouter       from './routes/users.js';
+import watchlistRoutes   from './routes/watchlist.js';
+import preferencesRoutes from './routes/preferences.js';
+import clubeRoutes       from './routes/clubes.js';
+import yahooRoutes       from './routes/yahoo.js';
 
 const PORT = process.env.PORT || 4000;
 const app  = express();
 
+// ── CORS ──────────────────────────────────────────────────────────────────────
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : ['http://localhost:5173', 'http://localhost:3000'];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (curl, Postman, server-to-server)
+    if (!origin) return callback(null, true);
+    if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
+  credentials: true,
+}));
+
 // ── Middleware ────────────────────────────────────────────────────────────────
-app.use(cors({ origin: ['http://localhost:5173', 'http://localhost:3000'] }));
 app.use(express.json());
 
 // ── Routes ────────────────────────────────────────────────────────────────────
@@ -22,10 +41,15 @@ app.use('/api/v1/groups',    groupRoutes);
 app.use('/api/v1/subgroups', subgroupRoutes);
 app.use('/api/v1/assets',    assetRoutes);
 app.use('/api/v1/taxonomy',  taxonomyRoutes);
-app.use('/api/v1/users',     usersRouter);
+app.use('/api/v1/users',       usersRouter);
+app.use('/api/v1/watchlist',   watchlistRoutes);
+app.use('/api/v1/preferences', preferencesRoutes);
+app.use('/api/yahoo',          yahooRoutes);
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/api/v1/health', (_req, res) => res.json({ status: 'ok', ts: Date.now() }));
+
+app.use('/api/v1/clubes', clubeRoutes);
 
 // ── 404 ───────────────────────────────────────────────────────────────────────
 app.use((_req, res) => res.status(404).json({ error: 'NOT_FOUND' }));
@@ -34,7 +58,19 @@ app.use((_req, res) => res.status(404).json({ error: 'NOT_FOUND' }));
 async function start() {
   initSchema();
   await seedIfEmpty();
-  logTaxonomyCounts();
+
+  // Verify Supabase connectivity before accepting traffic
+  const { error: pingError } = await supabase.from('groups').select('id').limit(1);
+  if (pingError) {
+    console.error('[startup] Supabase connectivity check FAILED:', pingError.message);
+    console.error('[startup] Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your environment.');
+    process.exit(1);
+  }
+  console.log('[startup] Supabase connectivity check — OK');
+
+  if (process.env.NODE_ENV !== 'production') {
+    await seedClubeDemo();
+  }
 
   app.listen(PORT, () => {
     console.log('');
@@ -51,10 +87,18 @@ async function start() {
     console.log('│    GET    /api/v1/assets                             │');
     console.log('│    GET    /api/v1/taxonomy                           │');
     console.log('│    GET    /api/v1/health                             │');
+    console.log('│    GET    /api/v1/watchlist                          │');
+    console.log('│    POST   /api/v1/watchlist                          │');
+    console.log('│    DELETE /api/v1/watchlist/:type/:target_id         │');
+    console.log('│    GET    /api/v1/preferences                        │');
+    console.log('│    PUT    /api/v1/preferences                        │');
+    console.log('│    GET    /api/v1/clubes                             │');
+    console.log('│    POST   /api/v1/clubes                             │');
+    console.log('│    GET    /api/yahoo/v7/finance/quote                │');
+    console.log('│    GET    /api/yahoo/v8/finance/chart                │');
     console.log('├──────────────────────────────────────────────────────┤');
-    console.log('│  ⚠️  Default admin credentials are active:            │');
-    console.log('│     email:    admin@terminal.local                   │');
-    console.log('│     password: Admin1234!                             │');
+    console.log('│  Database: Supabase (hosted Postgres)                │');
+    console.log(`│  CORS origins: ${ALLOWED_ORIGINS.join(', ')}`);
     console.log('└──────────────────────────────────────────────────────┘');
     console.log('');
   });

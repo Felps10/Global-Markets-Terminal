@@ -15,9 +15,12 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import LiveClock from './LiveClock.jsx';
 import MarketStatusPill, { MARKETS } from './MarketStatusPill.jsx';
 import TickerStrip from './TickerStrip.jsx';
+import MarketsDropdown from './MarketsDropdown.jsx';
+import { useTaxonomy } from '../context/TaxonomyContext.jsx';
 
 // ─── Inject nav + dropdown styles ─────────────────────────────────────────────
 const STYLE_ID = 'gmt-header-nav-styles';
@@ -188,6 +191,9 @@ function UserDropdown({ user, onNav, onLogout, onClose }) {
           </span>
         </button>
       )}
+      <button className="gmt-dropdown-item" onClick={() => { onNav?.('/clube'); onClose(); }}>
+        <span>📊</span> Clube
+      </button>
       <button className="gmt-dropdown-item" onClick={onClose}>
         <span>⚙</span> Preferences
         <span style={{ marginLeft: 'auto', fontSize: 10, color: '#1e293b' }}>soon</span>
@@ -308,17 +314,20 @@ const ADMIN_NAV_ITEMS = [
 
 // ─── GMTHeader (authenticated) ────────────────────────────────────────────────
 export default function GMTHeader({
-  activePage   = 'dashboard',
+  activePage        = 'dashboard',
   user,
   onMenuOpen,
   onNav,
   onLogout,
   onAssetClick,
-  showTicker  = true,
-  tickerItems = [],
-  adminNav,           // { activeTab, onTabChange } — admin mode
+  showTicker        = true,
+  tickerItems       = [],
+  adminNav,                   // { activeTab, onTabChange } — admin mode
+  watchlistEnabled  = false,  // show Watchlist tab when user is authenticated
 }) {
   const [selectedMarketId, setSelectedMarketId] = useState('nyse');
+  const { assets, groups, subgroups } = useTaxonomy();
+  const navigate = useNavigate();
 
   useEffect(() => { injectStyles(); }, []);
 
@@ -352,7 +361,24 @@ export default function GMTHeader({
       display: 'flex', alignItems: 'center',
       padding: '0 20px', gap: 28,
     }}>
-      {NAV_ITEMS.map(item => (
+      {/* Terminal */}
+      <button
+        className={`gmt-nav-item${activePage === 'dashboard' ? ' active' : ''}`}
+        onClick={() => onNav && onNav('dashboard')}
+      >
+        Terminal
+      </button>
+
+      {/* Markets dropdown — between Terminal and Heatmap */}
+      <MarketsDropdown />
+
+      {/* Heatmap · Catalog · News (+ optional Watchlist) */}
+      {[
+        { id: 'heatmap',   label: 'Heatmap'  },
+        { id: 'catalog',   label: 'Catalog'  },
+        { id: 'news',      label: 'News'     },
+        ...(watchlistEnabled ? [{ id: 'watchlist', label: 'Watchlist' }] : []),
+      ].map(item => (
         <button
           key={item.id}
           className={`gmt-nav-item${activePage === item.id ? ' active' : ''}`}
@@ -361,6 +387,12 @@ export default function GMTHeader({
           {item.label}
         </button>
       ))}
+      <button
+        className={`gmt-nav-item${activePage === 'clube' ? ' active' : ''}`}
+        onClick={() => navigate('/clube')}
+      >
+        Clube
+      </button>
       <div style={{ flex: 1 }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
         <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 5px #22c55e' }} />
@@ -370,7 +402,7 @@ export default function GMTHeader({
       </div>
       <div style={{ width: 1, height: 14, background: 'rgba(51,65,85,0.5)', margin: '0 12px' }} />
       <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: '#334155', letterSpacing: '0.06em' }}>
-        126 ASSETS · 6 GROUPS · 20 SUBGROUPS
+        {assets.length} ASSETS · {groups.length} GROUPS · {subgroups.length} SUBGROUPS
       </span>
     </div>
   );

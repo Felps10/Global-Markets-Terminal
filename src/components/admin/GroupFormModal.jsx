@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { createGroup, updateGroup } from '../../services/taxonomyService.js';
-import { useAuth } from '../../hooks/useAuth.js';
 
 const Overlay = styled.div`
   position: fixed; inset: 0;
@@ -134,7 +133,6 @@ function toSlug(str) {
 }
 
 export default function GroupFormModal({ group, onClose, onSaved, existingSlugs = [] }) {
-  const { token } = useAuth();
   const isEdit    = !!group;
 
   const [displayName,  setDisplayName]  = useState(group?.display_name || '');
@@ -159,9 +157,9 @@ export default function GroupFormModal({ group, onClose, onSaved, existingSlugs 
     try {
       const payload = { display_name: displayName.trim(), description: description.trim() || null, slug };
       if (isEdit) {
-        await updateGroup(group.id, payload, token);
+        await updateGroup(group.id, payload);
       } else {
-        await createGroup(payload, token);
+        await createGroup(payload);
       }
       onSaved();
     } catch (err) {

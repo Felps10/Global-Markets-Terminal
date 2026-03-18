@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./hooks/useAuth.js";
 import GMTHeader from "./components/GMTHeader.jsx";
+import CommandBar from "./components/CommandBar.jsx";
+import AssetListView from "./components/AssetListView.jsx";
 import {
   hasFinnhubKey, finnhubNews, finnhubRecommendation,
   hasFmpKey, fmpProfile, fmpRatios, fmpBatchProfile,
@@ -17,6 +19,9 @@ import {
 import { SUBGROUPS as STATIC_SUBGROUPS_ARRAY } from './data/subgroups.js';
 import { ASSETS    as STATIC_ASSETS_ARRAY    } from './data/assets.js';
 import { useTaxonomy } from './context/TaxonomyContext.jsx';
+import { usePreferences } from './context/PreferencesContext.jsx';
+import { useWatchlist }   from './context/WatchlistContext.jsx';
+import WatchlistPage     from './WatchlistPage.jsx';
 import { isExhausted } from './services/quotaTracker.js';
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
@@ -36,11 +41,13 @@ const REFRESH_INTERVAL = 30000;
 //
 //  EQUITIES — US SECTORS (GICS-aligned)
 //    aerospace      Aerospace & Defense     (GICS: Industrials / A&D sub-industry)
+//    biotech        Biotech                 (GICS: Health Care / Biotechnology)
 //    cleanenergy    Clean Energy            (Thematic: EVs + renewables + utilities)
 //    consumer       Consumer                (GICS: Consumer Discretionary + Staples)
 //    oil-gas        Oil & Gas               (GICS: Energy)
 //    financials     Financials              (GICS: Financials)
 //    healthcare     Health Care             (GICS: Health Care — official two-word form)
+//    industrials    Industrials             (GICS: Industrials)
 //    reits          Real Estate             (GICS: Real Estate)
 //    semiconductors Semiconductors          (GICS: IT / Semiconductors sub-industry)
 //    technology     Technology              (GICS: Information Technology + Comm. Svcs.)
@@ -470,17 +477,19 @@ function CrossListBadge({ symbol }) {
 }
 
 // ─── ASSET CARD ───────────────────────────────────────────────────────────────
-function AssetCard({ symbol, data, onClick }) {
+function AssetCard({ symbol, data, onClick, groupLabel }) {
   const [hovered, setHovered] = useState(false);
+  const { isAuthenticated }           = useAuth();
+  const { pin, unpin, isPinned }      = useWatchlist();
   const asset = STATIC_ASSETS_MAP[symbol];
   if (!asset || !data) return null;
 
-  const positive     = data.changePct >= 0;
+  const positive     = (data.changePct ?? 0) >= 0;
   const color        = positive ? "#00E676" : "#FF5252";
   const arrow        = positive ? "▲" : "▼";
   const sign         = positive ? "+" : "";
   const displayTicker = asset.display || symbol;
-  const heatWidth    = Math.min(Math.abs(data.changePct) / 4, 1) * 100;
+  const heatWidth    = Math.min(Math.abs(data.changePct ?? 0) / 4, 1) * 100;
   const showVolume   = asset.cat !== "fx";
 
   return (
@@ -512,9 +521,16 @@ function AssetCard({ symbol, data, onClick }) {
             {asset.isCrypto && <SourceBadge source="coingecko" />}
             {asset.isB3 && <SourceBadge source="brapi" />}
             <CrossListBadge symbol={symbol} />
+            {groupLabel && (
+              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, padding: "1px 5px", borderRadius: 2, background: "#0a0f1a", color: "#2a4a6a", border: "0.5px solid #1a2f4a" }}>
+                {groupLabel.toUpperCase()}
+              </span>
+            )}
           </div>
         </div>
-        <Sparkline data={data.sparkline} positive={positive} />
+        <div style={{ marginRight: isAuthenticated ? 20 : 0 }}>
+          <Sparkline data={data.sparkline} positive={positive} />
+        </div>
       </div>
 
       {/* Price row */}
@@ -524,10 +540,10 @@ function AssetCard({ symbol, data, onClick }) {
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, fontWeight: 600, color }}>
-            {arrow} {sign}{data.changePct.toFixed(2)}%
+            {arrow} {sign}{data.changePct != null ? data.changePct.toFixed(2) : '—'}%
           </div>
           <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: color + "99", marginTop: 1 }}>
-            {sign}{data.change.toFixed(asset.cat === "fx" ? 4 : 2)}
+            {sign}{data.change != null ? data.change.toFixed(asset.cat === "fx" ? 4 : 2) : '—'}
           </div>
         </div>
       </div>
@@ -544,6 +560,25 @@ function AssetCard({ symbol, data, onClick }) {
       <div style={{ height: 3, background: "var(--c-border)", borderRadius: 2, overflow: "hidden", marginTop: showVolume ? 0 : 6 }}>
         <div style={{ height: "100%", width: `${heatWidth}%`, background: `linear-gradient(90deg,${color}66,${color})`, borderRadius: 2, transition: "width 0.6s ease" }} />
       </div>
+
+      {/* Star / pin button */}
+      {isAuthenticated && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            isPinned('asset', symbol) ? unpin('asset', symbol) : pin('asset', symbol);
+          }}
+          style={{
+            position: "absolute", top: 8, right: 8,
+            background: "transparent", border: "none", cursor: "pointer",
+            fontSize: 14, lineHeight: 1, padding: 2,
+            color: isPinned('asset', symbol) ? "#FFB300" : "var(--c-text-3)",
+            transition: "color 0.15s ease",
+          }}
+        >
+          {isPinned('asset', symbol) ? "★" : "☆"}
+        </button>
+      )}
     </div>
   );
 }
@@ -566,10 +601,12 @@ function ListColumnHeader() {
 // ─── ASSET ROW ────────────────────────────────────────────────────────────────
 function AssetRow({ symbol, data, rank, onClick }) {
   const [hovered, setHovered] = useState(false);
+  const { isAuthenticated }       = useAuth();
+  const { pin, unpin, isPinned }  = useWatchlist();
   const asset = STATIC_ASSETS_MAP[symbol];
   if (!asset || !data) return null;
 
-  const positive     = data.changePct >= 0;
+  const positive     = (data.changePct ?? 0) >= 0;
   const color        = positive ? "#00E676" : "#FF5252";
   const sign         = positive ? "+" : "";
   const displayTicker = asset.display || symbol;
@@ -601,19 +638,35 @@ function AssetRow({ symbol, data, rank, onClick }) {
       </div>
       <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, fontWeight: 700, color: "var(--c-text)", textAlign: "right" }}>{formatPrice(symbol, data.price)}</div>
       <div style={{ textAlign: "right" }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 600, color }}>{positive ? "▲" : "▼"} {sign}{data.changePct.toFixed(2)}%</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: color + "80", marginTop: 1 }}>{sign}{data.change.toFixed(asset.cat === "fx" ? 4 : 2)}</div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 600, color }}>{positive ? "▲" : "▼"} {sign}{data.changePct != null ? data.changePct.toFixed(2) : '—'}%</div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: color + "80", marginTop: 1 }}>{sign}{data.change != null ? data.change.toFixed(asset.cat === "fx" ? 4 : 2) : '—'}</div>
       </div>
       <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", textAlign: "right" }}>{asset.cat !== "fx" ? formatVolume(data.volume) : "—"}</div>
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <Sparkline data={data.sparkline} positive={positive} width={60} height={22} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
+        {isAuthenticated && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              isPinned('asset', symbol) ? unpin('asset', symbol) : pin('asset', symbol);
+            }}
+            style={{
+              background: "transparent", border: "none", cursor: "pointer",
+              fontSize: 13, lineHeight: 1, padding: "1px 2px",
+              color: isPinned('asset', symbol) ? "#FFB300" : "var(--c-text-3)",
+              transition: "color 0.15s ease", flexShrink: 0,
+            }}
+          >
+            {isPinned('asset', symbol) ? "★" : "☆"}
+          </button>
+        )}
+        <Sparkline data={data.sparkline} positive={positive} width={50} height={22} />
       </div>
     </div>
   );
 }
 
 // ─── HAMBURGER MENU ───────────────────────────────────────────────────────────
-function HamburgerMenu({ open, onClose, activeFilter, onFilterChange, activeExchanges, onExchangeToggle, onResetExchanges, theme, onThemeToggle, lastUpdate, allExchanges, currentView, onNavigate }) {
+function HamburgerMenu({ open, onClose, activeFilter, onFilterChange, activeExchanges, onExchangeToggle, onResetExchanges, theme, onThemeToggle, lastUpdate, allExchanges, currentView, onNavigate, watchlistItems, watchlistLoading, onUnpin, assets, categories, marketData }) {
   useEffect(() => {
     if (!open) return;
     const handler = (e) => { if (e.key === "Escape") onClose(); };
@@ -624,6 +677,7 @@ function HamburgerMenu({ open, onClose, activeFilter, onFilterChange, activeExch
   const navItems = [
     { key: "all",           label: "All Markets",        icon: "🌍" },
     { key: "aerospace",     label: "Aerospace & Defense", icon: "🛡" },
+    { key: "biotech",       label: "Biotech",            icon: "🧬" },
     { key: "brazil",        label: "Brazil Equities",    icon: "🇧🇷" },
     { key: "cleanenergy",   label: "Clean Energy",       icon: "🔋" },
     { key: "consumer",      label: "Consumer",           icon: "🛒" },
@@ -634,6 +688,7 @@ function HamburgerMenu({ open, onClose, activeFilter, onFilterChange, activeExch
     { key: "financials",    label: "Financials",         icon: "🏦" },
     { key: "fx",            label: "Foreign Exchange",   icon: "💱" },
     { key: "healthcare",    label: "Health Care",        icon: "💊" },
+    { key: "industrials",   label: "Industrials",        icon: "🏭" },
     { key: "indices",       label: "Global Indices",     icon: "🌐" },
     { key: "reits",         label: "Real Estate",        icon: "🏢" },
     { key: "semiconductors",label: "Semiconductors",     icon: "🔬" },
@@ -748,14 +803,76 @@ function HamburgerMenu({ open, onClose, activeFilter, onFilterChange, activeExch
 
         <Divider />
 
-        {/* Watchlist placeholder */}
+        {/* Watchlist */}
         <div style={{ padding: "16px 18px" }}>
           <SectionLabel>WATCHLIST</SectionLabel>
-          <div style={{ border: "1px dashed var(--c-border)", borderRadius: 6, padding: "16px 12px", textAlign: "center" }}>
-            <div style={{ fontSize: 22, marginBottom: 6, opacity: 0.25 }}>★</div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", letterSpacing: "0.5px" }}>COMING SOON</div>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: "var(--c-text-3)", marginTop: 4 }}>Pin your favourite assets here</div>
-          </div>
+
+          {watchlistLoading ? (
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", letterSpacing: "1px" }}>
+              LOADING...
+            </div>
+
+          ) : !watchlistItems || watchlistItems.length === 0 ? (
+            <div style={{ border: "1px dashed var(--c-border)", borderRadius: 6, padding: "16px 12px", textAlign: "center" }}>
+              <div style={{ fontSize: 22, marginBottom: 6, opacity: 0.25 }}>★</div>
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", letterSpacing: "0.5px" }}>YOUR WATCHLIST IS EMPTY</div>
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: "var(--c-text-3)", marginTop: 4 }}>Star any asset or group to pin it here</div>
+            </div>
+
+          ) : (
+            <>
+              {/* Pinned subgroups */}
+              {watchlistItems.filter(i => i.type === 'subgroup').length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: "var(--c-text-3)", letterSpacing: "1.5px", marginBottom: 6 }}>GROUPS</div>
+                  {watchlistItems.filter(i => i.type === 'subgroup').map(item => {
+                    const cat = categories?.[item.target_id];
+                    return (
+                      <div key={item.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--c-border-faint)" }}>
+                        <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "var(--c-text-2)" }}>
+                          {cat?.icon && <span style={{ marginRight: 6 }}>{cat.icon}</span>}
+                          {cat?.label || item.target_id}
+                        </span>
+                        <button
+                          onClick={() => onUnpin('subgroup', item.target_id)}
+                          style={{ background: "transparent", border: "none", cursor: "pointer", color: "#00E676", fontSize: 14, lineHeight: 1, padding: "2px 6px" }}
+                        >★</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Pinned assets */}
+              {watchlistItems.filter(i => i.type === 'asset').length > 0 && (
+                <div>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: "var(--c-text-3)", letterSpacing: "1.5px", marginBottom: 6 }}>ASSETS</div>
+                  {watchlistItems.filter(i => i.type === 'asset').map(item => {
+                    const live    = marketData?.[item.target_id];
+                    const pct     = live?.changePct;
+                    const pctColor = pct == null ? "var(--c-text-3)" : pct >= 0 ? "#00E676" : "#FF5252";
+                    return (
+                      <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 0", borderBottom: "1px solid var(--c-border-faint)" }}>
+                        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 600, color: "var(--c-text)", flex: "0 0 auto", minWidth: 48 }}>
+                          {item.target_id}
+                        </span>
+                        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-2)", flex: 1, textAlign: "right" }}>
+                          {live?.price != null ? formatPrice(item.target_id, live.price) : "—"}
+                        </span>
+                        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 600, color: pctColor, flex: "0 0 52px", textAlign: "right" }}>
+                          {pct != null ? (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%" : "—"}
+                        </span>
+                        <button
+                          onClick={() => onUnpin('asset', item.target_id)}
+                          style={{ background: "transparent", border: "none", cursor: "pointer", color: "#00E676", fontSize: 14, lineHeight: 1, padding: "2px 4px", flex: "0 0 auto" }}
+                        >★</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         <Divider />
@@ -885,7 +1002,7 @@ function DetailPanel({ symbol, data, onClose }) {
   const chartOk      = chartState.status === "ok" && chartState.data;
   const displayPct   = chartOk ? chartState.data.changePct   : data.changePct;
   const displayDelta = chartOk ? chartState.data.change       : data.change;
-  const positive     = displayPct >= 0;
+  const positive     = (displayPct ?? 0) >= 0;
   const color        = positive ? "#00E676" : "#FF5252";
   const sign         = positive ? "+" : "";
   const periodLabel  = activeRange === "1D" ? "today" : `past ${activeRange.toLowerCase()}`;
@@ -946,10 +1063,10 @@ function DetailPanel({ symbol, data, onClose }) {
             </div>
             <div style={{ textAlign: "right" }}>
               <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 18, fontWeight: 600, color }}>
-                {positive ? "▲" : "▼"} {sign}{displayPct.toFixed(2)}%
+                {positive ? "▲" : "▼"} {sign}{displayPct != null ? displayPct.toFixed(2) : '—'}%
               </div>
               <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: color + "99", marginTop: 2 }}>
-                {sign}{displayDelta.toFixed(asset.cat === "fx" ? 4 : 2)} {periodLabel}
+                {sign}{displayDelta != null ? displayDelta.toFixed(asset.cat === "fx" ? 4 : 2) : '—'} {periodLabel}
               </div>
             </div>
           </div>
@@ -1088,6 +1205,8 @@ function DetailPanel({ symbol, data, onClose }) {
 export default function GlobalMarketsTerminal({ currentView = "dashboard", onNavigate, catalogPage, newsPage, heatmapPage }) {
   const navigate                          = useNavigate();
   const { user, logout }                  = useAuth();
+  const { prefs, synced, updatePrefs }    = usePreferences();
+  const { items: watchlistItems, loading: watchlistLoading, unpin, isPinned } = useWatchlist();
   const [marketData,      setMarketData]      = useState(null);
   const [loading,         setLoading]         = useState(true);
   const [lastUpdate,      setLastUpdate]       = useState(null);
@@ -1097,7 +1216,7 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
   const [groupSort,       setGroupSort]       = useState("alpha");   // "alpha" | "return"
   const [groupDir,        setGroupDir]        = useState("asc");     // "asc" | "desc"
   const [menuOpen,        setMenuOpen]        = useState(false);
-  const [theme,           setTheme]           = useState("dark");
+  const theme = prefs.theme;
   const [activeExchanges, setActiveExchanges] = useState(new Set());
   const [selectedAsset,   setSelectedAsset]   = useState(null);
   const [macroData,       setMacroData]       = useState({});
@@ -1108,16 +1227,28 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
     catch { return {}; }
   });
   const [expandedCards, setExpandedCards] = useState(new Set());
-  const prevDataRef  = useRef(null);
-  const intervalRef  = useRef(null);
-  const mountedRef   = useRef(true);
+  const [flatExpand, setFlatExpand] = useState(false);
+  const prevDataRef          = useRef(null);
+  const intervalRef          = useRef(null);
+  const mountedRef           = useRef(true);
+  const defaultViewApplied   = useRef(false);
   useEffect(() => {
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
 
+  // ── Apply persisted defaultView once preferences are loaded from server ───────
+  useEffect(() => {
+    if (synced && !defaultViewApplied.current) {
+      defaultViewApplied.current = true;
+      if (prefs.defaultView && prefs.defaultView !== 'dashboard') {
+        onNavigate(prefs.defaultView);
+      }
+    }
+  }, [synced]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Taxonomy from TaxonomyContext (falls back to static data) ────────────────
-  const { subgroups: ctxSubgroups, assets: ctxAssets, error: taxError, loading: taxLoading } = useTaxonomy() ?? {};
+  const { groups: ctxGroups, subgroups: ctxSubgroups, assets: ctxAssets, error: taxError, loading: taxLoading } = useTaxonomy() ?? {};
 
   const CATEGORIES = useMemo(() => {
     if (ctxSubgroups?.length) {
@@ -1158,12 +1289,15 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
     });
   };
   const collapseAll = () => {
+    setFlatExpand(false);
+    setExpandedCards(new Set());
     const next = {};
     Object.keys(CATEGORIES).forEach(k => next[k] = true);
     setCollapsedGroups(next);
     sessionStorage.setItem("collapsedGroups", JSON.stringify(next));
   };
   const expandAll = () => {
+    setFlatExpand(true);
     setCollapsedGroups({});
     setExpandedCards(new Set());
     sessionStorage.setItem("collapsedGroups", JSON.stringify({}));
@@ -1260,11 +1394,18 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
     setActiveExchanges(prev => {
       const next = new Set(prev);
       next.has(exch) ? next.delete(exch) : next.add(exch);
+      // Persist when user settles on a single exchange as the active filter
       return next;
     });
   }, []);
 
   const resetExchanges = useCallback(() => setActiveExchanges(new Set()), []);
+
+  // Wrap onNavigate to persist the user's chosen view
+  const handleNavigate = useCallback((key) => {
+    onNavigate(key);
+    updatePrefs({ defaultView: key });
+  }, [onNavigate, updatePrefs]);
 
   // All unique exchanges derived from ASSETS
   const allExchanges = [...new Set(Object.values(ASSETS).map(a => a.exchange))];
@@ -1291,9 +1432,12 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
 
   // Sentiment over currently visible set
   const allPcts = marketData
-    ? Object.keys(ASSETS).filter(s => marketData[s] && passes(s)).map(s => marketData[s].changePct)
+    ? Object.keys(ASSETS)
+        .filter(s => marketData[s] && passes(s))
+        .map(s => marketData[s]?.changePct)
+        .filter(n => typeof n === 'number' && !isNaN(n))
     : [];
-  const avgPct        = allPcts.length ? allPcts.reduce((a, b) => a + b, 0) / allPcts.length : 0;
+  const avgPct        = allPcts.length > 0 ? allPcts.reduce((a, b) => a + b, 0) / allPcts.length : 0;
   const rising        = allPcts.filter(p => p > 0).length;
   const falling       = allPcts.filter(p => p < 0).length;
   const sentiment     = avgPct > 0.3 ? "BULLISH" : avgPct < -0.3 ? "BEARISH" : "MIXED";
@@ -1401,6 +1545,138 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
       }));
   }, [marketData, ASSETS]);
 
+  // ── Group Summary Card ───────────────────────────────────────────────────
+  // Reusable in both allCollapsed grid (layout="grid") and individual collapse (layout="row").
+  // Closes over getGroupSymbols, marketData, ASSETS from component scope.
+  function GroupSummaryCard({ catKey, cat, layout, onExpand }) {
+    const syms = getGroupSymbols(catKey);
+    const pcts = syms
+      .map(s => marketData?.[s]?.changePct)
+      .filter(n => typeof n === 'number' && !isNaN(n));
+    const avg = pcts.length > 0 ? pcts.reduce((a, b) => a + b, 0) / pcts.length : 0;
+    const totalMcap = syms.reduce((sum, s) => sum + (marketData?.[s]?.marketCap ?? 0), 0);
+    const count = syms.length;
+
+    const accentColor = avg > 0 ? "#00d4aa" : avg < 0 ? "#ff6b6b" : "#2a4a6a";
+    const pctColor    = avg > 0 ? "#00d4aa" : avg < 0 ? "#ff6b6b" : "#3d6080";
+    const pctLabel    = avg > 0 ? `▲ +${avg.toFixed(2)}%` : avg < 0 ? `▼ ${avg.toFixed(2)}%` : "— 0.00%";
+    const barWidth    = Math.min(Math.abs(avg) / 5 * 100, 100);
+
+    const fmtMcap = (mc) => {
+      if (!mc) return "—";
+      const p = catKey === "brazil" ? "R$ " : "$";
+      if (mc >= 1e12) return p + (mc / 1e12).toFixed(2) + "T";
+      if (mc >= 1e9)  return p + (mc / 1e9).toFixed(1) + "B";
+      if (mc >= 1e6)  return p + (mc / 1e6).toFixed(1) + "M";
+      return p + mc.toLocaleString();
+    };
+
+    const byAbs = [...syms]
+      .filter(s => typeof marketData?.[s]?.changePct === 'number' && !isNaN(marketData[s].changePct))
+      .sort((a, b) => Math.abs(marketData[b].changePct) - Math.abs(marketData[a].changePct));
+    const topGainer = byAbs.find(s => marketData[s].changePct > 0) || null;
+    const topLoser  = byAbs.find(s => marketData[s].changePct < 0) || null;
+
+    const movers = (topGainer || topLoser) ? (
+      <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+        {topGainer && (
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, padding: "1px 4px", borderRadius: 1, background: "#0a2018", color: "#00d4aa", border: "0.5px solid #1d5c3a" }}>
+            {ASSETS[topGainer]?.display || topGainer} +{marketData[topGainer].changePct.toFixed(2)}%
+          </span>
+        )}
+        {topLoser && (
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 7, padding: "1px 4px", borderRadius: 1, background: "#1e0a0a", color: "#ff6b6b", border: "0.5px solid #5c1d1d" }}>
+            {ASSETS[topLoser]?.display || topLoser} {marketData[topLoser].changePct.toFixed(2)}%
+          </span>
+        )}
+      </div>
+    ) : null;
+
+    const cardBase = {
+      position: "relative", overflow: "hidden",
+      background: "#0b1623", border: "0.5px solid #1a2f4a", borderRadius: 4,
+      cursor: "pointer", transition: "border-color 120ms ease, background 120ms ease",
+    };
+    const onEnter = e => { e.currentTarget.style.borderColor = "#2a4a6a"; e.currentTarget.style.background = "#0d1929"; };
+    const onLeave = e => { e.currentTarget.style.borderColor = "#1a2f4a"; e.currentTarget.style.background = "#0b1623"; };
+    const accentBar = <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 2.5, background: accentColor, borderRadius: "4px 0 0 4px" }} />;
+    const progressBar = (
+      <div style={{ background: "#1a2f4a", borderRadius: 1, height: 2, width: "100%" }}>
+        <div style={{ height: 2, borderRadius: 1, width: `${barWidth}%`, background: accentColor, transition: "width 0.3s ease" }} />
+      </div>
+    );
+
+    if (layout === "row") {
+      // Horizontal full-width bar (individual collapsed group)
+      return (
+        <div onClick={onExpand} style={{ ...cardBase, display: "flex", alignItems: "center", gap: 16, padding: "12px 16px 14px 16px" }}
+          onMouseEnter={onEnter} onMouseLeave={onLeave}>
+          {accentBar}
+          {/* progress bar pinned to bottom */}
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 2, background: "#1a2f4a" }}>
+            <div style={{ height: 2, width: `${barWidth}%`, background: accentColor, borderRadius: 1 }} />
+          </div>
+          {/* icon */}
+          <span style={{ fontSize: 14, lineHeight: 1, flexShrink: 0 }}>{cat.icon}</span>
+          {/* name */}
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", color: "#c8d8e8", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {cat.label.toUpperCase()}
+          </span>
+          {/* ASSETS */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", flexShrink: 0 }}>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, letterSpacing: "0.08em", color: "#2a4a6a" }}>ASSETS</span>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "#4a7fa5" }}>{count}</span>
+          </div>
+          {/* MKT CAP */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", flexShrink: 0 }}>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, letterSpacing: "0.08em", color: "#2a4a6a" }}>MKT CAP</span>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "#4a7fa5" }}>{fmtMcap(totalMcap)}</span>
+          </div>
+          {/* movers */}
+          {movers && <div style={{ flexShrink: 0 }}>{movers}</div>}
+          {/* return */}
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700, color: pctColor, flexShrink: 0 }}>{pctLabel}</span>
+          {/* expand hint — always visible in row mode */}
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: "#1a3050", letterSpacing: "0.06em", flexShrink: 0 }}>EXPAND ▾</span>
+        </div>
+      );
+    }
+
+    // Grid card (allCollapsed mode)
+    return (
+      <div className="gmt-group-card" onClick={onExpand} style={{ ...cardBase, padding: "14px 16px" }}
+        onMouseEnter={onEnter} onMouseLeave={onLeave}>
+        {accentBar}
+        {/* Row 1: icon + return */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 14, lineHeight: 1 }}>{cat.icon}</span>
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700, color: pctColor }}>{pctLabel}</span>
+        </div>
+        {/* Row 2: name */}
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", color: "#c8d8e8", marginTop: 10, marginBottom: 10 }}>
+          {cat.label.toUpperCase()}
+        </div>
+        {/* Row 3: stats */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, letterSpacing: "0.08em", color: "#2a4a6a" }}>ASSETS</span>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "#4a7fa5" }}>{count}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, letterSpacing: "0.08em", color: "#2a4a6a" }}>MKT CAP</span>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "#4a7fa5" }}>{fmtMcap(totalMcap)}</span>
+          </div>
+        </div>
+        {/* Row 4: movers */}
+        {movers && <div style={{ marginTop: 8 }}>{movers}</div>}
+        {/* Row 5: progress bar */}
+        <div style={{ marginTop: 10 }}>{progressBar}</div>
+        {/* hover expand hint */}
+        <span className="gmt-expand-hint" style={{ position: "absolute", bottom: 8, right: 10, fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: "#1a3050", letterSpacing: "0.06em", opacity: 0, transition: "opacity 150ms ease", pointerEvents: "none" }}>EXPAND ▾</span>
+      </div>
+    );
+  }
+
   return (
     <>
     <GMTHeader
@@ -1408,13 +1684,14 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
       user={user}
       onNav={(pageKey) => {
         if (pageKey.startsWith('/')) { navigate(pageKey); return; }
-        onNavigate(pageKey);
+        handleNavigate(pageKey);
       }}
       onLogout={() => { logout(); navigate("/"); }}
       onAssetClick={(item) => setSelectedAsset(item.ticker)}
       onMenuOpen={() => setMenuOpen(true)}
       showTicker={currentView === 'dashboard'}
       tickerItems={tickerItems}
+      watchlistEnabled={!!user}
     />
     <div
       data-theme={theme}
@@ -1454,6 +1731,7 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
 
         .scanline-overlay { position:fixed;top:0;left:0;right:0;height:60px;background:linear-gradient(180deg,transparent,rgba(0,230,118,0.015),transparent);animation:scanline 8s linear infinite;pointer-events:none;z-index:0; }
         .section-animate  { animation:slideUp 0.5s ease both; }
+        .gmt-group-card:hover .gmt-expand-hint { opacity: 1 !important; }
         .fade-in          { animation:fadeIn 0.4s ease both; }
         ::-webkit-scrollbar       { width:6px; }
         ::-webkit-scrollbar-track { background:rgba(255,255,255,0.02); }
@@ -1471,35 +1749,44 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
         open={menuOpen} onClose={() => setMenuOpen(false)}
         activeFilter={activeFilter} onFilterChange={setActiveFilter}
         activeExchanges={activeExchanges} onExchangeToggle={toggleExchange} onResetExchanges={resetExchanges}
-        theme={theme} onThemeToggle={() => setTheme(t => t === "dark" ? "light" : "dark")}
+        theme={theme} onThemeToggle={() => updatePrefs({ theme: theme === "dark" ? "light" : "dark" })}
         lastUpdate={lastUpdate} allExchanges={allExchanges}
-        currentView={currentView} onNavigate={onNavigate}
+        currentView={currentView} onNavigate={handleNavigate}
+        watchlistItems={watchlistItems} watchlistLoading={watchlistLoading}
+        onUnpin={unpin} assets={ASSETS} categories={CATEGORIES} marketData={marketData}
       />
       {selectedAsset && marketData?.[selectedAsset] && (
         <DetailPanel symbol={selectedAsset} data={marketData[selectedAsset]} onClose={() => setSelectedAsset(null)} />
       )}
 
-      <div style={{ position: "relative", zIndex: 1, maxWidth: 1400, margin: "0 auto", padding: "0 20px 40px" }}>
+      {/* ── COMMAND BAR — full-width strip below GMTHeader ── */}
+      <CommandBar
+        sentiment={sentiment}
+        risingCount={rising}
+        fallingCount={falling}
+        avgChange={avgPct}
+        topMovers={topMovers.map(([symbol, d]) => ({ symbol, changePct: d.changePct ?? 0 }))}
+        activeFilter={activeFilter}
+        onFilterChange={setActiveFilter}
+        sortMode={groupSort}
+        sortDir={groupDir}
+        onSortChange={(mode, dir) => { setGroupSort(mode); setGroupDir(dir); }}
+        activeExchanges={activeExchanges}
+        allExchanges={allExchanges}
+        onExchangeToggle={toggleExchange}
+        onExchangeReset={resetExchanges}
+        viewMode={viewMode === "cards" ? "grid" : "list"}
+        onViewChange={(mode) => setViewMode(mode === "grid" ? "cards" : "list")}
+        onDensityChange={() => {}}
+        onCollapseAll={collapseAll}
+        onExpandAll={expandAll}
+        flatExpand={flatExpand}
+        onRefresh={loadData}
+        groups={ctxGroups}
+        subgroups={ctxSubgroups}
+      />
 
-        {/* ── STATUS BAR ── */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid var(--c-border)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#00E676", animation: "pulse 2s ease-in-out infinite", boxShadow: "0 0 6px #00E67666" }} />
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "#00E676", fontWeight: 600, letterSpacing: "1px" }}>LIVE</span>
-            {lastUpdate && (
-              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)" }}>
-                {lastUpdate.toLocaleTimeString("en-US", { hour12: false })}
-              </span>
-            )}
-          </div>
-          <button
-            onClick={loadData}
-            style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 600, color: "var(--c-text-2)", background: "transparent", border: "1px solid var(--c-border)", borderRadius: 6, padding: "5px 12px", cursor: "pointer", letterSpacing: "0.5px", transition: "all 0.2s ease" }}
-            onMouseEnter={(e) => { e.target.style.borderColor = "#00E676"; e.target.style.color = "#00E676"; }}
-            onMouseLeave={(e) => { e.target.style.borderColor = "var(--c-border)"; e.target.style.color = "var(--c-text-2)"; }}>
-            REFRESH
-          </button>
-        </div>
+      <div style={{ position: "relative", zIndex: 1, maxWidth: 1400, margin: "0 auto", padding: "0 20px 40px" }}>
 
         {/* ── CATALOG VIEW ── */}
         {currentView === "catalog" && catalogPage}
@@ -1509,6 +1796,17 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
 
         {/* ── HEATMAP VIEW ── (renders as fixed full-screen overlay) */}
         {currentView === "heatmap" && heatmapPage}
+
+        {/* ── WATCHLIST VIEW ── */}
+        {currentView === "watchlist" && (
+          <WatchlistPage
+            watchlistItems={watchlistItems}
+            marketData={marketData}
+            assets={ASSETS}
+            categories={CATEGORIES}
+            onNavigate={handleNavigate}
+          />
+        )}
 
         {/* ── LOADING ── */}
         {currentView === "dashboard" && loading && (
@@ -1539,149 +1837,20 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
         {currentView === "dashboard" && !loading && marketData && (
           <div className="fade-in">
 
-            {/* Sentiment bar */}
-            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 20, padding: "14px 0", borderBottom: "1px solid var(--c-border)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: sentimentColor, animation: "pulse 2.5s ease-in-out infinite", boxShadow: `0 0 8px ${sentimentColor}66` }} />
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, fontWeight: 700, color: sentimentColor, letterSpacing: "1px" }}>{sentiment}</span>
-              </div>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "var(--c-text-2)", display: "flex", gap: 14 }}>
-                <span style={{ color: "#00E676" }}>▲ {rising} rising</span>
-                <span style={{ color: "#FF5252" }}>▼ {falling} falling</span>
-              </div>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: sentimentColor }}>
-                AVG {avgPct >= 0 ? "+" : ""}{avgPct.toFixed(2)}%
-              </div>
-            </div>
-
-            {/* Top movers */}
-            <div style={{ padding: "14px 0", borderBottom: "1px solid var(--c-border)" }}>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", letterSpacing: "1.5px", marginBottom: 8 }}>TOP MOVERS</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {topMovers.map(([sym, d]) => {
-                  const pos = d.changePct >= 0;
-                  const col = pos ? "#00E676" : "#FF5252";
-                  const dispSym = ASSETS[sym]?.display || sym;
-                  return (
-                    <div key={sym} onClick={() => setSelectedAsset(sym)}
-                      style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 600, color: col, background: col + "10", border: `1px solid ${col}30`, borderRadius: 20, padding: "4px 12px", whiteSpace: "nowrap", cursor: "pointer", transition: "all 0.15s ease" }}>
-                      {dispSym} {pos ? "+" : ""}{d.changePct.toFixed(2)}%
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* ── TOOLBAR ── */}
-            <div style={{ padding: "12px 0", borderBottom: "1px solid var(--c-border)" }}>
-              {/* Row 1: category filter + sort + view */}
-              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {filterButtons.map(btn => {
-                    const active = activeFilter === btn.key;
-                    return (
-                      <button key={btn.key} onClick={() => setActiveFilter(btn.key)}
-                        style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, color: active ? "#00E676" : "var(--c-text-2)", background: active ? "rgba(0,230,118,0.08)" : "var(--c-surface)", border: `1px solid ${active ? "#00E67640" : "var(--c-border)"}`, borderRadius: 20, padding: "6px 14px", cursor: "pointer", transition: "all 0.2s ease" }}>
-                        {btn.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  {[{ key: "default", label: "Default", accent: null }, { key: "gainers", label: "▲ Gainers", accent: "#00E676" }, { key: "losers", label: "▼ Losers", accent: "#FF5252" }].map(s => {
-                    const active = sortMode === s.key;
-                    const ac = s.accent;
-                    return (
-                      <button key={s.key} onClick={() => setSortMode(s.key)}
-                        style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 600, color: active ? (ac || "var(--c-text)") : "var(--c-text-3)", background: active ? (ac ? ac + "14" : "var(--c-surface)") : "transparent", border: `1px solid ${active ? (ac ? ac + "44" : "var(--c-border)") : "var(--c-border)"}`, borderRadius: 6, padding: "5px 12px", cursor: "pointer", transition: "all 0.2s ease", letterSpacing: "0.3px" }}>
-                        {s.label}
-                      </button>
-                    );
-                  })}
-                  <div style={{ width: 1, height: 20, background: "var(--c-border)", margin: "0 2px" }} />
-                  {[{ key: "cards", label: "⊞", title: "Card view" }, { key: "list", label: "☰", title: "List view" }].map(v => {
-                    const active = viewMode === v.key;
-                    return (
-                      <button key={v.key} onClick={() => setViewMode(v.key)} title={v.title}
-                        style={{ fontSize: 15, lineHeight: 1, color: active ? "#00E676" : "var(--c-text-3)", background: active ? "rgba(0,230,118,0.1)" : "transparent", border: `1px solid ${active ? "#00E67640" : "var(--c-border)"}`, borderRadius: 6, padding: "4px 10px", cursor: "pointer", transition: "all 0.2s ease" }}>
-                        {v.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Row 2: exchange filter */}
-              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "var(--c-text-3)", letterSpacing: "1px", marginRight: 2 }}>EXCHANGE:</span>
-                {allExchanges.map(exch => {
-                  const active = activeExchanges.has(exch);
-                  const c = EXCHANGE_COLORS[exch] || "#9E9E9E";
-                  return (
-                    <button key={exch} onClick={() => toggleExchange(exch)}
-                      style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700, color: active ? c : "var(--c-text-3)", background: active ? c + "18" : "transparent", border: `1px solid ${active ? c + "50" : "var(--c-border)"}`, borderRadius: 4, padding: "3px 9px", cursor: "pointer", letterSpacing: "0.5px", transition: "all 0.15s ease" }}>
-                      {exch}
-                    </button>
-                  );
-                })}
-                {activeExchanges.size > 0 && (
-                  <button onClick={resetExchanges}
-                    style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "#FF5252", background: "transparent", border: "none", cursor: "pointer", letterSpacing: "0.5px", marginLeft: 2 }}>
-                    ✕ CLEAR
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* ── GROUP SORT BAR + COLLAPSE / EXPAND ALL ── */}
-            {!flatSymbols && (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "var(--c-text-3)", letterSpacing: "1px", userSelect: "none" }}>SORT BY</span>
-                  {[
-                    { key: "alpha",  label: "A\u2013Z",   defaultDir: "asc"  },
-                    { key: "return", label: "RETURN", defaultDir: "desc" },
-                  ].map(opt => {
-                    const active = groupSort === opt.key;
-                    const arrow = active ? (groupDir === "asc" ? " \u2191" : " \u2193") : "";
-                    return (
-                      <button key={opt.key}
-                        onClick={() => {
-                          if (active) {
-                            setGroupDir(d => d === "asc" ? "desc" : "asc");
-                          } else {
-                            setGroupSort(opt.key);
-                            setGroupDir(opt.defaultDir);
-                          }
-                        }}
-                        style={{
-                          fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 600,
-                          color: active ? "#00E676" : "var(--c-text-3)",
-                          background: active ? "rgba(0,230,118,0.10)" : "transparent",
-                          border: `1px solid ${active ? "#00E67644" : "var(--c-border)"}`,
-                          borderRadius: 14, padding: "4px 12px", cursor: "pointer",
-                          letterSpacing: "0.3px", transition: "all 0.15s ease",
-                        }}>
-                        {opt.label}{arrow}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button onClick={collapseAll}
-                    style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 600, color: "var(--c-text-3)", background: "transparent", border: "1px solid var(--c-border)", borderRadius: 4, padding: "4px 10px", cursor: "pointer", letterSpacing: "0.5px", transition: "all 0.15s ease" }}>
-                    ▲ Collapse all
-                  </button>
-                  <button onClick={expandAll}
-                    style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 600, color: "var(--c-text-3)", background: "transparent", border: "1px solid var(--c-border)", borderRadius: 4, padding: "4px 10px", cursor: "pointer", letterSpacing: "0.5px", transition: "all 0.15s ease" }}>
-                    ▼ Expand all
-                  </button>
-                </div>
-              </div>
+            {/* ── LIST VIEW — flat sortable table, mutually exclusive with card views ── */}
+            {viewMode === "list" && (
+              <AssetListView
+                marketData={marketData}
+                assets={ASSETS}
+                passes={passes}
+                subgroups={ctxSubgroups}
+                groups={ctxGroups}
+                onAssetClick={setSelectedAsset}
+              />
             )}
 
-            {/* ── CONTENT ── */}
-            {flatSymbols ? (
+            {/* ── CARD VIEWS (flatSymbols / flatExpand / collapsed / normal expanded) ── */}
+            {viewMode !== "list" && (flatSymbols ? (
               <div style={{ marginTop: 16 }}>
                 {viewMode === "list" && <ListColumnHeader />}
                 {viewMode === "cards" ? (
@@ -1694,6 +1863,26 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
                   </div>
                 )}
               </div>
+            ) : flatExpand ? (
+              /* ── FLAT EXPAND MODE — one continuous grid, no group headers ── */
+              (() => {
+                const seen = new Set();
+                const flatItems = sortedCats.flatMap(catKey => {
+                  const cat = CATEGORIES[catKey];
+                  return getGroupSymbols(catKey)
+                    .filter(s => passes(s) && marketData[s] && !seen.has(s) && seen.add(s))
+                    .map(s => ({ sym: s, groupLabel: cat.label }));
+                });
+                return (
+                  <div style={{ marginTop: 16 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
+                      {flatItems.map(({ sym, groupLabel }) => (
+                        <AssetCard key={sym} symbol={sym} data={marketData[sym]} onClick={() => setSelectedAsset(sym)} groupLabel={groupLabel} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()
             ) : allCollapsed && viewMode === "list" ? (
               /* ── COLLAPSED LIST MODE ── */
               <div style={{ marginTop: 8, border: "1px solid var(--c-border)", borderRadius: 8, overflow: "hidden" }}>
@@ -1806,140 +1995,74 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
               </div>
             ) : allCollapsed ? (
               /* ── COLLAPSED CARD GRID MODE ── */
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10, marginTop: 8 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8, padding: "12px 0" }}>
                 {sortedCats.map((catKey) => {
                   const cat = CATEGORIES[catKey];
                   const stats = getGroupStats(catKey);
                   if (stats.count === 0) return null;
                   const isOpen = expandedCards.has(catKey);
-                  const pctColor = stats.avgPct > 0 ? "#00E676" : stats.avgPct < 0 ? "#FF5252" : "var(--c-text-3)";
-                  const pctArrow = stats.avgPct > 0 ? "↑" : stats.avgPct < 0 ? "↓" : "";
-                  const borderAccent = stats.avgPct >= 0 ? "#00E676" : "#FF5252";
 
-                  // Gather symbols for expanded view
-                  let symbols = null;
-                  if (isOpen) {
-                    if (catKey === "dividends") {
-                      symbols = dividendSymbols.filter(s => marketData[s]);
-                    } else {
-                      symbols = Object.keys(ASSETS).filter(s => {
-                        const a = ASSETS[s];
-                        const inCat = a.cat === catKey || (a.alsoIn && a.alsoIn.includes(catKey));
-                        return inCat && marketData[s];
-                      });
-                    }
-                    if (activeExchanges.size > 0) {
-                      symbols = symbols.filter(s => activeExchanges.has(ASSETS[s]?.exchange));
-                    }
-                    if (sortMode !== "default") {
-                      symbols = [...symbols].sort((a, b) =>
-                        sortMode === "gainers"
-                          ? (marketData[b]?.changePct ?? 0) - (marketData[a]?.changePct ?? 0)
-                          : (marketData[a]?.changePct ?? 0) - (marketData[b]?.changePct ?? 0)
-                      );
-                    }
+                  if (!isOpen) {
+                    return <GroupSummaryCard key={catKey} catKey={catKey} cat={cat} layout="grid" onExpand={() => toggleCard(catKey)} />;
+                  }
+
+                  // Expanded full-width slot
+                  let symbols;
+                  if (catKey === "dividends") {
+                    symbols = dividendSymbols.filter(s => marketData[s]);
+                  } else {
+                    symbols = Object.keys(ASSETS).filter(s => {
+                      const a = ASSETS[s];
+                      const inCat = a.cat === catKey || (a.alsoIn && a.alsoIn.includes(catKey));
+                      return inCat && marketData[s];
+                    });
+                  }
+                  if (activeExchanges.size > 0) {
+                    symbols = symbols.filter(s => activeExchanges.has(ASSETS[s]?.exchange));
+                  }
+                  if (sortMode !== "default") {
+                    symbols = [...symbols].sort((a, b) =>
+                      sortMode === "gainers"
+                        ? (marketData[b]?.changePct ?? 0) - (marketData[a]?.changePct ?? 0)
+                        : (marketData[a]?.changePct ?? 0) - (marketData[b]?.changePct ?? 0)
+                    );
                   }
 
                   return (
-                    <div
-                      key={catKey}
-                      className="section-animate"
-                      style={{
-                        gridColumn: isOpen ? "1 / -1" : undefined,
-                        background: isOpen ? "rgba(0,200,255,0.03)" : "rgba(255,255,255,0.02)",
-                        border: `1px solid ${isOpen ? "#00BCD444" : "var(--c-border)"}`,
-                        borderLeft: `3px solid ${isOpen ? "#00BCD4" : borderAccent}`,
-                        borderRadius: 2,
-                        padding: "14px 16px",
-                        cursor: "pointer",
-                        transition: "all 0.15s ease",
-                        position: "relative",
-                      }}
-                      onClick={() => !isOpen && toggleCard(catKey)}
-                      onMouseEnter={e => { if (!isOpen) { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; } }}
-                      onMouseLeave={e => { if (!isOpen) { e.currentTarget.style.background = "rgba(255,255,255,0.02)"; e.currentTarget.style.borderColor = "var(--c-border)"; } }}
-                    >
-                      {/* Close button for expanded state */}
-                      {isOpen && (
+                    <div key={catKey} className="section-animate" style={{ gridColumn: "1 / -1", background: "rgba(0,200,255,0.03)", border: "0.5px solid #00BCD444", borderRadius: 4, padding: "14px 16px", position: "relative" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "absolute", top: 10, left: 12, right: 12 }}>
+                        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 500, letterSpacing: "0.10em", color: "#2a4a6a", textTransform: "uppercase", userSelect: "none" }}>
+                          {cat.icon} {cat.label}
+                        </span>
                         <button
-                          onClick={(e) => { e.stopPropagation(); toggleCard(catKey); }}
-                          style={{
-                            position: "absolute", top: 10, right: 12,
-                            fontFamily: "'JetBrains Mono', monospace", fontSize: 14, lineHeight: 1,
-                            color: "var(--c-text-3)", background: "transparent",
-                            border: "1px solid var(--c-border)", borderRadius: 4,
-                            padding: "2px 8px", cursor: "pointer",
-                            transition: "all 0.15s ease",
-                          }}
-                          onMouseEnter={e => { e.target.style.color = "#FF5252"; e.target.style.borderColor = "#FF5252"; }}
+                          onClick={() => toggleCard(catKey)}
+                          style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, lineHeight: 1, color: "var(--c-text-3)", background: "transparent", border: "1px solid var(--c-border)", borderRadius: 4, padding: "2px 8px", cursor: "pointer", transition: "all 0.15s ease" }}
+                          onMouseEnter={e => { e.target.style.color = "#ff6b6b"; e.target.style.borderColor = "#ff6b6b"; }}
                           onMouseLeave={e => { e.target.style.color = "var(--c-text-3)"; e.target.style.borderColor = "var(--c-border)"; }}
                         >✕</button>
-                      )}
-
-                      {/* Card header / summary */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: isOpen ? 14 : 10 }}>
-                        <span style={{ fontSize: 16 }}>{cat.icon}</span>
-                        <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, color: "var(--c-text)", letterSpacing: "0.3px" }}>
-                          {cat.label}
-                        </span>
                       </div>
-
-                      {/* Daily return */}
-                      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 16, fontWeight: 700, color: pctColor, marginBottom: 6 }}>
-                        {pctArrow}{stats.avgPct >= 0 ? "+" : ""}{stats.avgPct.toFixed(2)}%
+                      <div style={{ paddingTop: 38 }}>
+                        <MacroBanner macroData={macroData} catKey={catKey} />
+                        {catKey === "brazil" && <BrasilMacroBanner brasilMacro={brasilMacro} />}
+                        {catKey === "dividends" && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(255,193,7,0.08)", border: "1px solid rgba(255,193,7,0.2)", borderRadius: 6, padding: "8px 14px", marginBottom: 10 }}>
+                            <SourceBadge source="fmp" />
+                            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--c-text-2)" }}>
+                              Assets with dividend yield &gt; 3% (via FMP profile data)
+                            </span>
+                          </div>
+                        )}
+                        {viewMode === "list" && <ListColumnHeader />}
+                        {viewMode === "cards" ? (
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
+                            {symbols.map(sym => <AssetCard key={sym} symbol={sym} data={marketData[sym]} onClick={() => setSelectedAsset(sym)} />)}
+                          </div>
+                        ) : (
+                          <div style={{ border: "1px solid var(--c-border)", borderRadius: 8, overflow: "hidden" }}>
+                            {symbols.map((sym, i) => <AssetRow key={sym} symbol={sym} data={marketData[sym]} rank={i + 1} onClick={() => setSelectedAsset(sym)} />)}
+                          </div>
+                        )}
                       </div>
-
-                      {/* Total value */}
-                      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--c-text-2)", marginBottom: 4 }}>
-                        {stats.totalMcap > 0 ? formatMarketCap(stats.totalMcap) : "—"}
-                      </div>
-
-                      {/* Stock count */}
-                      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", marginBottom: isOpen ? 12 : 6 }}>
-                        {stats.count} {stats.count === 1 ? "stock" : "stocks"}
-                      </div>
-
-                      {/* Expand hint when collapsed */}
-                      {!isOpen && (
-                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "var(--c-text-3)", letterSpacing: "0.5px", opacity: 0.6 }}>
-                          VIEW GROUP ›
-                        </div>
-                      )}
-
-                      {/* Expanded content: full list view */}
-                      {isOpen && symbols && (
-                        <div style={{
-                          borderTop: "1px solid var(--c-border)", paddingTop: 12,
-                          overflow: "hidden",
-                          maxHeight: 4000,
-                          transition: "max-height 0.25s ease",
-                        }}>
-                          <MacroBanner macroData={macroData} catKey={catKey} />
-                          {catKey === "brazil" && <BrasilMacroBanner brasilMacro={brasilMacro} />}
-                          {catKey === "dividends" && (
-                            <div style={{
-                              display: "flex", alignItems: "center", gap: 10,
-                              background: "rgba(255,193,7,0.08)", border: "1px solid rgba(255,193,7,0.2)",
-                              borderRadius: 6, padding: "8px 14px", marginBottom: 10,
-                            }}>
-                              <SourceBadge source="fmp" />
-                              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--c-text-2)" }}>
-                                Assets with dividend yield &gt; 3% (via FMP profile data)
-                              </span>
-                            </div>
-                          )}
-                          {viewMode === "list" && <ListColumnHeader />}
-                          {viewMode === "cards" ? (
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
-                              {symbols.map(sym => <AssetCard key={sym} symbol={sym} data={marketData[sym]} onClick={() => setSelectedAsset(sym)} />)}
-                            </div>
-                          ) : (
-                            <div style={{ border: "1px solid var(--c-border)", borderRadius: 8, overflow: "hidden" }}>
-                              {symbols.map((sym, i) => <AssetRow key={sym} symbol={sym} data={marketData[sym]} rank={i + 1} onClick={() => setSelectedAsset(sym)} />)}
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
                   );
                 })}
@@ -1978,55 +2101,54 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
                   if (symbols.length === 0) return null;
 
                   return (
-                    <div key={catKey} className="section-animate" style={{ marginBottom: 24, animationDelay: `${idx * 0.08}s` }}>
-                      <div
-                        onClick={() => toggleGroup(catKey)}
-                        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: collapsedGroups[catKey] ? 0 : 10, padding: "6px 8px", borderRadius: 6, cursor: "pointer", userSelect: "none", minHeight: 44, transition: "background 0.15s ease" }}
-                        onMouseEnter={e => e.currentTarget.style.background = "var(--c-surface)"}
-                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 11, color: "var(--c-text-3)", transition: "transform 0.2s ease", transform: collapsedGroups[catKey] ? "rotate(-90deg)" : "rotate(0deg)", display: "inline-block" }}>▼</span>
-                          <span style={{ fontSize: 16 }}>{cat.icon}</span>
-                          <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: "0.3px", color: "var(--c-text)" }}>{cat.label}</span>
-                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)" }}>({symbols.length})</span>
-                        </div>
-                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 600, color: catColor }}>
-                          {catAvg >= 0 ? "+" : ""}{catAvg.toFixed(2)}%
-                        </div>
-                      </div>
-                      <div style={{ overflow: "hidden", maxHeight: collapsedGroups[catKey] ? 0 : 2000, opacity: collapsedGroups[catKey] ? 0 : 1, transition: "max-height 0.3s ease, opacity 0.2s ease" }}>
-                        <MacroBanner macroData={macroData} catKey={catKey} />
-                        {catKey === "brazil" && <BrasilMacroBanner brasilMacro={brasilMacro} />}
-                        {/* Dividend yield info for dividends group */}
-                        {catKey === "dividends" && (
-                          <div style={{
-                            display: "flex", alignItems: "center", gap: 10,
-                            background: "rgba(255,193,7,0.08)", border: "1px solid rgba(255,193,7,0.2)",
-                            borderRadius: 6, padding: "8px 14px", marginBottom: 10,
-                          }}>
-                            <SourceBadge source="fmp" />
-                            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--c-text-2)" }}>
-                              Assets with dividend yield &gt; 3% (via FMP profile data)
-                            </span>
+                    <div key={catKey} className="section-animate" style={{ marginBottom: collapsedGroups[catKey] ? 8 : 24, animationDelay: `${idx * 0.08}s` }}>
+                      {collapsedGroups[catKey] ? (
+                        <GroupSummaryCard catKey={catKey} cat={cat} layout="row" onExpand={() => toggleGroup(catKey)} />
+                      ) : (
+                        <>
+                          <div
+                            onClick={() => toggleGroup(catKey)}
+                            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, padding: "6px 8px", borderRadius: 6, cursor: "pointer", userSelect: "none", minHeight: 44, transition: "background 0.15s ease" }}
+                            onMouseEnter={e => e.currentTarget.style.background = "var(--c-surface)"}
+                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <span style={{ fontSize: 11, color: "var(--c-text-3)", display: "inline-block" }}>▼</span>
+                              <span style={{ fontSize: 16 }}>{cat.icon}</span>
+                              <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: "0.3px", color: "var(--c-text)" }}>{cat.label}</span>
+                              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)" }}>({symbols.length})</span>
+                            </div>
+                            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 600, color: catColor }}>
+                              {catAvg >= 0 ? "+" : ""}{catAvg.toFixed(2)}%
+                            </div>
                           </div>
-                        )}
-                        {viewMode === "list" && <ListColumnHeader />}
-                        {viewMode === "cards" ? (
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
-                            {symbols.map(sym => <AssetCard key={sym} symbol={sym} data={marketData[sym]} onClick={() => setSelectedAsset(sym)} />)}
-                          </div>
-                        ) : (
-                          <div style={{ border: "1px solid var(--c-border)", borderRadius: 8, overflow: "hidden" }}>
-                            {symbols.map((sym, i) => <AssetRow key={sym} symbol={sym} data={marketData[sym]} rank={i + 1} onClick={() => setSelectedAsset(sym)} />)}
-                          </div>
-                        )}
-                      </div>
+                          <MacroBanner macroData={macroData} catKey={catKey} />
+                          {catKey === "brazil" && <BrasilMacroBanner brasilMacro={brasilMacro} />}
+                          {catKey === "dividends" && (
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(255,193,7,0.08)", border: "1px solid rgba(255,193,7,0.2)", borderRadius: 6, padding: "8px 14px", marginBottom: 10 }}>
+                              <SourceBadge source="fmp" />
+                              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--c-text-2)" }}>
+                                Assets with dividend yield &gt; 3% (via FMP profile data)
+                              </span>
+                            </div>
+                          )}
+                          {viewMode === "list" && <ListColumnHeader />}
+                          {viewMode === "cards" ? (
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
+                              {symbols.map(sym => <AssetCard key={sym} symbol={sym} data={marketData[sym]} onClick={() => setSelectedAsset(sym)} />)}
+                            </div>
+                          ) : (
+                            <div style={{ border: "1px solid var(--c-border)", borderRadius: 8, overflow: "hidden" }}>
+                              {symbols.map((sym, i) => <AssetRow key={sym} symbol={sym} data={marketData[sym]} rank={i + 1} onClick={() => setSelectedAsset(sym)} />)}
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
                   );
                 })}
               </div>
-            )}
+            ))}
 
             {/* Footer */}
             <div style={{ borderTop: "1px solid var(--c-border)", paddingTop: 14, marginTop: 10, display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 8 }}>

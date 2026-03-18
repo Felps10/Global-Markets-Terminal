@@ -14,6 +14,15 @@ export const SUBGROUPS = [
     color:        "#607D8B",
   },
   {
+    id:           "biotech",
+    display_name: "Biotech",
+    description:  "GICS: Health Care — biotechnology sub-industry",
+    slug:         "biotech",
+    group_id:     "equities",
+    icon:         "🧬",
+    color:        "#EC407A",
+  },
+  {
     id:           "cleanenergy",
     display_name: "Clean Energy",
     description:  "Thematic: EVs + renewables + utilities",
@@ -48,6 +57,15 @@ export const SUBGROUPS = [
     group_id:     "equities",
     icon:         "💊",
     color:        "#E91E63",
+  },
+  {
+    id:           "industrials",
+    display_name: "Industrials",
+    description:  "GICS: Industrials — transportation, machinery, conglomerates",
+    slug:         "industrials",
+    group_id:     "equities",
+    icon:         "🏭",
+    color:        "#78909C",
   },
   {
     id:           "oil-gas",

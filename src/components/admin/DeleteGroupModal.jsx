@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import styled from 'styled-components';
 import { deleteGroup } from '../../services/taxonomyService.js';
-import { useAuth } from '../../hooks/useAuth.js';
 
 const Overlay = styled.div`
   position: fixed; inset: 0;
@@ -70,7 +69,6 @@ const DeleteBtn = styled(Btn)`
 `;
 
 export default function DeleteGroupModal({ group, onClose, onDeleted }) {
-  const { token }    = useAuth();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -81,7 +79,7 @@ export default function DeleteGroupModal({ group, onClose, onDeleted }) {
     setError('');
     setLoading(true);
     try {
-      await deleteGroup(group.id, token);
+      await deleteGroup(group.id);
       onDeleted();
     } catch (err) {
       setError(err?.message || 'Failed to delete group');

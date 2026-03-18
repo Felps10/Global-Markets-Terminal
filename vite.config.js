@@ -1,3 +1,9 @@
+// VITE_API_BASE_URL — set in Cloudflare Pages build environment vars.
+// In dev, leave unset (defaults to '') so proxy rules handle /api/* paths.
+// In production, set to your Railway backend URL:
+//   e.g. https://gmt-production.up.railway.app
+// The React app reads this via: import.meta.env.VITE_API_BASE_URL || ''
+
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 

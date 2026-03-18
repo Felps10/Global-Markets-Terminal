@@ -182,7 +182,8 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const data = await login(email, password);
-      navigate(data.user?.role === 'admin' ? '/admin' : '/app', { replace: true });
+      const role = data?.user?.user_metadata?.role || 'user';
+      navigate(role === 'admin' ? '/admin/taxonomy' : '/app', { replace: true });
     } catch (err) {
       setError(err?.message || 'Invalid credentials');
     } finally {

@@ -29,7 +29,7 @@ const TabContent = styled.div`
 
 // ── Component ──────────────────────────────────────────────────────────────────
 export default function AdminPanel() {
-  const { user, token, logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate                = useNavigate();
   const [activeTab, setActiveTab] = useState('taxonomy');
 
@@ -55,7 +55,6 @@ export default function AdminPanel() {
           {activeTab === 'taxonomy' && <TaxonomyManager />}
           {activeTab === 'users' && (
             <UserManager
-              token={token}
               currentUserId={user?.id}
             />
           )}

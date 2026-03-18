@@ -11,6 +11,8 @@ const FRED_KEY      = import.meta.env.VITE_FRED_KEY     || "";
 const FMP_KEY       = import.meta.env.VITE_FMP_KEY      || "";
 const BRAPI_TOKEN   = import.meta.env.VITE_BRAPI_TOKEN  || "";
 
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+
 // ─── STARTUP VALIDATION ─────────────────────────────────────────────────────
 const KEY_CONFIG = [
   { key: "VITE_FINNHUB_KEY",      value: FINNHUB_KEY, label: "Finnhub",      url: "https://finnhub.io" },
@@ -183,49 +185,47 @@ export async function finnhubRecommendation(symbol) {
 
 export function hasAlphaVantageKey() { return !!AV_KEY; }
 
-// DORMANT (D-3) — exported for future panel use; not called by any active UI path.
-// When activated: replace the inner safeFetch() call with apiClient.call('alphavantage', 'rsi', { symbol, interval, timePeriod }, { fetcher }).
 export async function alphaVantageRSI(symbol, interval = "daily", timePeriod = 14) {
   if (!AV_KEY) return null;
-  const cacheKey = `av:rsi:${symbol}:${interval}:${timePeriod}`;
-  const cached = cacheGet(cacheKey);
-  if (cached) return cached;
-  const data = await safeFetch(
-    `/api/alphavantage/query?function=RSI&symbol=${encodeURIComponent(symbol)}&interval=${interval}&time_period=${timePeriod}&series_type=close&apikey=${AV_KEY}`,
-    {}, "AlphaVantage"
-  );
-  if (data && data["Technical Analysis: RSI"]) {
-    const entries = Object.entries(data["Technical Analysis: RSI"]);
-    const result = entries.slice(0, 30).map(([date, v]) => ({ date, value: parseFloat(v.RSI) }));
-    cacheSet(cacheKey, result, 86400_000); // 24hr cache — preserve quota
-    return result;
-  }
-  return null;
+  const response = await apiClient.call('alphaVantage', 'rsi', { symbol, interval, timePeriod }, {
+    fetcher: async () => {
+      const res = await fetch(
+        `/api/alphavantage/query?function=RSI&symbol=${encodeURIComponent(symbol)}&interval=${interval}&time_period=${timePeriod}&series_type=close&apikey=${AV_KEY}`,
+        { signal: AbortSignal.timeout(15000) }
+      );
+      if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
+      const data = await res.json();
+      if (!data?.["Technical Analysis: RSI"]) throw new ApiHttpError(204, 'No RSI data in response');
+      const entries = Object.entries(data["Technical Analysis: RSI"]);
+      return entries.slice(0, 30).map(([date, v]) => ({ date, value: parseFloat(v.RSI) }));
+    },
+  });
+  if (response.error || response.deferred) return null;
+  return response.data ?? null;
 }
 
-// DORMANT (D-4) — exported for future panel use; not called by any active UI path.
-// When activated: replace the inner safeFetch() call with apiClient.call('alphavantage', 'macd', { symbol, interval }, { fetcher }).
 export async function alphaVantageMACD(symbol, interval = "daily") {
   if (!AV_KEY) return null;
-  const cacheKey = `av:macd:${symbol}:${interval}`;
-  const cached = cacheGet(cacheKey);
-  if (cached) return cached;
-  const data = await safeFetch(
-    `/api/alphavantage/query?function=MACD&symbol=${encodeURIComponent(symbol)}&interval=${interval}&series_type=close&apikey=${AV_KEY}`,
-    {}, "AlphaVantage"
-  );
-  if (data && data["Technical Analysis: MACD"]) {
-    const entries = Object.entries(data["Technical Analysis: MACD"]);
-    const result = entries.slice(0, 30).map(([date, v]) => ({
-      date,
-      macd:   parseFloat(v.MACD),
-      signal: parseFloat(v.MACD_Signal),
-      hist:   parseFloat(v.MACD_Hist),
-    }));
-    cacheSet(cacheKey, result, 86400_000);
-    return result;
-  }
-  return null;
+  const response = await apiClient.call('alphaVantage', 'macd', { symbol, interval }, {
+    fetcher: async () => {
+      const res = await fetch(
+        `/api/alphavantage/query?function=MACD&symbol=${encodeURIComponent(symbol)}&interval=${interval}&series_type=close&apikey=${AV_KEY}`,
+        { signal: AbortSignal.timeout(15000) }
+      );
+      if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
+      const data = await res.json();
+      if (!data?.["Technical Analysis: MACD"]) throw new ApiHttpError(204, 'No MACD data in response');
+      const entries = Object.entries(data["Technical Analysis: MACD"]);
+      return entries.slice(0, 30).map(([date, v]) => ({
+        date,
+        macd:   parseFloat(v.MACD),
+        signal: parseFloat(v.MACD_Signal),
+        hist:   parseFloat(v.MACD_Hist),
+      }));
+    },
+  });
+  if (response.error || response.deferred) return null;
+  return response.data ?? null;
 }
 
 // ─── FRED (unlimited — most reliable) ────────────────────────────────────────
@@ -281,6 +281,61 @@ export async function fredAllMacro() {
     if (r) results[k] = r;
   }
   return Object.keys(results).length > 0 ? results : null;
+}
+
+/**
+ * Fetch all FRED release series with metadata.
+ * Returns an array of release objects, or [] if no key or fetch fails.
+ */
+export async function fredReleases() {
+  if (!FRED_KEY) return [];
+  const response = await apiClient.call('fred', 'releases', {}, {
+    fetcher: async () => {
+      const res = await fetch(
+        `/api/fred/releases?api_key=${FRED_KEY}&file_type=json`,
+        { signal: AbortSignal.timeout(10000) }
+      );
+      if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
+      const data = await res.json();
+      const releases = Array.isArray(data?.releases) ? data.releases : [];
+      if (!releases.length) throw new ApiHttpError(204, 'No releases data');
+      return releases;
+    },
+  });
+  if (response.deferred) return [];
+  return response.data ?? [];
+}
+
+/**
+ * Fetch upcoming and recent FRED release dates.
+ * @param {string} [startDate]  'YYYY-MM-DD' — defaults to 14 days before today
+ * @param {string} [endDate]    'YYYY-MM-DD' — defaults to 30 days after today
+ * @returns {Promise<Array<{release_id: number, release_name: string, date: string}>>}
+ *   Sorted ascending by date. Returns [] if no key or fetch fails.
+ */
+export async function fredReleaseDates(startDate, endDate) {
+  if (!FRED_KEY) return [];
+  const today = new Date();
+  const s = startDate || (() => { const d = new Date(today); d.setDate(d.getDate() - 14); return d.toISOString().slice(0, 10); })();
+  const e = endDate   || (() => { const d = new Date(today); d.setDate(d.getDate() + 30); return d.toISOString().slice(0, 10); })();
+  const response = await apiClient.call('fred', 'releaseDates', { s, e }, {
+    fetcher: async () => {
+      const url =
+        `/api/fred/releases/dates?api_key=${FRED_KEY}&file_type=json` +
+        `&realtime_start=${s}&realtime_end=${e}` +
+        `&include_release_dates_with_no_data=true&limit=1000`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
+      const data = await res.json();
+      // FRED returns release_dates as a direct array; handle both formats defensively
+      let dates = data?.release_dates ?? [];
+      if (!Array.isArray(dates)) dates = dates?.release_date ?? [];
+      if (!dates.length) throw new ApiHttpError(204, 'No release dates data');
+      return dates.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    },
+  });
+  if (response.deferred) return [];
+  return response.data ?? [];
 }
 
 // ─── COINGECKO (30 calls/min, no key) ────────────────────────────────────────
@@ -929,6 +984,83 @@ export async function fetchYahooChartData(symbol, range, interval, { assets }) {
   });
 
   if (response.deferred || !response.data) throw new Error("Chart data unavailable");
+  return response.data;
+}
+
+// ─── YAHOO OHLCV (for Chart Center) ──────────────────────────────────────────
+// Returns full candlestick data (open, high, low, close, volume).
+// Distinct from fetchYahooChartData which only returns close prices.
+// Timestamps are Unix seconds (lightweight-charts expects seconds).
+
+const OHLCV_TIMEFRAMES = {
+  '1D': { interval: '5m',  range: '1d'  },
+  '1W': { interval: '60m', range: '5d'  },
+  '1M': { interval: '1d',  range: '1mo' },
+  '3M': { interval: '1d',  range: '3mo' },
+  '1Y': { interval: '1wk', range: '1y'  },
+};
+
+/**
+ * Fetch OHLCV candlestick data for a symbol and timeframe.
+ * Used by ChartCenterPage for interactive charts.
+ *
+ * @param {string} symbol       - Internal symbol key (e.g. "SPY", "PETR4")
+ * @param {string} [timeframe]  - '1D' | '1W' | '1M' | '3M' | '1Y' (default: '1M')
+ * @param {{ assets?: Object }} [maps]
+ * @returns {Promise<Array<{ time: number, open: number, high: number, low: number, close: number, volume: number }>>}
+ */
+export async function fetchYahooOHLCV(symbol, timeframe = '1M', { assets = {} } = {}) {
+  const tf = OHLCV_TIMEFRAMES[timeframe] || OHLCV_TIMEFRAMES['1M'];
+  const { range, interval } = tf;
+  const chartSymbol = assets[symbol]?.isB3 ? symbol + '.SA' : symbol;
+  const yahooPath = `/v8/finance/chart/${encodeURIComponent(chartSymbol)}?range=${range}&interval=${interval}`;
+  const yahooUrl  = `https://query1.finance.yahoo.com${yahooPath}`;
+
+  const response = await apiClient.call('yahoo', 'chart', { symbol, range, interval }, {
+    fetcher: async () => {
+      const urls = [
+        `/api/yahoo/v8/finance/chart?symbol=${encodeURIComponent(chartSymbol)}&range=${range}&interval=${interval}`,
+        `https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`,
+      ];
+      for (const url of urls) {
+        try {
+          const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+          if (!res.ok) continue;
+          const json   = await res.json();
+          const result = json?.chart?.result?.[0];
+          if (!result) continue;
+          const timestamps = result.timestamp || [];
+          const quote      = result.indicators?.quote?.[0] || {};
+          const opens      = quote.open   || [];
+          const highs      = quote.high   || [];
+          const lows       = quote.low    || [];
+          const closes     = quote.close  || [];
+          const volumes    = quote.volume || [];
+          const candles = timestamps
+            .map((t, i) => ({
+              time:   t,            // Unix seconds — lightweight-charts expects seconds
+              open:   opens[i],
+              high:   highs[i],
+              low:    lows[i],
+              close:  closes[i],
+              volume: volumes[i] ?? 0,
+            }))
+            .filter(c =>
+              c.close != null && !isNaN(c.close) &&
+              c.open  != null && !isNaN(c.open)  &&
+              c.high  != null && !isNaN(c.high)  &&
+              c.low   != null && !isNaN(c.low)
+            );
+          if (candles.length < 2) continue;
+          return candles;
+        } catch (_) { /* try next proxy */ }
+      }
+      throw new ApiHttpError(503, 'Yahoo OHLCV unavailable via all proxy routes');
+    },
+  });
+
+  if (response.deferred || !response.data) throw new Error('OHLCV data unavailable');
   return response.data;
 }
 

@@ -1,96 +1,120 @@
 import { Router } from 'express';
-import { getDb } from '../db.js';
+import { supabase } from '../db.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
 
 // GET /api/v1/groups
-router.get('/', (req, res) => {
-  const db     = getDb();
-  const groups = db.prepare(`
-    SELECT g.*,
-           COUNT(s.id) AS subgroup_count
-    FROM   groups g
-    LEFT   JOIN subgroups s ON s.group_id = g.id
-    GROUP  BY g.id
-    ORDER  BY g.display_name
-  `).all();
-  res.json(groups);
+router.get('/', async (req, res) => {
+  const { data: groups, error } = await supabase
+    .from('groups')
+    .select('*, subgroups(id)')
+    .order('display_name');
+  if (error) return res.status(500).json({ error: 'DB_ERROR', message: error.message });
+
+  // Mimic the subgroup_count column the old SQL query provided
+  const result = groups.map((g) => ({
+    ...g,
+    subgroup_count: g.subgroups?.length ?? 0,
+    subgroups: undefined,
+  }));
+  res.json(result);
 });
 
 // GET /api/v1/groups/:id
-router.get('/:id', (req, res) => {
-  const db    = getDb();
-  const group = db.prepare('SELECT * FROM groups WHERE id = ?').get(req.params.id);
-  if (!group) return res.status(404).json({ error: 'NOT_FOUND', message: 'Group not found' });
+router.get('/:id', async (req, res) => {
+  const { data: group, error } = await supabase
+    .from('groups')
+    .select('*')
+    .eq('id', req.params.id)
+    .single();
+  if (error || !group) return res.status(404).json({ error: 'NOT_FOUND', message: 'Group not found' });
   res.json(group);
 });
 
 // POST /api/v1/groups
-router.post('/', authenticate, requireAdmin, (req, res) => {
+router.post('/', authenticate, requireAdmin, async (req, res) => {
   const { display_name, description, slug } = req.body;
   if (!display_name || !slug) {
     return res.status(400).json({ error: 'BAD_REQUEST', message: 'display_name and slug are required' });
   }
 
-  const db = getDb();
   const id = slug;
 
   // Check slug uniqueness
-  const existing = db.prepare('SELECT id FROM groups WHERE slug = ?').get(slug);
+  const { data: existing } = await supabase
+    .from('groups')
+    .select('id')
+    .eq('slug', slug)
+    .single();
   if (existing) {
     return res.status(409).json({ error: 'SLUG_CONFLICT', message: `Slug "${slug}" is already in use` });
   }
 
-  try {
-    db.prepare(`
-      INSERT INTO groups (id, display_name, description, slug) VALUES (?, ?, ?, ?)
-    `).run(id, display_name, description || null, slug);
+  const { data: created, error } = await supabase
+    .from('groups')
+    .insert({ id, display_name, description: description || null, slug })
+    .select()
+    .single();
+  if (error) return res.status(500).json({ error: 'DB_ERROR', message: error.message });
 
-    const created = db.prepare('SELECT * FROM groups WHERE id = ?').get(id);
-    res.status(201).json(created);
-  } catch (err) {
-    res.status(500).json({ error: 'DB_ERROR', message: err.message });
-  }
+  res.status(201).json(created);
 });
 
 // PUT /api/v1/groups/:id
-router.put('/:id', authenticate, requireAdmin, (req, res) => {
+router.put('/:id', authenticate, requireAdmin, async (req, res) => {
   const { display_name, description, slug } = req.body;
-  const db = getDb();
 
-  const group = db.prepare('SELECT * FROM groups WHERE id = ?').get(req.params.id);
-  if (!group) return res.status(404).json({ error: 'NOT_FOUND', message: 'Group not found' });
+  const { data: group, error: fetchError } = await supabase
+    .from('groups')
+    .select('*')
+    .eq('id', req.params.id)
+    .single();
+  if (fetchError || !group) return res.status(404).json({ error: 'NOT_FOUND', message: 'Group not found' });
 
   if (slug && slug !== group.slug) {
-    const conflict = db.prepare('SELECT id FROM groups WHERE slug = ? AND id != ?').get(slug, req.params.id);
+    const { data: conflict } = await supabase
+      .from('groups')
+      .select('id')
+      .eq('slug', slug)
+      .neq('id', req.params.id)
+      .single();
     if (conflict) {
       return res.status(409).json({ error: 'SLUG_CONFLICT', message: `Slug "${slug}" is already in use` });
     }
   }
 
-  const newSlug        = slug         || group.slug;
-  const newDisplayName = display_name || group.display_name;
-  const newDescription = description  !== undefined ? description : group.description;
+  const { data: updated, error } = await supabase
+    .from('groups')
+    .update({
+      display_name: display_name || group.display_name,
+      description:  description  !== undefined ? description : group.description,
+      slug:         slug         || group.slug,
+      updated_at:   new Date().toISOString(),
+    })
+    .eq('id', req.params.id)
+    .select()
+    .single();
+  if (error) return res.status(500).json({ error: 'DB_ERROR', message: error.message });
 
-  db.prepare(`
-    UPDATE groups
-    SET display_name = ?, description = ?, slug = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `).run(newDisplayName, newDescription, newSlug, req.params.id);
-
-  const updated = db.prepare('SELECT * FROM groups WHERE id = ?').get(req.params.id);
   res.json(updated);
 });
 
 // DELETE /api/v1/groups/:id
-router.delete('/:id', authenticate, requireAdmin, (req, res) => {
-  const db = getDb();
+router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
+  const { data: group, error: fetchError } = await supabase
+    .from('groups')
+    .select('*')
+    .eq('id', req.params.id)
+    .single();
+  if (fetchError || !group) return res.status(404).json({ error: 'NOT_FOUND', message: 'Group not found' });
 
-  const group = db.prepare('SELECT * FROM groups WHERE id = ?').get(req.params.id);
-  if (!group) return res.status(404).json({ error: 'NOT_FOUND', message: 'Group not found' });
+  const { count: subgroupCount, error: countError } = await supabase
+    .from('subgroups')
+    .select('*', { count: 'exact', head: true })
+    .eq('group_id', req.params.id);
+  if (countError) return res.status(500).json({ error: 'DB_ERROR', message: countError.message });
 
-  const subgroupCount = db.prepare('SELECT COUNT(*) as n FROM subgroups WHERE group_id = ?').get(req.params.id).n;
   if (subgroupCount > 0) {
     return res.status(409).json({
       error:         'GROUP_HAS_SUBGROUPS',
@@ -99,7 +123,9 @@ router.delete('/:id', authenticate, requireAdmin, (req, res) => {
     });
   }
 
-  db.prepare('DELETE FROM groups WHERE id = ?').run(req.params.id);
+  const { error } = await supabase.from('groups').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: 'DB_ERROR', message: error.message });
+
   res.status(204).send();
 });
 

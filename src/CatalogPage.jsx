@@ -1272,348 +1272,423 @@ function DataPointPanel({ item, sourceHealth, onClose }) {
 // ─── QUOTA DASHBOARD ─────────────────────────────────────────────────────────
 
 const QUOTA_HEALTH_COLORS = {
-  healthy:   { color: "#00E676", bg: "rgba(0,230,118,0.1)",  border: "rgba(0,230,118,0.3)"  },
-  warning:   { color: "#FFD740", bg: "rgba(255,215,64,0.1)", border: "rgba(255,215,64,0.3)" },
-  critical:  { color: "#FF9800", bg: "rgba(255,152,0,0.1)",  border: "rgba(255,152,0,0.3)"  },
-  exhausted: { color: "#FF5252", bg: "rgba(255,82,82,0.1)",  border: "rgba(255,82,82,0.3)"  },
+  healthy:   { color: "#00E676", bg: "rgba(0,230,118,0.08)",  border: "rgba(0,230,118,0.3)"  },
+  warning:   { color: "#f59e0b", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.3)" },
+  critical:  { color: "#FF5252", bg: "rgba(255,82,82,0.08)",  border: "rgba(255,82,82,0.3)"  },
+  exhausted: { color: "#FF5252", bg: "rgba(255,82,82,0.08)",  border: "rgba(255,82,82,0.3)"  },
 };
 
-function QuotaDashboard() {
-  const [quotaStatus, setQuotaStatus]   = useState({});
-  const [cacheStats, setCacheStats]     = useState({ byApi: {}, global: { hits: 0, misses: 0, hitRate: 0, totalEntries: 0 } });
-  const [deferredSizes, setDeferredSizes] = useState({});
-  const [expanded, setExpanded]         = useState({});
-  const [showAdmin, setShowAdmin]       = useState(false);
+// ── QuotaDashboard helpers ────────────────────────────────────────────────────
 
-  const refresh = useCallback(() => {
-    setQuotaStatus(quotaTracker.getAllQuotaStatus());
+const QD_CARD_ORDER = ['alphaVantage', 'fmp', 'finnhub', 'coingecko', 'brapi', 'yahoo', 'fred', '_bcb'];
+
+function qdFmtReset(nextDayResetISO) {
+  if (!nextDayResetISO) return null;
+  const diff = new Date(nextDayResetISO) - Date.now();
+  if (diff <= 0) return 'Soon';
+  const h = Math.floor(diff / 3_600_000);
+  const m = Math.floor((diff % 3_600_000) / 60_000);
+  return `${h}h ${m}m`;
+}
+
+function qdBarColor(pct) {
+  if (pct < 0.6) return '#00E676';
+  if (pct < 0.8) return '#f59e0b';
+  return '#FF5252';
+}
+
+function qdExportCSV(allStatus) {
+  const rows = [['API', 'Endpoint', 'Calls', 'Daily Limit', 'Pct of Limit']];
+  getAllApiIds().forEach(apiId => {
+    const s = allStatus[apiId] ?? {};
+    const byEp = s.sessionByEndpoint ?? {};
+    Object.entries(byEp).forEach(([ep, count]) => {
+      if (ep === '_total' || !count) return;
+      const lim = s.perDayLimit;
+      const pct = lim ? ((count / lim) * 100).toFixed(1) + '%' : '—';
+      rows.push([apiId, ep, count, lim ?? 'unlimited', pct]);
+    });
+  });
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = 'quota-session-log.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function QuotaDashboard() {
+  const [allStatus, setAllStatus]           = useState({});
+  const [cacheStats, setCacheStats]         = useState({ byApi: {}, global: { hits: 0, misses: 0, hitRate: 0, totalEntries: 0 } });
+  const [deferredSizes, setDeferredSizes]   = useState({});
+  const [expandedEp, setExpandedEp]         = useState({});   // apiId → bool (endpoints expanded)
+  const [sessionLogOpen, setSessionLogOpen] = useState(false);
+  const [confirmReset, setConfirmReset]     = useState({});   // apiId → bool
+  const [lastRefresh, setLastRefresh]       = useState(Date.now());
+  const [now, setNow]                       = useState(Date.now());
+  const cardRefs = useRef({});
+
+  const refreshAll = useCallback(() => {
+    setAllStatus(quotaTracker.getAllQuotaStatus());
     setCacheStats(getCacheStats());
     setDeferredSizes(apiClient.getDeferredQueueSizes());
+    setLastRefresh(Date.now());
   }, []);
 
   useEffect(() => {
-    refresh();
-    const id = setInterval(refresh, 10_000);
-    return () => clearInterval(id);
-  }, [refresh]);
+    refreshAll();
+    const full = setInterval(refreshAll, 15_000);
+    const mini = setInterval(() => setAllStatus(quotaTracker.getAllQuotaStatus()), 5_000);
+    return () => { clearInterval(full); clearInterval(mini); };
+  }, [refreshAll]);
 
-  const allApiIds         = getAllApiIds();
-  const dormantEndpoints  = getDormantEndpoints();
-  const globalHits        = cacheStats.global?.hits ?? 0;
-  const globalMisses      = cacheStats.global?.misses ?? 0;
-  const globalHitRate     = cacheStats.global?.hitRate ?? 0;
-  const globalEntries     = cacheStats.global?.totalEntries ?? 0;
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
-  const criticalApis = allApiIds.filter(id => {
-    const h = quotaStatus[id]?.health;
-    return h === "critical" || h === "exhausted";
+  const dormantEndpoints = getDormantEndpoints();
+  const globalHits       = cacheStats.global?.hits ?? 0;
+  const globalMisses     = cacheStats.global?.misses ?? 0;
+  const globalHitRate    = cacheStats.global?.hitRate ?? 0;
+  const globalEntries    = cacheStats.global?.totalEntries ?? 0;
+  const secondsAgo       = Math.round((now - lastRefresh) / 1000);
+
+  // ── Per-card data helper ────────────────────────────────────────────────────
+  function getCardData(cardId) {
+    if (cardId === '_bcb') {
+      const bcbS  = allStatus['bcb']  ?? {};
+      const awsS  = allStatus['awesomeapi'] ?? {};
+      const bcbA  = getApiDef('bcb');
+      const awsA  = getApiDef('awesomeapi');
+      const byEp  = { ...(bcbS.sessionByEndpoint ?? {}), ...(awsS.sessionByEndpoint ?? {}) };
+      const total = (bcbS.sessionTotal ?? 0) + (awsS.sessionTotal ?? 0);
+      byEp._total = total;
+      return {
+        api: { ...bcbA, name: 'BCB + AwesomeAPI', endpoints: [...(bcbA?.endpoints ?? []), ...(awsA?.endpoints ?? [])] },
+        status: { ...bcbS, sessionTotal: total, sessionByEndpoint: byEp },
+        health: 'healthy', isUnmetered: true,
+        deferred: (deferredSizes['bcb'] ?? 0) + (deferredSizes['awesomeapi'] ?? 0),
+        cache: cacheStats.byApi?.['bcb'] ?? null,
+      };
+    }
+    const api      = getApiDef(cardId);
+    const status   = allStatus[cardId] ?? {};
+    const health   = status.health ?? 'healthy';
+    const isUnmetered = !api?.limits?.perDay && !api?.limits?.perMinute;
+    return { api, status, health, isUnmetered, deferred: deferredSizes[cardId] ?? 0, cache: cacheStats.byApi?.[cardId] ?? null };
+  }
+
+  // ── Reset handler ─────────────────────────────────────────────────────────
+  function handleReset(cardId) {
+    if (cardId === '_bcb') {
+      quotaTracker.resetCounters('bcb');
+      quotaTracker.resetCounters('awesomeapi');
+    } else {
+      quotaTracker.resetCounters(cardId);
+    }
+    refreshAll();
+    setConfirmReset(prev => ({ ...prev, [cardId]: true }));
+    setTimeout(() => setConfirmReset(prev => { const n = { ...prev }; delete n[cardId]; return n; }), 2000);
+  }
+
+  function handleResetAll() {
+    getAllApiIds().forEach(id => quotaTracker.resetCounters(id));
+    refreshAll();
+  }
+
+  // ── Tier pill style ────────────────────────────────────────────────────────
+  function tierPill(tier) {
+    if (!tier) return null;
+    const t = tier.toLowerCase();
+    const isUnlim    = t.includes('unlimited') || t.includes('public') || t.includes('no key');
+    const isUnofficial = t.includes('unofficial') || t.includes('proxy');
+    const color  = isUnlim ? '#00E676' : isUnofficial ? '#f59e0b' : 'var(--c-text-3)';
+    const bg     = isUnlim ? 'rgba(0,230,118,0.08)' : isUnofficial ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.04)';
+    const border = isUnlim ? 'rgba(0,230,118,0.3)' : isUnofficial ? 'rgba(245,158,11,0.3)' : 'var(--c-border)';
+    const label  = isUnlim ? 'UNLIMITED' : isUnofficial ? 'UNOFFICIAL' : 'FREE';
+    return (
+      <span style={{ fontFamily: mono, fontSize: 8, fontWeight: 700, letterSpacing: '0.6px', color, background: bg, border: `1px solid ${border}`, borderRadius: 3, padding: '2px 7px' }}>
+        {label}
+      </span>
+    );
+  }
+
+  // ── Progress bar subcomponent ─────────────────────────────────────────────
+  function QuotaBar({ used, limit, label }) {
+    const pct   = limit ? Math.min(used / limit, 1) : 0;
+    const color = qdBarColor(pct);
+    return (
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+          <span style={{ fontFamily: mono, fontSize: 9, color: 'var(--c-text-3)' }}>{label}</span>
+          <span style={{ fontFamily: mono, fontSize: 9, color }}>{used}/{limit}</span>
+        </div>
+        <div style={{ height: 6, background: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${pct * 100}%`, background: color, borderRadius: 3, transition: 'width 0.4s ease' }} />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Summary strip badges ───────────────────────────────────────────────────
+  const summaryItems = QD_CARD_ORDER.map(cardId => {
+    const { api, status, health, isUnmetered } = getCardData(cardId);
+    const hc = QUOTA_HEALTH_COLORS[health] ?? QUOTA_HEALTH_COLORS.healthy;
+    const remaining = status.perDayRemaining ?? status.perMinuteRemaining ?? null;
+    const limit     = status.perDayLimit ?? status.perMinuteLimit ?? null;
+    return { cardId, name: api?.name ?? cardId, health, hc, remaining, limit, isUnmetered };
   });
 
-  function toggleExpand(apiId) {
-    setExpanded(prev => ({ ...prev, [apiId]: !prev[apiId] }));
-  }
+  // ── Session log rows ──────────────────────────────────────────────────────
+  const sessionRows = [];
+  getAllApiIds().forEach(apiId => {
+    const s = allStatus[apiId] ?? {};
+    const byEp = s.sessionByEndpoint ?? {};
+    Object.entries(byEp).forEach(([ep, count]) => {
+      if (ep === '_total' || !count) return;
+      const lim = s.perDayLimit;
+      const pct = lim ? ((count / lim) * 100).toFixed(1) + '%' : '—';
+      sessionRows.push({ apiId, ep, count, lim, pct });
+    });
+  });
+  sessionRows.sort((a, b) => b.count - a.count);
+  const sessionTotal = sessionRows.reduce((s, r) => s + r.count, 0);
 
   return (
     <div style={{ padding: "20px 0", borderBottom: "1px solid var(--c-border)" }}>
 
       {/* ── Header ── */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <div style={{ fontFamily: mono, fontSize: 10, color: "var(--c-text-3)", letterSpacing: "1.5px" }}>
             API QUOTA MANAGEMENT
           </div>
+          <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)" }}>
+            Updated {secondsAgo}s ago
+          </span>
           {globalHits > 0 && (
             <span style={{ fontFamily: mono, fontSize: 9, color: "#00E676" }}>
-              ↑ {globalHits} calls saved by cache
-            </span>
-          )}
-          {globalHits === 0 && globalMisses > 0 && (
-            <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)" }}>
-              {Math.round(globalHitRate * 100)}% cache hit rate
+              ↑ {globalHits} cache saves
             </span>
           )}
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={() => setShowAdmin(v => !v)}
-            style={{
-              fontFamily: mono, fontSize: 9, fontWeight: 600,
-              color: showAdmin ? "#FF9800" : "var(--c-text-3)",
-              background: showAdmin ? "rgba(255,152,0,0.08)" : "transparent",
-              border: `1px solid ${showAdmin ? "rgba(255,152,0,0.4)" : "var(--c-border)"}`,
-              borderRadius: 6, padding: "4px 10px", cursor: "pointer", letterSpacing: "0.5px",
-            }}
-          >
-            ADMIN
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={() => qdExportCSV(allStatus)} style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", background: "transparent", border: "1px solid var(--c-border)", borderRadius: 4, padding: "4px 10px", cursor: "pointer" }}>
+            ↓ Export Log
           </button>
-          <button
-            onClick={refresh}
-            style={{
-              fontFamily: mono, fontSize: 10, fontWeight: 600, color: "var(--c-text-2)",
-              background: "transparent", border: "1px solid var(--c-border)", borderRadius: 6,
-              padding: "5px 14px", cursor: "pointer", letterSpacing: "0.5px", transition: "all 0.2s ease",
-            }}
-            onMouseEnter={e => { e.target.style.borderColor = "#00E676"; e.target.style.color = "#00E676"; }}
-            onMouseLeave={e => { e.target.style.borderColor = "var(--c-border)"; e.target.style.color = "var(--c-text-2)"; }}
-          >
-            REFRESH
+          <button onClick={handleResetAll} style={{ fontFamily: mono, fontSize: 9, color: "#f59e0b", background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 4, padding: "4px 10px", cursor: "pointer" }}>
+            ↺ Reset All
+          </button>
+          <button onClick={refreshAll} style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-2)", background: "transparent", border: "1px solid var(--c-border)", borderRadius: 4, padding: "4px 10px", cursor: "pointer" }}>
+            ↻ Refresh
           </button>
         </div>
       </div>
 
-      {/* ── Global Critical CTA ── */}
-      {criticalApis.length > 0 && (
-        <div style={{
-          background: "rgba(255,82,82,0.06)", border: "1px solid rgba(255,82,82,0.25)",
-          borderRadius: 6, padding: "10px 16px", marginBottom: 12,
-          display: "flex", alignItems: "flex-start", gap: 10,
-        }}>
-          <span style={{ fontSize: 14, lineHeight: 1.4 }}>⚠</span>
-          <div>
-            <div style={{ fontFamily: mono, fontSize: 10, color: "#FF5252", fontWeight: 700, letterSpacing: "0.5px", marginBottom: 3 }}>
-              QUOTA CRITICAL
-            </div>
-            <div style={{ fontFamily: sans, fontSize: 11, color: "var(--c-text-3)", lineHeight: 1.5 }}>
-              {criticalApis.map(id => getApiDef(id)?.name || id).join(", ")} — at critical or exhausted quota.
-              Consider upgrading your plan or reducing call frequency.
-            </div>
+      {/* ── Section 1: Summary strip ── */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 20, overflowX: "auto", paddingBottom: 4 }}>
+        {summaryItems.map(({ cardId, name, health, hc, remaining, limit, isUnmetered }) => (
+          <div
+            key={cardId}
+            onClick={() => cardRefs.current[cardId]?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              fontFamily: mono, fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
+              color: hc.color, background: hc.bg, border: `1px solid ${hc.border}`,
+              borderRadius: 4, padding: '4px 10px', cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+          >
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: hc.color, display: 'inline-block', flexShrink: 0, animation: health === 'exhausted' ? 'pulse 1s ease-in-out infinite' : undefined }} />
+            {name.split(' ')[0].toUpperCase()}
+            {isUnmetered ? ' ∞' : limit != null ? ` ${remaining ?? '?'}/${limit}` : ''}
           </div>
-        </div>
-      )}
+        ))}
+      </div>
 
-      {/* ── Per-API rows ── */}
-      <div style={{ display: "grid", gap: 6 }}>
-        {allApiIds.map(apiId => {
-          const api         = getApiDef(apiId);
-          const status      = quotaStatus[apiId] ?? {};
-          const cache       = cacheStats.byApi?.[apiId];
-          const deferred    = deferredSizes[apiId] ?? 0;
-          const health      = status.health ?? "healthy";
-          const hc          = QUOTA_HEALTH_COLORS[health];
-          const isExpanded  = !!expanded[apiId];
-          const isUnmetered = !api?.limits?.perDay && !api?.limits?.perMinute;
-          const color       = SOURCE_COLORS[apiId] || "#9E9E9E";
-          const apiHitRate  = cache?.totals?.hitRate ?? 0;
-          const apiHits     = cache?.totals?.hits ?? 0;
-
-          const dayPct  = status.perDayLimit  ? Math.min((status.perDayUsed  / status.perDayLimit)  * 100, 100) : 0;
-          const minPct  = status.perMinuteLimit ? Math.min((status.perMinuteUsed / status.perMinuteLimit) * 100, 100) : 0;
-          const showDay = !!status.perDayLimit;
-          const showMin = !showDay && !!status.perMinuteLimit;
-          const barPct  = showDay ? dayPct : showMin ? minPct : 0;
-          const barLabel = showDay
-            ? `${status.perDayUsed}/${status.perDayLimit} /day`
-            : showMin
-              ? `${status.perMinuteUsed}/${status.perMinuteLimit} /min`
-              : null;
+      {/* ── Section 2: API cards grid ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12, marginBottom: 20 }}>
+        {QD_CARD_ORDER.map(cardId => {
+          const { api, status, health, isUnmetered, deferred, cache } = getCardData(cardId);
+          const hc = QUOTA_HEALTH_COLORS[health] ?? QUOTA_HEALTH_COLORS.healthy;
+          const isExhaustedCard = health === 'exhausted';
+          const epExpanded = !!expandedEp[cardId];
+          const isConfirm  = !!confirmReset[cardId];
+          const resetTime  = qdFmtReset(status.nextDayResetISO);
+          const byEp = status.sessionByEndpoint ?? {};
+          const apiHits = cache?.totals?.hits ?? 0;
 
           return (
-            <div key={apiId} style={{
-              background: "var(--c-surface)",
-              border: `1px solid ${isExpanded ? color + "50" : "var(--c-border)"}`,
-              borderRadius: 8, overflow: "hidden", transition: "border-color 0.2s ease",
-            }}>
+            <div
+              key={cardId}
+              ref={el => { if (el) cardRefs.current[cardId] = el; }}
+              style={{
+                background: isExhaustedCard ? 'rgba(255,82,82,0.04)' : 'var(--c-surface)',
+                border: `1px solid ${isExhaustedCard ? '#FF525244' : 'var(--c-border)'}`,
+                borderRadius: 8, overflow: 'hidden', minHeight: 220,
+                display: 'flex', flexDirection: 'column',
+              }}
+            >
+              {/* Card header */}
+              <div style={{ padding: '10px 12px 8px', borderBottom: '1px solid var(--c-border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: hc.color, display: 'inline-block', flexShrink: 0 }} />
+                    <span style={{ fontFamily: mono, fontSize: 12, fontWeight: 700, color: 'var(--c-text-1)', lineHeight: 1.3 }}>
+                      {api?.name ?? cardId}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {tierPill(api?.currentTier)}
+                    <button
+                      title={`Reset ${api?.name ?? cardId} quota counters`}
+                      onClick={() => isConfirm ? null : handleReset(cardId)}
+                      style={{ fontFamily: mono, fontSize: 10, color: isConfirm ? '#00E676' : 'var(--c-text-3)', background: 'transparent', border: 'none', cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}
+                    >
+                      {isConfirm ? '✓' : '↺'}
+                    </button>
+                  </div>
+                </div>
+                {api?.baseUrl && (
+                  <div style={{ fontFamily: sans, fontSize: 10, color: 'var(--c-text-3)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {api.baseUrl.replace('https://', '')}
+                  </div>
+                )}
+              </div>
 
-              {/* ── Row header (clickable) ── */}
-              <div
-                role="button" tabIndex={0}
-                onClick={() => toggleExpand(apiId)}
-                onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleExpand(apiId); } }}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "180px 1fr 100px 80px 100px 28px",
-                  gap: 10, alignItems: "center",
-                  padding: "10px 14px", cursor: "pointer",
-                }}
-              >
-                {/* API name */}
-                <span style={{ fontFamily: mono, fontSize: 10, fontWeight: 700, color, letterSpacing: "0.3px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {api?.name || apiId}
-                </span>
+              <div style={{ flex: 1, padding: '10px 12px' }}>
+                {/* Exhausted badge */}
+                {isExhaustedCard && (
+                  <div style={{ textAlign: 'center', padding: '6px 0', marginBottom: 8 }}>
+                    <span style={{ fontFamily: mono, fontSize: 11, fontWeight: 700, color: '#FF5252', letterSpacing: '0.12em' }}>QUOTA EXHAUSTED</span>
+                    {resetTime && <div style={{ fontFamily: mono, fontSize: 9, color: 'var(--c-text-3)', marginTop: 2 }}>Resets in {resetTime}</div>}
+                  </div>
+                )}
 
-                {/* Quota bar or UNMETERED */}
-                {isUnmetered ? (
-                  <span style={{
-                    fontFamily: mono, fontSize: 9, letterSpacing: "0.6px",
-                    color: "#00BCD4", background: "rgba(0,188,212,0.1)",
-                    border: "1px solid rgba(0,188,212,0.3)",
-                    borderRadius: 3, padding: "2px 8px", justifySelf: "start",
-                  }}>
-                    UNMETERED
-                  </span>
-                ) : (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ flex: 1, height: 4, background: "var(--c-border)", borderRadius: 2, overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${barPct}%`, background: hc.color, borderRadius: 2, transition: "width 0.5s ease" }} />
-                    </div>
-                    {barLabel && (
-                      <span style={{ fontFamily: mono, fontSize: 9, color: hc.color, whiteSpace: "nowrap" }}>
-                        {barLabel}
-                      </span>
+                {/* Quota bars */}
+                {!isUnmetered && (
+                  <div style={{ opacity: isExhaustedCard ? 0.5 : 1 }}>
+                    {status.perDayLimit != null && (
+                      <QuotaBar used={status.perDayUsed ?? 0} limit={status.perDayLimit} label="Daily" />
+                    )}
+                    {status.perMinuteLimit != null && (
+                      <QuotaBar used={status.perMinuteUsed ?? 0} limit={status.perMinuteLimit} label="Per-min (rolling)" />
+                    )}
+                    {resetTime && !isExhaustedCard && (
+                      <div style={{ fontFamily: mono, fontSize: 9, color: 'var(--c-text-3)', marginBottom: 8 }}>
+                        Resets in {resetTime}
+                      </div>
                     )}
                   </div>
                 )}
 
-                {/* Health badge */}
-                <span style={{
-                  fontFamily: mono, fontSize: 8, fontWeight: 700, letterSpacing: "0.8px",
-                  color: hc.color, background: hc.bg, border: `1px solid ${hc.border}`,
-                  borderRadius: 10, padding: "2px 8px", whiteSpace: "nowrap", textAlign: "center",
-                }}>
-                  {health.toUpperCase()}
-                </span>
+                {/* Unlimited note */}
+                {isUnmetered && !isExhaustedCard && (
+                  <div style={{ fontFamily: sans, fontSize: 11, color: 'var(--c-text-3)', fontStyle: 'italic', marginBottom: 8 }}>
+                    Unlimited — tracked for observability only
+                  </div>
+                )}
 
-                {/* Cache hit rate */}
-                <span style={{ fontFamily: mono, fontSize: 9, color: apiHits > 0 ? "#00E676" : "var(--c-text-3)", whiteSpace: "nowrap", textAlign: "right" }}>
-                  {apiHits > 0 ? `${Math.round(apiHitRate * 100)}% cache` : "—"}
-                </span>
-
-                {/* Deferred badge */}
-                <div style={{ textAlign: "right" }}>
-                  {deferred > 0 && (
-                    <span style={{
-                      fontFamily: mono, fontSize: 8, color: "#FF9800",
-                      background: "rgba(255,152,0,0.1)", border: "1px solid rgba(255,152,0,0.3)",
-                      borderRadius: 10, padding: "2px 7px",
-                    }}>
-                      {deferred} def
-                    </span>
+                {/* Session calls */}
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontFamily: mono, fontSize: 9, color: 'var(--c-text-3)', letterSpacing: '0.8px', marginBottom: 4 }}>SESSION CALLS</div>
+                  <div style={{ fontFamily: mono, fontSize: 11, color: 'var(--c-text-2)', marginBottom: 4 }}>
+                    {status.sessionTotal ?? 0} calls
+                    {apiHits > 0 && <span style={{ color: '#00E676', marginLeft: 8 }}>· {apiHits} cached</span>}
+                  </div>
+                  {Object.entries(byEp).filter(([k, v]) => k !== '_total' && v > 0).map(([ep, count]) => (
+                    <div key={ep} style={{ fontFamily: mono, fontSize: 9, color: 'var(--c-text-3)' }}>
+                      {ep} ×{count}
+                    </div>
+                  ))}
+                  {(status.sessionTotal ?? 0) === 0 && (
+                    <div style={{ fontFamily: mono, fontSize: 9, color: 'var(--c-text-3)', fontStyle: 'italic' }}>No calls this session</div>
                   )}
                 </div>
 
-                {/* Expand arrow */}
-                <span style={{
-                  fontFamily: mono, fontSize: 9, color: "var(--c-text-3)",
-                  transition: "transform 0.2s ease", display: "inline-block",
-                  transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
-                  textAlign: "center",
-                }}>▶</span>
+                {deferred > 0 && (
+                  <div style={{ fontFamily: mono, fontSize: 9, color: '#f59e0b', marginBottom: 8 }}>{deferred} deferred</div>
+                )}
               </div>
 
-              {/* ── Expanded breakdown ── */}
-              {isExpanded && (
-                <div style={{ borderTop: "1px solid var(--c-border)", padding: "12px 14px", background: "rgba(0,0,0,0.12)" }}>
+              {/* Health bar */}
+              <div style={{ height: 4, background: hc.color, opacity: 0.7 }} />
 
-                  {/* Quota summary boxes */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 8, marginBottom: 12 }}>
-                    {status.perDayLimit != null && (
-                      <>
-                        <MetricBox label="USED / DAY"      value={`${status.perDayUsed}/${status.perDayLimit}`}  valueColor={hc.color} />
-                        <MetricBox label="REMAINING / DAY" value={status.perDayRemaining ?? "—"} valueColor={status.perDayRemaining <= 0 ? "#FF5252" : hc.color} />
-                      </>
-                    )}
-                    {status.perMinuteLimit != null && (
-                      <>
-                        <MetricBox label="USED / MIN"  value={`${status.perMinuteUsed}/${status.perMinuteLimit}`} valueColor={hc.color} />
-                        <MetricBox label="REM / MIN"   value={status.perMinuteRemaining ?? "—"} />
-                      </>
-                    )}
-                    <MetricBox label="SESSION CALLS" value={status.sessionTotal ?? 0} />
-                    {cache?.totals && (
-                      <MetricBox
-                        label="CACHE HITS"
-                        value={`${cache.totals.hits} / ${cache.totals.hits + cache.totals.misses}`}
-                        valueColor={cache.totals.hits > 0 ? "#00E676" : "var(--c-text-3)"}
-                      />
-                    )}
-                    {deferred > 0 && (
-                      <MetricBox label="DEFERRED" value={deferred} valueColor="#FF9800" />
-                    )}
-                  </div>
-
-                  {/* Exhausted notice */}
-                  {status.exhausted && status.exhaustedUntilISO && (
-                    <div style={{
-                      background: "rgba(255,82,82,0.08)", border: "1px solid rgba(255,82,82,0.2)",
-                      borderRadius: 4, padding: "6px 10px", marginBottom: 10,
-                    }}>
-                      <span style={{ fontFamily: mono, fontSize: 9, color: "#FF5252" }}>
-                        EXHAUSTED — resets at {new Date(status.exhaustedUntilISO).toLocaleTimeString()}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Per-endpoint table */}
-                  {api?.endpoints.filter(ep => ep.status !== "dormant").length > 0 && (
-                    <div style={{ marginBottom: 10 }}>
-                      <div style={{ fontFamily: mono, fontSize: 8, color: "var(--c-text-3)", letterSpacing: "1px", marginBottom: 6 }}>
-                        ENDPOINTS
-                      </div>
-                      {api.endpoints.filter(ep => ep.status !== "dormant").map(ep => {
-                        const epCache    = cache?.byEndpoint?.[ep.id];
-                        const sessionCalls = status.sessionByEndpoint?.[ep.id] ?? 0;
-                        const epHitRate  = epCache ? Math.round(epCache.hitRate * 100) : null;
-                        return (
-                          <div key={ep.id} style={{
-                            display: "grid", gridTemplateColumns: "130px 60px 60px 1fr",
-                            gap: 8, alignItems: "center",
-                            padding: "5px 0", borderBottom: "1px solid rgba(255,255,255,0.04)",
-                          }}>
-                            <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-2)" }}>{ep.id}</span>
-                            <span style={{ fontFamily: mono, fontSize: 9, color: sessionCalls > 0 ? "var(--c-text-2)" : "var(--c-text-3)" }}>
-                              {sessionCalls} calls
-                            </span>
-                            <span style={{ fontFamily: mono, fontSize: 9, color: epHitRate != null && epHitRate > 0 ? "#00E676" : "var(--c-text-3)" }}>
-                              {epHitRate != null ? `${epHitRate}% hit` : "—"}
-                            </span>
-                            <span style={{
-                              fontFamily: mono, fontSize: 8, color: "var(--c-text-3)",
-                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                            }}>
-                              {ep.callsNote}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Upgrade CTA */}
-                  {(health === "critical" || health === "exhausted") && api?.upgradeUrl && (
-                    <div style={{
-                      padding: "8px 10px", marginTop: 4,
-                      background: "rgba(255,152,0,0.06)", border: "1px solid rgba(255,152,0,0.25)", borderRadius: 6,
-                    }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                        <span style={{ fontFamily: mono, fontSize: 9, color: "#FF9800", fontWeight: 700 }}>
-                          UPGRADE RECOMMENDED
-                        </span>
-                        <a href={api.upgradeUrl} target="_blank" rel="noopener noreferrer"
-                          style={{ fontFamily: mono, fontSize: 9, color: "#FF9800", textDecoration: "none" }}>
-                          View plans →
-                        </a>
-                      </div>
-                      {api.tierOptions?.[1] && (
-                        <div style={{ fontFamily: sans, fontSize: 10, color: "var(--c-text-3)", lineHeight: 1.4 }}>
-                          <strong style={{ color: "var(--c-text-2)" }}>{api.tierOptions[1].name}</strong>
-                          {" — "}
-                          {api.tierOptions[1].notes}
+              {/* Endpoints collapsible */}
+              {api?.endpoints?.length > 0 && (
+                <div style={{ borderTop: '1px solid var(--c-border)' }}>
+                  <button
+                    onClick={() => setExpandedEp(prev => ({ ...prev, [cardId]: !prev[cardId] }))}
+                    style={{ width: '100%', padding: '6px 12px', fontFamily: mono, fontSize: 9, color: 'var(--c-text-3)', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', letterSpacing: '0.6px' }}
+                  >
+                    ENDPOINTS {epExpanded ? '▴' : '▾'}
+                  </button>
+                  {epExpanded && (
+                    <div style={{ padding: '0 12px 10px' }}>
+                      {api.endpoints.map(ep => (
+                        <div key={ep.id} style={{ display: 'flex', gap: 6, alignItems: 'baseline', padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                          <span style={{ fontFamily: mono, fontSize: 9, color: ep.status === 'dormant' ? 'var(--c-text-3)' : 'var(--c-text-2)', fontStyle: ep.status === 'dormant' ? 'italic' : 'normal', flexShrink: 0 }}>
+                            {ep.status === 'dormant' ? '○' : '●'} {ep.id}
+                          </span>
+                          <span style={{ fontFamily: mono, fontSize: 8, color: 'var(--c-text-3)' }}>
+                            {ep.cacheTTL}s TTL
+                          </span>
                         </div>
-                      )}
+                      ))}
                     </div>
                   )}
-
-                  {/* Admin: raw session log */}
-                  {showAdmin && (
-                    <div style={{ marginTop: 10 }}>
-                      <div style={{ fontFamily: mono, fontSize: 8, color: "var(--c-text-3)", letterSpacing: "1px", marginBottom: 4 }}>
-                        RAW SESSION LOG
-                      </div>
-                      <pre style={{
-                        fontFamily: mono, fontSize: 9, color: "var(--c-text-3)",
-                        background: "rgba(0,0,0,0.2)", borderRadius: 4, padding: "8px 10px",
-                        maxHeight: 80, overflowY: "auto", margin: 0,
-                      }}>
-                        {JSON.stringify(status.sessionByEndpoint ?? {}, null, 2)}
-                      </pre>
-                    </div>
-                  )}
-
                 </div>
               )}
             </div>
           );
         })}
+      </div>
+
+      {/* ── Section 3: Session log table ── */}
+      <div style={{ marginBottom: 16 }}>
+        <button
+          onClick={() => setSessionLogOpen(v => !v)}
+          style={{ fontFamily: mono, fontSize: 9, color: 'var(--c-text-3)', background: 'transparent', border: 'none', cursor: 'pointer', letterSpacing: '0.8px', padding: 0, marginBottom: sessionLogOpen ? 10 : 0 }}
+        >
+          SESSION LOG {sessionLogOpen ? '▴' : '▾'}
+        </button>
+        {sessionLogOpen && (
+          <div style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)', borderRadius: 6, overflow: 'hidden' }}>
+            <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--c-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontFamily: mono, fontSize: 9, color: 'var(--c-text-3)', letterSpacing: '0.8px' }}>CALL LOG — THIS SESSION</span>
+              <button onClick={() => qdExportCSV(allStatus)} style={{ fontFamily: mono, fontSize: 9, color: 'var(--c-text-3)', background: 'transparent', border: '1px solid var(--c-border)', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}>↓ Export CSV</button>
+            </div>
+            {sessionRows.length === 0 ? (
+              <div style={{ padding: '14px 12px', fontFamily: mono, fontSize: 10, color: 'var(--c-text-3)', fontStyle: 'italic' }}>
+                No API calls recorded this session yet.
+              </div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--c-border)' }}>
+                    {['API', 'Endpoint', 'Calls', '% of Limit'].map(h => (
+                      <th key={h} style={{ fontFamily: mono, fontSize: 9, color: 'var(--c-text-3)', textAlign: 'left', padding: '6px 12px', fontWeight: 600, letterSpacing: '0.5px' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sessionRows.map((r, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                      <td style={{ fontFamily: mono, fontSize: 9, color: SOURCE_COLORS[r.apiId] ?? 'var(--c-text-2)', padding: '5px 12px', fontWeight: 700 }}>{r.apiId}</td>
+                      <td style={{ fontFamily: mono, fontSize: 9, color: 'var(--c-text-2)', padding: '5px 12px' }}>{r.ep}</td>
+                      <td style={{ fontFamily: mono, fontSize: 9, color: 'var(--c-text-1)', padding: '5px 12px', fontWeight: 700 }}>{r.count}</td>
+                      <td style={{ fontFamily: mono, fontSize: 9, color: 'var(--c-text-3)', padding: '5px 12px' }}>{r.pct}</td>
+                    </tr>
+                  ))}
+                  <tr style={{ borderTop: '1px solid var(--c-border)', background: 'rgba(255,255,255,0.02)' }}>
+                    <td colSpan={2} style={{ fontFamily: mono, fontSize: 9, color: 'var(--c-text-3)', padding: '5px 12px' }}>Total tracked calls this session</td>
+                    <td style={{ fontFamily: mono, fontSize: 9, color: 'var(--c-text-1)', padding: '5px 12px', fontWeight: 700 }}>{sessionTotal}</td>
+                    <td />
+                  </tr>
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Dormant endpoints ── */}
@@ -1648,7 +1723,7 @@ function QuotaDashboard() {
           {globalEntries} entries cached
         </span>
         {(cacheStats.global?.staleServed ?? 0) > 0 && (
-          <span style={{ fontFamily: mono, fontSize: 9, color: "#FFD740" }}>
+          <span style={{ fontFamily: mono, fontSize: 9, color: "#f59e0b" }}>
             {cacheStats.global.staleServed} stale-served
           </span>
         )}

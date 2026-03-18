@@ -54,8 +54,8 @@ quota MUST go through `apiClient.call()`. The only exemption is `healthPing()`
 | finnhub       | recommendation     | 1               | 1hr       | yes      | medium   |
 | finnhub       | earnings           | 1               | 1hr       | yes      | medium   | *(dormant D-1)* |
 | finnhub       | insiderSentiment   | 1               | 1hr       | yes      | low      | *(dormant D-2)* |
-| alphavantage  | rsi                | 1               | 24hr      | yes      | medium   | *(dormant D-3)* |
-| alphavantage  | macd               | 1               | 24hr      | yes      | medium   | *(dormant D-4)* |
+| alphaVantage  | rsi                | 1               | 24hr      | yes      | medium   | Used by SignalEnginePage |
+| alphaVantage  | macd               | 1               | 24hr      | yes      | medium   | Used by SignalEnginePage |
 | coingecko     | prices             | 1               | 2min      | no       | critical |
 | coingecko     | trending           | 1               | 5min      | yes      | low      | *(dormant D-5)* |
 | fred          | seriesObservations | 1               | 1hr       | yes      | medium   |
@@ -215,15 +215,16 @@ active UI path. They are preserved for future panel features.
 |-----|---------------------------|---------------|----------------------------------|
 | D-1 | `finnhubEarnings`         | finnhub       | Replace `finnhubFetch()` with `apiClient.call('finnhub', 'earnings', ...)` |
 | D-2 | `finnhubInsiderSentiment` | finnhub       | Replace `finnhubFetch()` with `apiClient.call('finnhub', 'insiderSentiment', ...)` |
-| D-3 | `alphaVantageRSI`         | alphavantage  | Replace `safeFetch()` with `apiClient.call('alphavantage', 'rsi', ...)` |
-| D-4 | `alphaVantageMACD`        | alphavantage  | Replace `safeFetch()` with `apiClient.call('alphavantage', 'macd', ...)` |
 | D-5 | `coingeckoTrending`       | coingecko     | Replace `safeFetch()` with `apiClient.call('coingecko', 'trending', ...)` |
 | D-6 | `fmpDCF`                  | fmp           | Replace `fmpFetch()` with `apiClient.call('fmp', 'dcf', ...)` |
+
+**Activated (no longer dormant):** `alphaVantageRSI` (D-3) and `alphaVantageMACD` (D-4) were migrated to
+`apiClient.call('alphaVantage', 'rsi'/'macd', ...)` on 2026-03-17. See §13.
 
 **Legacy helpers used only by dormant functions** (remove when all are activated):
 - `finnhubQueue`, `processFinnhubQueue`, `finnhubFetch` — support D-1, D-2
 - `fmpSafeFetch`, `fmpQueue`, `processFmpQueue`, `fmpFetch` — support D-6
-- `safeFetch` — support D-3, D-4, D-5 (and Finnhub queue internally)
+- `safeFetch` — support D-5 (and Finnhub queue internally); formerly D-3, D-4
 
 ---
 
@@ -311,3 +312,65 @@ Performed after Layer 6 completion.
 **Pre-existing bug fixed:** `runCacheSelfTest()` in `apiCache.js` declared as sync `function` but contained `await` — corrected to `async function`. No behavior change.
 
 **System status: PRODUCTION READY**
+
+---
+
+## 13. AV Quota Fix + Enhanced Dashboard — 2026-03-17
+
+### Part A — Alpha Vantage quota tracking fix
+
+`alphaVantageRSI` and `alphaVantageMACD` were previously calling `safeFetch()` directly,
+bypassing `apiClient.call()`. This meant every RSI and MACD request went unrecorded by
+`quotaTracker` — the Alpha Vantage per-day counter never decremented, making the health
+badge and remaining-count display permanently wrong.
+
+**Fix applied in `src/dataServices.js`:**
+- Both functions now call `apiClient.call('alphaVantage', 'rsi' / 'macd', params, { fetcher })`.
+- The `fetcher` extracts and returns the final processed array (not raw JSON), so `apiClient`
+  caches the already-parsed data — no redundant `cacheGet`/`cacheSet` needed.
+- Manual `cacheGet`/`cacheSet` calls (using sessionStorage) removed from both functions.
+- Public return type is unchanged: `Array | null` — callers in SignalEnginePage are unaffected.
+- `safeFetch` itself is preserved (still required by D-1, D-2, D-5, and the Finnhub queue).
+
+**Note on API ID:** the correct registry key is `'alphaVantage'` (camelCase). Old dormant
+comments had a typo (`'alphavantage'` lowercase) that would have caused a silent registry
+miss at runtime — corrected in this migration.
+
+**Secondary fixes:** audit confirmed `fetchYahooOHLCV`, `fredReleaseDates`, and `fredReleases`
+already route through `apiClient.call()` — no further changes required.
+
+### Part B — Enhanced Quota Dashboard
+
+The `QuotaDashboard` component in `src/CatalogPage.jsx` (accessible at `/catalog` → Quota
+Dashboard tab) was replaced with a three-section design.
+
+**Section 1 — Summary Strip**
+A horizontal row of colored health badges, one per API. Click any badge to scroll to its card.
+Colors match `QUOTA_HEALTH_COLORS`: healthy = #00E676, warning = #f59e0b, critical = #FF5252,
+exhausted = #FF5252.
+
+**Section 2 — API Cards Grid**
+Eight cards in quota-criticality order: Alpha Vantage → FMP → Finnhub → CoinGecko → BRAPI →
+Yahoo → FRED → BCB+AwesomeAPI. Each card shows:
+- Health dot + API name + tier pill + reset button (2-step confirm)
+- Per-day progress bar (where applicable)
+- Per-minute rolling-window bar (where applicable)
+- Session call count broken down by endpoint
+- 4 px color-coded health bar along the bottom edge
+- Collapsible endpoint list (toggle with "N endpoints" button)
+- Exhausted state: red border + "QUOTA EXHAUSTED" banner + dimmed bars
+
+BCB and AwesomeAPI share a single virtual card (`_bcb`) since both are unlimited Brazilian APIs.
+
+**Section 3 — Session Log Table**
+Collapsible table listing all APIs with at least one session call, sorted by calls descending.
+Includes per-API session total and an Export CSV button.
+
+**Refresh cadence:**
+- Full refresh (all sections): every 15 seconds
+- Per-minute bar only: every 5 seconds (reads `quotaTracker.getAllQuotaStatus()` directly)
+- "Updated N s ago" counter: 1-second interval
+
+**Card order constant:** `QD_CARD_ORDER = ['alphaVantage','fmp','finnhub','coingecko','brapi','yahoo','fred','_bcb']`
+
+**Bar fill color helper:** `qdBarColor(pct)` — <60% → #00E676, <80% → #f59e0b, ≥80% → #FF5252

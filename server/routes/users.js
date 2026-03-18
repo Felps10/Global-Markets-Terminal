@@ -1,51 +1,82 @@
 import { Router } from 'express';
-import { getDb } from '../db.js';
+import { supabase } from '../db.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
 
-// All routes require authentication + admin role
 router.use(authenticate, requireAdmin);
 
-// ─── GET /api/v1/users ────────────────────────────────────────────────────────
-router.get('/', (req, res) => {
-  const db = getDb();
-  const users = db.prepare(
-    'SELECT id, email, name, role, created_at FROM users ORDER BY created_at DESC'
-  ).all();
-  res.json({ users });
+// GET /api/v1/users
+router.get('/', async (_req, res) => {
+  const { data: { users }, error } = await supabase.auth.admin.listUsers();
+  if (error) return res.status(500).json({ error: 'DB_ERROR', message: error.message });
+
+  const mapped = users.map((u) => ({
+    id:              u.id,
+    email:           u.email,
+    name:            u.user_metadata?.name || '',
+    role:            u.user_metadata?.role || 'user',
+    created_at:      u.created_at,
+    last_sign_in_at: u.last_sign_in_at || null,
+  }));
+
+  res.json({ users: mapped });
 });
 
-// ─── GET /api/v1/users/:id ────────────────────────────────────────────────────
-router.get('/:id', (req, res) => {
-  const db   = getDb();
-  const user = db.prepare(
-    'SELECT id, email, name, role, created_at FROM users WHERE id = ?'
-  ).get(Number(req.params.id));
-
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
-  }
-  res.json({ user });
-});
-
-// ─── DELETE /api/v1/users/:id ─────────────────────────────────────────────────
-router.delete('/:id', (req, res) => {
-  const targetId = Number(req.params.id);
+// DELETE /api/v1/users/:id
+router.delete('/:id', async (req, res) => {
+  const targetId = req.params.id;
 
   if (req.user.id === targetId) {
-    return res.status(403).json({ error: 'Cannot delete your own account' });
+    return res.status(403).json({ error: 'FORBIDDEN', message: 'Cannot delete your own account' });
   }
 
-  const db   = getDb();
-  const user = db.prepare('SELECT id FROM users WHERE id = ?').get(targetId);
-
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
+  // Fetch target user to check their role before deleting
+  const { data: { user: target }, error: fetchError } = await supabase.auth.admin.getUserById(targetId);
+  if (fetchError || !target) {
+    return res.status(404).json({ error: 'NOT_FOUND', message: 'User not found' });
   }
 
-  db.prepare('DELETE FROM users WHERE id = ?').run(targetId);
+  if ((target.user_metadata?.role || 'user') === 'admin') {
+    return res.status(403).json({ error: 'FORBIDDEN', message: 'Cannot delete another admin account' });
+  }
+
+  const { error } = await supabase.auth.admin.deleteUser(targetId);
+  if (error) return res.status(500).json({ error: 'DB_ERROR', message: error.message });
+
   res.json({ ok: true });
+});
+
+// PATCH /api/v1/users/:id/role
+router.patch('/:id/role', async (req, res) => {
+  const targetId = req.params.id;
+  const { role } = req.body;
+
+  if (!role || !['admin', 'user'].includes(role)) {
+    return res.status(400).json({ error: 'BAD_REQUEST', message: 'role must be "admin" or "user"' });
+  }
+
+  if (req.user.id === targetId) {
+    return res.status(403).json({ error: 'FORBIDDEN', message: 'Cannot change your own role' });
+  }
+
+  // Fetch existing metadata to preserve other fields
+  const { data: { user: target }, error: fetchError } = await supabase.auth.admin.getUserById(targetId);
+  if (fetchError || !target) {
+    return res.status(404).json({ error: 'NOT_FOUND', message: 'User not found' });
+  }
+
+  const { data: { user: updated }, error } = await supabase.auth.admin.updateUserById(targetId, {
+    user_metadata: { ...target.user_metadata, role },
+  });
+  if (error) return res.status(500).json({ error: 'DB_ERROR', message: error.message });
+
+  res.json({
+    id:    updated.id,
+    email: updated.email,
+    name:  updated.user_metadata?.name || '',
+    role:  updated.user_metadata?.role || 'user',
+  });
 });
 
 export default router;

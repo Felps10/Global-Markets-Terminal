@@ -1,6 +1,14 @@
+import { supabase } from '../lib/supabase.js';
+
 const BASE = '/api/v1';
 
-function authHeaders(token) {
+async function getToken() {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.access_token ?? null;
+}
+
+async function authHeaders() {
+  const token = await getToken();
   return {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -33,7 +41,12 @@ export async function register(name, email, password, confirmPassword) {
 }
 
 export async function getMe(token) {
-  const res = await fetch(`${BASE}/auth/me`, { headers: authHeaders(token) });
+  const res = await fetch(`${BASE}/auth/me`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
   return handleResponse(res);
 }
 
@@ -43,28 +56,28 @@ export async function fetchGroups() {
   return handleResponse(res);
 }
 
-export async function createGroup(data, token) {
+export async function createGroup(data) {
   const res = await fetch(`${BASE}/groups`, {
     method:  'POST',
-    headers: authHeaders(token),
+    headers: await authHeaders(),
     body:    JSON.stringify(data),
   });
   return handleResponse(res);
 }
 
-export async function updateGroup(id, data, token) {
+export async function updateGroup(id, data) {
   const res = await fetch(`${BASE}/groups/${id}`, {
     method:  'PUT',
-    headers: authHeaders(token),
+    headers: await authHeaders(),
     body:    JSON.stringify(data),
   });
   return handleResponse(res);
 }
 
-export async function deleteGroup(id, token) {
+export async function deleteGroup(id) {
   const res = await fetch(`${BASE}/groups/${id}`, {
     method:  'DELETE',
-    headers: authHeaders(token),
+    headers: await authHeaders(),
   });
   if (res.status === 204) return { success: true };
   return handleResponse(res);
@@ -77,28 +90,28 @@ export async function fetchSubgroups(groupId) {
   return handleResponse(res);
 }
 
-export async function createSubgroup(data, token) {
+export async function createSubgroup(data) {
   const res = await fetch(`${BASE}/subgroups`, {
     method:  'POST',
-    headers: authHeaders(token),
+    headers: await authHeaders(),
     body:    JSON.stringify(data),
   });
   return handleResponse(res);
 }
 
-export async function updateSubgroup(id, data, token) {
+export async function updateSubgroup(id, data) {
   const res = await fetch(`${BASE}/subgroups/${id}`, {
     method:  'PUT',
-    headers: authHeaders(token),
+    headers: await authHeaders(),
     body:    JSON.stringify(data),
   });
   return handleResponse(res);
 }
 
-export async function deleteSubgroup(id, token) {
+export async function deleteSubgroup(id) {
   const res = await fetch(`${BASE}/subgroups/${id}`, {
     method:  'DELETE',
-    headers: authHeaders(token),
+    headers: await authHeaders(),
   });
   if (res.status === 204) return { success: true };
   return handleResponse(res);
@@ -111,10 +124,10 @@ export async function fetchAssets(subgroupId) {
   return handleResponse(res);
 }
 
-export async function bulkRelocateAssets(assetIds, targetSubgroupId, token) {
+export async function bulkRelocateAssets(assetIds, targetSubgroupId) {
   const res = await fetch(`${BASE}/assets/bulk-relocate`, {
     method:  'PATCH',
-    headers: authHeaders(token),
+    headers: await authHeaders(),
     body:    JSON.stringify({ assetIds, targetSubgroupId }),
   });
   return handleResponse(res);
