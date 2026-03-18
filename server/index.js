@@ -17,6 +17,12 @@ import yahooRoutes       from './routes/yahoo.js';
 const PORT = process.env.PORT || 4000;
 const app  = express();
 
+// Trust Railway's reverse proxy — required for express-rate-limit to see
+// real client IPs instead of the proxy IP
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // ── CORS ──────────────────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
@@ -72,7 +78,7 @@ async function start() {
     await seedClubeDemo();
   }
 
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log('');
     console.log('┌──────────────────────────────────────────────────────┐');
     console.log(`│  Markets Dashboard API  —  http://localhost:${PORT}      │`);
@@ -101,6 +107,15 @@ async function start() {
     console.log(`│  CORS origins: ${ALLOWED_ORIGINS.join(', ')}`);
     console.log('└──────────────────────────────────────────────────────┘');
     console.log('');
+  });
+
+  // Graceful shutdown — Railway sends SIGTERM before stopping a deployment
+  process.on('SIGTERM', () => {
+    console.log('[shutdown] SIGTERM received — closing HTTP server gracefully');
+    server.close(() => {
+      console.log('[shutdown] HTTP server closed');
+      process.exit(0);
+    });
   });
 }
 
