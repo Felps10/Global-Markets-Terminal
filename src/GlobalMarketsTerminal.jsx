@@ -22,6 +22,7 @@ import { useTaxonomy } from './context/TaxonomyContext.jsx';
 import { usePreferences } from './context/PreferencesContext.jsx';
 import { useWatchlist }   from './context/WatchlistContext.jsx';
 import WatchlistPage     from './WatchlistPage.jsx';
+import BrazilTerminal    from './BrazilTerminal.jsx';
 import { isExhausted } from './services/quotaTracker.js';
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
@@ -100,11 +101,11 @@ const REFRESH_INTERVAL = 30000;
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Static fallback maps — built from src/data/ files (same source as DB seed)
-const STATIC_CATEGORIES = Object.fromEntries(
+export const STATIC_CATEGORIES = Object.fromEntries(
   STATIC_SUBGROUPS_ARRAY.map(s => [s.id, { label: s.display_name, icon: s.icon, color: s.color }])
 );
 
-const STATIC_ASSETS_MAP = Object.fromEntries(
+export const STATIC_ASSETS_MAP = Object.fromEntries(
   STATIC_ASSETS_ARRAY.map(a => [a.symbol, {
     name:     a.name,
     cat:      a.subgroup_id,
@@ -146,6 +147,8 @@ const GROUP_MACRO = {
   consumer:    { fredKey: "consumerSentiment", label: "Consumer Sentiment" },
   cleanenergy: { fredKey: "treasury10y",       label: "10Y Treasury Yield" },
   reits:       { fredKey: "mortgage30y",       label: "30-Year Mortgage Rate" },
+  // Brazil uses brasilMacro (BCB/AwesomeAPI), not FRED — null prevents accidental FRED lookup
+  brazil:      { fredKey: null,                label: null },
 };
 
 // Cross-listing: find all assets that belong to a given category (primary or alsoIn)
@@ -165,7 +168,10 @@ const VOLATILITY = {
   technology: 0.018, "oil-gas": 0.014, financials: 0.012, healthcare: 0.014,
   semiconductors: 0.020, consumer: 0.010, aerospace: 0.010, cleanenergy: 0.025,
   reits: 0.012, emerging: 0.016, crypto: 0.035, indices: 0.01, fx: 0.004,
-  brazil: 0.018,
+  "br-bancos": 0.016, "br-utilities": 0.014, "br-commodities": 0.020,
+  "br-consumo": 0.018, "br-construcao": 0.022, "br-infra": 0.015,
+  "br-industrial": 0.016, "br-saude": 0.018,
+  "br-fiis": 0.010, "br-etfs": 0.015, "br-indices": 0.012,
 };
 
 const TIMEFRAMES = [
@@ -181,7 +187,7 @@ const TIMEFRAMES = [
 ];
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
-function formatVolume(v) {
+export function formatVolume(v) {
   if (!v && v !== 0) return "—";
   if (v >= 1e9) return (v / 1e9).toFixed(1) + "B";
   if (v >= 1e6) return (v / 1e6).toFixed(1) + "M";
@@ -189,7 +195,7 @@ function formatVolume(v) {
   return String(v);
 }
 
-function formatMarketCap(mc) {
+export function formatMarketCap(mc) {
   if (!mc) return "—";
   if (mc >= 1e12) return "$" + (mc / 1e12).toFixed(2) + "T";
   if (mc >= 1e9)  return "$" + (mc / 1e9).toFixed(1) + "B";
@@ -197,7 +203,7 @@ function formatMarketCap(mc) {
   return "$" + mc.toLocaleString();
 }
 
-function formatPrice(symbol, price) {
+export function formatPrice(symbol, price) {
   if (price == null) return "—";
   const asset = STATIC_ASSETS_MAP[symbol];
   if (!asset) return String(price);
@@ -275,7 +281,7 @@ async function fetchChartData(symbol, range, interval) {
 }
 
 // ─── SPARKLINE ────────────────────────────────────────────────────────────────
-function Sparkline({ data, positive, width = 80, height = 28 }) {
+export function Sparkline({ data, positive, width = 80, height = 28 }) {
   if (!data || data.length < 2) return null;
   const clean = data.filter(v => isFinite(v) && !isNaN(v));
   if (clean.length < 2) return null;
@@ -477,7 +483,7 @@ function CrossListBadge({ symbol }) {
 }
 
 // ─── ASSET CARD ───────────────────────────────────────────────────────────────
-function AssetCard({ symbol, data, onClick, groupLabel }) {
+export function AssetCard({ symbol, data, onClick, groupLabel }) {
   const [hovered, setHovered] = useState(false);
   const { isAuthenticated }           = useAuth();
   const { pin, unpin, isPinned }      = useWatchlist();
@@ -584,7 +590,7 @@ function AssetCard({ symbol, data, onClick, groupLabel }) {
 }
 
 // ─── LIST COLUMN HEADER ───────────────────────────────────────────────────────
-function ListColumnHeader() {
+export function ListColumnHeader() {
   const cols   = ["#", "ASSET", "EXCH", "SECTOR", "PRICE", "CHANGE", "VOLUME", "TREND"];
   const aligns = ["right", "left", "left", "left", "right", "right", "right", "right"];
   return (
@@ -599,7 +605,7 @@ function ListColumnHeader() {
 }
 
 // ─── ASSET ROW ────────────────────────────────────────────────────────────────
-function AssetRow({ symbol, data, rank, onClick }) {
+export function AssetRow({ symbol, data, rank, onClick }) {
   const [hovered, setHovered] = useState(false);
   const { isAuthenticated }       = useAuth();
   const { pin, unpin, isPinned }  = useWatchlist();
@@ -678,7 +684,17 @@ function HamburgerMenu({ open, onClose, activeFilter, onFilterChange, activeExch
     { key: "all",           label: "All Markets",        icon: "🌍" },
     { key: "aerospace",     label: "Aerospace & Defense", icon: "🛡" },
     { key: "biotech",       label: "Biotech",            icon: "🧬" },
-    { key: "brazil",        label: "Brazil Equities",    icon: "🇧🇷" },
+    { key: "br-bancos",     label: "Bancos & Financeiro", icon: "🏦" },
+    { key: "br-commodities",label: "Commodities & Export.", icon: "🛢" },
+    { key: "br-construcao", label: "Construção & Imob.", icon: "🏗" },
+    { key: "br-consumo",    label: "Consumo & Varejo",   icon: "🛍" },
+    { key: "br-etfs",       label: "ETFs B3",            icon: "📦" },
+    { key: "br-fiis",       label: "FIIs",               icon: "🏢" },
+    { key: "br-indices",    label: "Índices B3",         icon: "📊" },
+    { key: "br-industrial", label: "Industrial & Cap. Goods", icon: "⚙️" },
+    { key: "br-infra",      label: "Infraestrutura & Log.", icon: "🚚" },
+    { key: "br-saude",      label: "Saúde",              icon: "🧬" },
+    { key: "br-utilities",  label: "Utilities & Energia", icon: "⚡" },
     { key: "cleanenergy",   label: "Clean Energy",       icon: "🔋" },
     { key: "consumer",      label: "Consumer",           icon: "🛒" },
     { key: "crypto",        label: "Crypto",             icon: "🪙" },
@@ -1228,6 +1244,7 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
   });
   const [expandedCards, setExpandedCards] = useState(new Set());
   const [flatExpand, setFlatExpand] = useState(false);
+  const [marketMode, setMarketMode] = useState("global");
   const prevDataRef          = useRef(null);
   const intervalRef          = useRef(null);
   const mountedRef           = useRef(true);
@@ -1564,7 +1581,7 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
 
     const fmtMcap = (mc) => {
       if (!mc) return "—";
-      const p = catKey === "brazil" ? "R$ " : "$";
+      const p = ASSETS[syms?.[0]]?.isB3 ? "R$ " : "$";
       if (mc >= 1e12) return p + (mc / 1e12).toFixed(2) + "T";
       if (mc >= 1e9)  return p + (mc / 1e9).toFixed(1) + "B";
       if (mc >= 1e6)  return p + (mc / 1e6).toFixed(1) + "M";
@@ -1692,6 +1709,8 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
       showTicker={currentView === 'dashboard'}
       tickerItems={tickerItems}
       watchlistEnabled={!!user}
+      marketMode={marketMode}
+      onModeChange={(mode) => { setMarketMode(mode); setActiveFilter("all"); }}
     />
     <div
       data-theme={theme}
@@ -1759,32 +1778,34 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
         <DetailPanel symbol={selectedAsset} data={marketData[selectedAsset]} onClose={() => setSelectedAsset(null)} />
       )}
 
-      {/* ── COMMAND BAR — full-width strip below GMTHeader ── */}
-      <CommandBar
-        sentiment={sentiment}
-        risingCount={rising}
-        fallingCount={falling}
-        avgChange={avgPct}
-        topMovers={topMovers.map(([symbol, d]) => ({ symbol, changePct: d.changePct ?? 0 }))}
-        activeFilter={activeFilter}
-        onFilterChange={setActiveFilter}
-        sortMode={groupSort}
-        sortDir={groupDir}
-        onSortChange={(mode, dir) => { setGroupSort(mode); setGroupDir(dir); }}
-        activeExchanges={activeExchanges}
-        allExchanges={allExchanges}
-        onExchangeToggle={toggleExchange}
-        onExchangeReset={resetExchanges}
-        viewMode={viewMode === "cards" ? "grid" : "list"}
-        onViewChange={(mode) => setViewMode(mode === "grid" ? "cards" : "list")}
-        onDensityChange={() => {}}
-        onCollapseAll={collapseAll}
-        onExpandAll={expandAll}
-        flatExpand={flatExpand}
-        onRefresh={loadData}
-        groups={ctxGroups}
-        subgroups={ctxSubgroups}
-      />
+      {/* ── COMMAND BAR — hidden in Brazil mode (BrazilTerminal has its own controls) ── */}
+      {marketMode === "global" && (
+        <CommandBar
+          sentiment={sentiment}
+          risingCount={rising}
+          fallingCount={falling}
+          avgChange={avgPct}
+          topMovers={topMovers.map(([symbol, d]) => ({ symbol, changePct: d.changePct ?? 0 }))}
+          activeFilter={activeFilter}
+          onFilterChange={setActiveFilter}
+          sortMode={groupSort}
+          sortDir={groupDir}
+          onSortChange={(mode, dir) => { setGroupSort(mode); setGroupDir(dir); }}
+          activeExchanges={activeExchanges}
+          allExchanges={allExchanges}
+          onExchangeToggle={toggleExchange}
+          onExchangeReset={resetExchanges}
+          viewMode={viewMode === "cards" ? "grid" : "list"}
+          onViewChange={(mode) => setViewMode(mode === "grid" ? "cards" : "list")}
+          onDensityChange={() => {}}
+          onCollapseAll={collapseAll}
+          onExpandAll={expandAll}
+          flatExpand={flatExpand}
+          onRefresh={loadData}
+          groups={ctxGroups}
+          subgroups={ctxSubgroups}
+        />
+      )}
 
       <div style={{ position: "relative", zIndex: 1, maxWidth: 1400, margin: "0 auto", padding: "0 20px 40px" }}>
 
@@ -1808,8 +1829,11 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
           />
         )}
 
+        {/* ── BRAZIL MODE ── */}
+        {currentView === "dashboard" && marketMode === "brazil" && <BrazilTerminal />}
+
         {/* ── LOADING ── */}
-        {currentView === "dashboard" && loading && (
+        {currentView === "dashboard" && marketMode === "global" && loading && (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "120px 0", gap: 12 }}>
             <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#00E676", animation: "pulse 1.2s ease-in-out infinite" }} />
             <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, color: "var(--c-text-2)" }}>Connecting to market feeds...</span>
@@ -1817,7 +1841,7 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
         )}
 
         {/* ── OUT OF AIR ── */}
-        {currentView === "dashboard" && !loading && !marketData && (
+        {currentView === "dashboard" && marketMode === "global" && !loading && !marketData && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "100px 0", gap: 20, textAlign: "center" }}>
             <div style={{ fontSize: 48, opacity: 0.3 }}>📡</div>
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 18, fontWeight: 700, color: "var(--c-text-2)", letterSpacing: "2px" }}>SYSTEM OUT OF AIR</div>
@@ -1834,7 +1858,7 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
         )}
 
         {/* ── MAIN CONTENT ── */}
-        {currentView === "dashboard" && !loading && marketData && (
+        {currentView === "dashboard" && marketMode === "global" && !loading && marketData && (
           <div className="fade-in">
 
             {/* ── LIST VIEW — flat sortable table, mutually exclusive with card views ── */}
@@ -1966,7 +1990,7 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
                       }}>
                         <div style={{ borderTop: "1px solid var(--c-border)", padding: "12px 0" }}>
                           <MacroBanner macroData={macroData} catKey={catKey} />
-                          {catKey === "brazil" && <BrasilMacroBanner brasilMacro={brasilMacro} />}
+                          {ctxSubgroups?.find(s => s.id === catKey)?.group_id === "brazil" && <BrasilMacroBanner brasilMacro={brasilMacro} />}
                           {catKey === "dividends" && (
                             <div style={{
                               display: "flex", alignItems: "center", gap: 10,
@@ -2043,7 +2067,7 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
                       </div>
                       <div style={{ paddingTop: 38 }}>
                         <MacroBanner macroData={macroData} catKey={catKey} />
-                        {catKey === "brazil" && <BrasilMacroBanner brasilMacro={brasilMacro} />}
+                        {ctxSubgroups?.find(s => s.id === catKey)?.group_id === "brazil" && <BrasilMacroBanner brasilMacro={brasilMacro} />}
                         {catKey === "dividends" && (
                           <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(255,193,7,0.08)", border: "1px solid rgba(255,193,7,0.2)", borderRadius: 6, padding: "8px 14px", marginBottom: 10 }}>
                             <SourceBadge source="fmp" />
@@ -2123,7 +2147,7 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
                             </div>
                           </div>
                           <MacroBanner macroData={macroData} catKey={catKey} />
-                          {catKey === "brazil" && <BrasilMacroBanner brasilMacro={brasilMacro} />}
+                          {ctxSubgroups?.find(s => s.id === catKey)?.group_id === "brazil" && <BrasilMacroBanner brasilMacro={brasilMacro} />}
                           {catKey === "dividends" && (
                             <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(255,193,7,0.08)", border: "1px solid rgba(255,193,7,0.2)", borderRadius: 6, padding: "8px 14px", marginBottom: 10 }}>
                               <SourceBadge source="fmp" />

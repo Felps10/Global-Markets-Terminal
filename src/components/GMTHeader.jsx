@@ -206,8 +206,45 @@ function UserDropdown({ user, onNav, onLogout, onClose }) {
   );
 }
 
+// ─── MODE TOGGLE ──────────────────────────────────────────────────────────────
+function ModeToggle({ marketMode, onModeChange }) {
+  const segments = [
+    { key: "global", label: "🌐 GLOBAL",  activeColor: "#00E676" },
+    { key: "brazil", label: "🇧🇷 BRAZIL", activeColor: "#F9C300" },
+  ];
+  return (
+    <div style={{
+      display: "inline-flex", borderRadius: 20,
+      border: "1px solid rgba(51,65,85,0.6)",
+      overflow: "hidden", height: 34, width: 220,
+    }}>
+      {segments.map((seg, i) => {
+        const active = marketMode === seg.key;
+        return (
+          <button
+            key={seg.key}
+            onClick={() => onModeChange(seg.key)}
+            style={{
+              flex: 1, border: "none",
+              borderRight: i === 0 ? "1px solid rgba(51,65,85,0.6)" : "none",
+              background: active ? seg.activeColor : "transparent",
+              color: active ? "#080f1a" : "var(--c-text-2, rgba(255,255,255,0.35))",
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 11, fontWeight: 700, letterSpacing: "1.5px",
+              cursor: "pointer", transition: "background 0.2s ease, color 0.2s ease",
+              padding: 0, whiteSpace: "nowrap",
+            }}
+          >
+            {seg.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Shared top bar (Layer 1) ─────────────────────────────────────────────────
-function TopBar({ user, onMenuOpen, onNav, onLogout, selectedMarketId, setSelectedMarketId }) {
+function TopBar({ user, onMenuOpen, onNav, onLogout, selectedMarketId, setSelectedMarketId, showModeToggle, marketMode, onModeChange }) {
   const [dropOpen, setDropOpen] = useState(false);
   const selectedMarket = MARKETS.find(m => m.id === selectedMarketId) || MARKETS[0];
 
@@ -258,7 +295,9 @@ function TopBar({ user, onMenuOpen, onNav, onLogout, selectedMarketId, setSelect
       </div>
 
       {/* CENTER */}
-      <div />
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        {showModeToggle && <ModeToggle marketMode={marketMode} onModeChange={onModeChange} />}
+      </div>
 
       {/* RIGHT */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
@@ -324,6 +363,8 @@ export default function GMTHeader({
   tickerItems       = [],
   adminNav,                   // { activeTab, onTabChange } — admin mode
   watchlistEnabled  = false,  // show Watchlist tab when user is authenticated
+  marketMode        = 'global',
+  onModeChange,
 }) {
   const [selectedMarketId, setSelectedMarketId] = useState('nyse');
   const { assets, groups, subgroups } = useTaxonomy();
@@ -420,6 +461,9 @@ export default function GMTHeader({
         onLogout={onLogout}
         selectedMarketId={selectedMarketId}
         setSelectedMarketId={setSelectedMarketId}
+        showModeToggle={activePage === 'terminal' && !adminNav}
+        marketMode={marketMode}
+        onModeChange={onModeChange}
       />
       {navBar2}
       {!adminNav && showTicker && tickerItems.length > 0 && (

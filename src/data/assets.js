@@ -123,30 +123,6 @@ export const ASSETS = [
   { id: "mchi",  symbol: "MCHI",  name: "China ETF",       subgroup_id: "emerging", group_id: "equities", type: "etf", exchange: "NASDAQ" },
   { id: "ewy",   symbol: "EWY",   name: "South Korea ETF", subgroup_id: "emerging", group_id: "equities", type: "etf", exchange: "NYSE"   },
 
-  // ── Brazil Equities (B3) ─────────────────────────────────────────────────
-  { id: "petr4",  symbol: "PETR4",  name: "Petrobras PN",              subgroup_id: "brazil", group_id: "equities", type: "equity-br", exchange: "B3", meta: { isB3: true } },
-  { id: "petr3",  symbol: "PETR3",  name: "Petrobras ON",              subgroup_id: "brazil", group_id: "equities", type: "equity-br", exchange: "B3", meta: { isB3: true } },
-  { id: "vale3",  symbol: "VALE3",  name: "Vale",                      subgroup_id: "brazil", group_id: "equities", type: "equity-br", exchange: "B3", meta: { isB3: true } },
-  { id: "itub4",  symbol: "ITUB4",  name: "Itaú Unibanco",             subgroup_id: "brazil", group_id: "equities", type: "equity-br", exchange: "B3", meta: { isB3: true } },
-  { id: "bbdc4",  symbol: "BBDC4",  name: "Bradesco",                  subgroup_id: "brazil", group_id: "equities", type: "equity-br", exchange: "B3", meta: { isB3: true } },
-  { id: "bbas3",  symbol: "BBAS3",  name: "Banco do Brasil",           subgroup_id: "brazil", group_id: "equities", type: "equity-br", exchange: "B3", meta: { isB3: true } },
-  { id: "sanb11", symbol: "SANB11", name: "Santander Brasil",          subgroup_id: "brazil", group_id: "equities", type: "equity-br", exchange: "B3", meta: { isB3: true } },
-  { id: "mglu3",  symbol: "MGLU3",  name: "Magazine Luiza",            subgroup_id: "brazil", group_id: "equities", type: "equity-br", exchange: "B3", meta: { isB3: true } },
-  { id: "rent3",  symbol: "RENT3",  name: "Localiza",                  subgroup_id: "brazil", group_id: "equities", type: "equity-br", exchange: "B3", meta: { isB3: true } },
-  { id: "lren3",  symbol: "LREN3",  name: "Lojas Renner",              subgroup_id: "brazil", group_id: "equities", type: "equity-br", exchange: "B3", meta: { isB3: true } },
-  { id: "vivt3",  symbol: "VIVT3",  name: "Vivo / Telefônica Brasil",  subgroup_id: "brazil", group_id: "equities", type: "equity-br", exchange: "B3", meta: { isB3: true } },
-  { id: "elet3",  symbol: "ELET3",  name: "Eletrobras",                subgroup_id: "brazil", group_id: "equities", type: "equity-br", exchange: "B3", meta: { isB3: true } },
-  { id: "sbsp3",  symbol: "SBSP3",  name: "Sabesp",                    subgroup_id: "brazil", group_id: "equities", type: "equity-br", exchange: "B3", meta: { isB3: true } },
-  { id: "csna3",  symbol: "CSNA3",  name: "CSN",                       subgroup_id: "brazil", group_id: "equities", type: "equity-br", exchange: "B3", meta: { isB3: true } },
-  { id: "ggbr4",  symbol: "GGBR4",  name: "Gerdau",                    subgroup_id: "brazil", group_id: "equities", type: "equity-br", exchange: "B3", meta: { isB3: true } },
-  { id: "slce3",  symbol: "SLCE3",  name: "SLC Agrícola",              subgroup_id: "brazil", group_id: "equities", type: "equity-br", exchange: "B3", meta: { isB3: true } },
-  { id: "agro3",  symbol: "AGRO3",  name: "BrasilAgro",                subgroup_id: "brazil", group_id: "equities", type: "equity-br", exchange: "B3", meta: { isB3: true } },
-  { id: "hapv3",  symbol: "HAPV3",  name: "Hapvida",            subgroup_id: "brazil", group_id: "equities", type: "equity-br", exchange: "B3", meta: { isB3: true } },
-  { id: "rdor3",  symbol: "RDOR3",  name: "Rede D'Or",          subgroup_id: "brazil", group_id: "equities", type: "equity-br", exchange: "B3", meta: { isB3: true } },
-  { id: "wege3",  symbol: "WEGE3",  name: "WEG",                subgroup_id: "brazil", group_id: "equities", type: "equity-br", exchange: "B3", meta: { isB3: true } },
-  { id: "jbss3",  symbol: "JBSS3",  name: "JBS",                subgroup_id: "brazil", group_id: "equities", type: "equity-br", exchange: "B3", meta: { isB3: true } },
-  { id: "suzb3",  symbol: "SUZB3",  name: "Suzano",             subgroup_id: "brazil", group_id: "equities", type: "equity-br", exchange: "B3", meta: { isB3: true } },
-
   // ── Currencies — Foreign Exchange ─────────────────────────────────────────
   { id: "eurusd", symbol: "EURUSD=X", name: "Euro / US Dollar",              subgroup_id: "fx", group_id: "currencies", type: "forex", exchange: "FOREX", meta: { display: "EUR/USD" } },
   { id: "gbpusd", symbol: "GBPUSD=X", name: "British Pound / US Dollar",     subgroup_id: "fx", group_id: "currencies", type: "forex", exchange: "FOREX", meta: { display: "GBP/USD" } },
@@ -171,7 +147,6 @@ export const ASSETS = [
   { id: "gdaxi", symbol: "^GDAXI", name: "DAX",          subgroup_id: "indices", group_id: "indices", type: "index", exchange: "XETRA",  meta: { display: "DAX"  } },
   { id: "n225",  symbol: "^N225",  name: "Nikkei 225",   subgroup_id: "indices", group_id: "indices", type: "index", exchange: "TSE",    meta: { display: "N225" } },
   { id: "hsi",   symbol: "^HSI",   name: "Hang Seng",    subgroup_id: "indices", group_id: "indices", type: "index", exchange: "HKEX",   meta: { display: "HSI"  } },
-  { id: "bvsp",  symbol: "^BVSP",  name: "Ibovespa",     subgroup_id: "indices", group_id: "indices", type: "index", exchange: "B3",       meta: { display: "IBOV"  } },
   { id: "fchi",  symbol: "^FCHI",  name: "CAC 40",       subgroup_id: "indices", group_id: "indices", type: "index", exchange: "EURONEXT", meta: { display: "CAC"   } },
   { id: "axjo",  symbol: "^AXJO",  name: "ASX 200",      subgroup_id: "indices", group_id: "indices", type: "index", exchange: "ASX",      meta: { display: "ASX"   } },
   { id: "ks11",  symbol: "^KS11",  name: "KOSPI",        subgroup_id: "indices", group_id: "indices", type: "index", exchange: "KRX",      meta: { display: "KOSPI" } },
@@ -249,4 +224,132 @@ export const ASSETS = [
   { id: "vrtx",  symbol: "VRTX",  name: "Vertex Pharma",   subgroup_id: "biotech", group_id: "equities", type: "equity", exchange: "NASDAQ" },
   { id: "gild",  symbol: "GILD",  name: "Gilead Sciences", subgroup_id: "biotech", group_id: "equities", type: "equity", exchange: "NASDAQ" },
   { id: "incy",  symbol: "INCY",  name: "Incyte",          subgroup_id: "biotech", group_id: "equities", type: "equity", exchange: "NASDAQ" },
+
+  // ══════════════════════════════════════════════════════════════════════
+  // ── BRAZIL — B3 ───────────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════
+
+  // ── Bancos & Financeiro ───────────────────────────────────────────────
+  { id: "itub4",  symbol: "ITUB4",  name: "Itaú Unibanco",        subgroup_id: "br-bancos", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "bbdc4",  symbol: "BBDC4",  name: "Bradesco",             subgroup_id: "br-bancos", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "bbas3",  symbol: "BBAS3",  name: "Banco do Brasil",      subgroup_id: "br-bancos", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "bpac11", symbol: "BPAC11", name: "BTG Pactual",          subgroup_id: "br-bancos", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "b3sa3",  symbol: "B3SA3",  name: "B3",                   subgroup_id: "br-bancos", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "sanb11", symbol: "SANB11", name: "Santander Brasil",     subgroup_id: "br-bancos", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "abcb4",  symbol: "ABCB4",  name: "ABC Brasil",           subgroup_id: "br-bancos", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+
+  // ── Utilities & Energia ───────────────────────────────────────────────
+  { id: "elet3",  symbol: "ELET3",  name: "Eletrobras ON",        subgroup_id: "br-utilities", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "elet6",  symbol: "ELET6",  name: "Eletrobras PNB",       subgroup_id: "br-utilities", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "taee11", symbol: "TAEE11", name: "Taesa",                subgroup_id: "br-utilities", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "egie3",  symbol: "EGIE3",  name: "Engie Brasil",         subgroup_id: "br-utilities", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "cpfe3",  symbol: "CPFE3",  name: "CPFL Energia",         subgroup_id: "br-utilities", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "enev3",  symbol: "ENEV3",  name: "Eneva",                subgroup_id: "br-utilities", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "aesb3",  symbol: "AESB3",  name: "AES Brasil",           subgroup_id: "br-utilities", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "sbsp3",  symbol: "SBSP3",  name: "Sabesp",               subgroup_id: "br-utilities", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+
+  // ── Commodities & Exportadoras ────────────────────────────────────────
+  { id: "vale3",  symbol: "VALE3",  name: "Vale",                 subgroup_id: "br-commodities", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "petr4",  symbol: "PETR4",  name: "Petrobras PN",         subgroup_id: "br-commodities", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "petr3",  symbol: "PETR3",  name: "Petrobras ON",         subgroup_id: "br-commodities", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "suzb3",  symbol: "SUZB3",  name: "Suzano",               subgroup_id: "br-commodities", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "klbn11", symbol: "KLBN11", name: "Klabin",               subgroup_id: "br-commodities", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "ggbr4",  symbol: "GGBR4",  name: "Gerdau",               subgroup_id: "br-commodities", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "csna3",  symbol: "CSNA3",  name: "CSN",                  subgroup_id: "br-commodities", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "usim5",  symbol: "USIM5",  name: "Usiminas",             subgroup_id: "br-commodities", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "brap4",  symbol: "BRAP4",  name: "Bradespar",            subgroup_id: "br-commodities", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "jbss3",  symbol: "JBSS3",  name: "JBS",                  subgroup_id: "br-commodities", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "slce3",  symbol: "SLCE3",  name: "SLC Agrícola",         subgroup_id: "br-commodities", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "agro3",  symbol: "AGRO3",  name: "BrasilAgro",           subgroup_id: "br-commodities", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+
+  // ── Consumo & Varejo ──────────────────────────────────────────────────
+  { id: "lren3",  symbol: "LREN3",  name: "Lojas Renner",         subgroup_id: "br-consumo", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "mglu3",  symbol: "MGLU3",  name: "Magazine Luiza",       subgroup_id: "br-consumo", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "viia3",  symbol: "VIIA3",  name: "Via Varejo",           subgroup_id: "br-consumo", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "amer3",  symbol: "AMER3",  name: "Americanas",           subgroup_id: "br-consumo", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "arzz3",  symbol: "ARZZ3",  name: "Arezzo",               subgroup_id: "br-consumo", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "soma3",  symbol: "SOMA3",  name: "Grupo Soma",           subgroup_id: "br-consumo", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "pcar3",  symbol: "PCAR3",  name: "Grupo Pão de Açúcar",  subgroup_id: "br-consumo", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "asai3",  symbol: "ASAI3",  name: "Assaí",                subgroup_id: "br-consumo", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "vivt3",  symbol: "VIVT3",  name: "Vivo / Telefônica",    subgroup_id: "br-consumo", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+
+  // ── Construção & Imobiliário ──────────────────────────────────────────
+  { id: "cyre3",  symbol: "CYRE3",  name: "Cyrela",               subgroup_id: "br-construcao", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "mrve3",  symbol: "MRVE3",  name: "MRV",                  subgroup_id: "br-construcao", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "eztc3",  symbol: "EZTC3",  name: "EZTEC",                subgroup_id: "br-construcao", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "tend3",  symbol: "TEND3",  name: "Tenda",                subgroup_id: "br-construcao", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "dirr3",  symbol: "DIRR3",  name: "Direcional",           subgroup_id: "br-construcao", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "even3",  symbol: "EVEN3",  name: "Even",                 subgroup_id: "br-construcao", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+
+  // ── Infraestrutura & Logística ────────────────────────────────────────
+  { id: "rail3",  symbol: "RAIL3",  name: "Rumo",                 subgroup_id: "br-infra", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "ccro3",  symbol: "CCRO3",  name: "CCR",                  subgroup_id: "br-infra", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "ecor3",  symbol: "ECOR3",  name: "Ecorodovias",          subgroup_id: "br-infra", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "logg3",  symbol: "LOGG3",  name: "LOG Commercial",       subgroup_id: "br-infra", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "jslg3",  symbol: "JSLG3",  name: "JSL",                  subgroup_id: "br-infra", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "rent3",  symbol: "RENT3",  name: "Localiza",             subgroup_id: "br-infra", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+
+  // ── Industrial & Capital Goods ────────────────────────────────────────
+  { id: "wege3",  symbol: "WEGE3",  name: "WEG",                  subgroup_id: "br-industrial", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "romi3",  symbol: "ROMI3",  name: "Romi",                 subgroup_id: "br-industrial", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "tupy3",  symbol: "TUPY3",  name: "Tupy",                 subgroup_id: "br-industrial", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "pomo4",  symbol: "POMO4",  name: "Marcopolo",            subgroup_id: "br-industrial", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+
+  // ── Saúde ─────────────────────────────────────────────────────────────
+  { id: "rdor3",  symbol: "RDOR3",  name: "Rede D'Or",            subgroup_id: "br-saude", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "hapv3",  symbol: "HAPV3",  name: "Hapvida",              subgroup_id: "br-saude", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "flry3",  symbol: "FLRY3",  name: "Fleury",               subgroup_id: "br-saude", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+  { id: "pard3",  symbol: "PARD3",  name: "Oncoclínicas",         subgroup_id: "br-saude", group_id: "brazil", type: "equity-br", exchange: "B3", meta: { isB3: true } },
+
+  // ── FIIs — Logística ──────────────────────────────────────────────────
+  { id: "hglg11", symbol: "HGLG11", name: "CSHG Logística",       subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  { id: "xplg11", symbol: "XPLG11", name: "XP Log",               subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  { id: "btlg11", symbol: "BTLG11", name: "BTG Logística",        subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  { id: "lvbi11", symbol: "LVBI11", name: "VBI Logístico",        subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  { id: "brco11", symbol: "BRCO11", name: "Bresco Logística",     subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  { id: "vilg11", symbol: "VILG11", name: "Vinci Logística",      subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  // ── FIIs — Shoppings ──────────────────────────────────────────────────
+  { id: "xpml11", symbol: "XPML11", name: "XP Malls",             subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  { id: "visc11", symbol: "VISC11", name: "Vinci Shopping",       subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  { id: "hsml11", symbol: "HSML11", name: "HSI Malls",            subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  { id: "mall11", symbol: "MALL11", name: "Malls Brasil Plural",  subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  { id: "alzr11", symbol: "ALZR11", name: "Alianza Trust Renda",  subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  // ── FIIs — Lajes Corporativas ─────────────────────────────────────────
+  { id: "hgre11", symbol: "HGRE11", name: "CSHG Real Estate",     subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  { id: "brcr11", symbol: "BRCR11", name: "BC Fund",              subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  { id: "jsre11", symbol: "JSRE11", name: "JS Real Estate",       subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  { id: "rcrb11", symbol: "RCRB11", name: "Rio Bravo Corp.",       subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  // ── FIIs — CRI / Papel ────────────────────────────────────────────────
+  { id: "kncr11", symbol: "KNCR11", name: "Kinea Recebíveis",     subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  { id: "hgcr11", symbol: "HGCR11", name: "CSHG Recebíveis",      subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  { id: "mxrf11", symbol: "MXRF11", name: "Maxi Renda",           subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  { id: "vrta11", symbol: "VRTA11", name: "Verta",                subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  { id: "recr11", symbol: "RECR11", name: "REC Recebíveis",       subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  { id: "cpts11", symbol: "CPTS11", name: "Capitânia Securities", subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  // ── FIIs — Híbridos & FOF ─────────────────────────────────────────────
+  { id: "knip11", symbol: "KNIP11", name: "Kinea Índices Preços", subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  { id: "rbrf11", symbol: "RBRF11", name: "RBR Alpha",            subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  { id: "bcff11", symbol: "BCFF11", name: "BC Fundo de Fundos",   subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+  { id: "hfof11", symbol: "HFOF11", name: "Hedge FOF",            subgroup_id: "br-fiis", group_id: "brazil", type: "fii", exchange: "B3", meta: { isB3: true } },
+
+  // ── ETFs B3 — Brasil ──────────────────────────────────────────────────
+  { id: "bova11", symbol: "BOVA11", name: "iShares Ibovespa",     subgroup_id: "br-etfs", group_id: "brazil", type: "etf-br", exchange: "B3", meta: { isB3: true } },
+  { id: "smal11", symbol: "SMAL11", name: "iShares Small Cap",    subgroup_id: "br-etfs", group_id: "brazil", type: "etf-br", exchange: "B3", meta: { isB3: true } },
+  { id: "divo11", symbol: "DIVO11", name: "iShares Dividendos",   subgroup_id: "br-etfs", group_id: "brazil", type: "etf-br", exchange: "B3", meta: { isB3: true } },
+  { id: "pibb11", symbol: "PIBB11", name: "It Now PIBB",          subgroup_id: "br-etfs", group_id: "brazil", type: "etf-br", exchange: "B3", meta: { isB3: true } },
+  // ── ETFs B3 — Exterior ────────────────────────────────────────────────
+  { id: "ivvb11", symbol: "IVVB11", name: "iShares S&P 500 (B3)", subgroup_id: "br-etfs", group_id: "brazil", type: "etf-br", exchange: "B3", meta: { isB3: true } },
+  { id: "nasd11", symbol: "NASD11", name: "Trend Nasdaq",         subgroup_id: "br-etfs", group_id: "brazil", type: "etf-br", exchange: "B3", meta: { isB3: true } },
+  { id: "eurp11", symbol: "EURP11", name: "Trend Europa",         subgroup_id: "br-etfs", group_id: "brazil", type: "etf-br", exchange: "B3", meta: { isB3: true } },
+  { id: "spxi11", symbol: "SPXI11", name: "It Now S&P 500",       subgroup_id: "br-etfs", group_id: "brazil", type: "etf-br", exchange: "B3", meta: { isB3: true } },
+  // ── ETFs B3 — Renda Fixa ──────────────────────────────────────────────
+  { id: "imab11", symbol: "IMAB11", name: "iShares IMA-B",        subgroup_id: "br-etfs", group_id: "brazil", type: "etf-br", exchange: "B3", meta: { isB3: true } },
+  { id: "fixa11", symbol: "FIXA11", name: "Trend DI",             subgroup_id: "br-etfs", group_id: "brazil", type: "etf-br", exchange: "B3", meta: { isB3: true } },
+
+  // ── Índices B3 ────────────────────────────────────────────────────────
+  { id: "br-ibov", symbol: "^BVSP", name: "Ibovespa",             subgroup_id: "br-indices", group_id: "brazil", type: "index-br", exchange: "B3", meta: { isB3: true, display: "IBOV" } },
+  { id: "br-ifix", symbol: "IFIX",  name: "Índice FIIs",          subgroup_id: "br-indices", group_id: "brazil", type: "index-br", exchange: "B3", meta: { isB3: true, display: "IFIX" } },
+  { id: "br-smll", symbol: "SMLL",  name: "Small Cap Index",      subgroup_id: "br-indices", group_id: "brazil", type: "index-br", exchange: "B3", meta: { isB3: true, display: "SMLL" } },
+  { id: "br-idiv", symbol: "IDIV",  name: "Dividendos Index",     subgroup_id: "br-indices", group_id: "brazil", type: "index-br", exchange: "B3", meta: { isB3: true, display: "IDIV" } },
+  { id: "br-imab", symbol: "IMA-B", name: "IMA-B",                subgroup_id: "br-indices", group_id: "brazil", type: "index-br", exchange: "B3", meta: { isB3: true, display: "IMA-B" } },
 ];

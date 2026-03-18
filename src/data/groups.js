@@ -39,4 +39,10 @@ export const GROUPS = [
     description:  "Bonds, treasuries, dividend instruments",
     slug:         "fixed-income",
   },
+  {
+    id:           "brazil",
+    display_name: "Brazil",
+    description:  "Brazilian B3 equities, FIIs, ETFs, and indices",
+    slug:         "brazil",
+  },
 ];

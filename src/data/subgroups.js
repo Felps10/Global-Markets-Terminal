@@ -106,15 +106,6 @@ export const SUBGROUPS = [
 
   // ── Equities — International ───────────────────────────────────────────────
   {
-    id:           "brazil",
-    display_name: "Brazil Equities",
-    description:  "B3 / Bovespa — kept distinct from Emerging Markets",
-    slug:         "brazil",
-    group_id:     "equities",
-    icon:         "🇧🇷",
-    color:        "#009C3B",
-  },
-  {
     id:           "emerging",
     display_name: "Emerging Markets",
     description:  "EM ETFs: EWZ, INDA, MCHI, EWY",
@@ -214,4 +205,18 @@ export const SUBGROUPS = [
     icon:         "📄",
     color:        "#78909C",
   },
+
+  // ── Brazil — Ações ────────────────────────────────────────────────────────
+  { id: "br-bancos",      display_name: "Bancos & Financeiro",      slug: "br-bancos",      group_id: "brazil", icon: "🏦", color: "#0077B6", description: "Bancos e serviços financeiros brasileiros" },
+  { id: "br-utilities",   display_name: "Utilities & Energia",      slug: "br-utilities",   group_id: "brazil", icon: "⚡", color: "#00B4D8", description: "Elétricas, saneamento e energia elétrica" },
+  { id: "br-commodities", display_name: "Commodities & Export.",    slug: "br-commodities", group_id: "brazil", icon: "🛢", color: "#E9C46A", description: "Mineração, petróleo, papel/celulose, aço e agro" },
+  { id: "br-consumo",     display_name: "Consumo & Varejo",         slug: "br-consumo",     group_id: "brazil", icon: "🛍", color: "#F4A261", description: "Varejo, moda, alimentação e telecom" },
+  { id: "br-construcao",  display_name: "Construção & Imobiliário", slug: "br-construcao",  group_id: "brazil", icon: "🏗", color: "#E76F51", description: "Incorporadoras e construtoras" },
+  { id: "br-infra",       display_name: "Infraestrutura & Log.",    slug: "br-infra",       group_id: "brazil", icon: "🚚", color: "#457B9D", description: "Logística, concessões e infraestrutura" },
+  { id: "br-industrial",  display_name: "Industrial & Cap. Goods",  slug: "br-industrial",  group_id: "brazil", icon: "⚙️", color: "#6D6875", description: "Bens de capital e manufatura industrial" },
+  { id: "br-saude",       display_name: "Saúde",                    slug: "br-saude",       group_id: "brazil", icon: "🧬", color: "#2A9D8F", description: "Hospitais, planos e diagnósticos" },
+  // ── Brazil — FIIs, ETFs, Índices ──────────────────────────────────────────
+  { id: "br-fiis",        display_name: "FIIs",                     slug: "br-fiis",        group_id: "brazil", icon: "🏢", color: "#264653", description: "Fundos de Investimento Imobiliário" },
+  { id: "br-etfs",        display_name: "ETFs B3",                  slug: "br-etfs",        group_id: "brazil", icon: "📦", color: "#43AA8B", description: "ETFs listados na B3 — Brasil e exterior" },
+  { id: "br-indices",     display_name: "Índices B3",               slug: "br-indices",     group_id: "brazil", icon: "📊", color: "#7B2D8B", description: "Índices de referência da B3" },
 ];
