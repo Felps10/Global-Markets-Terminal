@@ -243,7 +243,7 @@ export default function TaxonomyManager() {
     if (!subgroupId) { setAssets([]); return; }
     setLoadingAssets(true);
     try {
-      const data = await fetchAssets(subgroupId);
+      const data = await fetchAssets({ subgroupId });
       setAssets(data);
     } finally {
       setLoadingAssets(false);

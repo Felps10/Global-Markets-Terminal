@@ -23,8 +23,9 @@ export async function seedIfEmpty() {
   // meta is jsonb in Postgres — pass the object directly, no JSON.stringify
   const assetsPayload = ASSETS.map((a) => ({
     ...a,
-    currency: a.currency ?? null,
-    meta:     a.meta ?? null,
+    currency:   a.currency   ?? null,
+    sort_order: a.sort_order ?? 0,
+    meta:       a.meta       ?? null,
   }));
 
   const { error: assetError } = await supabase
@@ -36,14 +37,27 @@ export async function seedIfEmpty() {
 
 /** After seeding, verify counts and log them */
 export async function logTaxonomyCounts() {
-  const [{ count: groupCount }, { count: subgroupCount }, { count: assetCount }] =
-    await Promise.all([
-      supabase.from('groups').select('*', { count: 'exact', head: true }),
-      supabase.from('subgroups').select('*', { count: 'exact', head: true }),
-      supabase.from('assets').select('*', { count: 'exact', head: true }),
-    ]);
-  console.log(`  📊 Taxonomy: ${groupCount} groups, ${subgroupCount} subgroups, ${assetCount} assets — OK`);
-  return { groupCount, subgroupCount, assetCount };
+  const [
+    { count: groupCount },
+    { count: subgroupCount },
+    { count: assetCount },
+    { count: globalGroupCount },
+    { count: brazilGroupCount },
+    { count: globalAssetCount },
+    { count: brazilAssetCount },
+  ] = await Promise.all([
+    supabase.from('groups').select('*', { count: 'exact', head: true }),
+    supabase.from('subgroups').select('*', { count: 'exact', head: true }),
+    supabase.from('assets').select('*', { count: 'exact', head: true }),
+    supabase.from('groups').select('*', { count: 'exact', head: true }).eq('terminal_view', 'global'),
+    supabase.from('groups').select('*', { count: 'exact', head: true }).eq('terminal_view', 'brazil'),
+    supabase.from('assets').select('*', { count: 'exact', head: true }).eq('terminal_view', 'global'),
+    supabase.from('assets').select('*', { count: 'exact', head: true }).eq('terminal_view', 'brazil'),
+  ]);
+  console.log(`  📊 Groups:    ${groupCount} (${globalGroupCount} global · ${brazilGroupCount} brazil)`);
+  console.log(`  📊 Subgroups: ${subgroupCount}`);
+  console.log(`  📊 Assets:    ${assetCount} (${globalAssetCount} global · ${brazilAssetCount} brazil)`);
+  return { groupCount, subgroupCount, assetCount, globalGroupCount, brazilGroupCount, globalAssetCount, brazilAssetCount };
 }
 
 /** Seed a demo Clube de Investimento — idempotent, safe to re-run */

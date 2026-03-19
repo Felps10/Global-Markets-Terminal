@@ -8,6 +8,7 @@ import {
 } from '../services/taxonomyService.js';
 import GroupFormModal     from '../components/admin/GroupFormModal.jsx';
 import SubgroupFormModal  from '../components/admin/SubgroupFormModal.jsx';
+import AssetFormModal     from '../components/admin/AssetFormModal.jsx';
 import DeleteGroupModal   from '../components/admin/DeleteGroupModal.jsx';
 import DeleteSubgroupModal from '../components/admin/DeleteSubgroupModal.jsx';
 
@@ -293,13 +294,16 @@ export default function AdminTaxonomyPage() {
   const [subgroups, setSubgroups] = useState([]);
   const [assets,    setAssets]    = useState([]);
 
+  // Terminal view filter
+  const [terminalFilter, setTerminalFilter] = useState(null); // null = all
+
   // Selection state
   const [selectedGroupId,    setSelectedGroupId]    = useState(null);
   const [selectedSubgroupId, setSelectedSubgroupId] = useState(null);
 
   // Modal state
   const [modal, setModal] = useState(null);
-  // modal: { type: 'addGroup'|'editGroup'|'deleteGroup'|'addSubgroup'|'editSubgroup'|'deleteSubgroup', payload? }
+  // modal: { type: 'addGroup'|'editGroup'|'deleteGroup'|'addSubgroup'|'editSubgroup'|'deleteSubgroup'|'addAsset'|'editAsset', payload? }
 
   // Loading
   const [loadingGroups,    setLoadingGroups]    = useState(true);
@@ -332,7 +336,7 @@ export default function AdminTaxonomyPage() {
     if (!subgroupId) { setAssets([]); return; }
     setLoadingAssets(true);
     try {
-      const data = await fetchAssets(subgroupId);
+      const data = await fetchAssets({ subgroupId });
       setAssets(data);
     } finally {
       setLoadingAssets(false);
@@ -352,6 +356,7 @@ export default function AdminTaxonomyPage() {
   }, [selectedSubgroupId, loadAssets]);
 
   // ── Computed ───────────────────────────────────────────────────────────────
+  const displayedGroups  = terminalFilter ? groups.filter((g) => g.terminal_view === terminalFilter) : groups;
   const selectedGroup    = groups.find((g) => g.id === selectedGroupId);
   const selectedSubgroup = subgroups.find((s) => s.id === selectedSubgroupId);
   const existingGroupSlugs    = groups.map((g) => g.slug);
@@ -405,6 +410,13 @@ export default function AdminTaxonomyPage() {
     }
   }
 
+  async function onAssetSaved(deleted = false) {
+    closeModal();
+    await loadAssets(selectedSubgroupId);
+    await loadSubgroups(selectedGroupId);
+    push(deleted ? 'Asset deleted' : 'Asset saved successfully');
+  }
+
   function handleLogout() {
     logout();
     navigate('/login', { replace: true });
@@ -430,17 +442,43 @@ export default function AdminTaxonomyPage() {
             <ColHeader>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <ColTitle>Groups</ColTitle>
-                <ColCount>{groups.length}</ColCount>
+                <ColCount>{displayedGroups.length}</ColCount>
               </div>
               <AddBtn onClick={() => setModal({ type: 'addGroup' })}>+ Add</AddBtn>
             </ColHeader>
+            {/* Terminal view filter tabs */}
+            <div style={{ display: 'flex', borderBottom: '1px solid #1E2740', flexShrink: 0 }}>
+              {[null, 'global', 'brazil'].map((v) => (
+                <button
+                  key={v ?? 'all'}
+                  onClick={() => { setTerminalFilter(v); setSelectedGroupId(null); }}
+                  style={{
+                    flex: 1,
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: terminalFilter === v ? '2px solid #00BCD4' : '2px solid transparent',
+                    color: terminalFilter === v ? '#00BCD4' : '#4A5568',
+                    cursor: 'pointer',
+                    fontFamily: "'Space Mono', monospace",
+                    fontSize: '9px',
+                    fontWeight: 700,
+                    letterSpacing: '0.1em',
+                    padding: '8px 4px',
+                    textTransform: 'uppercase',
+                    transition: 'color 0.15s',
+                  }}
+                >
+                  {v ?? 'All'}
+                </button>
+              ))}
+            </div>
             <ColBody>
               {loadingGroups ? (
                 <EmptyState>Loading...</EmptyState>
-              ) : groups.length === 0 ? (
+              ) : displayedGroups.length === 0 ? (
                 <EmptyState>No groups yet.<br />Click + Add to create one.</EmptyState>
               ) : (
-                groups.map((g) => (
+                displayedGroups.map((g) => (
                   <ListRow
                     key={g.id}
                     $active={selectedGroupId === g.id}
@@ -448,7 +486,13 @@ export default function AdminTaxonomyPage() {
                   >
                     <RowMain>
                       <RowName $active={selectedGroupId === g.id}>{g.display_name}</RowName>
-                      <RowMeta>{g.subgroup_count} subgroup{g.subgroup_count !== 1 ? 's' : ''} · {g.slug}</RowMeta>
+                      <RowMeta>
+                        {g.subgroup_count} subgroup{g.subgroup_count !== 1 ? 's' : ''} · {g.slug}
+                        {' · '}
+                        <span style={{ color: g.terminal_view === 'brazil' ? '#F9C300' : '#26C6DA' }}>
+                          {g.terminal_view}
+                        </span>
+                      </RowMeta>
                     </RowMain>
                     <RowActions>
                       <IconBtn
@@ -520,6 +564,9 @@ export default function AdminTaxonomyPage() {
                 <ColTitle>Assets</ColTitle>
                 {selectedSubgroup && <ColCount>{assets.length}</ColCount>}
               </div>
+              {selectedSubgroup && (
+                <AddBtn onClick={() => setModal({ type: 'addAsset' })}>+ Add</AddBtn>
+              )}
             </ColHeader>
             <ColBody>
               {!selectedSubgroup ? (
@@ -527,16 +574,26 @@ export default function AdminTaxonomyPage() {
               ) : loadingAssets ? (
                 <EmptyState>Loading...</EmptyState>
               ) : assets.length === 0 ? (
-                <EmptyState>No assets in<br />{selectedSubgroup.display_name}.</EmptyState>
+                <EmptyState>No assets in<br />{selectedSubgroup.display_name}.<br />Click + Add.</EmptyState>
               ) : (
                 assets.map((a) => (
-                  <ListRow key={a.id} style={{ cursor: 'default' }}>
+                  <ListRow
+                    key={a.id}
+                    onClick={() => setModal({ type: 'editAsset', payload: a })}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <AssetSymbolLabel>{a.symbol}</AssetSymbolLabel>
                     <RowMain>
                       <RowName style={{ color: '#8892A4' }}>{a.name}</RowName>
-                      <RowMeta>{a.exchange}</RowMeta>
+                      <RowMeta>{a.exchange} · {a.type}</RowMeta>
                     </RowMain>
                     <TypeBadge>{a.type}</TypeBadge>
+                    <RowActions>
+                      <IconBtn
+                        title="Edit"
+                        onClick={(e) => { e.stopPropagation(); setModal({ type: 'editAsset', payload: a }); }}
+                      >✏</IconBtn>
+                    </RowActions>
                   </ListRow>
                 ))
               )}
@@ -594,6 +651,15 @@ export default function AdminTaxonomyPage() {
             allSubgroups={allSubgroupsFlat}
             onClose={closeModal}
             onDeleted={onSubgroupDeleted}
+          />
+        )}
+        {(modal?.type === 'addAsset' || modal?.type === 'editAsset') && (
+          <AssetFormModal
+            asset={modal.type === 'editAsset' ? modal.payload : null}
+            subgroup={selectedSubgroup}
+            allSubgroups={allSubgroupsFlat}
+            onClose={closeModal}
+            onSaved={onAssetSaved}
           />
         )}
 

@@ -118,9 +118,40 @@ export async function deleteSubgroup(id) {
 }
 
 // ── Assets ────────────────────────────────────────────────────────────────────
-export async function fetchAssets(subgroupId) {
-  const url = subgroupId ? `${BASE}/assets?subgroupId=${subgroupId}` : `${BASE}/assets`;
-  const res = await fetch(url);
+export async function fetchAssets({ subgroupId, groupId, terminal_view } = {}) {
+  const params = new URLSearchParams();
+  if (subgroupId)    params.set('subgroupId',    subgroupId);
+  if (groupId)       params.set('groupId',       groupId);
+  if (terminal_view) params.set('terminal_view', terminal_view);
+  const qs = params.toString();
+  const res = await fetch(qs ? `${BASE}/assets?${qs}` : `${BASE}/assets`);
+  return handleResponse(res);
+}
+
+export async function createAsset(data) {
+  const res = await fetch(`${BASE}/assets`, {
+    method:  'POST',
+    headers: await authHeaders(),
+    body:    JSON.stringify(data),
+  });
+  return handleResponse(res);
+}
+
+export async function updateAsset(id, data) {
+  const res = await fetch(`${BASE}/assets/${id}`, {
+    method:  'PUT',
+    headers: await authHeaders(),
+    body:    JSON.stringify(data),
+  });
+  return handleResponse(res);
+}
+
+export async function deleteAsset(id) {
+  const res = await fetch(`${BASE}/assets/${id}`, {
+    method:  'DELETE',
+    headers: await authHeaders(),
+  });
+  if (res.status === 204) return { success: true };
   return handleResponse(res);
 }
 
@@ -134,7 +165,8 @@ export async function bulkRelocateAssets(assetIds, targetSubgroupId) {
 }
 
 // ── Taxonomy ──────────────────────────────────────────────────────────────────
-export async function fetchTaxonomy() {
-  const res = await fetch(`${BASE}/taxonomy`);
+export async function fetchTaxonomy({ view } = {}) {
+  const url = view ? `${BASE}/taxonomy?view=${view}` : `${BASE}/taxonomy`;
+  const res = await fetch(url);
   return handleResponse(res);
 }

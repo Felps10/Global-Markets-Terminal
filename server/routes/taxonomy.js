@@ -3,13 +3,23 @@ import { supabase } from '../db.js';
 
 const router = Router();
 
-// GET /api/v1/taxonomy  — full nested tree: Groups → Subgroups → Assets
+// GET /api/v1/taxonomy[?view=global|brazil|all]  — full nested tree: Groups → Subgroups → Assets
 router.get('/', async (req, res) => {
-  // Three separate queries, same JS join logic as before
+  const { view } = req.query; // 'global', 'brazil', or omitted/'all'
+
+  let groupsQuery   = supabase.from('groups').select('*').order('sort_order');
+  let subgroupsQuery = supabase.from('subgroups').select('*').order('sort_order');
+  let assetsQuery   = supabase.from('assets').select('*').order('symbol');
+
+  if (view === 'global' || view === 'brazil') {
+    groupsQuery = groupsQuery.eq('terminal_view', view);
+    assetsQuery = assetsQuery.eq('terminal_view', view);
+  }
+
   const [groupsRes, subgroupsRes, assetsRes] = await Promise.all([
-    supabase.from('groups').select('*').order('display_name'),
-    supabase.from('subgroups').select('*').order('display_name'),
-    supabase.from('assets').select('*').order('symbol'),
+    groupsQuery,
+    subgroupsQuery,
+    assetsQuery,
   ]);
 
   if (groupsRes.error)    return res.status(500).json({ error: 'DB_ERROR', message: groupsRes.error.message });

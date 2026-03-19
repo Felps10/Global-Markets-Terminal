@@ -4,12 +4,16 @@ import { authenticate, requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
 
-// GET /api/v1/groups
+// GET /api/v1/groups[?terminalView=global|brazil]
 router.get('/', async (req, res) => {
-  const { data: groups, error } = await supabase
-    .from('groups')
-    .select('*, subgroups(id)')
-    .order('display_name');
+  const { terminalView } = req.query;
+
+  let query = supabase.from('groups').select('*, subgroups(id)').order('sort_order');
+  if (terminalView === 'global' || terminalView === 'brazil') {
+    query = query.eq('terminal_view', terminalView);
+  }
+
+  const { data: groups, error } = await query;
   if (error) return res.status(500).json({ error: 'DB_ERROR', message: error.message });
 
   // Mimic the subgroup_count column the old SQL query provided
@@ -34,7 +38,7 @@ router.get('/:id', async (req, res) => {
 
 // POST /api/v1/groups
 router.post('/', authenticate, requireAdmin, async (req, res) => {
-  const { display_name, description, slug } = req.body;
+  const { display_name, description, slug, terminal_view, block_id, sort_order, icon, color } = req.body;
   if (!display_name || !slug) {
     return res.status(400).json({ error: 'BAD_REQUEST', message: 'display_name and slug are required' });
   }
@@ -53,7 +57,17 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
 
   const { data: created, error } = await supabase
     .from('groups')
-    .insert({ id, display_name, description: description || null, slug })
+    .insert({
+      id,
+      display_name,
+      description:   description   || null,
+      slug,
+      terminal_view: terminal_view || 'global',
+      block_id:      block_id      || null,
+      sort_order:    sort_order    ?? 0,
+      icon:          icon          || null,
+      color:         color         || null,
+    })
     .select()
     .single();
   if (error) return res.status(500).json({ error: 'DB_ERROR', message: error.message });
@@ -63,7 +77,7 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
 
 // PUT /api/v1/groups/:id
 router.put('/:id', authenticate, requireAdmin, async (req, res) => {
-  const { display_name, description, slug } = req.body;
+  const { display_name, description, slug, terminal_view, block_id, sort_order, icon, color } = req.body;
 
   const { data: group, error: fetchError } = await supabase
     .from('groups')
@@ -87,10 +101,15 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
   const { data: updated, error } = await supabase
     .from('groups')
     .update({
-      display_name: display_name || group.display_name,
-      description:  description  !== undefined ? description : group.description,
-      slug:         slug         || group.slug,
-      updated_at:   new Date().toISOString(),
+      display_name:  display_name  || group.display_name,
+      description:   description   !== undefined ? description   : group.description,
+      slug:          slug          || group.slug,
+      terminal_view: terminal_view !== undefined ? terminal_view : group.terminal_view,
+      block_id:      block_id      !== undefined ? block_id      : group.block_id,
+      sort_order:    sort_order    !== undefined ? sort_order    : group.sort_order,
+      icon:          icon          !== undefined ? icon          : group.icon,
+      color:         color         !== undefined ? color         : group.color,
+      updated_at:    new Date().toISOString(),
     })
     .eq('id', req.params.id)
     .select()

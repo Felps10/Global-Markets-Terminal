@@ -36,14 +36,27 @@ export function TaxonomyProvider({ children }) {
     [subgroups],
   );
 
+  // Terminal-view filtered derived trees
+  const globalTaxonomy = useMemo(
+    () => tree.filter((g) => !g.terminal_view || g.terminal_view === 'global'),
+    [tree],
+  );
+
+  const brazilTaxonomy = useMemo(
+    () => tree.filter((g) => g.terminal_view === 'brazil'),
+    [tree],
+  );
+
   const value = {
-    taxonomy:  tree,
+    taxonomy:       tree,
+    globalTaxonomy,
+    brazilTaxonomy,
     groups,
     subgroups,
     assets,
     loading,
     error,
-    refresh:   load,
+    refresh:        load,
   };
 
   return (

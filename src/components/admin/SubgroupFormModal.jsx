@@ -86,6 +86,20 @@ function toSlug(str) {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
+const Row2 = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+`;
+
+const DATA_SOURCES = ['yahoo', 'brapi', 'bcb', 'bcb_and_yahoo', 'coingecko', 'awesomeapi', 'static'];
+
+const SECTION_IDS = [
+  'acoes-b3', 'fiis', 'etfs', 'indices-benchmarks',
+  'juros', 'credito', 'titulos-publicos',
+  'macro-brasil', 'cambio-liquidez',
+];
+
 export default function SubgroupFormModal({ subgroup, defaultGroupId, groups = [], onClose, onSaved, existingSlugs = [] }) {
   const isEdit    = !!subgroup;
 
@@ -94,6 +108,9 @@ export default function SubgroupFormModal({ subgroup, defaultGroupId, groups = [
   const [groupId,     setGroupId]     = useState(subgroup?.group_id || defaultGroupId || groups[0]?.id || '');
   const [slug,        setSlug]        = useState(subgroup?.slug     || '');
   const [slugManual,  setSlugManual]  = useState(isEdit);
+  const [sectionId,   setSectionId]   = useState(subgroup?.section_id  || '');
+  const [dataSource,  setDataSource]  = useState(subgroup?.data_source || '');
+  const [sortOrder,   setSortOrder]   = useState(subgroup?.sort_order  ?? 0);
   const [error,       setError]       = useState('');
   const [loading,     setLoading]     = useState(false);
 
@@ -114,7 +131,10 @@ export default function SubgroupFormModal({ subgroup, defaultGroupId, groups = [
         display_name: displayName.trim(),
         description:  description.trim() || null,
         slug,
-        group_id: groupId,
+        group_id:    groupId,
+        section_id:  sectionId  || null,
+        data_source: dataSource || null,
+        sort_order:  Number(sortOrder) || 0,
       };
       if (isEdit) {
         await updateSubgroup(subgroup.id, payload);
@@ -176,6 +196,37 @@ export default function SubgroupFormModal({ subgroup, defaultGroupId, groups = [
           <SlugPreview>Preview: <span>/api/v1/subgroups/{slug || '...'}</span></SlugPreview>
           {slugConflict && <FieldError>This slug is already in use</FieldError>}
           {slugInvalid  && <FieldError>Slug must be lowercase letters, numbers, and hyphens only</FieldError>}
+        </Field>
+
+        <Row2>
+          <Field>
+            <Label>Section ID (Brazil)</Label>
+            <Select value={sectionId} onChange={(e) => setSectionId(e.target.value)}>
+              <option value="">— None —</option>
+              {SECTION_IDS.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field>
+            <Label>Data Source</Label>
+            <Select value={dataSource} onChange={(e) => setDataSource(e.target.value)}>
+              <option value="">— None —</option>
+              {DATA_SOURCES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </Select>
+          </Field>
+        </Row2>
+
+        <Field>
+          <Label>Sort Order</Label>
+          <Input
+            type="number"
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            placeholder="0"
+          />
         </Field>
 
         <Actions>

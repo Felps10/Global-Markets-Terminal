@@ -132,15 +132,42 @@ function toSlug(str) {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
+const RadioGroup = styled.div`
+  display: flex;
+  gap: 16px;
+  margin-top: 2px;
+`;
+
+const RadioLabel = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #8892A4;
+  cursor: pointer;
+  input { cursor: pointer; accent-color: #00BCD4; }
+`;
+
+const Row2 = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+`;
+
 export default function GroupFormModal({ group, onClose, onSaved, existingSlugs = [] }) {
   const isEdit    = !!group;
 
-  const [displayName,  setDisplayName]  = useState(group?.display_name || '');
-  const [description,  setDescription]  = useState(group?.description  || '');
-  const [slug,         setSlug]         = useState(group?.slug          || '');
-  const [slugManual,   setSlugManual]   = useState(isEdit);
-  const [error,        setError]        = useState('');
-  const [loading,      setLoading]      = useState(false);
+  const [displayName,   setDisplayName]   = useState(group?.display_name   || '');
+  const [description,   setDescription]   = useState(group?.description    || '');
+  const [slug,          setSlug]          = useState(group?.slug            || '');
+  const [slugManual,    setSlugManual]    = useState(isEdit);
+  const [terminalView,  setTerminalView]  = useState(group?.terminal_view  || 'global');
+  const [blockId,       setBlockId]       = useState(group?.block_id       || '');
+  const [sortOrder,     setSortOrder]     = useState(group?.sort_order     ?? 0);
+  const [icon,          setIcon]          = useState(group?.icon           || '');
+  const [color,         setColor]         = useState(group?.color          || '');
+  const [error,         setError]         = useState('');
+  const [loading,       setLoading]       = useState(false);
 
   useEffect(() => {
     if (!slugManual) setSlug(toSlug(displayName));
@@ -155,7 +182,16 @@ export default function GroupFormModal({ group, onClose, onSaved, existingSlugs 
     setError('');
     setLoading(true);
     try {
-      const payload = { display_name: displayName.trim(), description: description.trim() || null, slug };
+      const payload = {
+        display_name:  displayName.trim(),
+        description:   description.trim() || null,
+        slug,
+        terminal_view: terminalView,
+        block_id:      terminalView === 'brazil' ? (blockId.trim() || null) : null,
+        sort_order:    Number(sortOrder) || 0,
+        icon:          icon.trim()  || null,
+        color:         color.trim() || null,
+      };
       if (isEdit) {
         await updateGroup(group.id, payload);
       } else {
@@ -206,6 +242,64 @@ export default function GroupFormModal({ group, onClose, onSaved, existingSlugs 
           <SlugPreview>Preview: <span>/api/v1/groups/{slug || '...'}</span></SlugPreview>
           {slugConflict && <FieldError>This slug is already in use</FieldError>}
           {slugInvalid  && <FieldError>Slug must be lowercase letters, numbers, and hyphens only</FieldError>}
+        </Field>
+
+        <Field>
+          <Label>Terminal View *</Label>
+          <RadioGroup>
+            <RadioLabel>
+              <input type="radio" value="global" checked={terminalView === 'global'} onChange={() => setTerminalView('global')} />
+              Global
+            </RadioLabel>
+            <RadioLabel>
+              <input type="radio" value="brazil" checked={terminalView === 'brazil'} onChange={() => setTerminalView('brazil')} />
+              Brazil
+            </RadioLabel>
+          </RadioGroup>
+        </Field>
+
+        {terminalView === 'brazil' && (
+          <Field>
+            <Label>Block ID</Label>
+            <Input
+              value={blockId}
+              onChange={(e) => setBlockId(e.target.value)}
+              placeholder="e.g. mercado"
+            />
+          </Field>
+        )}
+
+        <Row2>
+          <Field>
+            <Label>Sort Order</Label>
+            <Input
+              type="number"
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+              placeholder="0"
+            />
+          </Field>
+          <Field>
+            <Label>Icon (emoji)</Label>
+            <Input
+              value={icon}
+              onChange={(e) => setIcon(e.target.value)}
+              placeholder="e.g. 🟢"
+            />
+          </Field>
+        </Row2>
+
+        <Field>
+          <Label>Accent Color</Label>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Input
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              placeholder="e.g. #00E676"
+              style={{ flex: 1 }}
+            />
+            {color && <div style={{ width: 28, height: 28, borderRadius: 4, background: color, border: '1px solid #1E2740', flexShrink: 0 }} />}
+          </div>
         </Field>
 
         <Actions>
