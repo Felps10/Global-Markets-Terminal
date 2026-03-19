@@ -20,31 +20,48 @@ const B3_VOLATILITY = {
 
 // Metadata for the 8 equity subgroups — display order + labels
 const EQUITY_SUBGROUP_ORDER = [
-  "br-bancos", "br-utilities", "br-commodities", "br-consumo",
-  "br-construcao", "br-infra", "br-industrial", "br-saude",
+  "br-bancos",
+  "br-petroleo",
+  "br-mineracao",
+  "br-agronegocio",
+  "br-varejo",
+  "br-utilities",
+  "br-transporte",
+  "br-industria",
+  "br-construcao",
+  "br-saude",
+  "br-telecom",
+  "br-outros",
 ];
 const EQUITY_SUBGROUP_META = {
-  "br-bancos":      { label: "Bancos & Financeiro",      icon: "🏦" },
-  "br-utilities":   { label: "Utilities & Energia",      icon: "⚡" },
-  "br-commodities": { label: "Commodities & Export.",    icon: "🛢"  },
-  "br-consumo":     { label: "Consumo & Varejo",         icon: "🛍"  },
-  "br-construcao":  { label: "Construção & Imobiliário", icon: "🏗"  },
-  "br-infra":       { label: "Infraestrutura & Log.",    icon: "🚚"  },
-  "br-industrial":  { label: "Industrial & Cap. Goods",  icon: "⚙️" },
-  "br-saude":       { label: "Saúde",                    icon: "🧬"  },
+  "br-bancos":      { label: "Bancos & Financeiro",    icon: "🏦" },
+  "br-petroleo":    { label: "Petróleo & Gás",         icon: "🛢"  },
+  "br-mineracao":   { label: "Mineração",              icon: "⛏"  },
+  "br-agronegocio": { label: "Agronegócio",            icon: "🌾"  },
+  "br-varejo":      { label: "Varejo & Consumo",       icon: "🛍"  },
+  "br-utilities":   { label: "Utilities & Energia",    icon: "⚡" },
+  "br-transporte":  { label: "Logística & Transporte", icon: "🚚"  },
+  "br-industria":   { label: "Indústria",              icon: "⚙️" },
+  "br-construcao":  { label: "Construção Civil",       icon: "🏗️" },
+  "br-saude":       { label: "Saúde",                  icon: "🏥"  },
+  "br-telecom":     { label: "Telecom & Tech",         icon: "📡"  },
+  "br-outros":      { label: "Outros Setores",         icon: "📎"  },
 };
 
 // Setor filter label → subgroup ID (for wiring filter pills to activeSubgroup)
 const SETOR_LABEL_TO_ID = {
-  "Todos":                    "all",
-  "Bancos & Financeiro":      "br-bancos",
-  "Utilities & Energia":      "br-utilities",
-  "Commodities & Export.":    "br-commodities",
-  "Consumo & Varejo":         "br-consumo",
-  "Construção & Imobiliário": "br-construcao",
-  "Infraestrutura & Log.":    "br-infra",
-  "Industrial & Cap. Goods":  "br-industrial",
-  "Saúde":                    "br-saude",
+  "Bancos":      "br-bancos",
+  "Petróleo":    "br-petroleo",
+  "Mineração":   "br-mineracao",
+  "Agronegócio": "br-agronegocio",
+  "Varejo":      "br-varejo",
+  "Utilities":   "br-utilities",
+  "Transporte":  "br-transporte",
+  "Indústria":   "br-industria",
+  "Construção":  "br-construcao",
+  "Saúde":       "br-saude",
+  "Telecom":     "br-telecom",
+  "Outros":      "br-outros",
 };
 
 // B3_ASSET_ENTRIES is computed lazily at call time to avoid circular-module init
@@ -564,8 +581,12 @@ export default function BrazilTerminal() {
   // ─────────────────────────────────────────────────────────────────────────────
   // EMPTY STATE
   // ─────────────────────────────────────────────────────────────────────────────
-  const hasData = b3Data && Object.keys(b3Data).length > 0;
-  if (!hasData) {
+  const hasB3Data    = b3Data && Object.keys(b3Data).length > 0;
+  const hasMacroData = macroData != null && (
+    macroData.selic != null || macroData.ipca != null ||
+    macroData.cdi   != null || macroData.usdBrl != null
+  );
+  if (!hasB3Data && !hasMacroData) {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "100px 0", gap: 20, textAlign: "center" }}>
         <div style={{ fontSize: 48, opacity: 0.3 }}>📡</div>

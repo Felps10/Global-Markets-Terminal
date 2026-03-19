@@ -26,7 +26,7 @@ export const BRAZIL_BLOCKS = [
         dataSource: "brapi",
         assetType:  "equity-br",
         filters: [
-          { id: "setor",     label: "Setor",      type: "pill",  options: ["Todos","Bancos & Financeiro","Utilities & Energia","Commodities & Export.","Consumo & Varejo","Construção & Imobiliário","Infraestrutura & Log.","Industrial & Cap. Goods","Saúde"] },
+          { id: "setor",     label: "Setor",      type: "pill",  options: ["Todos","Bancos","Petróleo","Mineração","Agronegócio","Varejo","Utilities","Transporte","Indústria","Construção","Saúde","Telecom","Outros"] },
           { id: "marketcap", label: "Market Cap", type: "range", unit: "BRL" },
           { id: "liquidez",  label: "Liquidez",   type: "range", unit: "vol" },
           { id: "pl",        label: "P/L",        type: "range", unit: "x"   },
