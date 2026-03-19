@@ -740,7 +740,42 @@ export default function BrazilTerminal() {
       {activeSection !== "acoes-b3" ? (
         <PlaceholderSection section={currentSection} accentColor={accentColor} />
 
-      ) : allCollapsed && viewMode === "list" ? (
+      ) : (
+        <>
+          {!hasB3Data && (
+            <div style={{
+              margin: "0 0 16px 0",
+              padding: "14px 18px",
+              background: "rgba(249,195,0,0.06)",
+              border: "1px solid rgba(249,195,0,0.25)",
+              borderRadius: 6,
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+            }}>
+              <div style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: 11,
+                fontWeight: 700,
+                color: "#F9C300",
+                letterSpacing: "0.5px",
+              }}>
+                ⚠ BRAPI QUOTA ESGOTADA
+              </div>
+              <div style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: 10,
+                color: "rgba(249,195,0,0.65)",
+                lineHeight: 1.6,
+              }}>
+                Dados do mercado B3 indisponíveis.<br />
+                Limite diário atingido — reset à meia-noite UTC.<br />
+                SELIC · IPCA · CDI · USD/BRL continuam disponíveis abaixo.
+              </div>
+            </div>
+          )}
+
+          {allCollapsed && viewMode === "list" ? (
         /* ── MODE B: COLLAPSED LIST MODE ── */
         <div style={{ marginTop: 8, border: "1px solid var(--c-border)", borderRadius: 8, overflow: "hidden" }}>
           {visibleSubgroups.map(sg => {
@@ -982,6 +1017,8 @@ export default function BrazilTerminal() {
             );
           })}
         </div>
+        )}
+        </>
       )}
 
       {/* ── FOOTER ── */}
