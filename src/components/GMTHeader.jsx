@@ -14,8 +14,8 @@
  *   named    GMTPublicHeader  — unauthenticated landing-page header (top bar only)
  */
 
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import LiveClock from './LiveClock.jsx';
 import MarketStatusPill, { MARKETS } from './MarketStatusPill.jsx';
 import TickerStrip from './TickerStrip.jsx';
@@ -194,9 +194,8 @@ function UserDropdown({ user, onNav, onLogout, onClose }) {
       <button className="gmt-dropdown-item" onClick={() => { onNav?.('/clube'); onClose(); }}>
         <span>📊</span> Clube
       </button>
-      <button className="gmt-dropdown-item" onClick={onClose}>
-        <span>⚙</span> Preferences
-        <span style={{ marginLeft: 'auto', fontSize: 10, color: '#1e293b' }}>soon</span>
+      <button className="gmt-dropdown-item" onClick={() => { onNav?.('/app/settings'); onClose(); }}>
+        <span>⚙</span> Settings
       </button>
       <div className="gmt-dropdown-divider" />
       <button className="gmt-dropdown-item danger" onClick={() => { onLogout?.(); onClose(); }}>
@@ -206,45 +205,31 @@ function UserDropdown({ user, onNav, onLogout, onClose }) {
   );
 }
 
-// ─── MODE TOGGLE ──────────────────────────────────────────────────────────────
-function ModeToggle({ marketMode, onModeChange }) {
-  const segments = [
-    { key: "global", label: "🌐 GLOBAL",  activeColor: "#00E676" },
-    { key: "brazil", label: "🇧🇷 BRAZIL", activeColor: "#F9C300" },
-  ];
+// ─── Mode indicator badge (read-only — switching is in the hamburger menu) ───
+function ModeBadge() {
+  const location  = useLocation();
+  const isBrasil  = location.pathname.startsWith('/app/brasil');
+  const accent    = isBrasil ? '#F9C300' : '#00E676';
   return (
     <div style={{
-      display: "inline-flex", borderRadius: 20,
-      border: "1px solid rgba(51,65,85,0.6)",
-      overflow: "hidden", height: 34, width: 220,
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      padding: '4px 14px', borderRadius: 20,
+      background: isBrasil ? 'rgba(249,195,0,0.12)' : 'rgba(0,230,118,0.12)',
+      border: `1px solid ${isBrasil ? 'rgba(249,195,0,0.3)' : 'rgba(0,230,118,0.3)'}`,
     }}>
-      {segments.map((seg, i) => {
-        const active = marketMode === seg.key;
-        return (
-          <button
-            key={seg.key}
-            onClick={() => onModeChange(seg.key)}
-            style={{
-              flex: 1, border: "none",
-              borderRight: i === 0 ? "1px solid rgba(51,65,85,0.6)" : "none",
-              background: active ? seg.activeColor : "transparent",
-              color: active ? "#080f1a" : "var(--c-text-2, rgba(255,255,255,0.35))",
-              fontFamily: "'JetBrains Mono', monospace",
-              fontSize: 11, fontWeight: 700, letterSpacing: "1.5px",
-              cursor: "pointer", transition: "background 0.2s ease, color 0.2s ease",
-              padding: 0, whiteSpace: "nowrap",
-            }}
-          >
-            {seg.label}
-          </button>
-        );
-      })}
+      <span style={{ fontSize: 12 }}>{isBrasil ? '🇧🇷' : '🌐'}</span>
+      <span style={{
+        fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700,
+        letterSpacing: '1.5px', color: accent,
+      }}>
+        {isBrasil ? 'BRASIL' : 'GLOBAL'}
+      </span>
     </div>
   );
 }
 
 // ─── Shared top bar (Layer 1) ─────────────────────────────────────────────────
-function TopBar({ user, onMenuOpen, onNav, onLogout, selectedMarketId, setSelectedMarketId, showModeToggle, marketMode, onModeChange }) {
+function TopBar({ user, onMenuOpen, onNav, onLogout, selectedMarketId, setSelectedMarketId }) {
   const [dropOpen, setDropOpen] = useState(false);
   const selectedMarket = MARKETS.find(m => m.id === selectedMarketId) || MARKETS[0];
 
@@ -294,9 +279,9 @@ function TopBar({ user, onMenuOpen, onNav, onLogout, selectedMarketId, setSelect
         <MarketStatusPill selected={selectedMarketId} setSelected={setSelectedMarketId} />
       </div>
 
-      {/* CENTER */}
+      {/* CENTER — mode indicator */}
       <div style={{ display: "flex", justifyContent: "center" }}>
-        {showModeToggle && <ModeToggle marketMode={marketMode} onModeChange={onModeChange} />}
+        <ModeBadge />
       </div>
 
       {/* RIGHT */}
@@ -363,12 +348,46 @@ export default function GMTHeader({
   tickerItems       = [],
   adminNav,                   // { activeTab, onTabChange } — admin mode
   watchlistEnabled  = false,  // show Watchlist tab when user is authenticated
-  marketMode        = 'global',
-  onModeChange,
 }) {
   const [selectedMarketId, setSelectedMarketId] = useState('nyse');
-  const { assets, groups, subgroups } = useTaxonomy();
+  const { globalTaxonomy, brazilTaxonomy } = useTaxonomy();
   const navigate = useNavigate();
+  const location = useLocation();
+  const pathname = location.pathname;
+
+  const isBrasilMode = pathname.startsWith('/app/brasil');
+  const isTerminalPage = pathname.startsWith('/app/global') || pathname.startsWith('/app/brasil');
+
+  // Derive active page from pathname for nav bar highlighting
+  const derivedActivePage = useMemo(() => {
+    if (pathname.startsWith('/app/global') || pathname.startsWith('/app/brasil')) return 'terminal';
+    if (pathname.startsWith('/app/heatmap')) return 'heatmap';
+    if (pathname.startsWith('/app/catalog')) return 'catalog';
+    if (pathname.startsWith('/app/news')) return 'news';
+    if (pathname.startsWith('/app/watchlist')) return 'watchlist';
+    if (pathname.startsWith('/clube')) return 'clube';
+    return activePage;
+  }, [pathname, activePage]);
+
+  // Scoped counts based on terminal mode
+  const scopedStats = useMemo(() => {
+    if (isBrasilMode) {
+      const brGroups = brazilTaxonomy || [];
+      const brSubgroups = brGroups.flatMap(g => g.subgroups || []);
+      const brAssets = brSubgroups.flatMap(s => s.assets || []);
+      return {
+        assets: brAssets.length, groups: brGroups.length, subgroups: brSubgroups.length,
+        label: 'ATIVOS', groupLabel: 'GRUPOS', subgroupLabel: 'SUBGRUPOS',
+      };
+    }
+    const glGroups = globalTaxonomy || [];
+    const glSubgroups = glGroups.flatMap(g => g.subgroups || []);
+    const glAssets = glSubgroups.flatMap(s => s.assets || []);
+    return {
+      assets: glAssets.length, groups: glGroups.length, subgroups: glSubgroups.length,
+      label: 'ASSETS', groupLabel: 'GROUPS', subgroupLabel: 'SUBGROUPS',
+    };
+  }, [globalTaxonomy, brazilTaxonomy, isBrasilMode]);
 
   useEffect(() => { injectStyles(); }, []);
 
@@ -404,7 +423,7 @@ export default function GMTHeader({
     }}>
       {/* Terminal */}
       <button
-        className={`gmt-nav-item${activePage === 'dashboard' ? ' active' : ''}`}
+        className={`gmt-nav-item${derivedActivePage === 'terminal' ? ' active' : ''}`}
         onClick={() => onNav && onNav('dashboard')}
       >
         Terminal
@@ -422,28 +441,32 @@ export default function GMTHeader({
       ].map(item => (
         <button
           key={item.id}
-          className={`gmt-nav-item${activePage === item.id ? ' active' : ''}`}
+          className={`gmt-nav-item${derivedActivePage === item.id ? ' active' : ''}`}
           onClick={() => onNav && onNav(item.id)}
         >
           {item.label}
         </button>
       ))}
       <button
-        className={`gmt-nav-item${activePage === 'clube' ? ' active' : ''}`}
+        className={`gmt-nav-item${derivedActivePage === 'clube' ? ' active' : ''}`}
         onClick={() => navigate('/clube')}
       >
         Clube
       </button>
       <div style={{ flex: 1 }} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-        <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 5px #22c55e' }} />
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: '#334155', letterSpacing: '0.08em' }}>
-          LIVE · 30s REFRESH
-        </span>
-      </div>
-      <div style={{ width: 1, height: 14, background: 'rgba(51,65,85,0.5)', margin: '0 12px' }} />
+      {isTerminalPage && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 5px #22c55e' }} />
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: '#334155', letterSpacing: '0.08em' }}>
+              LIVE · 30s REFRESH
+            </span>
+          </div>
+          <div style={{ width: 1, height: 14, background: 'rgba(51,65,85,0.5)', margin: '0 12px' }} />
+        </>
+      )}
       <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: '#334155', letterSpacing: '0.06em' }}>
-        {assets.length} ASSETS · {groups.length} GROUPS · {subgroups.length} SUBGROUPS
+        {scopedStats.assets} {scopedStats.label} · {scopedStats.groups} {scopedStats.groupLabel} · {scopedStats.subgroups} {scopedStats.subgroupLabel}
       </span>
     </div>
   );
@@ -461,9 +484,6 @@ export default function GMTHeader({
         onLogout={onLogout}
         selectedMarketId={selectedMarketId}
         setSelectedMarketId={setSelectedMarketId}
-        showModeToggle={activePage === 'terminal' && !adminNav}
-        marketMode={marketMode}
-        onModeChange={onModeChange}
       />
       {navBar2}
       {!adminNav && showTicker && tickerItems.length > 0 && (

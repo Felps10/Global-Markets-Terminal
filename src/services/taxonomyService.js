@@ -164,9 +164,25 @@ export async function bulkRelocateAssets(assetIds, targetSubgroupId) {
   return handleResponse(res);
 }
 
+// ── L1 Nodes ──────────────────────────────────────────────────────────────────
+export async function fetchL1() {
+  const res = await fetch(`${BASE}/l1`, { headers: await authHeaders() });
+  return handleResponse(res);
+}
+
 // ── Taxonomy ──────────────────────────────────────────────────────────────────
 export async function fetchTaxonomy({ view } = {}) {
   const url = view ? `${BASE}/taxonomy?view=${view}` : `${BASE}/taxonomy`;
   const res = await fetch(url);
   return handleResponse(res);
+}
+
+export async function fetchTaxonomyTree() {
+  const headers = await authHeaders();
+  const res = await fetch(
+    `${BASE}/taxonomy/tree`,
+    { headers }
+  );
+  if (!res.ok) throw new Error(`taxonomy/tree failed: ${res.status}`);
+  return res.json();
 }

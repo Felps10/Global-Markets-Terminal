@@ -59,21 +59,11 @@ router.post('/register', registerLimiter, async (req, res) => {
     });
   }
 
-  const { data: sessionData, error: signInError } =
-    await supabase.auth.signInWithPassword({
-      email: email.toLowerCase(),
-      password,
-    });
-
-  if (signInError) {
-    return res.status(500).json({
-      error:   'SERVER_ERROR',
-      message: 'Account created but sign-in failed. Please log in manually.',
-    });
-  }
-
+  // Return the created user — the client handles sign-in via
+  // supabase.auth.signInWithPassword() in AuthContext.register().
+  // Do NOT call signInWithPassword here: the server uses a service-role
+  // client, which would create an unused server-side session.
   return res.status(201).json({
-    token: sessionData.session.access_token,
     user: {
       id:    data.user.id,
       email: data.user.email,
@@ -84,6 +74,9 @@ router.post('/register', registerLimiter, async (req, res) => {
 });
 
 // POST /api/v1/auth/login
+// NOTE: The current frontend (AuthContext.login) calls supabase.auth.signInWithPassword()
+// directly on the browser client — it does NOT hit this endpoint. This route is retained
+// for backward compatibility and potential API-client usage.
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password)

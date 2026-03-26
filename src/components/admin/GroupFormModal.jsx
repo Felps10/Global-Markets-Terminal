@@ -132,6 +132,11 @@ function toSlug(str) {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
+const L1_OPTIONS = [
+  { id: 'global',  display_name: 'Global' },
+  { id: 'brasil',  display_name: 'Brasil' },
+];
+
 const RadioGroup = styled.div`
   display: flex;
   gap: 16px;
@@ -161,13 +166,15 @@ export default function GroupFormModal({ group, onClose, onSaved, existingSlugs 
   const [description,   setDescription]   = useState(group?.description    || '');
   const [slug,          setSlug]          = useState(group?.slug            || '');
   const [slugManual,    setSlugManual]    = useState(isEdit);
-  const [terminalView,  setTerminalView]  = useState(group?.terminal_view  || 'global');
+  const [l1Id,          setL1Id]          = useState(group?.l1_id          || L1_OPTIONS[0].id);
   const [blockId,       setBlockId]       = useState(group?.block_id       || '');
   const [sortOrder,     setSortOrder]     = useState(group?.sort_order     ?? 0);
   const [icon,          setIcon]          = useState(group?.icon           || '');
   const [color,         setColor]         = useState(group?.color          || '');
   const [error,         setError]         = useState('');
   const [loading,       setLoading]       = useState(false);
+
+  const selectedL1Slug = l1Id;
 
   useEffect(() => {
     if (!slugManual) setSlug(toSlug(displayName));
@@ -182,12 +189,14 @@ export default function GroupFormModal({ group, onClose, onSaved, existingSlugs 
     setError('');
     setLoading(true);
     try {
+      const terminalView = selectedL1Slug === 'brasil' ? 'brazil' : 'global';
       const payload = {
         display_name:  displayName.trim(),
         description:   description.trim() || null,
         slug,
+        l1_id:         l1Id || null,
         terminal_view: terminalView,
-        block_id:      terminalView === 'brazil' ? (blockId.trim() || null) : null,
+        block_id:      selectedL1Slug === 'brasil' ? (blockId.trim() || null) : null,
         sort_order:    Number(sortOrder) || 0,
         icon:          icon.trim()  || null,
         color:         color.trim() || null,
@@ -245,20 +254,18 @@ export default function GroupFormModal({ group, onClose, onSaved, existingSlugs 
         </Field>
 
         <Field>
-          <Label>Terminal View *</Label>
+          <Label>Region *</Label>
           <RadioGroup>
-            <RadioLabel>
-              <input type="radio" value="global" checked={terminalView === 'global'} onChange={() => setTerminalView('global')} />
-              Global
-            </RadioLabel>
-            <RadioLabel>
-              <input type="radio" value="brazil" checked={terminalView === 'brazil'} onChange={() => setTerminalView('brazil')} />
-              Brazil
-            </RadioLabel>
+            {L1_OPTIONS.map((n) => (
+              <RadioLabel key={n.id}>
+                <input type="radio" value={n.id} checked={l1Id === n.id} onChange={() => setL1Id(n.id)} />
+                {n.display_name}
+              </RadioLabel>
+            ))}
           </RadioGroup>
         </Field>
 
-        {terminalView === 'brazil' && (
+        {selectedL1Slug === 'brasil' && (
           <Field>
             <Label>Block ID</Label>
             <Input

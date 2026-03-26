@@ -1,4 +1,6 @@
+import { useNavigate } from 'react-router-dom';
 import { useWatchlist } from './context/WatchlistContext.jsx';
+import { STATIC_CATEGORIES, STATIC_ASSETS_MAP } from './GlobalMarketsTerminal.jsx';
 
 // Simple price formatter — avoids importing the private formatPrice from GMT
 function fmt(symbol, price, assets) {
@@ -73,8 +75,14 @@ function AssetWatchRow({ symbol, marketData, assets, onUnpin }) {
 }
 
 // ─── WatchlistPage ─────────────────────────────────────────────────────────────
-export default function WatchlistPage({ watchlistItems, marketData, assets, categories, onNavigate }) {
-  const { unpin } = useWatchlist();
+// TODO: WatchlistPage needs marketData from a shared context (currently no live prices when rendered standalone)
+export default function WatchlistPage({ watchlistItems: propItems, marketData, assets: propAssets, categories: propCategories, onNavigate: propOnNavigate } = {}) {
+  const navigate = useNavigate();
+  const { items: ctxItems, unpin } = useWatchlist();
+  const watchlistItems = propItems || ctxItems || [];
+  const assets = propAssets || STATIC_ASSETS_MAP;
+  const categories = propCategories || STATIC_CATEGORIES;
+  const onNavigate = propOnNavigate || ((key) => navigate(key === 'dashboard' ? '/app/global' : '/app/global'));
 
   const pinnedAssets    = (watchlistItems || []).filter(i => i.type === 'asset');
   const pinnedSubgroups = (watchlistItems || []).filter(i => i.type === 'subgroup');

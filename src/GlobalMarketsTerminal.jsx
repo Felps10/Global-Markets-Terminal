@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./hooks/useAuth.js";
-import GMTHeader from "./components/GMTHeader.jsx";
 import CommandBar from "./components/CommandBar.jsx";
 import AssetListView from "./components/AssetListView.jsx";
 import {
@@ -10,23 +9,20 @@ import {
   hasFredKey, fredSeries, fredAllMacro, getFredSeriesConfig,
   hasAlphaVantageKey, alphaVantageRSI, alphaVantageMACD,
   coingeckoPrices,
-  bcbMacro, awesomeFx,
   getSourceStatus,
   fetchYahooMarketData,
-  fetchB3MarketData,
   fetchYahooChartData,
 } from "./dataServices.js";
 import { SUBGROUPS as STATIC_SUBGROUPS_ARRAY } from './data/subgroups.js';
 import { ASSETS    as STATIC_ASSETS_ARRAY    } from './data/assets.js';
 import { useTaxonomy } from './context/TaxonomyContext.jsx';
+import { useTicker } from './context/TickerContext.jsx';
+import { useSelectedAsset } from './context/SelectedAssetContext.jsx';
 import { usePreferences } from './context/PreferencesContext.jsx';
 import { useWatchlist }   from './context/WatchlistContext.jsx';
-import WatchlistPage     from './WatchlistPage.jsx';
-import BrazilTerminal    from './BrazilTerminal.jsx';
 import { isExhausted } from './services/quotaTracker.js';
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const REFRESH_INTERVAL = 30000;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MARKET GROUP CONFIGURATION
@@ -109,13 +105,14 @@ export const STATIC_ASSETS_MAP = Object.fromEntries(
   STATIC_ASSETS_ARRAY.map(a => [a.symbol, {
     name:     a.name,
     cat:      a.subgroup_id,
+    sector:   a.sector || null,
     exchange: a.exchange || 'NASDAQ',
     type:     a.type,
     ...(a.meta || {}),
   }])
 );
 
-const EXCHANGE_COLORS = {
+export const EXCHANGE_COLORS = {
   NASDAQ: "#00BCD4",
   NYSE:   "#7C4DFF",
   LSE:    "#FF9100",
@@ -147,8 +144,6 @@ const GROUP_MACRO = {
   consumer:    { fredKey: "consumerSentiment", label: "Consumer Sentiment" },
   cleanenergy: { fredKey: "treasury10y",       label: "10Y Treasury Yield" },
   reits:       { fredKey: "mortgage30y",       label: "30-Year Mortgage Rate" },
-  // Brazil uses brasilMacro (BCB/AwesomeAPI), not FRED — null prevents accidental FRED lookup
-  brazil:      { fredKey: null,                label: null },
 };
 
 // Cross-listing: find all assets that belong to a given category (primary or alsoIn)
@@ -161,17 +156,16 @@ function assetsInCategory(catKey) {
 }
 
 // All equity symbols (for FMP batch, Finnhub fallback, etc.)
-const EQUITY_CATS = new Set(["technology", "oil-gas", "financials", "healthcare", "semiconductors", "consumer", "aerospace", "cleanenergy", "reits", "emerging"]);
+const EQUITY_CATS = new Set(["technology", "oil-gas", "financials", "healthcare", "semiconductors", "consumer", "aerospace", "cleanenergy", "reits", "emerging", "automobile", "industrials", "biotech"]);
 function isEquityCat(cat) { return EQUITY_CATS.has(cat); }
 
 const VOLATILITY = {
   technology: 0.018, "oil-gas": 0.014, financials: 0.012, healthcare: 0.014,
   semiconductors: 0.020, consumer: 0.010, aerospace: 0.010, cleanenergy: 0.025,
   reits: 0.012, emerging: 0.016, crypto: 0.035, indices: 0.01, fx: 0.004,
-  "br-bancos": 0.016, "br-utilities": 0.014, "br-commodities": 0.020,
-  "br-consumo": 0.018, "br-construcao": 0.022, "br-infra": 0.015,
-  "br-industrial": 0.016, "br-saude": 0.018,
-  "br-fiis": 0.010, "br-etfs": 0.015, "br-indices": 0.012,
+  automobile: 0.022, credit: 0.008, industrials: 0.012, biotech: 0.022,
+  "dividend-income": 0.008, treasuries: 0.006, bonds: 0.006,
+  "precious-metals": 0.012, "energy-commodities": 0.018, agriculture: 0.014,
 };
 
 const TIMEFRAMES = [
@@ -232,15 +226,15 @@ function generateSparkline(basePrice, vol, points = 30) {
   return arr;
 }
 
-async function fetchMarketData(prevData) {
+async function fetchMarketData(prevData, assetsMap = STATIC_ASSETS_MAP) {
   // Exclude crypto (CoinGecko) and B3 (BRAPI) — they use dedicated sources
-  const yahooSymbols = Object.keys(STATIC_ASSETS_MAP).filter(s => !STATIC_ASSETS_MAP[s].isCrypto && !STATIC_ASSETS_MAP[s].isB3);
-  return fetchYahooMarketData(yahooSymbols, prevData, { assets: STATIC_ASSETS_MAP, volatility: VOLATILITY, isEquityCat });
+  const yahooSymbols = Object.keys(assetsMap).filter(s => !assetsMap[s].isCrypto && !assetsMap[s].isB3);
+  return fetchYahooMarketData(yahooSymbols, prevData, { assets: assetsMap, volatility: VOLATILITY, isEquityCat });
 }
 
 // Fetch crypto data from CoinGecko and merge into the same data shape
-async function fetchCryptoData() {
-  const cryptoAssets = Object.entries(STATIC_ASSETS_MAP).filter(([, a]) => a.isCrypto);
+async function fetchCryptoData(assetsMap = STATIC_ASSETS_MAP) {
+  const cryptoAssets = Object.entries(assetsMap).filter(([, a]) => a.isCrypto);
   if (cryptoAssets.length === 0) return {};
   const ids = cryptoAssets.map(([, a]) => a.cgId).join(",");
   const data = await coingeckoPrices(ids);
@@ -268,12 +262,6 @@ async function fetchCryptoData() {
     };
   }
   return result;
-}
-
-// Fetch B3 data from BRAPI, with Yahoo .SA suffix fallback
-async function fetchB3Data() {
-  const b3Assets = Object.entries(STATIC_ASSETS_MAP).filter(([, a]) => a.isB3);
-  return fetchB3MarketData(b3Assets, { assets: STATIC_ASSETS_MAP, volatility: VOLATILITY });
 }
 
 async function fetchChartData(symbol, range, interval) {
@@ -417,51 +405,6 @@ function MacroBanner({ macroData, catKey }) {
       <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "var(--c-text-3)" }}>
         ({latest.date})
       </span>
-    </div>
-  );
-}
-
-// ─── BRASIL MACRO BANNER ──────────────────────────────────────────────────────
-function BrasilMacroBanner({ brasilMacro }) {
-  if (!brasilMacro) {
-    return (
-      <div style={{
-        display: "flex", alignItems: "center", gap: 8,
-        background: "rgba(0,156,59,0.08)", border: "1px solid rgba(0,156,59,0.2)",
-        borderRadius: 6, padding: "8px 14px", marginBottom: 10,
-      }}>
-        <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#009C3B", animation: "pulse 1.2s ease-in-out infinite" }} />
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)" }}>Loading Brazilian macro data...</span>
-      </div>
-    );
-  }
-  const na = "N/A";
-  const items = [
-    { label: "SELIC",   value: brasilMacro.selic != null ? brasilMacro.selic + "%" : na, color: "#009C3B", src: "bcb" },
-    { label: "IPCA",    value: brasilMacro.ipca != null ? brasilMacro.ipca + "%" : na,   color: "#003087", src: "bcb" },
-    { label: "CDI",     value: brasilMacro.cdi != null ? brasilMacro.cdi + "%" : na,     color: "#7C4DFF", src: "bcb" },
-    { label: "USD/BRL", value: brasilMacro.usdBrl != null ? "R$ " + Number(brasilMacro.usdBrl).toFixed(2) : na, color: "#FF6B00", src: "awesomeapi",
-      pct: brasilMacro.usdBrlPct },
-  ];
-  return (
-    <div style={{
-      display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10,
-      background: "rgba(0,156,59,0.08)", border: "1px solid rgba(0,156,59,0.2)",
-      borderRadius: 6, padding: "8px 14px", marginBottom: 10,
-    }}>
-      <SourceBadge source="bcb" />
-      <SourceBadge source="awesomeapi" />
-      {items.map(it => (
-        <span key={it.label} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)" }}>{it.label}:</span>
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700, color: it.value === na ? "var(--c-text-3)" : it.color }}>{it.value}</span>
-          {it.pct != null && (
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: it.pct >= 0 ? "#00E676" : "#FF5252" }}>
-              {it.pct >= 0 ? "+" : ""}{it.pct.toFixed(2)}%
-            </span>
-          )}
-        </span>
-      ))}
     </div>
   );
 }
@@ -668,276 +611,6 @@ export function AssetRow({ symbol, data, rank, onClick }) {
         <Sparkline data={data.sparkline} positive={positive} width={50} height={22} />
       </div>
     </div>
-  );
-}
-
-// ─── HAMBURGER MENU ───────────────────────────────────────────────────────────
-function HamburgerMenu({ open, onClose, activeFilter, onFilterChange, activeExchanges, onExchangeToggle, onResetExchanges, theme, onThemeToggle, lastUpdate, allExchanges, currentView, onNavigate, watchlistItems, watchlistLoading, onUnpin, assets, categories, marketData }) {
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open, onClose]);
-
-  const navItems = [
-    { key: "all",           label: "All Markets",        icon: "🌍" },
-    { key: "aerospace",     label: "Aerospace & Defense", icon: "🛡" },
-    { key: "biotech",       label: "Biotech",            icon: "🧬" },
-    { key: "br-bancos",     label: "Bancos & Financeiro", icon: "🏦" },
-    { key: "br-commodities",label: "Commodities & Export.", icon: "🛢" },
-    { key: "br-construcao", label: "Construção & Imob.", icon: "🏗" },
-    { key: "br-consumo",    label: "Consumo & Varejo",   icon: "🛍" },
-    { key: "br-etfs",       label: "ETFs B3",            icon: "📦" },
-    { key: "br-fiis",       label: "FIIs",               icon: "🏢" },
-    { key: "br-indices",    label: "Índices B3",         icon: "📊" },
-    { key: "br-industrial", label: "Industrial & Cap. Goods", icon: "⚙️" },
-    { key: "br-infra",      label: "Infraestrutura & Log.", icon: "🚚" },
-    { key: "br-saude",      label: "Saúde",              icon: "🧬" },
-    { key: "br-utilities",  label: "Utilities & Energia", icon: "⚡" },
-    { key: "cleanenergy",   label: "Clean Energy",       icon: "🔋" },
-    { key: "consumer",      label: "Consumer",           icon: "🛒" },
-    { key: "crypto",        label: "Crypto",             icon: "🪙" },
-    { key: "dividends",     label: "Dividend Income",    icon: "💰" },
-    { key: "emerging",      label: "Emerging Markets",   icon: "🌍" },
-    { key: "oil-gas",       label: "Oil & Gas",          icon: "🛢" },
-    { key: "financials",    label: "Financials",         icon: "🏦" },
-    { key: "fx",            label: "Foreign Exchange",   icon: "💱" },
-    { key: "healthcare",    label: "Health Care",        icon: "💊" },
-    { key: "industrials",   label: "Industrials",        icon: "🏭" },
-    { key: "indices",       label: "Global Indices",     icon: "🌐" },
-    { key: "reits",         label: "Real Estate",        icon: "🏢" },
-    { key: "semiconductors",label: "Semiconductors",     icon: "🔬" },
-    { key: "technology",    label: "Technology",         icon: "⚡" },
-  ];
-
-  const SectionLabel = ({ children }) => (
-    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "var(--c-text-3)", letterSpacing: "1.5px", marginBottom: 10 }}>
-      {children}
-    </div>
-  );
-
-  const Divider = () => <div style={{ height: 1, background: "var(--c-border)", margin: "4px 18px" }} />;
-
-  return (
-    <>
-      {open && <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "var(--c-overlay)", zIndex: 200 }} />}
-
-      <div style={{
-        position: "fixed", top: 0, left: 0, bottom: 0, width: 288,
-        background: "var(--c-panel)", borderRight: "1px solid var(--c-border)",
-        zIndex: 201, overflowY: "auto", display: "flex", flexDirection: "column",
-        transform: open ? "translateX(0)" : "translateX(-100%)",
-        transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
-      }}>
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 18px 16px", borderBottom: "1px solid var(--c-border)", flexShrink: 0 }}>
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 700, color: "#00E676", letterSpacing: "1.5px" }}>MENU</span>
-          <button onClick={onClose} style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--c-text-2)", fontSize: 18, lineHeight: 1, padding: "2px 6px" }}>✕</button>
-        </div>
-
-        {/* Pages — first section */}
-        <div style={{ padding: "16px 18px" }}>
-          <SectionLabel>PAGES</SectionLabel>
-          {[
-            { key: "dashboard", label: "Dashboard",     icon: "📊" },
-            { key: "heatmap",   label: "Market Heatmap", icon: "🔥" },
-            { key: "news",      label: "Market News",   icon: "📰" },
-            { key: "catalog",   label: "Data Catalog",  icon: "📋" },
-          ].map(pg => {
-            const active = currentView === pg.key;
-            return (
-              <button key={pg.key} onClick={() => { onNavigate(pg.key); onClose(); }}
-                style={{
-                  display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
-                  fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: active ? 700 : 400,
-                  color: active ? "#00E676" : "var(--c-text-2)", background: active ? "rgba(0,230,118,0.06)" : "transparent",
-                  border: "none", borderLeft: `2px solid ${active ? "#00E676" : "transparent"}`,
-                  padding: "8px 12px", cursor: "pointer", transition: "all 0.15s ease",
-                  borderRadius: "0 6px 6px 0", marginBottom: 2,
-                }}>
-                <span style={{ fontSize: 14 }}>{pg.icon}</span>{pg.label}
-              </button>
-            );
-          })}
-        </div>
-
-        <Divider />
-
-        {/* Asset Groups */}
-        <div style={{ padding: "16px 18px" }}>
-          <SectionLabel>ASSET GROUPS</SectionLabel>
-          {navItems.map(btn => {
-            const active = activeFilter === btn.key;
-            return (
-              <button key={btn.key} onClick={() => { onFilterChange(btn.key); onNavigate("dashboard"); onClose(); }}
-                style={{
-                  display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
-                  fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: active ? 700 : 400,
-                  color: active ? "#00E676" : "var(--c-text-2)", background: active ? "rgba(0,230,118,0.06)" : "transparent",
-                  border: "none", borderLeft: `2px solid ${active ? "#00E676" : "transparent"}`,
-                  padding: "6px 12px", cursor: "pointer", transition: "all 0.15s ease",
-                  borderRadius: "0 6px 6px 0", marginBottom: 1,
-                }}>
-                <span style={{ fontSize: 13 }}>{btn.icon}</span>{btn.label}
-              </button>
-            );
-          })}
-        </div>
-
-        <Divider />
-
-        {/* Exchange filter */}
-        <div style={{ padding: "16px 18px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <SectionLabel>EXCHANGE FILTER</SectionLabel>
-            {activeExchanges.size > 0 && (
-              <button onClick={onResetExchanges} style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: "#FF5252", background: "transparent", border: "none", cursor: "pointer", letterSpacing: "0.5px", marginTop: -8 }}>
-                CLEAR ALL
-              </button>
-            )}
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {allExchanges.map(exch => {
-              const active = activeExchanges.has(exch);
-              const c = EXCHANGE_COLORS[exch] || "#9E9E9E";
-              return (
-                <button key={exch} onClick={() => onExchangeToggle(exch)}
-                  style={{
-                    fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700,
-                    color: active ? c : "var(--c-text-3)", background: active ? c + "18" : "transparent",
-                    border: `1px solid ${active ? c + "50" : "var(--c-border)"}`,
-                    borderRadius: 4, padding: "4px 10px", cursor: "pointer",
-                    letterSpacing: "0.5px", transition: "all 0.15s ease",
-                  }}>
-                  {exch}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <Divider />
-
-        {/* Watchlist */}
-        <div style={{ padding: "16px 18px" }}>
-          <SectionLabel>WATCHLIST</SectionLabel>
-
-          {watchlistLoading ? (
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", letterSpacing: "1px" }}>
-              LOADING...
-            </div>
-
-          ) : !watchlistItems || watchlistItems.length === 0 ? (
-            <div style={{ border: "1px dashed var(--c-border)", borderRadius: 6, padding: "16px 12px", textAlign: "center" }}>
-              <div style={{ fontSize: 22, marginBottom: 6, opacity: 0.25 }}>★</div>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", letterSpacing: "0.5px" }}>YOUR WATCHLIST IS EMPTY</div>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: "var(--c-text-3)", marginTop: 4 }}>Star any asset or group to pin it here</div>
-            </div>
-
-          ) : (
-            <>
-              {/* Pinned subgroups */}
-              {watchlistItems.filter(i => i.type === 'subgroup').length > 0 && (
-                <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: "var(--c-text-3)", letterSpacing: "1.5px", marginBottom: 6 }}>GROUPS</div>
-                  {watchlistItems.filter(i => i.type === 'subgroup').map(item => {
-                    const cat = categories?.[item.target_id];
-                    return (
-                      <div key={item.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--c-border-faint)" }}>
-                        <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "var(--c-text-2)" }}>
-                          {cat?.icon && <span style={{ marginRight: 6 }}>{cat.icon}</span>}
-                          {cat?.label || item.target_id}
-                        </span>
-                        <button
-                          onClick={() => onUnpin('subgroup', item.target_id)}
-                          style={{ background: "transparent", border: "none", cursor: "pointer", color: "#00E676", fontSize: 14, lineHeight: 1, padding: "2px 6px" }}
-                        >★</button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Pinned assets */}
-              {watchlistItems.filter(i => i.type === 'asset').length > 0 && (
-                <div>
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: "var(--c-text-3)", letterSpacing: "1.5px", marginBottom: 6 }}>ASSETS</div>
-                  {watchlistItems.filter(i => i.type === 'asset').map(item => {
-                    const live    = marketData?.[item.target_id];
-                    const pct     = live?.changePct;
-                    const pctColor = pct == null ? "var(--c-text-3)" : pct >= 0 ? "#00E676" : "#FF5252";
-                    return (
-                      <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 0", borderBottom: "1px solid var(--c-border-faint)" }}>
-                        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 600, color: "var(--c-text)", flex: "0 0 auto", minWidth: 48 }}>
-                          {item.target_id}
-                        </span>
-                        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-2)", flex: 1, textAlign: "right" }}>
-                          {live?.price != null ? formatPrice(item.target_id, live.price) : "—"}
-                        </span>
-                        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 600, color: pctColor, flex: "0 0 52px", textAlign: "right" }}>
-                          {pct != null ? (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%" : "—"}
-                        </span>
-                        <button
-                          onClick={() => onUnpin('asset', item.target_id)}
-                          style={{ background: "transparent", border: "none", cursor: "pointer", color: "#00E676", fontSize: 14, lineHeight: 1, padding: "2px 4px", flex: "0 0 auto" }}
-                        >★</button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        <Divider />
-
-        {/* Theme toggle */}
-        <div style={{ padding: "16px 18px" }}>
-          <SectionLabel>APPEARANCE</SectionLabel>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "var(--c-text-2)" }}>
-              {theme === "dark" ? "🌙 Dark mode" : "☀️ Light mode"}
-            </span>
-            <button onClick={onThemeToggle}
-              style={{
-                width: 44, height: 24, borderRadius: 12, position: "relative", padding: 0, cursor: "pointer",
-                background: theme === "dark" ? "rgba(0,230,118,0.2)" : "rgba(99,102,241,0.2)",
-                border: `1px solid ${theme === "dark" ? "#00E67640" : "rgba(99,102,241,0.4)"}`,
-                transition: "all 0.25s ease",
-              }}>
-              <div style={{
-                width: 16, height: 16, borderRadius: "50%", position: "absolute", top: 3,
-                left: theme === "dark" ? 23 : 3,
-                background: theme === "dark" ? "#00E676" : "#6366f1",
-                transition: "left 0.25s ease",
-              }} />
-            </button>
-          </div>
-        </div>
-
-        <Divider />
-
-        {/* About */}
-        <div style={{ padding: "16px 18px 24px", marginTop: "auto" }}>
-          <SectionLabel>ABOUT</SectionLabel>
-          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "var(--c-text-2)", lineHeight: 1.7 }}>
-            Global Markets Terminal
-            <br />
-            <span style={{ color: "var(--c-text-3)", fontSize: 11 }}>Multi-source financial data</span>
-          </div>
-          {lastUpdate && (
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", marginTop: 8, letterSpacing: "0.5px" }}>
-              Last update: {lastUpdate.toLocaleTimeString("en-US", { hour12: false })}
-            </div>
-          )}
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", marginTop: 4, letterSpacing: "0.5px" }}>
-            {Object.keys(STATIC_ASSETS_MAP).length} assets · {Object.keys(STATIC_CATEGORIES).length} groups · 9 sources
-          </div>
-        </div>
-      </div>
-    </>
   );
 }
 
@@ -1218,78 +891,79 @@ function DetailPanel({ symbol, data, onClose }) {
 }
 
 // ─── MAIN DASHBOARD ───────────────────────────────────────────────────────────
-export default function GlobalMarketsTerminal({ currentView = "dashboard", onNavigate, catalogPage, newsPage, heatmapPage }) {
+export default function GlobalMarketsTerminal() {
   const navigate                          = useNavigate();
   const { user, logout }                  = useAuth();
-  const { prefs, synced, updatePrefs }    = usePreferences();
+  const { prefs }                         = usePreferences();
   const { items: watchlistItems, loading: watchlistLoading, unpin, isPinned } = useWatchlist();
+  const { setTickerItems }                = useTicker();
+  const { selectedAsset, setSelectedAsset } = useSelectedAsset();
   const [marketData,      setMarketData]      = useState(null);
   const [loading,         setLoading]         = useState(true);
-  const [lastUpdate,      setLastUpdate]       = useState(null);
+  const [, setLastUpdate]                       = useState(null);
   const [activeFilter,    setActiveFilter]    = useState("all");
   const [sortMode,        setSortMode]        = useState("default");
   const [viewMode,        setViewMode]        = useState("cards");
   const [groupSort,       setGroupSort]       = useState("alpha");   // "alpha" | "return"
   const [groupDir,        setGroupDir]        = useState("asc");     // "asc" | "desc"
-  const [menuOpen,        setMenuOpen]        = useState(false);
-  const theme = prefs.theme;
   const [activeExchanges, setActiveExchanges] = useState(new Set());
-  const [selectedAsset,   setSelectedAsset]   = useState(null);
   const [macroData,       setMacroData]       = useState({});
   const [batchProfiles,   setBatchProfiles]   = useState(null);
-  const [brasilMacro,     setBrasilMacro]     = useState(null);
   const [collapsedGroups, setCollapsedGroups] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem("collapsedGroups")) || {}; }
     catch { return {}; }
   });
   const [expandedCards, setExpandedCards] = useState(new Set());
   const [flatExpand, setFlatExpand] = useState(false);
-  const [marketMode, setMarketMode] = useState("global");
   const prevDataRef          = useRef(null);
   const intervalRef          = useRef(null);
   const mountedRef           = useRef(true);
-  const defaultViewApplied   = useRef(false);
+  const assetsRef            = useRef(STATIC_ASSETS_MAP);
   useEffect(() => {
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
 
-  // ── Apply persisted defaultView once preferences are loaded from server ───────
-  useEffect(() => {
-    if (synced && !defaultViewApplied.current) {
-      defaultViewApplied.current = true;
-      if (prefs.defaultView && prefs.defaultView !== 'dashboard') {
-        onNavigate(prefs.defaultView);
-      }
-    }
-  }, [synced]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // ── Taxonomy from TaxonomyContext (falls back to static data) ────────────────
-  const { groups: ctxGroups, subgroups: ctxSubgroups, assets: ctxAssets, error: taxError, loading: taxLoading } = useTaxonomy() ?? {};
+  const { globalTaxonomy, groups: ctxGroups, subgroups: ctxSubgroups, loading: taxLoading } = useTaxonomy() ?? {};
 
   const CATEGORIES = useMemo(() => {
-    if (ctxSubgroups?.length) {
-      return Object.fromEntries(
-        ctxSubgroups.map(s => [s.id, { label: s.display_name, icon: s.icon, color: s.color }])
-      );
+    if (globalTaxonomy?.length) {
+      const map = {};
+      for (const group of globalTaxonomy) {
+        for (const sg of (group.subgroups || [])) {
+          map[sg.id] = { label: sg.display_name, icon: sg.icon, color: sg.color, groupId: group.id };
+        }
+      }
+      return map;
     }
     return STATIC_CATEGORIES;
-  }, [ctxSubgroups]);
+  }, [globalTaxonomy]);
 
   const ASSETS = useMemo(() => {
-    if (ctxAssets?.length) {
-      return Object.fromEntries(
-        ctxAssets.map(a => [a.symbol, {
-          name:     a.name,
-          cat:      a.subgroup_id,
-          exchange: a.exchange || 'NASDAQ',
-          type:     a.type,
-          ...(a.meta ? (typeof a.meta === 'string' ? JSON.parse(a.meta) : a.meta) : {}),
-        }])
-      );
+    if (globalTaxonomy?.length) {
+      const map = {};
+      for (const group of globalTaxonomy) {
+        for (const sg of (group.subgroups || [])) {
+          for (const a of (sg.assets || [])) {
+            map[a.symbol] = {
+              name:     a.name,
+              cat:      a.subgroup_id,
+              sector:   a.sector || null,
+              exchange: a.exchange || 'NASDAQ',
+              type:     a.type,
+              ...(a.meta ? (typeof a.meta === 'string' ? JSON.parse(a.meta) : a.meta) : {}),
+            };
+          }
+        }
+      }
+      return map;
     }
     return STATIC_ASSETS_MAP;
-  }, [ctxAssets]);
+  }, [globalTaxonomy]);
+
+  // Keep ref in sync so loadData always uses latest ASSETS without re-creating the callback
+  assetsRef.current = ASSETS;
 
   const assetsInCategory = useCallback((catKey) => {
     return Object.keys(ASSETS).filter(s => {
@@ -1328,15 +1002,15 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
   };
 
   const loadData = useCallback(async () => {
-    // Fetch Yahoo data + CoinGecko crypto + BRAPI B3 in parallel
+    // Fetch Yahoo data + CoinGecko crypto in parallel, using dynamic ASSETS from taxonomy
+    const currentAssets = assetsRef.current;
     try {
-      const [result, cryptoData, b3Data] = await Promise.all([
-        fetchMarketData(prevDataRef.current),
-        fetchCryptoData(),
-        fetchB3Data(),
+      const [result, cryptoData] = await Promise.all([
+        fetchMarketData(prevDataRef.current, currentAssets),
+        fetchCryptoData(currentAssets),
       ]);
       if (!mountedRef.current) return;
-      const merged = { ...(result.data || {}), ...cryptoData, ...b3Data };
+      const merged = { ...(result.data || {}), ...cryptoData };
       if (Object.keys(merged).length > 0) {
         prevDataRef.current = merged;
         setMarketData(merged);
@@ -1355,12 +1029,14 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
     }
   }, []);
 
+  const refreshInterval = (prefs.refreshInterval || 30) * 1000;
+
   useEffect(() => {
     if (taxLoading) return;
     loadData();
-    intervalRef.current = setInterval(loadData, REFRESH_INTERVAL);
+    intervalRef.current = setInterval(loadData, refreshInterval);
     return () => clearInterval(intervalRef.current);
-  }, [taxLoading, loadData]);
+  }, [taxLoading, loadData, refreshInterval]);
 
   // Load FRED macro context data for group banners (once, after initial load)
   useEffect(() => {
@@ -1394,18 +1070,8 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
     return () => { cancelled = true; };
   }, [!!marketData]);
 
-  // Load BCB + AwesomeAPI macro data for Brasil group banner (once, after initial load)
-  useEffect(() => {
-    if (!marketData) return;
-    let cancelled = false;
-    (async () => {
-      const [bcbData, fxData] = await Promise.all([bcbMacro(), awesomeFx()]);
-      if (cancelled) return;
-      const merged = { ...(bcbData || {}), ...(fxData || {}) };
-      setBrasilMacro(Object.keys(merged).length > 0 ? merged : {});
-    })();
-    return () => { cancelled = true; };
-  }, [!!marketData]);
+  // Removed from GlobalMarketsTerminal — the BrasilMacroBanner condition was
+  // always false after migration 002 deleted the old "brazil" group.
 
   const toggleExchange = useCallback((exch) => {
     setActiveExchanges(prev => {
@@ -1417,12 +1083,6 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
   }, []);
 
   const resetExchanges = useCallback(() => setActiveExchanges(new Set()), []);
-
-  // Wrap onNavigate to persist the user's chosen view
-  const handleNavigate = useCallback((key) => {
-    onNavigate(key);
-    updatePrefs({ defaultView: key });
-  }, [onNavigate, updatePrefs]);
 
   // All unique exchanges derived from ASSETS
   const allExchanges = [...new Set(Object.values(ASSETS).map(a => a.exchange))];
@@ -1562,6 +1222,10 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
       }));
   }, [marketData, ASSETS]);
 
+  useEffect(() => {
+    setTickerItems(tickerItems);
+  }, [tickerItems, setTickerItems]);
+
   // ── Group Summary Card ───────────────────────────────────────────────────
   // Reusable in both allCollapsed grid (layout="grid") and individual collapse (layout="row").
   // Closes over getGroupSymbols, marketData, ASSETS from component scope.
@@ -1695,52 +1359,10 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
   }
 
   return (
-    <>
-    <GMTHeader
-      activePage={currentView === 'dashboard' ? 'terminal' : currentView}
-      user={user}
-      onNav={(pageKey) => {
-        if (pageKey.startsWith('/')) { navigate(pageKey); return; }
-        handleNavigate(pageKey);
-      }}
-      onLogout={() => { logout(); navigate("/"); }}
-      onAssetClick={(item) => setSelectedAsset(item.ticker)}
-      onMenuOpen={() => setMenuOpen(true)}
-      showTicker={currentView === 'dashboard'}
-      tickerItems={tickerItems}
-      watchlistEnabled={!!user}
-      marketMode={marketMode}
-      onModeChange={(mode) => { setMarketMode(mode); setActiveFilter("all"); }}
-    />
     <div
-      data-theme={theme}
-      style={{ minHeight: "100vh", background: "var(--c-bg-root)", color: "var(--c-text)", fontFamily: "'DM Sans', sans-serif", position: "relative", overflow: "hidden" }}
+      style={{ fontFamily: "'DM Sans', sans-serif", position: "relative", overflow: "hidden" }}
     >
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
-
-        [data-theme="dark"] {
-          --c-bg-root:      linear-gradient(180deg, #0a0a0f 0%, #0d0f18 100%);
-          --c-surface:      rgba(255,255,255,0.02);
-          --c-border:       rgba(255,255,255,0.06);
-          --c-border-faint: rgba(255,255,255,0.04);
-          --c-text:         rgba(255,255,255,0.95);
-          --c-text-2:       rgba(255,255,255,0.35);
-          --c-text-3:       rgba(255,255,255,0.2);
-          --c-panel:        #0e1016;
-          --c-overlay:      rgba(0,0,0,0.7);
-        }
-        [data-theme="light"] {
-          --c-bg-root:      linear-gradient(180deg, #f2f4fb 0%, #e8eaf6 100%);
-          --c-surface:      rgba(255,255,255,0.7);
-          --c-border:       rgba(0,0,0,0.09);
-          --c-border-faint: rgba(0,0,0,0.05);
-          --c-text:         rgba(10,10,18,0.9);
-          --c-text-2:       rgba(10,10,18,0.48);
-          --c-text-3:       rgba(10,10,18,0.3);
-          --c-panel:        #eef0f9;
-          --c-overlay:      rgba(0,0,0,0.35);
-        }
 
         @keyframes pulse       { 0%,100%{opacity:1} 50%{opacity:0.3} }
         @keyframes scanline    { 0%{transform:translateY(-100%)} 100%{transform:translateY(100vh)} }
@@ -1763,77 +1385,41 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
       <div style={{ position:"fixed",top:"-20%",left:"-10%",width:"50%",height:"50%",background:"radial-gradient(ellipse,rgba(0,230,118,0.03) 0%,transparent 70%)",pointerEvents:"none" }} />
       <div style={{ position:"fixed",bottom:"-20%",right:"-10%",width:"50%",height:"50%",background:"radial-gradient(ellipse,rgba(124,77,255,0.025) 0%,transparent 70%)",pointerEvents:"none" }} />
 
-      {/* ── SLIDE-IN PANELS ── */}
-      <HamburgerMenu
-        open={menuOpen} onClose={() => setMenuOpen(false)}
-        activeFilter={activeFilter} onFilterChange={setActiveFilter}
-        activeExchanges={activeExchanges} onExchangeToggle={toggleExchange} onResetExchanges={resetExchanges}
-        theme={theme} onThemeToggle={() => updatePrefs({ theme: theme === "dark" ? "light" : "dark" })}
-        lastUpdate={lastUpdate} allExchanges={allExchanges}
-        currentView={currentView} onNavigate={handleNavigate}
-        watchlistItems={watchlistItems} watchlistLoading={watchlistLoading}
-        onUnpin={unpin} assets={ASSETS} categories={CATEGORIES} marketData={marketData}
-      />
       {selectedAsset && marketData?.[selectedAsset] && (
         <DetailPanel symbol={selectedAsset} data={marketData[selectedAsset]} onClose={() => setSelectedAsset(null)} />
       )}
 
-      {/* ── COMMAND BAR — hidden in Brazil mode (BrazilTerminal has its own controls) ── */}
-      {marketMode === "global" && (
-        <CommandBar
-          sentiment={sentiment}
-          risingCount={rising}
-          fallingCount={falling}
-          avgChange={avgPct}
-          topMovers={topMovers.map(([symbol, d]) => ({ symbol, changePct: d.changePct ?? 0 }))}
-          activeFilter={activeFilter}
-          onFilterChange={setActiveFilter}
-          sortMode={groupSort}
-          sortDir={groupDir}
-          onSortChange={(mode, dir) => { setGroupSort(mode); setGroupDir(dir); }}
-          activeExchanges={activeExchanges}
-          allExchanges={allExchanges}
-          onExchangeToggle={toggleExchange}
-          onExchangeReset={resetExchanges}
-          viewMode={viewMode === "cards" ? "grid" : "list"}
-          onViewChange={(mode) => setViewMode(mode === "grid" ? "cards" : "list")}
-          onDensityChange={() => {}}
-          onCollapseAll={collapseAll}
-          onExpandAll={expandAll}
-          flatExpand={flatExpand}
-          onRefresh={loadData}
-          groups={ctxGroups}
-          subgroups={ctxSubgroups}
-        />
-      )}
+      {/* ── COMMAND BAR ── */}
+      <CommandBar
+        sentiment={sentiment}
+        risingCount={rising}
+        fallingCount={falling}
+        avgChange={avgPct}
+        topMovers={topMovers.map(([symbol, d]) => ({ symbol, changePct: d.changePct ?? 0 }))}
+        activeFilter={activeFilter}
+        onFilterChange={setActiveFilter}
+        sortMode={groupSort}
+        sortDir={groupDir}
+        onSortChange={(mode, dir) => { setGroupSort(mode); setGroupDir(dir); }}
+        activeExchanges={activeExchanges}
+        allExchanges={allExchanges}
+        onExchangeToggle={toggleExchange}
+        onExchangeReset={resetExchanges}
+        viewMode={viewMode === "cards" ? "grid" : "list"}
+        onViewChange={(mode) => setViewMode(mode === "grid" ? "cards" : "list")}
+        onDensityChange={() => {}}
+        onCollapseAll={collapseAll}
+        onExpandAll={expandAll}
+        flatExpand={flatExpand}
+        onRefresh={loadData}
+        groups={ctxGroups}
+        subgroups={ctxSubgroups}
+      />
 
       <div style={{ position: "relative", zIndex: 1, maxWidth: 1400, margin: "0 auto", padding: "0 20px 40px" }}>
 
-        {/* ── CATALOG VIEW ── */}
-        {currentView === "catalog" && catalogPage}
-
-        {/* ── NEWS VIEW ── */}
-        {currentView === "news" && newsPage}
-
-        {/* ── HEATMAP VIEW ── (renders as fixed full-screen overlay) */}
-        {currentView === "heatmap" && heatmapPage}
-
-        {/* ── WATCHLIST VIEW ── */}
-        {currentView === "watchlist" && (
-          <WatchlistPage
-            watchlistItems={watchlistItems}
-            marketData={marketData}
-            assets={ASSETS}
-            categories={CATEGORIES}
-            onNavigate={handleNavigate}
-          />
-        )}
-
-        {/* ── BRAZIL MODE ── */}
-        {currentView === "dashboard" && marketMode === "brazil" && <BrazilTerminal />}
-
         {/* ── LOADING ── */}
-        {currentView === "dashboard" && marketMode === "global" && loading && (
+        {loading && (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "120px 0", gap: 12 }}>
             <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#00E676", animation: "pulse 1.2s ease-in-out infinite" }} />
             <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, color: "var(--c-text-2)" }}>Connecting to market feeds...</span>
@@ -1841,7 +1427,7 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
         )}
 
         {/* ── OUT OF AIR ── */}
-        {currentView === "dashboard" && marketMode === "global" && !loading && !marketData && (
+        {!loading && !marketData && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "100px 0", gap: 20, textAlign: "center" }}>
             <div style={{ fontSize: 48, opacity: 0.3 }}>📡</div>
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 18, fontWeight: 700, color: "var(--c-text-2)", letterSpacing: "2px" }}>SYSTEM OUT OF AIR</div>
@@ -1858,7 +1444,7 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
         )}
 
         {/* ── MAIN CONTENT ── */}
-        {currentView === "dashboard" && marketMode === "global" && !loading && marketData && (
+        {!loading && marketData && (
           <div className="fade-in">
 
             {/* ── LIST VIEW — flat sortable table, mutually exclusive with card views ── */}
@@ -1990,8 +1576,7 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
                       }}>
                         <div style={{ borderTop: "1px solid var(--c-border)", padding: "12px 0" }}>
                           <MacroBanner macroData={macroData} catKey={catKey} />
-                          {ctxSubgroups?.find(s => s.id === catKey)?.group_id === "brazil" && <BrasilMacroBanner brasilMacro={brasilMacro} />}
-                          {catKey === "dividends" && (
+                                                    {catKey === "dividends" && (
                             <div style={{
                               display: "flex", alignItems: "center", gap: 10,
                               background: "rgba(255,193,7,0.08)", border: "1px solid rgba(255,193,7,0.2)",
@@ -2067,8 +1652,7 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
                       </div>
                       <div style={{ paddingTop: 38 }}>
                         <MacroBanner macroData={macroData} catKey={catKey} />
-                        {ctxSubgroups?.find(s => s.id === catKey)?.group_id === "brazil" && <BrasilMacroBanner brasilMacro={brasilMacro} />}
-                        {catKey === "dividends" && (
+                                                {catKey === "dividends" && (
                           <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(255,193,7,0.08)", border: "1px solid rgba(255,193,7,0.2)", borderRadius: 6, padding: "8px 14px", marginBottom: 10 }}>
                             <SourceBadge source="fmp" />
                             <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--c-text-2)" }}>
@@ -2147,8 +1731,7 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
                             </div>
                           </div>
                           <MacroBanner macroData={macroData} catKey={catKey} />
-                          {ctxSubgroups?.find(s => s.id === catKey)?.group_id === "brazil" && <BrasilMacroBanner brasilMacro={brasilMacro} />}
-                          {catKey === "dividends" && (
+                                                    {catKey === "dividends" && (
                             <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(255,193,7,0.08)", border: "1px solid rgba(255,193,7,0.2)", borderRadius: 6, padding: "8px 14px", marginBottom: 10 }}>
                               <SourceBadge source="fmp" />
                               <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--c-text-2)" }}>
@@ -2176,14 +1759,13 @@ export default function GlobalMarketsTerminal({ currentView = "dashboard", onNav
 
             {/* Footer */}
             <div style={{ borderTop: "1px solid var(--c-border)", paddingTop: 14, marginTop: 10, display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 8 }}>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", letterSpacing: "0.5px" }}>MULTI-SOURCE: YAHOO · FINNHUB · FRED · FMP · COINGECKO · BRAPI · BCB · AWESOMEAPI</div>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", letterSpacing: "0.5px" }}>{Object.keys(ASSETS).length} ASSETS · {Object.keys(CATEGORIES).length} GROUPS · 9 SOURCES</div>
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", letterSpacing: "0.5px" }}>MULTI-SOURCE: YAHOO · FINNHUB · FRED · FMP · COINGECKO</div>
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", letterSpacing: "0.5px" }}>{Object.keys(ASSETS).length} ASSETS · {Object.keys(CATEGORIES).length} GROUPS · 5 SOURCES</div>
             </div>
 
           </div>
         )}
       </div>
     </div>
-    </>
   );
 }

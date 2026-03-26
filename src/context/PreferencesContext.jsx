@@ -5,7 +5,9 @@ const PreferencesContext = createContext(null);
 
 const DEFAULTS = {
   theme:           'dark',
-  defaultView:     'dashboard',
+  defaultTerminal: 'global',
+  refreshInterval: 30,
+  language:        'en',
   defaultExchange: 'NYSE',
 };
 

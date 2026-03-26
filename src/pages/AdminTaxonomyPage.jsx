@@ -275,6 +275,17 @@ const EmptyState = styled.div`
   line-height: 1.8;
 `;
 
+const L1SectionHeader = styled.div`
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #4A5568;
+  padding: 8px 12px 4px;
+  border-top: ${(p) => (p.$first ? 'none' : '1px solid #1A2035')};
+  margin-top: ${(p) => (p.$first ? '0' : '4px')};
+`;
+
 const AssetSymbolLabel = styled.span`
   font-size: 12px;
   font-weight: 700;
@@ -293,9 +304,6 @@ export default function AdminTaxonomyPage() {
   const [groups,    setGroups]    = useState([]);
   const [subgroups, setSubgroups] = useState([]);
   const [assets,    setAssets]    = useState([]);
-
-  // Terminal view filter
-  const [terminalFilter, setTerminalFilter] = useState(null); // null = all
 
   // Selection state
   const [selectedGroupId,    setSelectedGroupId]    = useState(null);
@@ -343,7 +351,7 @@ export default function AdminTaxonomyPage() {
     }
   }, []);
 
-  useEffect(() => { loadGroups(); }, [loadGroups]);
+  useEffect(() => { loadGroups(); }, []);
 
   useEffect(() => {
     setSelectedSubgroupId(null);
@@ -356,7 +364,6 @@ export default function AdminTaxonomyPage() {
   }, [selectedSubgroupId, loadAssets]);
 
   // ── Computed ───────────────────────────────────────────────────────────────
-  const displayedGroups  = terminalFilter ? groups.filter((g) => g.terminal_view === terminalFilter) : groups;
   const selectedGroup    = groups.find((g) => g.id === selectedGroupId);
   const selectedSubgroup = subgroups.find((s) => s.id === selectedSubgroupId);
   const existingGroupSlugs    = groups.map((g) => g.slug);
@@ -442,56 +449,39 @@ export default function AdminTaxonomyPage() {
             <ColHeader>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <ColTitle>Groups</ColTitle>
-                <ColCount>{displayedGroups.length}</ColCount>
+                <ColCount>{groups.length}</ColCount>
               </div>
               <AddBtn onClick={() => setModal({ type: 'addGroup' })}>+ Add</AddBtn>
             </ColHeader>
-            {/* Terminal view filter tabs */}
-            <div style={{ display: 'flex', borderBottom: '1px solid #1E2740', flexShrink: 0 }}>
-              {[null, 'global', 'brazil'].map((v) => (
-                <button
-                  key={v ?? 'all'}
-                  onClick={() => { setTerminalFilter(v); setSelectedGroupId(null); }}
-                  style={{
-                    flex: 1,
-                    background: 'transparent',
-                    border: 'none',
-                    borderBottom: terminalFilter === v ? '2px solid #00BCD4' : '2px solid transparent',
-                    color: terminalFilter === v ? '#00BCD4' : '#4A5568',
-                    cursor: 'pointer',
-                    fontFamily: "'Space Mono', monospace",
-                    fontSize: '9px',
-                    fontWeight: 700,
-                    letterSpacing: '0.1em',
-                    padding: '8px 4px',
-                    textTransform: 'uppercase',
-                    transition: 'color 0.15s',
-                  }}
-                >
-                  {v ?? 'All'}
-                </button>
-              ))}
-            </div>
             <ColBody>
               {loadingGroups ? (
                 <EmptyState>Loading...</EmptyState>
-              ) : displayedGroups.length === 0 ? (
+              ) : groups.length === 0 ? (
                 <EmptyState>No groups yet.<br />Click + Add to create one.</EmptyState>
               ) : (
-                displayedGroups.map((g) => (
+                groups.map((g) => (
                   <ListRow
                     key={g.id}
                     $active={selectedGroupId === g.id}
                     onClick={() => setSelectedGroupId(g.id)}
                   >
                     <RowMain>
-                      <RowName $active={selectedGroupId === g.id}>{g.display_name}</RowName>
+                      <RowName $active={selectedGroupId === g.id}>
+                        {g.display_name}
+                        <span style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          letterSpacing: '0.04em',
+                          textTransform: 'uppercase',
+                          color: g.l1_id === 'brasil' ? '#F9C300' : '#26C6DA',
+                          marginLeft: 8,
+                          verticalAlign: 'middle',
+                        }}>
+                          {g.l1_id === 'brasil' ? '🇧🇷' : '🌐'}
+                        </span>
+                      </RowName>
                       <RowMeta>
                         {g.subgroup_count} subgroup{g.subgroup_count !== 1 ? 's' : ''} · {g.slug}
-                        {' · '}
-                        <span style={{ color: g.terminal_view === 'brazil' ? '#F9C300' : '#26C6DA' }}>
-                          {g.terminal_view}
-                        </span>
                       </RowMeta>
                     </RowMain>
                     <RowActions>

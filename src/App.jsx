@@ -1,14 +1,18 @@
-import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import GlobalMarketsTerminal from './GlobalMarketsTerminal';
+import BrazilTerminal from './BrazilTerminal';
 import CatalogPage from './CatalogPage';
 import NewsPage from './NewsPage';
 import MarketHeatmapPage from './MarketHeatmapPage';
+import WatchlistPage from './WatchlistPage';
 import LoginPage from './pages/LoginPage.jsx';
 import LandingPage from './pages/LandingPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
 import AdminPanel from './pages/AdminPanel.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
+import TerminalLayout from './components/TerminalLayout.jsx';
+import { TickerProvider } from './context/TickerContext.jsx';
+import { SelectedAssetProvider } from './context/SelectedAssetContext.jsx';
 import ChartCenterPage from './pages/markets/ChartCenterPage.jsx';
 import ResearchTerminalPage from './pages/markets/ResearchTerminalPage.jsx';
 import FundamentalLabPage from './pages/markets/FundamentalLabPage.jsx';
@@ -16,26 +20,7 @@ import MacroHubPage from './pages/markets/MacroHubPage.jsx';
 import SignalEnginePage from './pages/markets/SignalEnginePage.jsx';
 import ClubePage from './pages/ClubePage.jsx';
 import ClubeReportPage from './pages/ClubeReportPage.jsx';
-
-const VALID_VIEWS = ['dashboard', 'catalog', 'news', 'heatmap', 'watchlist'];
-
-function Dashboard() {
-  const [view, setView] = useState('dashboard');
-
-  const handleNavigate = (nextView) => {
-    setView(VALID_VIEWS.includes(nextView) ? nextView : 'dashboard');
-  };
-
-  return (
-    <GlobalMarketsTerminal
-      currentView={view}
-      onNavigate={handleNavigate}
-      catalogPage={<CatalogPage />}
-      newsPage={<NewsPage />}
-      heatmapPage={<MarketHeatmapPage onNavigate={handleNavigate} />}
-    />
-  );
-}
+import SettingsPage from './pages/SettingsPage.jsx';
 
 export default function App() {
   return (
@@ -46,15 +31,27 @@ export default function App() {
         <Route path="/login"     element={<LoginPage />} />
         <Route path="/register"  element={<RegisterPage />} />
 
-        {/* Dashboard — any authenticated user */}
+        {/* App terminal — nested routes with shared layout */}
+        <Route path="/app" element={<Navigate to="/app/global" replace />} />
         <Route
-          path="/app"
           element={
             <ProtectedRoute requiredRole={null}>
-              <Dashboard />
+              <SelectedAssetProvider>
+                <TickerProvider>
+                  <TerminalLayout />
+                </TickerProvider>
+              </SelectedAssetProvider>
             </ProtectedRoute>
           }
-        />
+        >
+          <Route path="/app/global" element={<GlobalMarketsTerminal />} />
+          <Route path="/app/brasil" element={<BrazilTerminal />} />
+          <Route path="/app/catalog" element={<CatalogPage />} />
+          <Route path="/app/news" element={<NewsPage />} />
+          <Route path="/app/heatmap" element={<MarketHeatmapPage />} />
+          <Route path="/app/watchlist" element={<WatchlistPage />} />
+          <Route path="/app/settings" element={<SettingsPage />} />
+        </Route>
 
         {/* Admin */}
         <Route

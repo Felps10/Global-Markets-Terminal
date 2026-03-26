@@ -25,6 +25,7 @@ export async function seedIfEmpty() {
     ...a,
     currency:   a.currency   ?? null,
     sort_order: a.sort_order ?? 0,
+    sector:     a.sector     ?? null,
     meta:       a.meta       ?? null,
   }));
 

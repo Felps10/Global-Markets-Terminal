@@ -159,6 +159,7 @@ export default function AssetFormModal({
   const [currency,       setCurrency]       = useState(asset?.currency    || '');
   const [active,         setActive]         = useState(asset?.active !== undefined ? !!asset.active : true);
   const [sortOrder,      setSortOrder]      = useState(asset?.sort_order  ?? 0);
+  const [sector,         setSector]         = useState(asset?.sector     || '');
   const [metaJson,       setMetaJson]       = useState(
     asset?.meta ? JSON.stringify(asset.meta, null, 2) : '',
   );
@@ -213,6 +214,7 @@ export default function AssetFormModal({
         currency:    currency.trim() || null,
         active,
         sort_order:  Number(sortOrder) || 0,
+        sector:      sector.trim() || null,
         meta:        parseMetaJson(),
       };
       if (isEdit) {
@@ -365,6 +367,15 @@ export default function AssetFormModal({
             </div>
           </Field>
         </Row2>
+
+        <Field>
+          <Label>Sector</Label>
+          <Input
+            value={sector}
+            onChange={(e) => setSector(e.target.value)}
+            placeholder="e.g. Bancos, Petróleo, Tijolo"
+          />
+        </Field>
 
         <Field>
           <Label>Meta (JSON)</Label>

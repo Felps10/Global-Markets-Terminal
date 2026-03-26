@@ -30,7 +30,7 @@ router.get('/', async (req, res) => {
 
 // POST /api/v1/assets
 router.post('/', authenticate, requireAdmin, async (req, res) => {
-  const { symbol, name, type, exchange, subgroup_id, currency, active, sort_order, meta } = req.body;
+  const { symbol, name, type, exchange, subgroup_id, currency, active, sort_order, sector, meta } = req.body;
   if (!symbol || !name || !subgroup_id) {
     return res.status(400).json({ error: 'BAD_REQUEST', message: 'symbol, name, and subgroup_id are required' });
   }
@@ -47,7 +47,29 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
 
   const group_id    = sg.group_id;
   const terminal_view = sg.groups?.terminal_view || 'global';
-  const id = symbol.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  // Generate a URL-safe ID from the symbol:
+  //   GC=F → gc-f, ^GSPC → gspc, EURUSD=X → eurusd-x, CL=F → cl-f
+  const id = symbol
+    .toLowerCase()
+    .replace(/\^/g, '')       // strip ^ prefix (indices)
+    .replace(/=/g, '-')       // = → - (futures, forex)
+    .replace(/[^a-z0-9-]/g, '') // strip anything else
+    .replace(/-+/g, '-')      // collapse consecutive dashes
+    .replace(/^-|-$/g, '');   // trim leading/trailing dashes
+
+  // Check for ID collision before inserting
+  const { data: existing } = await supabase
+    .from('assets')
+    .select('id')
+    .eq('id', id)
+    .maybeSingle();
+  if (existing) {
+    return res.status(409).json({
+      error:   'ID_CONFLICT',
+      message: `Asset ID "${id}" already exists (generated from symbol "${symbol}").`,
+    });
+  }
 
   const { data: created, error } = await supabase
     .from('assets')
@@ -63,6 +85,7 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
       currency:      currency     || null,
       active:        active !== undefined ? active : true,
       sort_order:    sort_order   ?? 0,
+      sector:        sector       || null,
       meta:          meta         || null,
     })
     .select()
@@ -74,7 +97,7 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
 
 // PUT /api/v1/assets/:id
 router.put('/:id', authenticate, requireAdmin, async (req, res) => {
-  const { symbol, name, type, exchange, subgroup_id, currency, active, sort_order, meta } = req.body;
+  const { symbol, name, type, exchange, subgroup_id, currency, active, sort_order, sector, meta } = req.body;
 
   const { data: asset, error: fetchError } = await supabase
     .from('assets')
@@ -112,6 +135,7 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
       currency:      currency      !== undefined ? currency      : asset.currency,
       active:        active        !== undefined ? active        : asset.active,
       sort_order:    sort_order    !== undefined ? sort_order    : asset.sort_order,
+      sector:        sector        !== undefined ? sector        : asset.sector,
       meta:          meta          !== undefined ? meta          : asset.meta,
       updated_at:    new Date().toISOString(),
     })

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import styled, { keyframes } from "styled-components";
 import MarketHeatmap from "./components/MarketHeatmap";
 import { finnhubQuote, hasFinnhubKey } from "./dataServices.js";
@@ -594,7 +595,9 @@ const CCRemove = styled.button`
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-export default function MarketHeatmapPage({ onNavigate }) {
+export default function MarketHeatmapPage() {
+  const navigate = useNavigate();
+  const onNavigate = (key) => navigate(key === 'dashboard' ? '/app/global' : '/app/global');
   // ── Data state ──────────────────────────────────────────────────────────────
   const [stocks, setStocks]           = useState(BASE_STOCKS);
   const [dataStatus, setDataStatus]   = useState("mock");

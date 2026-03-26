@@ -5,63 +5,40 @@ import {
   STATIC_ASSETS_MAP,
 } from "./GlobalMarketsTerminal.jsx";
 import { fetchB3MarketData, bcbMacro, awesomeFx } from "./dataServices.js";
+import { usePreferences } from './context/PreferencesContext.jsx';
 import { BRAZIL_BLOCKS, getSectionById } from "./data/brazilBlocks.js";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const GOLD             = "#F9C300";
-const REFRESH_INTERVAL = 30000;
 
 const B3_VOLATILITY = {
-  "br-bancos": 0.016, "br-utilities": 0.014, "br-commodities": 0.020,
-  "br-consumo": 0.018, "br-construcao": 0.022, "br-infra": 0.015,
-  "br-industrial": 0.016, "br-saude": 0.018,
+  "Bancos": 0.016, "Petróleo": 0.020, "Mineração": 0.020,
+  "Agronegócio": 0.018, "Varejo": 0.018, "Utilities": 0.014,
+  "Transporte": 0.015, "Indústria": 0.016, "Construção": 0.022,
+  "Saúde": 0.018, "Telecom": 0.016, "Outros": 0.016,
   "br-fiis": 0.010, "br-etfs": 0.015, "br-indices": 0.012,
 };
 
-// Metadata for the 8 equity subgroups — display order + labels
-const EQUITY_SUBGROUP_ORDER = [
-  "br-bancos",
-  "br-petroleo",
-  "br-mineracao",
-  "br-agronegocio",
-  "br-varejo",
-  "br-utilities",
-  "br-transporte",
-  "br-industria",
-  "br-construcao",
-  "br-saude",
-  "br-telecom",
-  "br-outros",
+// Sector display order + labels (replaces old subgroup-based constants)
+const SECTOR_ORDER = [
+  "Bancos", "Petróleo", "Mineração", "Agronegócio", "Varejo",
+  "Utilities", "Transporte", "Indústria", "Construção", "Saúde",
+  "Telecom", "Outros",
 ];
-const EQUITY_SUBGROUP_META = {
-  "br-bancos":      { label: "Bancos & Financeiro",    icon: "🏦" },
-  "br-petroleo":    { label: "Petróleo & Gás",         icon: "🛢"  },
-  "br-mineracao":   { label: "Mineração",              icon: "⛏"  },
-  "br-agronegocio": { label: "Agronegócio",            icon: "🌾"  },
-  "br-varejo":      { label: "Varejo & Consumo",       icon: "🛍"  },
-  "br-utilities":   { label: "Utilities & Energia",    icon: "⚡" },
-  "br-transporte":  { label: "Logística & Transporte", icon: "🚚"  },
-  "br-industria":   { label: "Indústria",              icon: "⚙️" },
-  "br-construcao":  { label: "Construção Civil",       icon: "🏗️" },
-  "br-saude":       { label: "Saúde",                  icon: "🏥"  },
-  "br-telecom":     { label: "Telecom & Tech",         icon: "📡"  },
-  "br-outros":      { label: "Outros Setores",         icon: "📎"  },
-};
 
-// Setor filter label → subgroup ID (for wiring filter pills to activeSubgroup)
-const SETOR_LABEL_TO_ID = {
-  "Bancos":      "br-bancos",
-  "Petróleo":    "br-petroleo",
-  "Mineração":   "br-mineracao",
-  "Agronegócio": "br-agronegocio",
-  "Varejo":      "br-varejo",
-  "Utilities":   "br-utilities",
-  "Transporte":  "br-transporte",
-  "Indústria":   "br-industria",
-  "Construção":  "br-construcao",
-  "Saúde":       "br-saude",
-  "Telecom":     "br-telecom",
-  "Outros":      "br-outros",
+const SECTOR_META = {
+  "Bancos":       { label: "Bancos & Financeiro",    icon: "🏦" },
+  "Petróleo":     { label: "Petróleo & Gás",         icon: "🛢"  },
+  "Mineração":    { label: "Mineração",              icon: "⛏"  },
+  "Agronegócio":  { label: "Agronegócio",            icon: "🌾"  },
+  "Varejo":       { label: "Varejo & Consumo",       icon: "🛍"  },
+  "Utilities":    { label: "Utilities & Energia",    icon: "⚡" },
+  "Transporte":   { label: "Logística & Transporte", icon: "🚚"  },
+  "Indústria":    { label: "Indústria",              icon: "⚙️" },
+  "Construção":   { label: "Construção Civil",       icon: "🏗️" },
+  "Saúde":        { label: "Saúde",                  icon: "🏥"  },
+  "Telecom":      { label: "Telecom & Tech",         icon: "📡"  },
+  "Outros":       { label: "Outros Setores",         icon: "📎"  },
 };
 
 // B3_ASSET_ENTRIES is computed lazily at call time to avoid circular-module init
@@ -155,12 +132,12 @@ function PlaceholderSection({ section, accentColor }) {
 }
 
 // ─── FILTER BAR ───────────────────────────────────────────────────────────────
-function FilterBar({ section, accentColor, getFilter, setFilter, clearFilters, activeFilterCount, activeSubgroup, setActiveSubgroup }) {
+function FilterBar({ section, accentColor, getFilter, setFilter, clearFilters, activeFilterCount, activeSector, setActiveSector }) {
   if (!section) return null;
   const { sectionId, filters = [] } = section;
 
   const nonSetorActiveCount = activeFilterCount(sectionId);
-  const setorIsFiltered     = sectionId === "acoes-b3" && activeSubgroup !== "all";
+  const setorIsFiltered     = sectionId === "acoes-b3" && activeSector !== "all";
   const hasAnyActive        = nonSetorActiveCount > 0 || setorIsFiltered;
 
   const inputStyle = {
@@ -173,19 +150,19 @@ function FilterBar({ section, accentColor, getFilter, setFilter, clearFilters, a
   return (
     <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: 16, padding: "10px 0 14px", borderBottom: "1px solid var(--c-border)", marginBottom: 12 }}>
       {filters.map(filter => {
-        // ── Setor pill (wired to activeSubgroup)
+        // ── Setor pill (wired to activeSector)
         if (filter.id === "setor" && sectionId === "acoes-b3") {
           return (
             <div key={filter.id} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: "1px", color: "var(--c-text-3)", textTransform: "uppercase" }}>{filter.label}</span>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
                 {filter.options.map(opt => {
-                  const subId   = SETOR_LABEL_TO_ID[opt] ?? "all";
-                  const isActive = activeSubgroup === subId;
+                  const sectorVal = opt === "Todos" ? "all" : opt;
+                  const isActive  = activeSector === sectorVal;
                   return (
                     <button
                       key={opt}
-                      onClick={() => setActiveSubgroup(subId)}
+                      onClick={() => setActiveSector(sectorVal)}
                       style={{
                         fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700,
                         padding: "3px 9px", borderRadius: 10, cursor: "pointer", transition: "all 0.15s",
@@ -263,7 +240,7 @@ function FilterBar({ section, accentColor, getFilter, setFilter, clearFilters, a
       {hasAnyActive && (
         <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end", paddingBottom: 2 }}>
           <button
-            onClick={() => { clearFilters(sectionId); setActiveSubgroup("all"); }}
+            onClick={() => { clearFilters(sectionId); setActiveSector("all"); }}
             style={{
               fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700,
               letterSpacing: "0.5px", color: "#FF5252", background: "transparent",
@@ -376,6 +353,9 @@ function BrazilDetailPanel({ symbol, data, onClose }) {
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 export default function BrazilTerminal() {
+  const { prefs } = usePreferences();
+  const refreshInterval = (prefs.refreshInterval || 30) * 1000;
+
   // ── Existing state ───────────────────────────────────────────────────────────
   const [b3Data,          setB3Data]          = useState(null);
   const [macroData,       setMacroData]       = useState(null);
@@ -384,7 +364,7 @@ export default function BrazilTerminal() {
   const [viewMode,        setViewMode]        = useState("cards");
   const [sortMode,        setSortMode]        = useState("default");
   const [sortDir,         setSortDir]         = useState("asc");
-  const [activeSubgroup,  setActiveSubgroup]  = useState("all");
+  const [activeSector,  setActiveSector]  = useState("all");
   const [collapsedGroups, setCollapsedGroups] = useState({});
   const [expandedCards,   setExpandedCards]   = useState(new Set());
   const [selectedAsset,   setSelectedAsset]   = useState(null);
@@ -461,23 +441,23 @@ export default function BrazilTerminal() {
 
   useEffect(() => {
     loadData();
-    intervalRef.current = setInterval(loadData, REFRESH_INTERVAL);
+    intervalRef.current = setInterval(loadData, refreshInterval);
     return () => clearInterval(intervalRef.current);
-  }, [loadData]);
+  }, [loadData, refreshInterval]);
 
-  // ── Derive equity subgroups from static map ─────────────────────────────────
-  const brazilEquitySubgroups = useMemo(() => {
+  // ── Derive equity sectors from static map ────────────────────────────────────
+  const brazilEquitySectors = useMemo(() => {
     const map = {};
     Object.entries(STATIC_ASSETS_MAP).forEach(([sym, a]) => {
       if (!a.isB3 || a.type !== "equity-br") return;
-      const sid = a.cat;
-      if (!sid || !EQUITY_SUBGROUP_META[sid]) return;
-      if (!map[sid]) map[sid] = [];
-      map[sid].push(sym);
+      const sec = a.sector;
+      if (!sec || !SECTOR_META[sec]) return;
+      if (!map[sec]) map[sec] = [];
+      map[sec].push(sym);
     });
-    return EQUITY_SUBGROUP_ORDER
-      .filter(id => map[id])
-      .map(id => ({ id, ...EQUITY_SUBGROUP_META[id], tickers: map[id] }));
+    return SECTOR_ORDER
+      .filter(s => map[s])
+      .map(s => ({ id: s, sector: s, ...SECTOR_META[s], tickers: map[s] }));
   }, []);
 
   // ── Toggle helpers ───────────────────────────────────────────────────────────
@@ -487,10 +467,10 @@ export default function BrazilTerminal() {
 
   const collapseAll = useCallback(() => {
     const next = {};
-    brazilEquitySubgroups.forEach(sg => { next[sg.id] = true; });
+    brazilEquitySectors.forEach(sg => { next[sg.id] = true; });
     setCollapsedGroups(next);
     setExpandedCards(new Set());
-  }, [brazilEquitySubgroups]);
+  }, [brazilEquitySectors]);
 
   const expandAll = useCallback(() => {
     setCollapsedGroups({});
@@ -516,14 +496,14 @@ export default function BrazilTerminal() {
   }, [sortMode]);
 
   // ── Derived state ────────────────────────────────────────────────────────────
-  const visibleSubgroups = useMemo(() => {
-    if (activeSubgroup === "all") return brazilEquitySubgroups;
-    return brazilEquitySubgroups.filter(sg => sg.id === activeSubgroup);
-  }, [activeSubgroup, brazilEquitySubgroups]);
+  const visibleSectors = useMemo(() => {
+    if (activeSector === "all") return brazilEquitySectors;
+    return brazilEquitySectors.filter(sg => sg.sector === activeSector);
+  }, [activeSector, brazilEquitySectors]);
 
   const allCollapsed = useMemo(() =>
-    visibleSubgroups.length > 0 && visibleSubgroups.every(sg => collapsedGroups[sg.id]),
-  [visibleSubgroups, collapsedGroups]);
+    visibleSectors.length > 0 && visibleSectors.every(sg => collapsedGroups[sg.id]),
+  [visibleSectors, collapsedGroups]);
 
   const sortedSymbols = useCallback((symbols) => {
     const arr = [...symbols];
@@ -538,7 +518,7 @@ export default function BrazilTerminal() {
     });
   }, [sortMode, sortDir, b3Data]);
 
-  const getSubgroupStats = useCallback((sg) => {
+  const getSectorStats = useCallback((sg) => {
     const syms     = sg.tickers.filter(s => b3Data?.[s]);
     const pcts     = syms.map(s => b3Data[s]?.changePct ?? 0);
     const avgPct   = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : 0;
@@ -552,7 +532,7 @@ export default function BrazilTerminal() {
     return sortDir === "desc" ? `${opt.label} ▲` : `${opt.label} ▼`;
   };
 
-  const totalTickers = brazilEquitySubgroups.reduce((n, sg) => n + sg.tickers.length, 0);
+  const totalTickers = brazilEquitySectors.reduce((n, sg) => n + sg.tickers.length, 0);
 
   // ── Active section lookup ────────────────────────────────────────────────────
   const currentSection = getSectionById(activeSection);
@@ -656,7 +636,7 @@ export default function BrazilTerminal() {
         {BRAZIL_BLOCKS.find(b => b.blockId === activeBlock)?.sections.map(section => {
           const isActive = activeSection === section.sectionId;
           const count    = activeFilterCount(section.sectionId) +
-            (section.sectionId === "acoes-b3" && activeSubgroup !== "all" ? 1 : 0);
+            (section.sectionId === "acoes-b3" && activeSector !== "all" ? 1 : 0);
           return (
             <button
               key={section.sectionId}
@@ -694,8 +674,8 @@ export default function BrazilTerminal() {
         setFilter={setFilter}
         clearFilters={clearFilters}
         activeFilterCount={activeFilterCount}
-        activeSubgroup={activeSubgroup}
-        setActiveSubgroup={setActiveSubgroup}
+        activeSector={activeSector}
+        setActiveSector={setActiveSector}
       />
 
       {/* ── CONTROLS BAR — only for acoes-b3 ── */}
@@ -778,8 +758,8 @@ export default function BrazilTerminal() {
           {allCollapsed && viewMode === "list" ? (
         /* ── MODE B: COLLAPSED LIST MODE ── */
         <div style={{ marginTop: 8, border: "1px solid var(--c-border)", borderRadius: 8, overflow: "hidden" }}>
-          {visibleSubgroups.map(sg => {
-            const stats    = getSubgroupStats(sg);
+          {visibleSectors.map(sg => {
+            const stats    = getSectorStats(sg);
             if (stats.count === 0) return null;
             const isOpen   = expandedCards.has(sg.id);
             const pctColor = stats.avgPct > 0 ? "#00E676" : stats.avgPct < 0 ? "#FF5252" : "var(--c-text-3)";
@@ -843,8 +823,8 @@ export default function BrazilTerminal() {
       ) : allCollapsed ? (
         /* ── MODE A: COLLAPSED CARD GRID MODE ── */
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8, padding: "12px 0" }}>
-          {visibleSubgroups.map(sg => {
-            const stats   = getSubgroupStats(sg);
+          {visibleSectors.map(sg => {
+            const stats   = getSectorStats(sg);
             if (stats.count === 0) return null;
             const isOpen  = expandedCards.has(sg.id);
 
@@ -935,7 +915,7 @@ export default function BrazilTerminal() {
       ) : (
         /* ── MODE C: NORMAL EXPANDED GROUP VIEW ── */
         <div style={{ marginTop: 8 }}>
-          {visibleSubgroups.map((sg, idx) => {
+          {visibleSectors.map((sg, idx) => {
             const rawSyms = sg.tickers.filter(s => b3Data?.[s]);
             const syms    = sortedSymbols(rawSyms);
             if (syms.length === 0) return null;
@@ -1026,7 +1006,7 @@ export default function BrazilTerminal() {
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", letterSpacing: "0.5px" }}>FONTE: BRAPI · BCB · AWESOMEAPI</div>
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", letterSpacing: "0.5px" }}>
           {activeSection === "acoes-b3"
-            ? `${totalTickers} ATIVOS · ${brazilEquitySubgroups.length} SETORES · B3 / BOVESPA`
+            ? `${totalTickers} ATIVOS · ${brazilEquitySectors.length} SETORES · B3 / BOVESPA`
             : (FOOTER_SECTION_TEXT[activeSection] || "B3 / BOVESPA")}
           {lastUpdate ? ` · ${lastUpdate.toLocaleTimeString()}` : ""}
         </div>

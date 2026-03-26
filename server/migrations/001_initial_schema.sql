@@ -42,8 +42,10 @@ create table if not exists assets (
 create index if not exists idx_assets_subgroup_id on assets(subgroup_id);
 create index if not exists idx_assets_group_id    on assets(group_id);
 
--- Users (auth handled by Supabase Auth in Phase 2;
--- this table holds role and profile data)
+-- UNUSED: This profiles table was created during Phase 1 planning but is never
+-- read or written to by the application. All user data (name, role) is stored
+-- in Supabase Auth user_metadata instead. Retained here for reference only;
+-- safe to drop if cleaning up the schema.
 create table if not exists profiles (
   id         uuid primary key references auth.users(id) on delete cascade,
   email      text unique not null,

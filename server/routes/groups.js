@@ -38,7 +38,7 @@ router.get('/:id', async (req, res) => {
 
 // POST /api/v1/groups
 router.post('/', authenticate, requireAdmin, async (req, res) => {
-  const { display_name, description, slug, terminal_view, block_id, sort_order, icon, color } = req.body;
+  const { display_name, description, slug, l1_id, terminal_view, block_id, sort_order, icon, color } = req.body;
   if (!display_name || !slug) {
     return res.status(400).json({ error: 'BAD_REQUEST', message: 'display_name and slug are required' });
   }
@@ -62,6 +62,7 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
       display_name,
       description:   description   || null,
       slug,
+      l1_id:         l1_id         || null,
       terminal_view: terminal_view || 'global',
       block_id:      block_id      || null,
       sort_order:    sort_order    ?? 0,
@@ -77,7 +78,7 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
 
 // PUT /api/v1/groups/:id
 router.put('/:id', authenticate, requireAdmin, async (req, res) => {
-  const { display_name, description, slug, terminal_view, block_id, sort_order, icon, color } = req.body;
+  const { display_name, description, slug, l1_id, terminal_view, block_id, sort_order, icon, color } = req.body;
 
   const { data: group, error: fetchError } = await supabase
     .from('groups')
@@ -104,6 +105,7 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
       display_name:  display_name  || group.display_name,
       description:   description   !== undefined ? description   : group.description,
       slug:          slug          || group.slug,
+      l1_id:         l1_id         !== undefined ? l1_id         : group.l1_id,
       terminal_view: terminal_view !== undefined ? terminal_view : group.terminal_view,
       block_id:      block_id      !== undefined ? block_id      : group.block_id,
       sort_order:    sort_order    !== undefined ? sort_order    : group.sort_order,

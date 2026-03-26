@@ -6,9 +6,13 @@ const router = Router();
 
 const DEFAULTS = {
   theme:           'dark',
-  defaultView:     'dashboard',
+  defaultTerminal: 'global',
+  refreshInterval: 30,
+  language:        'en',
   defaultExchange: 'NYSE',
 };
+
+const allowed = ['theme', 'defaultTerminal', 'refreshInterval', 'language', 'defaultExchange'];
 
 // GET /api/v1/preferences
 router.get('/', authenticate, async (req, res) => {
@@ -23,19 +27,35 @@ router.get('/', authenticate, async (req, res) => {
       error: 'DB_ERROR', message: error.message
     });
 
-  // PGRST116 = no row yet — return defaults
-  res.json({ prefs: { ...DEFAULTS, ...(data?.prefs || {}) } });
+  const merged = { ...DEFAULTS, ...(data?.prefs || {}) };
+
+  // Migrate old defaultView → defaultTerminal
+  if (merged.defaultView && !merged.defaultTerminal) {
+    merged.defaultTerminal = 'global';
+  }
+  delete merged.defaultView;
+
+  res.json({ prefs: merged });
 });
 
 // PUT /api/v1/preferences
-// Body: { prefs: { theme?, defaultView?, defaultExchange? } }
+// Body: { prefs: { theme?, defaultTerminal?, refreshInterval?, language?, defaultExchange? } }
 router.put('/', authenticate, async (req, res) => {
   const incoming = req.body.prefs || {};
 
-  const allowed  = ['theme', 'defaultView', 'defaultExchange'];
   const filtered = Object.fromEntries(
     Object.entries(incoming).filter(([k]) => allowed.includes(k))
   );
+
+  // Validate refreshInterval if provided
+  if (filtered.refreshInterval != null) {
+    const val = Number(filtered.refreshInterval);
+    if (![15, 30, 60].includes(val)) {
+      filtered.refreshInterval = 30;
+    } else {
+      filtered.refreshInterval = val;
+    }
+  }
 
   // Fetch existing to merge
   const { data: existing } = await supabase
@@ -44,9 +64,13 @@ router.put('/', authenticate, async (req, res) => {
     .eq('user_id', req.user.id)
     .single();
 
+  const existingPrefs = existing?.prefs || {};
+  // Clean old key
+  delete existingPrefs.defaultView;
+
   const merged = {
     ...DEFAULTS,
-    ...(existing?.prefs || {}),
+    ...existingPrefs,
     ...filtered
   };
 
