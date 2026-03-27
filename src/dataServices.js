@@ -475,7 +475,11 @@ export async function fmpProfile(symbol) {
         lastDiv:     p.lastDividend,
         sector:      p.sector,
         industry:    p.industry,
-        description: p.description?.slice(0, 200),
+        description: p.description?.slice(0, 500),
+        ceo:         p.ceo ?? null,
+        employees:   p.fullTimeEmployees ?? null,
+        ipoDate:     p.ipoDate ?? null,
+        country:     p.country ?? null,
       };
     },
   });
@@ -500,11 +504,28 @@ export async function fmpRatios(symbol) {
       if (!Array.isArray(data) || !data.length) throw new ApiHttpError(204, 'No ratios data');
       const r = data[0];
       return {
-        peRatio:      r.priceToEarningsRatioTTM ?? r.peRatioTTM,
-        debtEquity:   r.debtToEquityRatioTTM ?? r.debtEquityRatioTTM,
-        roe:          r.returnOnEquityTTM ?? null,
-        profitMargin: r.netProfitMarginTTM,
-        currentRatio: r.currentRatioTTM,
+        // Existing fields (keep — other consumers depend on them)
+        peRatio:              r.priceToEarningsRatioTTM ?? r.peRatioTTM,
+        debtEquity:           r.debtToEquityRatioTTM ?? r.debtEquityRatioTTM,
+        roe:                  r.returnOnEquityTTM ?? null,
+        profitMargin:         r.netProfitMarginTTM,
+        currentRatio:         r.currentRatioTTM,
+        // Valuation
+        priceToBook:          r.priceToBookRatioTTM ?? null,
+        priceToSales:         r.priceToSalesRatioTTM ?? null,
+        evToEbitda:           r.enterpriseValueMultipleTTM ?? null,
+        priceToFreeCashFlow:  r.priceToFreeCashFlowsRatioTTM ?? null,
+        // Profitability
+        roa:                  r.returnOnAssetsTTM ?? null,
+        grossMargin:          r.grossProfitMarginTTM ?? null,
+        operatingMargin:      r.operatingProfitMarginTTM ?? null,
+        // Leverage
+        debtToAssets:         r.totalDebtToTotalAssetsTTM ?? r.debtToAssetsTTM ?? null,
+        interestCoverage:     r.interestCoverageTTM ?? null,
+        quickRatio:           r.quickRatioTTM ?? null,
+        // Dividend
+        dividendYield:        r.dividendYieldTTM ?? r.dividendYieldPercentageTTM ?? null,
+        payoutRatio:          r.payoutRatioTTM ?? null,
       };
     },
   });
@@ -993,11 +1014,15 @@ export async function fetchYahooChartData(symbol, range, interval, { assets }) {
 // Timestamps are Unix seconds (lightweight-charts expects seconds).
 
 const OHLCV_TIMEFRAMES = {
-  '1D': { interval: '5m',  range: '1d'  },
-  '1W': { interval: '60m', range: '5d'  },
-  '1M': { interval: '1d',  range: '1mo' },
-  '3M': { interval: '1d',  range: '3mo' },
-  '1Y': { interval: '1wk', range: '1y'  },
+  '1D':  { interval: '5m',  range: '1d'  },
+  '5D':  { interval: '30m', range: '5d'  },
+  '1W':  { interval: '60m', range: '5d'  },
+  '1M':  { interval: '1d',  range: '1mo' },
+  '3M':  { interval: '1d',  range: '3mo' },
+  'YTD': { interval: '1d',  range: 'ytd' },
+  '1Y':  { interval: '1wk', range: '1y'  },
+  '5Y':  { interval: '1wk', range: '5y'  },
+  'MAX': { interval: '1mo', range: 'max' },
 };
 
 /**
@@ -1009,9 +1034,10 @@ const OHLCV_TIMEFRAMES = {
  * @param {{ assets?: Object }} [maps]
  * @returns {Promise<Array<{ time: number, open: number, high: number, low: number, close: number, volume: number }>>}
  */
-export async function fetchYahooOHLCV(symbol, timeframe = '1M', { assets = {} } = {}) {
+export async function fetchYahooOHLCV(symbol, timeframe = '1M', { assets = {}, interval: intervalOverride } = {}) {
   const tf = OHLCV_TIMEFRAMES[timeframe] || OHLCV_TIMEFRAMES['1M'];
-  const { range, interval } = tf;
+  const range = tf.range;
+  const interval = intervalOverride || tf.interval;
   const chartSymbol = assets[symbol]?.isB3 ? symbol + '.SA' : symbol;
   const yahooPath = `/v8/finance/chart/${encodeURIComponent(chartSymbol)}?range=${range}&interval=${interval}`;
   const yahooUrl  = `https://query1.finance.yahoo.com${yahooPath}`;

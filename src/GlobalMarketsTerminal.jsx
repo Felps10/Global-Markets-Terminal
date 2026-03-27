@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "./hooks/useAuth.js";
 import CommandBar from "./components/CommandBar.jsx";
 import AssetListView from "./components/AssetListView.jsx";
+import AssetDetailDrawer from "./components/AssetDetailDrawer.jsx";
 import {
   hasFinnhubKey, finnhubNews, finnhubRecommendation,
   hasFmpKey, fmpProfile, fmpRatios, fmpBatchProfile,
@@ -168,6 +169,8 @@ const VOLATILITY = {
   "precious-metals": 0.012, "energy-commodities": 0.018, agriculture: 0.014,
 };
 
+// ── DEAD CODE — legacy DetailPanel (replaced by AssetDetailDrawer) ──────────
+// TODO: Remove after confirming no other consumer exists
 const TIMEFRAMES = [
   { key: "1D",  range: "1d",  interval: "5m",  xFmt: "time"  },
   { key: "5D",  range: "5d",  interval: "30m", xFmt: "date"  },
@@ -264,6 +267,8 @@ async function fetchCryptoData(assetsMap = STATIC_ASSETS_MAP) {
   return result;
 }
 
+// ── DEAD CODE — legacy DetailPanel (replaced by AssetDetailDrawer) ──────────
+// TODO: Remove after confirming no other consumer exists
 async function fetchChartData(symbol, range, interval) {
   return fetchYahooChartData(symbol, range, interval, { assets: STATIC_ASSETS_MAP });
 }
@@ -298,6 +303,8 @@ export function Sparkline({ data, positive, width = 80, height = 28 }) {
   );
 }
 
+// ── DEAD CODE — legacy DetailPanel (replaced by AssetDetailDrawer) ──────────
+// TODO: Remove after confirming no other consumer exists
 // ─── HISTORY CHART ────────────────────────────────────────────────────────────
 function HistoryChart({ points, positive, xFmt }) {
   if (!points || points.length < 2) return null;
@@ -614,6 +621,8 @@ export function AssetRow({ symbol, data, rank, onClick }) {
   );
 }
 
+// ── DEAD CODE — legacy DetailPanel (replaced by AssetDetailDrawer) ──────────
+// TODO: Remove after confirming no other consumer exists
 // ─── DETAIL PANEL ─────────────────────────────────────────────────────────────
 function DetailPanel({ symbol, data, onClose }) {
   const asset = STATIC_ASSETS_MAP[symbol];
@@ -1160,8 +1169,10 @@ export default function GlobalMarketsTerminal() {
   const getGroupAvgPct = useCallback((catKey) => {
     const syms = getGroupSymbols(catKey);
     if (!syms.length) return null;
-    const pcts = syms.map(s => marketData?.[s]?.changePct ?? 0);
-    return pcts.reduce((a, b) => a + b, 0) / pcts.length;
+    const pcts = syms
+      .map(s => marketData?.[s]?.changePct)
+      .filter(n => typeof n === 'number' && isFinite(n));
+    return pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : null;
   }, [getGroupSymbols, marketData]);
 
   // Sort visibleCats by groupSort + groupDir
@@ -1385,9 +1396,11 @@ export default function GlobalMarketsTerminal() {
       <div style={{ position:"fixed",top:"-20%",left:"-10%",width:"50%",height:"50%",background:"radial-gradient(ellipse,rgba(0,230,118,0.03) 0%,transparent 70%)",pointerEvents:"none" }} />
       <div style={{ position:"fixed",bottom:"-20%",right:"-10%",width:"50%",height:"50%",background:"radial-gradient(ellipse,rgba(124,77,255,0.025) 0%,transparent 70%)",pointerEvents:"none" }} />
 
-      {selectedAsset && marketData?.[selectedAsset] && (
-        <DetailPanel symbol={selectedAsset} data={marketData[selectedAsset]} onClose={() => setSelectedAsset(null)} />
-      )}
+      <AssetDetailDrawer
+        symbol={selectedAsset}
+        onClose={() => setSelectedAsset(null)}
+        onSymbolChange={(sym) => setSelectedAsset(sym)}
+      />
 
       {/* ── COMMAND BAR ── */}
       <CommandBar
@@ -1479,9 +1492,27 @@ export default function GlobalMarketsTerminal() {
                 const seen = new Set();
                 const flatItems = sortedCats.flatMap(catKey => {
                   const cat = CATEGORIES[catKey];
-                  return getGroupSymbols(catKey)
-                    .filter(s => passes(s) && marketData[s] && !seen.has(s) && seen.add(s))
-                    .map(s => ({ sym: s, groupLabel: cat.label }));
+                  let syms = getGroupSymbols(catKey)
+                    .filter(s => passes(s) && marketData[s] && !seen.has(s) && seen.add(s));
+                  if (groupSort === 'return') {
+                    syms = syms.slice().sort((a, b) => {
+                      const pA = marketData?.[a]?.changePct;
+                      const pB = marketData?.[b]?.changePct;
+                      if (pA == null && pB == null) return 0;
+                      if (pA == null) return 1;
+                      if (pB == null) return -1;
+                      return groupDir === 'desc' ? pB - pA : pA - pB;
+                    });
+                  } else {
+                    syms = syms.slice().sort((a, b) => {
+                      const nA = ASSETS[a]?.display || ASSETS[a]?.name || a;
+                      const nB = ASSETS[b]?.display || ASSETS[b]?.name || b;
+                      return groupDir === 'asc'
+                        ? nA.localeCompare(nB, undefined, { sensitivity: 'base' })
+                        : nB.localeCompare(nA, undefined, { sensitivity: 'base' });
+                    });
+                  }
+                  return syms.map(s => ({ sym: s, groupLabel: cat.label }));
                 });
                 return (
                   <div style={{ marginTop: 16 }}>
@@ -1527,6 +1558,24 @@ export default function GlobalMarketsTerminal() {
                           ? (marketData[b]?.changePct ?? 0) - (marketData[a]?.changePct ?? 0)
                           : (marketData[a]?.changePct ?? 0) - (marketData[b]?.changePct ?? 0)
                       );
+                    }
+                    if (groupSort === 'return') {
+                      symbols = symbols.slice().sort((a, b) => {
+                        const pA = marketData?.[a]?.changePct;
+                        const pB = marketData?.[b]?.changePct;
+                        if (pA == null && pB == null) return 0;
+                        if (pA == null) return 1;
+                        if (pB == null) return -1;
+                        return groupDir === 'desc' ? pB - pA : pA - pB;
+                      });
+                    } else if (groupSort === 'alpha') {
+                      symbols = symbols.slice().sort((a, b) => {
+                        const nA = ASSETS[a]?.display || ASSETS[a]?.name || a;
+                        const nB = ASSETS[b]?.display || ASSETS[b]?.name || b;
+                        return groupDir === 'asc'
+                          ? nA.localeCompare(nB, undefined, { sensitivity: 'base' })
+                          : nB.localeCompare(nA, undefined, { sensitivity: 'base' });
+                      });
                     }
                   }
 
@@ -1701,6 +1750,24 @@ export default function GlobalMarketsTerminal() {
                         ? (marketData[b]?.changePct ?? 0) - (marketData[a]?.changePct ?? 0)
                         : (marketData[a]?.changePct ?? 0) - (marketData[b]?.changePct ?? 0)
                     );
+                  }
+                  if (groupSort === 'return') {
+                    symbols = symbols.slice().sort((a, b) => {
+                      const pA = marketData?.[a]?.changePct;
+                      const pB = marketData?.[b]?.changePct;
+                      if (pA == null && pB == null) return 0;
+                      if (pA == null) return 1;
+                      if (pB == null) return -1;
+                      return groupDir === 'desc' ? pB - pA : pA - pB;
+                    });
+                  } else if (groupSort === 'alpha') {
+                    symbols = symbols.slice().sort((a, b) => {
+                      const nA = ASSETS[a]?.display || ASSETS[a]?.name || a;
+                      const nB = ASSETS[b]?.display || ASSETS[b]?.name || b;
+                      return groupDir === 'asc'
+                        ? nA.localeCompare(nB, undefined, { sensitivity: 'base' })
+                        : nB.localeCompare(nA, undefined, { sensitivity: 'base' });
+                    });
                   }
                   const catPcts = symbols.map(s => marketData[s]?.changePct ?? 0);
                   const catAvg  = catPcts.length ? catPcts.reduce((a, b) => a + b, 0) / catPcts.length : 0;

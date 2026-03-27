@@ -50,8 +50,15 @@ export default function TerminalLayout() {
         user={user}
         onMenuOpen={() => setMenuOpen(true)}
         onNav={(key) => {
-          if (key.startsWith('/')) navigate(key);
-          else navigate('/app/global');
+          if (key.startsWith('/')) { navigate(key); return; }
+          const pathMap = {
+            dashboard: `/app/${terminalMode}`,
+            heatmap:   '/app/heatmap',
+            catalog:   '/app/catalog',
+            news:      '/app/news',
+            watchlist: '/app/watchlist',
+          };
+          navigate(pathMap[key] || `/app/${terminalMode}`);
         }}
         onLogout={() => { logout(); navigate('/'); }}
         watchlistEnabled={!!user}

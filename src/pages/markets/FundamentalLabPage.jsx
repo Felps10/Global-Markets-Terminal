@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTaxonomy } from '../../context/TaxonomyContext.jsx';
 import { API_BASE, fmpProfile, fmpRatios, hasFmpKey } from '../../dataServices.js';
 import { isExhausted } from '../../services/quotaTracker.js';
@@ -255,6 +255,7 @@ function BarChart({ values, metricKey, width }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function FundamentalLabPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { subgroups, assets } = useTaxonomy();
 
   const [selectedSymbols, setSelectedSymbols] = useState([]);
@@ -425,6 +426,18 @@ export default function FundamentalLabPage() {
     fetchYahooQuote(symbol);
     if (hasFmpKey()) fetchFmpData(symbol);
   }, [selectedSymbols, assetMap, fetchYahooQuote, fetchFmpData]);
+
+  // Load symbols from URL search params on mount (e.g., ?symbols=COP,XOM,CVX)
+  const urlParamsLoaded = useRef(false);
+  useEffect(() => {
+    if (urlParamsLoaded.current) return;
+    const urlSymbols = searchParams.get('symbols');
+    if (urlSymbols) {
+      urlParamsLoaded.current = true;
+      const syms = urlSymbols.split(',').filter(Boolean).slice(0, 5);
+      syms.forEach(sym => addAsset(sym));
+    }
+  }, [searchParams, addAsset]);
 
   const removeAsset = useCallback(symbol => {
     setSelectedSymbols(prev => prev.filter(s => s !== symbol));
