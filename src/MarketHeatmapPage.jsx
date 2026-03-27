@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import MarketsPageLayout from "./components/MarketsPageLayout.jsx";
 import styled, { keyframes } from "styled-components";
 import MarketHeatmap from "./components/MarketHeatmap";
 import { finnhubQuote, hasFinnhubKey } from "./dataServices.js";
@@ -11,8 +11,7 @@ import { finnhubQuote, hasFinnhubKey } from "./dataServices.js";
  * on top of GlobalMarketsTerminal's scrollable layout.  The hamburger menu
  * (z-index 200+) still appears above this page.
  *
- * Props:
- *   onNavigate — (view: string) => void  passed from App.jsx / GlobalMarketsTerminal
+ * Standalone route at /markets/heatmap — uses react-router navigate for navigation.
  * ───────────────────────────────────────────────────────────────────────────── */
 
 // ─── Color Palette (mirrors MarketHeatmap's theme) ───────────────────────────
@@ -126,9 +125,8 @@ const fadeIn = keyframes`
    below the hamburger menu panel (z:200). Users can still open the menu
    to navigate away. */
 const PageRoot = styled.div`
-  position: fixed;
-  inset: 0;
-  z-index: 50;
+  position: relative;
+  flex: 1;
   overflow: hidden;
   background: ${C.bg};
   font-family: "IBM Plex Mono", monospace;
@@ -136,7 +134,7 @@ const PageRoot = styled.div`
 
 /* ── Floating overlay layer (events pass through to children) ── */
 const FloatLayer = styled.div`
-  position: fixed;
+  position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: 100;
@@ -596,8 +594,6 @@ const CCRemove = styled.button`
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function MarketHeatmapPage() {
-  const navigate = useNavigate();
-  const onNavigate = (key) => navigate(key === 'dashboard' ? '/app/global' : '/app/global');
   // ── Data state ──────────────────────────────────────────────────────────────
   const [stocks, setStocks]           = useState(BASE_STOCKS);
   const [dataStatus, setDataStatus]   = useState("mock");
@@ -721,6 +717,7 @@ export default function MarketHeatmapPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
+    <MarketsPageLayout moduleTitle="Market Heatmap" moduleIcon="🔥">
     <PageRoot>
       {/* MarketHeatmap fills the full fixed root. It renders its own Sector
           sidebar (240px) + Toolbar + Treemap. We layer our controls on top. */}
@@ -732,13 +729,6 @@ export default function MarketHeatmapPage() {
 
       {/* ── Floating overlay ────────────────────────────────────────────── */}
       <FloatLayer>
-
-        {/* Back button — positioned just right of the heatmap's sector sidebar */}
-        {onNavigate && (
-          <BackBtn onClick={() => onNavigate("dashboard")}>
-            ← Dashboard
-          </BackBtn>
-        )}
 
         {/* Controls toggle button — top-right corner */}
         <CtrlToggle $open={ctrlOpen} onClick={() => setCtrlOpen((o) => !o)}>
@@ -979,5 +969,6 @@ export default function MarketHeatmapPage() {
         )}
       </FloatLayer>
     </PageRoot>
+    </MarketsPageLayout>
   );
 }

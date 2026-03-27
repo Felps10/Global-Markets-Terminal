@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import MarketsPageLayout from '../../components/MarketsPageLayout.jsx';
 import { useTaxonomy } from '../../context/TaxonomyContext.jsx';
 import { alphaVantageRSI, alphaVantageMACD, hasAlphaVantageKey } from '../../dataServices.js';
 import { quotaTracker, isExhausted } from '../../services/quotaTracker.js';
@@ -517,7 +517,6 @@ function ScannerResultsCard({ results, scanLoading, scanProgress, totalToScan, s
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function SignalEnginePage() {
-  const navigate = useNavigate();
   const { assets, subgroups } = useTaxonomy();
 
   // Mode
@@ -857,28 +856,17 @@ export default function SignalEnginePage() {
   );
 
   // ── Render ─────────────────────────────────────────────────────────────────
+  const statusControls = (
+    <>
+      {isMobile && (
+        <button onClick={() => setPanelOpen(true)} style={{ ...mono, fontSize: 11, color: TXT_2, background: 'transparent', border: `1px solid ${BORDER}`, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>⚙ Configure</button>
+      )}
+      <QuotaBadge />
+    </>
+  );
+
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: BG_PAGE, color: TXT_1, overflow: 'hidden' }}>
-      {/* Header */}
-      <div style={{ height: 48, minHeight: 48, background: BG_HEAD, borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 12, zIndex: 20 }}>
-        <button onClick={() => navigate('/app')} style={{ ...mono, fontSize: 12, color: TXT_3, background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 0' }}
-          onMouseEnter={e => e.currentTarget.style.color = TXT_2}
-          onMouseLeave={e => e.currentTarget.style.color = TXT_3}
-        >← Terminal</button>
-        <div style={{ width: 1, height: 16, background: BORDER2 }} />
-        <div style={{ ...mono, fontSize: 13, fontWeight: 700, letterSpacing: '0.08em', color: TXT_1, textTransform: 'uppercase', flex: 1 }}>
-          SIGNAL ENGINE
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {isMobile && (
-            <button onClick={() => setPanelOpen(true)} style={{ ...mono, fontSize: 11, color: TXT_2, background: 'transparent', border: `1px solid ${BORDER}`, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>⚙ Configure</button>
-          )}
-          <QuotaBadge />
-          <div style={{ ...mono, fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: AMBER, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 4, padding: '4px 10px' }}>
-            GMT_MODULE
-          </div>
-        </div>
-      </div>
+    <MarketsPageLayout moduleTitle="Signal Engine" moduleIcon="⚡" rightControls={statusControls}>
 
       {/* Body */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -959,6 +947,6 @@ export default function SignalEnginePage() {
           </div>
         </>
       )}
-    </div>
+    </MarketsPageLayout>
   );
 }

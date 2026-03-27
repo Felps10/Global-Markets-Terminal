@@ -779,8 +779,8 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
                 );
               })}
               <button
-                onClick={() => navigate(`/markets/chart?symbol=${currentSymbol}`)}
-                title="Open in Chart Center"
+                onClick={() => navigate(`/markets/research?symbol=${currentSymbol}`)}
+                title="Open in Chart & Research"
                 style={{
                   fontFamily: "'JetBrains Mono', monospace", fontSize: 9,
                   color: TXT_3, background: 'transparent',

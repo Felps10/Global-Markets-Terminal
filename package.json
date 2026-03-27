@@ -11,6 +11,7 @@
     "start:server": "node --max-http-header-size=65536 server/index.js",
     "start": "node --max-http-header-size=65536 server/index.js",
     "start:dev": "concurrently -n api,vite -c magenta,green \"npm run start:server\" \"npm run dev\"",
+    "start:full": "concurrently -n proxy,api,vite -c yellow,magenta,green \"node --max-http-header-size=65536 proxy-server.js\" \"npm run start:server\" \"npm run dev\"",
     "build": "vite build",
     "preview": "vite preview",
     "seed": "node --input-type=module --eval \"import('./server/seed.js').then(async m => { await m.seedIfEmpty(); await m.logTaxonomyCounts(); })\"",

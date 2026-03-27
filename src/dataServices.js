@@ -1008,7 +1008,7 @@ export async function fetchYahooChartData(symbol, range, interval, { assets }) {
   return response.data;
 }
 
-// ─── YAHOO OHLCV (for Chart Center) ──────────────────────────────────────────
+// ─── YAHOO OHLCV (for Chart & Research) ──────────────────────────────────────
 // Returns full candlestick data (open, high, low, close, volume).
 // Distinct from fetchYahooChartData which only returns close prices.
 // Timestamps are Unix seconds (lightweight-charts expects seconds).
@@ -1027,7 +1027,7 @@ const OHLCV_TIMEFRAMES = {
 
 /**
  * Fetch OHLCV candlestick data for a symbol and timeframe.
- * Used by ChartCenterPage for interactive charts.
+ * Used by ChartResearchPage for interactive charts.
  *
  * @param {string} symbol       - Internal symbol key (e.g. "SPY", "PETR4")
  * @param {string} [timeframe]  - '1D' | '1W' | '1M' | '3M' | '1Y' (default: '1M')

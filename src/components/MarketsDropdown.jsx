@@ -18,21 +18,25 @@ function injectDropdownStyles() {
     .markets-dropdown-item:hover {
       background: rgba(255,255,255,0.04) !important;
     }
+    .markets-dropdown-item.item-active {
+      background: rgba(59,130,246,0.06) !important;
+      border-left: 3px solid #3b82f6;
+    }
   `;
   document.head.appendChild(el);
 }
 
 const MARKETS_ITEMS = [
   {
-    icon: '📈',
-    label: 'Chart Center',
-    description: 'Interactive price charts & comparisons',
-    route: '/markets/chart',
+    icon: '🔥',
+    label: 'Market Heatmap',
+    description: 'Volume-weighted performance treemap',
+    route: '/markets/heatmap',
   },
   {
-    icon: '🔬',
-    label: 'Research Terminal',
-    description: 'Deep-dive asset research workspace',
+    icon: '📊',
+    label: 'Chart & Research',
+    description: 'Interactive charts & deep asset research',
     route: '/markets/research',
   },
   {
@@ -111,42 +115,48 @@ export default function MarketsDropdown() {
               {i > 0 && (
                 <div style={{ height: 1, background: 'rgba(30,41,59,0.8)' }} />
               )}
-              <button
-                className="markets-dropdown-item"
-                onClick={() => { navigate(item.route); setOpen(false); }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 10,
-                  width: '100%',
-                  padding: '12px 16px',
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
-                <span style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>{item.icon}</span>
-                <div>
-                  <div style={{
-                    fontFamily: "'JetBrains Mono', monospace",
-                    fontSize: 12,
-                    fontWeight: 500,
-                    color: '#e2e8f0',
-                    letterSpacing: '0.02em',
-                  }}>
-                    {item.label}
-                  </div>
-                  <div style={{
-                    fontFamily: "'IBM Plex Sans', sans-serif",
-                    fontSize: 11,
-                    color: '#475569',
-                    marginTop: 3,
-                  }}>
-                    {item.description}
-                  </div>
-                </div>
-              </button>
+              {(() => {
+                const itemActive = location.pathname.startsWith(item.route);
+                return (
+                  <button
+                    className={`markets-dropdown-item${itemActive ? ' item-active' : ''}`}
+                    onClick={() => { navigate(item.route); setOpen(false); }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 10,
+                      width: '100%',
+                      padding: '12px 16px',
+                      background: 'transparent',
+                      border: 'none',
+                      borderLeft: itemActive ? '3px solid #3b82f6' : '3px solid transparent',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <span style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>{item.icon}</span>
+                    <div>
+                      <div style={{
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontSize: 12,
+                        fontWeight: itemActive ? 600 : 500,
+                        color: itemActive ? '#3b82f6' : '#e2e8f0',
+                        letterSpacing: '0.02em',
+                      }}>
+                        {item.label}
+                      </div>
+                      <div style={{
+                        fontFamily: "'IBM Plex Sans', sans-serif",
+                        fontSize: 11,
+                        color: '#475569',
+                        marginTop: 3,
+                      }}>
+                        {item.description}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })()}
             </div>
           ))}
         </div>

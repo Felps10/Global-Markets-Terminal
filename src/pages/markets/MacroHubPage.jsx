@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import MarketsPageLayout from '../../components/MarketsPageLayout.jsx';
 import {
   fredAllMacro,
   bcbMacro,
@@ -518,8 +518,6 @@ function NoKeyCard({ varName }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function MacroHubPage() {
-  const navigate = useNavigate();
-
   const [activeTab,       setActiveTab]       = useState('us');
   const [fredData,        setFredData]        = useState(null);
   const [bcbData,         setBcbData]         = useState(null);
@@ -657,36 +655,7 @@ export default function MacroHubPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: BG_PAGE }}>
-
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div style={{
-        height: 48, flexShrink: 0, display: 'flex', alignItems: 'center',
-        justifyContent: 'space-between', padding: '0 16px',
-        background: BG_HEAD, borderBottom: `1px solid ${BORDER}`, zIndex: 10,
-      }}>
-        <button
-          onClick={() => navigate('/app')}
-          style={{
-            background: 'transparent', border: 'none', cursor: 'pointer',
-            color: TXT_3, fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13,
-            padding: 0, display: 'flex', alignItems: 'center', gap: 6,
-          }}
-          onMouseEnter={e => e.currentTarget.style.color = TXT_2}
-          onMouseLeave={e => e.currentTarget.style.color = TXT_3}
-        >← Terminal</button>
-
-        <div style={{
-          fontFamily: "'JetBrains Mono', monospace", fontSize: 13, fontWeight: 700,
-          letterSpacing: '2px', color: TXT_2, textTransform: 'uppercase',
-        }}>Macro Hub</div>
-
-        <div style={{
-          fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700,
-          letterSpacing: '0.14em', color: AMBER, padding: '3px 8px', borderRadius: 4,
-          background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)',
-        }}>GMT_MODULE</div>
-      </div>
+    <MarketsPageLayout moduleTitle="Macro Hub" moduleIcon="🌐">
 
       {/* ── Tab bar ────────────────────────────────────────────────────────── */}
       <div style={{
@@ -890,6 +859,6 @@ export default function MacroHubPage() {
         )}
 
       </div>{/* end content area */}
-    </div>
+    </MarketsPageLayout>
   );
 }

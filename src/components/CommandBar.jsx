@@ -378,7 +378,7 @@ export default function CommandBar({
   // Exchange (activeExchanges is a Set)
   activeExchanges, allExchanges, onExchangeToggle, onExchangeReset,
   // View ("grid" | "list") — no VIEW tab, toggle is in strip
-  viewMode, onViewChange, onDensityChange,
+  viewMode, onViewChange, onDensityChange, cardDensity,
   // Group collapse/expand
   onCollapseAll, onExpandAll, flatExpand,
   // Refresh
@@ -389,7 +389,7 @@ export default function CommandBar({
   // openPanel: null | 'filter' | 'sort' | 'exchange'  (no 'view')
   const [openPanel,         setOpenPanel]         = useState(null);
   const [activeGroupFilter, setActiveGroupFilter]  = useState(null);
-  const [density,           setDensity]            = useState('comfortable');
+  const [density,           setDensity]            = useState(cardDensity || 'compact');
 
   const togglePanel = (key) => setOpenPanel(p => p === key ? null : key);
 

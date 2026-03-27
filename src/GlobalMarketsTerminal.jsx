@@ -432,14 +432,48 @@ function CrossListBadge({ symbol }) {
   );
 }
 
+// ─── DENSITY CONFIG ──────────────────────────────────────────────────────────
+const DENSITY_CONFIG = {
+  compact: {
+    // GroupSummaryCard
+    gridMin: 200, gap: 8, cardPadding: "14px 16px",
+    iconSize: 14, nameSize: 11, pctSize: 12,
+    mcapSize: 9, assetCountSize: 8, barHeight: 2,
+    // AssetCard
+    assetGridMin: 220, assetGap: 8, assetPadding: "10px 12px 6px",
+    assetTickerSize: 12, assetNameSize: 9, assetPriceSize: 16,
+    assetChangeSize: 11, assetVolumeSize: 8, assetBadgeSize: 7,
+    assetSparkW: 70, assetSparkH: 24, assetShowHighLow: false,
+  },
+  comfortable: {
+    gridMin: 260, gap: 12, cardPadding: "18px 20px",
+    iconSize: 18, nameSize: 13, pctSize: 14,
+    mcapSize: 10, assetCountSize: 9, barHeight: 3,
+    assetGridMin: 270, assetGap: 10, assetPadding: "12px 14px 8px",
+    assetTickerSize: 13, assetNameSize: 10, assetPriceSize: 18,
+    assetChangeSize: 13, assetVolumeSize: 9, assetBadgeSize: 8,
+    assetSparkW: 80, assetSparkH: 28, assetShowHighLow: true,
+  },
+  spacious: {
+    gridMin: 320, gap: 16, cardPadding: "24px 24px",
+    iconSize: 22, nameSize: 15, pctSize: 16,
+    mcapSize: 11, assetCountSize: 10, barHeight: 4,
+    assetGridMin: 340, assetGap: 14, assetPadding: "16px 18px 12px",
+    assetTickerSize: 15, assetNameSize: 12, assetPriceSize: 22,
+    assetChangeSize: 15, assetVolumeSize: 10, assetBadgeSize: 9,
+    assetSparkW: 100, assetSparkH: 34, assetShowHighLow: true,
+  },
+};
+
 // ─── ASSET CARD ───────────────────────────────────────────────────────────────
-export function AssetCard({ symbol, data, onClick, groupLabel }) {
+export function AssetCard({ symbol, data, onClick, groupLabel, density = "compact" }) {
   const [hovered, setHovered] = useState(false);
   const { isAuthenticated }           = useAuth();
   const { pin, unpin, isPinned }      = useWatchlist();
   const asset = STATIC_ASSETS_MAP[symbol];
   if (!asset || !data) return null;
 
+  const dc = DENSITY_CONFIG[density] || DENSITY_CONFIG.compact;
   const positive     = (data.changePct ?? 0) >= 0;
   const color        = positive ? "#00E676" : "#FF5252";
   const arrow        = positive ? "▲" : "▼";
@@ -458,7 +492,7 @@ export function AssetCard({ symbol, data, onClick, groupLabel }) {
           ? `linear-gradient(135deg,${positive ? "rgba(0,230,118,0.06)" : "rgba(255,82,82,0.06)"},rgba(13,15,24,0.95))`
           : "var(--c-surface)",
         border: `1px solid ${hovered ? color + "40" : "var(--c-border)"}`,
-        borderRadius: 8, padding: "12px 14px 8px",
+        borderRadius: 8, padding: dc.assetPadding,
         transition: "all 0.25s ease", position: "relative",
         overflow: "hidden", cursor: "pointer",
       }}
@@ -466,10 +500,10 @@ export function AssetCard({ symbol, data, onClick, groupLabel }) {
       {/* Top row */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, fontWeight: 700, color: "var(--c-text)", letterSpacing: "0.5px" }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: dc.assetTickerSize, fontWeight: 700, color: "var(--c-text)", letterSpacing: "0.5px" }}>
             {displayTicker}
           </div>
-          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10, color: "var(--c-text-2)", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: dc.assetNameSize, color: "var(--c-text-2)", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {asset.name}
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 5 }}>
@@ -478,37 +512,37 @@ export function AssetCard({ symbol, data, onClick, groupLabel }) {
             {asset.isB3 && <SourceBadge source="brapi" />}
             <CrossListBadge symbol={symbol} />
             {groupLabel && (
-              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, padding: "1px 5px", borderRadius: 2, background: "#0a0f1a", color: "#2a4a6a", border: "0.5px solid #1a2f4a" }}>
+              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: dc.assetBadgeSize, padding: "1px 5px", borderRadius: 2, background: "#0a0f1a", color: "#2a4a6a", border: "0.5px solid #1a2f4a" }}>
                 {groupLabel.toUpperCase()}
               </span>
             )}
           </div>
         </div>
         <div style={{ marginRight: isAuthenticated ? 20 : 0 }}>
-          <Sparkline data={data.sparkline} positive={positive} />
+          <Sparkline data={data.sparkline} positive={positive} width={dc.assetSparkW} height={dc.assetSparkH} />
         </div>
       </div>
 
       {/* Price row */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: showVolume ? 6 : 2, marginTop: 6 }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 18, fontWeight: 700, color: "var(--c-text)" }}>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: dc.assetPriceSize, fontWeight: 700, color: "var(--c-text)" }}>
           {formatPrice(symbol, data.price)}
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, fontWeight: 600, color }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: dc.assetChangeSize, fontWeight: 600, color }}>
             {arrow} {sign}{data.changePct != null ? data.changePct.toFixed(2) : '—'}%
           </div>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: color + "99", marginTop: 1 }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: dc.assetChangeSize - 3, color: color + "99", marginTop: 1 }}>
             {sign}{data.change != null ? data.change.toFixed(asset.cat === "fx" ? 4 : 2) : '—'}
           </div>
         </div>
       </div>
 
-      {/* Volume / H-L */}
+      {/* Volume */}
       {showVolume && (
-        <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", marginBottom: 6 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "'JetBrains Mono', monospace", fontSize: dc.assetVolumeSize, color: "var(--c-text-3)", marginBottom: 6 }}>
           <span>Vol {formatVolume(data.volume)}</span>
-          <span>H {formatPrice(symbol, data.high)} · L {formatPrice(symbol, data.low)}</span>
+          {dc.assetShowHighLow && <span>H {formatPrice(symbol, data.high)} · L {formatPrice(symbol, data.low)}</span>}
         </div>
       )}
 
@@ -913,6 +947,7 @@ export default function GlobalMarketsTerminal() {
   const [activeFilter,    setActiveFilter]    = useState("all");
   const [sortMode,        setSortMode]        = useState("default");
   const [viewMode,        setViewMode]        = useState("cards");
+  const [cardDensity,     setCardDensity]     = useState("compact");
   const [groupSort,       setGroupSort]       = useState("alpha");   // "alpha" | "return"
   const [groupDir,        setGroupDir]        = useState("asc");     // "asc" | "desc"
   const [activeExchanges, setActiveExchanges] = useState(new Set());
@@ -1240,7 +1275,7 @@ export default function GlobalMarketsTerminal() {
   // ── Group Summary Card ───────────────────────────────────────────────────
   // Reusable in both allCollapsed grid (layout="grid") and individual collapse (layout="row").
   // Closes over getGroupSymbols, marketData, ASSETS from component scope.
-  function GroupSummaryCard({ catKey, cat, layout, onExpand }) {
+  function GroupSummaryCard({ catKey, cat, layout, onExpand, density = "compact" }) {
     const syms = getGroupSymbols(catKey);
     const pcts = syms
       .map(s => marketData?.[s]?.changePct)
@@ -1335,34 +1370,39 @@ export default function GlobalMarketsTerminal() {
     }
 
     // Grid card (allCollapsed mode)
+    const dc = DENSITY_CONFIG[density] || DENSITY_CONFIG.compact;
     return (
-      <div className="gmt-group-card" onClick={onExpand} style={{ ...cardBase, padding: "14px 16px" }}
+      <div className="gmt-group-card" onClick={onExpand} style={{ ...cardBase, padding: dc.cardPadding, transition: "all 0.2s ease, border-color 120ms ease, background 120ms ease" }}
         onMouseEnter={onEnter} onMouseLeave={onLeave}>
         {accentBar}
         {/* Row 1: icon + return */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: 14, lineHeight: 1 }}>{cat.icon}</span>
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700, color: pctColor }}>{pctLabel}</span>
+          <span style={{ fontSize: dc.iconSize, lineHeight: 1 }}>{cat.icon}</span>
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: dc.pctSize, fontWeight: 700, color: pctColor }}>{pctLabel}</span>
         </div>
         {/* Row 2: name */}
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", color: "#c8d8e8", marginTop: 10, marginBottom: 10 }}>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: dc.nameSize, fontWeight: 600, letterSpacing: "0.06em", color: "#c8d8e8", marginTop: 10, marginBottom: 10 }}>
           {cat.label.toUpperCase()}
         </div>
         {/* Row 3: stats */}
         <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, letterSpacing: "0.08em", color: "#2a4a6a" }}>ASSETS</span>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "#4a7fa5" }}>{count}</span>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: dc.assetCountSize - 1, letterSpacing: "0.08em", color: "#2a4a6a" }}>ASSETS</span>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: dc.assetCountSize, color: "#4a7fa5" }}>{count}</span>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, letterSpacing: "0.08em", color: "#2a4a6a" }}>MKT CAP</span>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "#4a7fa5" }}>{fmtMcap(totalMcap)}</span>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: dc.mcapSize - 1, letterSpacing: "0.08em", color: "#2a4a6a" }}>MKT CAP</span>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: dc.mcapSize, color: "#4a7fa5" }}>{fmtMcap(totalMcap)}</span>
           </div>
         </div>
         {/* Row 4: movers */}
         {movers && <div style={{ marginTop: 8 }}>{movers}</div>}
         {/* Row 5: progress bar */}
-        <div style={{ marginTop: 10 }}>{progressBar}</div>
+        <div style={{ marginTop: 10 }}>
+          <div style={{ background: "#1a2f4a", borderRadius: 1, height: dc.barHeight, width: "100%" }}>
+            <div style={{ height: dc.barHeight, borderRadius: 1, width: `${barWidth}%`, background: accentColor, transition: "width 0.3s ease" }} />
+          </div>
+        </div>
         {/* hover expand hint */}
         <span className="gmt-expand-hint" style={{ position: "absolute", bottom: 8, right: 10, fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: "#1a3050", letterSpacing: "0.06em", opacity: 0, transition: "opacity 150ms ease", pointerEvents: "none" }}>EXPAND ▾</span>
       </div>
@@ -1420,7 +1460,8 @@ export default function GlobalMarketsTerminal() {
         onExchangeReset={resetExchanges}
         viewMode={viewMode === "cards" ? "grid" : "list"}
         onViewChange={(mode) => setViewMode(mode === "grid" ? "cards" : "list")}
-        onDensityChange={() => {}}
+        onDensityChange={setCardDensity}
+        cardDensity={cardDensity}
         onCollapseAll={collapseAll}
         onExpandAll={expandAll}
         flatExpand={flatExpand}
@@ -1477,8 +1518,8 @@ export default function GlobalMarketsTerminal() {
               <div style={{ marginTop: 16 }}>
                 {viewMode === "list" && <ListColumnHeader />}
                 {viewMode === "cards" ? (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
-                    {flatSymbols.map(sym => <AssetCard key={sym} symbol={sym} data={marketData[sym]} onClick={() => setSelectedAsset(sym)} />)}
+                  <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${(DENSITY_CONFIG[cardDensity] || DENSITY_CONFIG.compact).assetGridMin}px, 1fr))`, gap: (DENSITY_CONFIG[cardDensity] || DENSITY_CONFIG.compact).assetGap, transition: "all 0.2s ease" }}>
+                    {flatSymbols.map(sym => <AssetCard key={sym} symbol={sym} data={marketData[sym]} onClick={() => setSelectedAsset(sym)} density={cardDensity} />)}
                   </div>
                 ) : (
                   <div style={{ border: "1px solid var(--c-border)", borderRadius: 8, overflow: "hidden" }}>
@@ -1516,9 +1557,9 @@ export default function GlobalMarketsTerminal() {
                 });
                 return (
                   <div style={{ marginTop: 16 }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${(DENSITY_CONFIG[cardDensity] || DENSITY_CONFIG.compact).assetGridMin}px, 1fr))`, gap: (DENSITY_CONFIG[cardDensity] || DENSITY_CONFIG.compact).assetGap, transition: "all 0.2s ease" }}>
                       {flatItems.map(({ sym, groupLabel }) => (
-                        <AssetCard key={sym} symbol={sym} data={marketData[sym]} onClick={() => setSelectedAsset(sym)} groupLabel={groupLabel} />
+                        <AssetCard key={sym} symbol={sym} data={marketData[sym]} onClick={() => setSelectedAsset(sym)} groupLabel={groupLabel} density={cardDensity} />
                       ))}
                     </div>
                   </div>
@@ -1653,7 +1694,7 @@ export default function GlobalMarketsTerminal() {
               </div>
             ) : allCollapsed ? (
               /* ── COLLAPSED CARD GRID MODE ── */
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8, padding: "12px 0" }}>
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${(DENSITY_CONFIG[cardDensity] || DENSITY_CONFIG.compact).gridMin}px, 1fr))`, gap: (DENSITY_CONFIG[cardDensity] || DENSITY_CONFIG.compact).gap, padding: "12px 0", transition: "all 0.2s ease" }}>
                 {sortedCats.map((catKey) => {
                   const cat = CATEGORIES[catKey];
                   const stats = getGroupStats(catKey);
@@ -1661,7 +1702,7 @@ export default function GlobalMarketsTerminal() {
                   const isOpen = expandedCards.has(catKey);
 
                   if (!isOpen) {
-                    return <GroupSummaryCard key={catKey} catKey={catKey} cat={cat} layout="grid" onExpand={() => toggleCard(catKey)} />;
+                    return <GroupSummaryCard key={catKey} catKey={catKey} cat={cat} layout="grid" onExpand={() => toggleCard(catKey)} density={cardDensity} />;
                   }
 
                   // Expanded full-width slot
@@ -1711,8 +1752,8 @@ export default function GlobalMarketsTerminal() {
                         )}
                         {viewMode === "list" && <ListColumnHeader />}
                         {viewMode === "cards" ? (
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
-                            {symbols.map(sym => <AssetCard key={sym} symbol={sym} data={marketData[sym]} onClick={() => setSelectedAsset(sym)} />)}
+                          <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${(DENSITY_CONFIG[cardDensity] || DENSITY_CONFIG.compact).assetGridMin}px, 1fr))`, gap: (DENSITY_CONFIG[cardDensity] || DENSITY_CONFIG.compact).assetGap, transition: "all 0.2s ease" }}>
+                            {symbols.map(sym => <AssetCard key={sym} symbol={sym} data={marketData[sym]} onClick={() => setSelectedAsset(sym)} density={cardDensity} />)}
                           </div>
                         ) : (
                           <div style={{ border: "1px solid var(--c-border)", borderRadius: 8, overflow: "hidden" }}>
@@ -1808,8 +1849,8 @@ export default function GlobalMarketsTerminal() {
                           )}
                           {viewMode === "list" && <ListColumnHeader />}
                           {viewMode === "cards" ? (
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
-                              {symbols.map(sym => <AssetCard key={sym} symbol={sym} data={marketData[sym]} onClick={() => setSelectedAsset(sym)} />)}
+                            <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${(DENSITY_CONFIG[cardDensity] || DENSITY_CONFIG.compact).assetGridMin}px, 1fr))`, gap: (DENSITY_CONFIG[cardDensity] || DENSITY_CONFIG.compact).assetGap, transition: "all 0.2s ease" }}>
+                              {symbols.map(sym => <AssetCard key={sym} symbol={sym} data={marketData[sym]} onClick={() => setSelectedAsset(sym)} density={cardDensity} />)}
                             </div>
                           ) : (
                             <div style={{ border: "1px solid var(--c-border)", borderRadius: 8, overflow: "hidden" }}>

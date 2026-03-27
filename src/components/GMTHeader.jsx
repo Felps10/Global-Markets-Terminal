@@ -2,7 +2,7 @@
  * GMTHeader.jsx — Unified terminal header
  *
  * Layer 1 (48px)  Top bar:  hamburger · GMT logo · market pill · [space] · clock · user menu
- * Layer 2 (38px)  Nav bar:  TERMINAL · HEATMAP · CATALOG · NEWS · [space] · LIVE · asset count
+ * Layer 2 (38px)  Nav bar:  TERMINAL · MARKETS ▾ · CATALOG · NEWS · [space] · LIVE · asset count
  * Layer 3 (48px)  Ticker:   dual scrolling price rows — only when showTicker === true
  *
  * Special modes:
@@ -326,7 +326,6 @@ function TopBar({ user, onMenuOpen, onNav, onLogout, selectedMarketId, setSelect
 // ─── NAV config ───────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Terminal' },
-  { id: 'heatmap',   label: 'Heatmap'  },
   { id: 'catalog',   label: 'Catalog'  },
   { id: 'news',      label: 'News'     },
 ];
@@ -361,7 +360,7 @@ export default function GMTHeader({
   // Derive active page from pathname for nav bar highlighting
   const derivedActivePage = useMemo(() => {
     if (pathname.startsWith('/app/global') || pathname.startsWith('/app/brasil')) return 'terminal';
-    if (pathname.startsWith('/app/heatmap')) return 'heatmap';
+    if (pathname.startsWith('/markets/')) return 'markets';
     if (pathname.startsWith('/app/catalog')) return 'catalog';
     if (pathname.startsWith('/app/news')) return 'news';
     if (pathname.startsWith('/app/watchlist')) return 'watchlist';
@@ -432,9 +431,8 @@ export default function GMTHeader({
       {/* Markets dropdown — between Terminal and Heatmap */}
       <MarketsDropdown />
 
-      {/* Heatmap · Catalog · News (+ optional Watchlist) */}
+      {/* Catalog · News (+ optional Watchlist) */}
       {[
-        { id: 'heatmap',   label: 'Heatmap'  },
         { id: 'catalog',   label: 'Catalog'  },
         { id: 'news',      label: 'News'     },
         ...(watchlistEnabled ? [{ id: 'watchlist', label: 'Watchlist' }] : []),

@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useTaxonomy } from '../../context/TaxonomyContext.jsx';
 import { API_BASE, fmpProfile, fmpRatios, hasFmpKey } from '../../dataServices.js';
+import MarketsPageLayout from '../../components/MarketsPageLayout.jsx';
 import { isExhausted } from '../../services/quotaTracker.js';
+import { useWatchlist } from '../../context/WatchlistContext.jsx';
 
-// ─── Colors (match ResearchTerminalPage / ChartCenterPage) ────────────────────
+// ─── Colors ──────────────────────────────────────────────────────────────────
 const BORDER  = 'rgba(30,41,59,0.8)';
 const BORDER2 = 'rgba(51,65,85,0.5)';
 const BG_PAGE = '#080f1a';
@@ -254,9 +256,9 @@ function BarChart({ values, metricKey, width }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function FundamentalLabPage() {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { subgroups, assets } = useTaxonomy();
+  const { items: watchlistItems } = useWatchlist();
 
   const [selectedSymbols, setSelectedSymbols] = useState([]);
   const [assetData,        setAssetData]       = useState({});
@@ -337,6 +339,13 @@ export default function FundamentalLabPage() {
     });
     return map;
   }, [subgroups]);
+
+  const watchlistAssets = useMemo(() => {
+    return watchlistItems
+      .filter(i => i.type === 'asset')
+      .map(i => assets.find(a => a.symbol === i.target_id))
+      .filter(Boolean);
+  }, [watchlistItems, assets]);
 
   // Bar chart data for the active metric
   const chartValues = useMemo(
@@ -605,6 +614,50 @@ export default function FundamentalLabPage() {
             )}
           </div>
 
+          {/* Watchlist quick-access */}
+          {watchlistAssets.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{
+                fontFamily: "'JetBrains Mono', monospace", fontSize: 9,
+                color: '#FFB300', letterSpacing: '1.5px', marginBottom: 8,
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+                <span>★</span> WATCHLIST
+              </div>
+              {watchlistAssets.map(a => {
+                const isSel = selectedSymbols.includes(a.symbol);
+                return (
+                  <div key={a.symbol} style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '4px 4px', borderRadius: 3,
+                  }}>
+                    <span style={{
+                      fontFamily: "'JetBrains Mono', monospace", fontSize: 11,
+                      color: isSel ? ACCENT : TXT_1, minWidth: 52,
+                    }}>{a.symbol}</span>
+                    <span style={{
+                      fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 10,
+                      color: TXT_3, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>{a.name}</span>
+                    {isSel ? (
+                      <span style={{ color: GREEN, fontSize: 13 }}>✓</span>
+                    ) : (
+                      <button
+                        onClick={() => addAsset(a.symbol, a.name)}
+                        style={{
+                          background: 'transparent', border: `1px solid ${BORDER2}`,
+                          borderRadius: 3, cursor: 'pointer', color: TXT_3,
+                          fontFamily: "'JetBrains Mono', monospace", fontSize: 11,
+                          padding: '1px 6px',
+                        }}
+                      >+</button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* Subgroup browser */}
           <div>
             <div style={{
@@ -701,54 +754,33 @@ export default function FundamentalLabPage() {
   // ── Render ─────────────────────────────────────────────────────────────────
   const fmpConnected = hasFmpKey();
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: BG_PAGE }}>
-
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div style={{
-        height: 48, flexShrink: 0, display: 'flex', alignItems: 'center',
-        justifyContent: 'space-between', padding: '0 16px',
-        background: BG_HEAD, borderBottom: `1px solid ${BORDER}`, zIndex: 10,
-      }}>
+  const statusControls = (
+    <>
+      {isMobile && (
         <button
-          onClick={() => navigate('/app')}
+          onClick={() => setMobileOpen(true)}
           style={{
-            background: 'transparent', border: 'none', cursor: 'pointer',
-            color: TXT_3, fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, padding: 0,
-            display: 'flex', alignItems: 'center', gap: 6,
+            background: 'transparent', border: `1px solid ${BORDER}`, borderRadius: 4,
+            cursor: 'pointer', color: TXT_2, fontFamily: "'IBM Plex Sans', sans-serif",
+            fontSize: 12, padding: '4px 10px',
           }}
-          onMouseEnter={e => e.currentTarget.style.color = TXT_2}
-          onMouseLeave={e => e.currentTarget.style.color = TXT_3}
-        >← Terminal</button>
-
-        <div style={{
-          fontFamily: "'JetBrains Mono', monospace", fontSize: 13, fontWeight: 700,
-          letterSpacing: '2px', color: TXT_2, textTransform: 'uppercase',
-        }}>Fundamental Lab</div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {isMobile && (
-            <button
-              onClick={() => setMobileOpen(true)}
-              style={{
-                background: 'transparent', border: `1px solid ${BORDER}`, borderRadius: 4,
-                cursor: 'pointer', color: TXT_2, fontFamily: "'IBM Plex Sans', sans-serif",
-                fontSize: 12, padding: '4px 10px',
-              }}
-            >Browse Assets</button>
-          )}
-          <div style={{
-            fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700,
-            letterSpacing: '0.1em', padding: '3px 8px', borderRadius: 4,
-            ...(fmpConnected
-              ? { background: 'rgba(0,230,118,0.08)', border: '1px solid rgba(0,230,118,0.3)',  color: GREEN }
-              : { background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)', color: AMBER }
-            ),
-          }}>
-            {fmpConnected ? 'FMP CONNECTED' : 'FMP REQUIRED FOR RATIOS'}
-          </div>
-        </div>
+        >Browse Assets</button>
+      )}
+      <div style={{
+        fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700,
+        letterSpacing: '0.1em', padding: '3px 8px', borderRadius: 4,
+        ...(fmpConnected
+          ? { background: 'rgba(0,230,118,0.08)', border: '1px solid rgba(0,230,118,0.3)',  color: GREEN }
+          : { background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)', color: AMBER }
+        ),
+      }}>
+        {fmpConnected ? 'FMP CONNECTED' : 'FMP REQUIRED FOR RATIOS'}
       </div>
+    </>
+  );
+
+  return (
+    <MarketsPageLayout moduleTitle="Fundamental Lab" moduleIcon="📊" rightControls={statusControls}>
 
       {/* ── Quota warning banner ────────────────────────────────────────────── */}
       {fmpQuotaWarning && (
@@ -980,6 +1012,6 @@ export default function FundamentalLabPage() {
         </div>
       )}
 
-    </div>
+    </MarketsPageLayout>
   );
 }

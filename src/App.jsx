@@ -13,14 +13,13 @@ import ProtectedRoute from './components/ProtectedRoute.jsx';
 import TerminalLayout from './components/TerminalLayout.jsx';
 import { TickerProvider } from './context/TickerContext.jsx';
 import { SelectedAssetProvider } from './context/SelectedAssetContext.jsx';
-import ChartCenterPage from './pages/markets/ChartCenterPage.jsx';
-import ResearchTerminalPage from './pages/markets/ResearchTerminalPage.jsx';
 import FundamentalLabPage from './pages/markets/FundamentalLabPage.jsx';
 import MacroHubPage from './pages/markets/MacroHubPage.jsx';
 import SignalEnginePage from './pages/markets/SignalEnginePage.jsx';
 import ClubePage from './pages/ClubePage.jsx';
 import ClubeReportPage from './pages/ClubeReportPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
+import ChartResearchPage from './pages/markets/ChartResearchPage.jsx';
 
 export default function App() {
   return (
@@ -48,7 +47,7 @@ export default function App() {
           <Route path="/app/brasil" element={<BrazilTerminal />} />
           <Route path="/app/catalog" element={<CatalogPage />} />
           <Route path="/app/news" element={<NewsPage />} />
-          <Route path="/app/heatmap" element={<MarketHeatmapPage />} />
+          {/* Heatmap moved to /markets/heatmap */}
           <Route path="/app/watchlist" element={<WatchlistPage />} />
           <Route path="/app/settings" element={<SettingsPage />} />
         </Route>
@@ -66,10 +65,10 @@ export default function App() {
 
         {/* Markets modules — authenticated users */}
         <Route
-          path="/markets/chart"
+          path="/markets/heatmap"
           element={
             <ProtectedRoute requiredRole={null}>
-              <ChartCenterPage />
+              <MarketHeatmapPage />
             </ProtectedRoute>
           }
         />
@@ -77,10 +76,11 @@ export default function App() {
           path="/markets/research"
           element={
             <ProtectedRoute requiredRole={null}>
-              <ResearchTerminalPage />
+              <ChartResearchPage />
             </ProtectedRoute>
           }
         />
+        <Route path="/markets/chart" element={<Navigate to="/markets/research" replace />} />
         <Route
           path="/markets/fundamentals"
           element={
