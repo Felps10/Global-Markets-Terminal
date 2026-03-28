@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
+import { hasRole } from '../lib/roles.js';
 import {
   buildPortfolioSnapshot,
   calculatePortfolioDailyReturn,
@@ -12,6 +13,7 @@ import {
   formatPct,
 } from '../services/portfolioEngine.js';
 import { ASSETS as STATIC_ASSETS_MAP } from '../data/assets.js';
+import ClubeShell from '../components/clube/ClubeShell.jsx';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -34,8 +36,8 @@ const GOLD     = '#FFD700';
 const MONO = "'JetBrains Mono', monospace";
 
 // ── Module-level cache ────────────────────────────────────────────────────────
-let _clubeCache         = null;
-let _clubeCacheTs       = 0;
+const _clubeCache       = {};
+const _clubeCacheTs     = {};
 let _navAutoCloseTimer  = null;
 const CLUBE_TTL_MS = 5 * 60 * 1000;
 
@@ -374,16 +376,202 @@ function NavRecordModal({ open, data, onDataChange, onSubmit, onClose,
   );
 }
 
+// ── Operacional helpers ──────────────────────────────────────────────────────
+
+/**
+ * Returns the display color for a severity level.
+ * Matches the severity values returned by classifyOperacionalSeverity in quotizacaoEngine.js
+ */
+function severityColor(severity) {
+  if (severity === 'CRITICAL') return '#FF5252';
+  if (severity === 'WARNING')  return '#F9C300';
+  return '#475569'; // INFO — matches TXT_3
+}
+
+/**
+ * Returns the Portuguese label for a severity level.
+ */
+function severityLabel(severity) {
+  if (severity === 'CRITICAL') return 'CRÍTICO';
+  if (severity === 'WARNING')  return 'ATENÇÃO';
+  return 'INFO';
+}
+
+// ── RenquadramentoSummary (module-level) ─────────────────────────────────────
+function RenquadramentoSummary({ clubeId, getToken, navigate }) {
+  const [events,  setEvents]  = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!clubeId) return;
+    setLoading(true);
+    async function load() {
+      try {
+        const token = await getToken();
+        const res = await fetch(
+          `${API_BASE}/api/v1/clubes/${clubeId}/reenquadramento`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setEvents(data.filter(e => e.status !== 'resolvido'));
+        }
+      } catch (_) {}
+      finally { setLoading(false); }
+    }
+    load();
+  }, [clubeId, getToken]);
+
+  if (loading || events.length === 0) return null;
+
+  return (
+    <div>
+      <div style={{
+        fontSize: 10, color: TXT_3, letterSpacing: '0.12em',
+        textTransform: 'uppercase', marginBottom: 8,
+      }}>
+        REENQUADRAMENTO ({events.length} aberto{events.length !== 1 ? 's' : ''})
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {events.map(ev => {
+          const statusColor = ev.status === 'em_correcao' ? AMBER : RED;
+          return (
+            <div
+              key={ev.id}
+              onClick={() => navigate(`/clube/reenquadramento/${ev.id}`)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '10px 14px', borderRadius: 4, cursor: 'pointer',
+                background: `${statusColor}08`,
+                border: `1px solid ${statusColor}30`,
+                transition: 'border-color 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = `${statusColor}60`}
+              onMouseLeave={e => e.currentTarget.style.borderColor = `${statusColor}30`}
+            >
+              <span style={{
+                fontFamily: MONO, fontSize: 9, fontWeight: 700,
+                padding: '2px 7px', borderRadius: 3, flexShrink: 0,
+                background: `${statusColor}20`,
+                border: `1px solid ${statusColor}50`,
+                color: statusColor, letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+              }}>
+                {ev.status === 'em_correcao' ? 'EM CORREÇÃO' : 'ABERTO'}
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: MONO, fontSize: 11, color: TXT_1, fontWeight: 600 }}>
+                  {ev.tipo_violacao.replace(/_/g, ' ').toUpperCase()}
+                </div>
+                <div style={{
+                  fontFamily: MONO, fontSize: 10, color: TXT_2,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  {ev.descricao}
+                </div>
+              </div>
+              <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_3, flexShrink: 0 }}>
+                {ev.diasAberto}d
+              </div>
+              <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_3, flexShrink: 0 }}>→</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Welcome banner (club_member only, dismissable) ───────────────────────────
+function WelcomeBanner({ userId }) {
+  const welcomeKey = `gmt_clube_welcomed_${userId}`;
+  const [visible, setVisible] = useState(
+    !localStorage.getItem(welcomeKey)
+  );
+  if (!visible) return null;
+  return (
+    <div style={{
+      marginBottom: 20,
+      padding: '12px 16px',
+      background: 'rgba(59,130,246,0.08)',
+      border: '1px solid rgba(59,130,246,0.25)',
+      borderRadius: 6,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    }}>
+      <span style={{
+        fontFamily: MONO,
+        fontSize: 12,
+        color: TXT_2,
+        lineHeight: 1.5,
+      }}>
+        Bem-vindo ao clube. Aqui você acompanha o desempenho,
+        os relatórios e a composição da carteira.
+      </span>
+      <button
+        onClick={() => {
+          localStorage.setItem(welcomeKey, '1');
+          setVisible(false);
+        }}
+        style={{
+          background: 'transparent', border: 'none',
+          color: TXT_3, cursor: 'pointer',
+          fontSize: 16, padding: '0 4px', flexShrink: 0,
+        }}
+      >×</button>
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function ClubePage() {
   const navigate            = useNavigate();
+  const { id: clubeIdParam } = useParams();
   const { getToken, user }  = useAuth();
+  const isManager = hasRole(user?.role, 'club_manager');
+  const isMember  = hasRole(user?.role, 'club_member');
 
   const [clube,      setClube]      = useState(null);
   const [posicoes,   setPosicoes]   = useState([]);
   const [cotistas,   setCotistas]   = useState(null);
   const [navHistory, setNavHistory] = useState([]);
   const [compliance, setCompliance] = useState(null);
+  const [operacional,        setOperacional]        = useState(null);
+  const [operacionalLoading, setOperacionalLoading] = useState(false);
+  const [operacionalError,   setOperacionalError]   = useState(null);
+
+  // Statute state
+  const [estatuto,        setEstatuto]        = useState(null);
+  const [estatutoHistory, setEstatutoHistory] = useState([]);
+  const [estatutoLoading, setEstatutoLoading] = useState(false);
+  const [showNewStatuteForm, setShowNewStatuteForm] = useState(false);
+  const [newStatuteValues,   setNewStatuteValues]   = useState({});
+  const [statuteSubmitting,  setStatuteSubmitting]  = useState(false);
+  const [statuteError,       setStatuteError]       = useState(null);
+
+  // Audit log state
+  const [auditLog,        setAuditLog]        = useState([]);
+  const [auditLoading,    setAuditLoading]    = useState(false);
+  const [auditFilter,     setAuditFilter]     = useState('');
+
+  // Setup checklist state
+  const [setupChecklist, setSetupChecklist] = useState(null);
+
+  // Annual close state
+  const [annualClose,        setAnnualClose]        = useState(null);
+  const [annualCloseLoading, setAnnualCloseLoading] = useState(false);
+
+  // Role state
+  const [meuRole, setMeuRole] = useState('admin');  // fallback: admin during transition
+
+  // CSV import state
+  const [csvImporting,   setCsvImporting]   = useState(false);
+  const [csvError,       setCsvError]       = useState(null);
+  const [csvPreview,     setCsvPreview]     = useState(null);
+  const [csvConfirming,  setCsvConfirming]  = useState(false);
+
   const [marketData, setMarketData] = useState({});
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState(null);
@@ -477,19 +665,155 @@ export default function ClubePage() {
     setMarketData({ ...yahooResults, ...b3Results });
   }, []);
 
+  // ── Operacional fetch ──────────────────────────────────────────────────────
+  const fetchOperacional = useCallback(async (clubeId) => {
+    if (!clubeId) return;
+    setOperacionalLoading(true);
+    setOperacionalError(null);
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const res = await fetch(
+        `${API_BASE}/api/v1/clubes/${clubeId}/operacional`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) throw new Error(`Erro ao carregar operacional (${res.status})`);
+      const data = await res.json();
+      setOperacional(data);
+    } catch (err) {
+      setOperacionalError(err.message ?? 'Erro desconhecido');
+    } finally {
+      setOperacionalLoading(false);
+    }
+  }, [getToken]);
+
+  // ── Estatuto fetch ────────────────────────────────────────────────────────
+  const fetchEstatuto = useCallback(async (clubeId) => {
+    if (!clubeId) return;
+    setEstatutoLoading(true);
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const headers = { Authorization: `Bearer ${token}` };
+      const [activeRes, histRes] = await Promise.all([
+        fetch(`${API_BASE}/api/v1/clubes/${clubeId}/estatuto/active`, { headers }),
+        fetch(`${API_BASE}/api/v1/clubes/${clubeId}/estatuto/history`, { headers }),
+      ]);
+      const activeData = activeRes.ok ? await activeRes.json() : null;
+      const histData   = histRes.ok  ? await histRes.json()   : [];
+      setEstatuto(activeData);
+      setEstatutoHistory(Array.isArray(histData) ? histData : []);
+      if (activeData) {
+        setNewStatuteValues({
+          prazo_conversao_dias: activeData.prazo_conversao_dias,
+          prazo_pagamento_dias: activeData.prazo_pagamento_dias,
+          carencia_dias:        activeData.carencia_dias,
+          taxa_administracao:   (activeData.taxa_administracao * 100).toFixed(4),
+          taxa_performance:     (activeData.taxa_performance * 100).toFixed(4),
+          benchmark_performance: activeData.benchmark_performance ?? '',
+          permite_derivativos:  activeData.permite_derivativos,
+          irrf_rate:            (activeData.irrf_rate * 100).toFixed(2),
+          regime_tributario:    activeData.regime_tributario ?? 'fia',
+          politica_investimento: activeData.politica_investimento ?? '',
+          versao_nota:          '',
+          valid_from:           '',
+        });
+      }
+    } catch (err) {
+      console.error('[fetchEstatuto]', err.message);
+    } finally {
+      setEstatutoLoading(false);
+    }
+  }, [getToken]);
+
+  // ── Setup checklist fetch ─────────────────────────────────────────────────
+  const fetchSetupChecklist = useCallback(async (clubeId) => {
+    if (!clubeId) return;
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const res = await fetch(`${API_BASE}/api/v1/clubes/${clubeId}/setup-checklist`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setSetupChecklist(await res.json());
+    } catch (err) {
+      console.error('[fetchSetupChecklist]', err.message);
+    }
+  }, [getToken]);
+
+  // ── Annual close fetch ────────────────────────────────────────────────────
+  const fetchAnnualClose = useCallback(async (clubeId) => {
+    const month = new Date().getMonth();
+    if (month !== 0) return; // Only in January
+    const year = new Date().getFullYear() - 1;
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const res = await fetch(
+        `${API_BASE}/api/v1/clubes/${clubeId}/annual-close/${year}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.ok) setAnnualClose(await res.json());
+    } catch (err) {
+      console.warn('[annualClose]', err.message);
+    }
+  }, [getToken]);
+
+  // ── Submit new statute ────────────────────────────────────────────────────
+  const submitNewStatute = useCallback(async () => {
+    if (!clube?.id) return;
+    setStatuteSubmitting(true);
+    setStatuteError(null);
+    try {
+      const token = await getToken();
+      const payload = {
+        valid_from:            newStatuteValues.valid_from,
+        prazo_conversao_dias:  Number(newStatuteValues.prazo_conversao_dias),
+        prazo_pagamento_dias:  Number(newStatuteValues.prazo_pagamento_dias),
+        carencia_dias:         Number(newStatuteValues.carencia_dias),
+        taxa_administracao:    parseFloat(newStatuteValues.taxa_administracao) / 100,
+        taxa_performance:      parseFloat(newStatuteValues.taxa_performance) / 100,
+        benchmark_performance: newStatuteValues.benchmark_performance || null,
+        permite_derivativos:   Boolean(newStatuteValues.permite_derivativos),
+        irrf_rate:             parseFloat(newStatuteValues.irrf_rate) / 100,
+        regime_tributario:     newStatuteValues.regime_tributario || 'fia',
+        politica_investimento: newStatuteValues.politica_investimento || null,
+        versao_nota:           newStatuteValues.versao_nota || null,
+      };
+      const res = await fetch(`${API_BASE}/api/v1/clubes/${clube.id}/estatuto`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message ?? `Erro ${res.status}`);
+      }
+      setShowNewStatuteForm(false);
+      setStatuteError(null);
+      await fetchEstatuto(clube.id);
+      await fetchSetupChecklist(clube.id);
+    } catch (err) {
+      setStatuteError(err.message);
+    } finally {
+      setStatuteSubmitting(false);
+    }
+  }, [clube?.id, getToken, newStatuteValues, fetchEstatuto, fetchSetupChecklist]);
+
   // ── Data fetch ──────────────────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     // Cache hit
-    if (_clubeCache && Date.now() - _clubeCacheTs < CLUBE_TTL_MS) {
-      setClube(_clubeCache.clube);
-      setPosicoes(_clubeCache.posicoes);
-      setCotistas(_clubeCache.cotistas);
-      setNavHistory(_clubeCache.navHistory);
-      setCompliance(_clubeCache.compliance);
-      fetchPositionPrices(_clubeCache.posicoes);
+    if (_clubeCache[clubeIdParam] && Date.now() - (_clubeCacheTs[clubeIdParam] ?? 0) < CLUBE_TTL_MS) {
+      const cached = _clubeCache[clubeIdParam];
+      setClube(cached.clube);
+      setPosicoes(cached.posicoes);
+      setCotistas(cached.cotistas);
+      setNavHistory(cached.navHistory);
+      setCompliance(cached.compliance);
+      fetchPositionPrices(cached.posicoes);
       setLoading(false);
       return;
     }
@@ -500,18 +824,16 @@ export default function ClubePage() {
 
       const headers = { Authorization: `Bearer ${token}` };
 
-      // Step 1: list clubes
-      const clubesRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes`, { headers });
-      if (!clubesRes.ok) throw new Error(`Erro ao carregar clubes (${clubesRes.status})`);
-      const clubesList = await clubesRes.json();
-
-      if (!clubesList || clubesList.length === 0) {
-        setClube(null);
-        setLoading(false);
-        return;
+      // Fetch specific clube by ID from URL param
+      const clubeRes = await fetch(
+        `${import.meta.env.VITE_API_URL || ''}/api/v1/clubes/${clubeIdParam}`,
+        { headers }
+      );
+      if (!clubeRes.ok) {
+        if (clubeRes.status === 404) { setClube(null); setLoading(false); return; }
+        throw new Error(`Erro ao carregar clube (${clubeRes.status})`);
       }
-
-      const c = clubesList[0];
+      const c = await clubeRes.json();
       setClube(c);
 
       // Step 2: parallel detail fetches
@@ -543,17 +865,62 @@ export default function ClubePage() {
       setNavHistory(navData);
       setCompliance(compData);
 
-      _clubeCache   = { clube: c, posicoes: posicoesData, cotistas: cotistasData, navHistory: navData, compliance: compData };
-      _clubeCacheTs = Date.now();
+      // Fetch operacional dashboard data
+      fetchOperacional(c.id);
+      fetchEstatuto(c.id);
+      fetchSetupChecklist(c.id);
+      fetchAnnualClose(c.id);
+
+      _clubeCache[clubeIdParam]   = { clube: c, posicoes: posicoesData, cotistas: cotistasData, navHistory: navData, compliance: compData };
+      _clubeCacheTs[clubeIdParam] = Date.now();
 
     } catch (err) {
       setError(err.message ?? 'Erro desconhecido');
     } finally {
       setLoading(false);
     }
-  }, [getToken]);
+  }, [getToken, clubeIdParam, fetchOperacional, fetchEstatuto, fetchSetupChecklist, fetchAnnualClose]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // ── Fetch audit log when ESTATUTO tab is active ──────────────────────────────
+  useEffect(() => {
+    if (activeTab !== 'estatuto' || !clube?.id) return;
+    setAuditLoading(true);
+    async function loadAudit() {
+      try {
+        const token = await getToken();
+        const res = await fetch(
+          `${API_BASE}/api/v1/clubes/${clube.id}/audit-log?limit=50`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (res.ok) setAuditLog(await res.json());
+      } catch (_) {}
+      finally { setAuditLoading(false); }
+    }
+    loadAudit();
+  }, [activeTab, clube?.id, getToken]);
+
+  // ── Fetch meu-role ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    async function fetchMeuRole() {
+      if (!clube?.id) return;
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const res = await fetch(`${API_BASE}/api/v1/clubes/${clube.id}/meu-role`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setMeuRole(data.role ?? 'admin');
+        }
+      } catch (err) {
+        console.warn('[meuRole]', err.message);
+      }
+    }
+    fetchMeuRole();
+  }, [clube?.id, getToken]);
 
   // ── 30-second price refresh ──────────────────────────────────────────────────
   useEffect(() => {
@@ -594,6 +961,24 @@ export default function ClubePage() {
 
   const rvCompliance = useMemo(() =>
     calculateRVCompliance(posicoes), [posicoes]);
+
+  // ── ClubeShell props ──────────────────────────────────────────────────────────
+  const shellPendingCount = useMemo(() => {
+    if (!operacional) return 0;
+    return (operacional.pendentes ?? []).length;
+  }, [operacional]);
+
+  const shellPatrimonio = useMemo(() => {
+    const totalCotas = cotistas?.data?.reduce((s, c) => s + parseFloat(c.cotas_detidas ?? 0), 0) ?? 0;
+    const cota = navAnalytics?.currentNAV ?? clube?.valor_cota_inicial ?? null;
+    return cota != null ? totalCotas * cota : null;
+  }, [cotistas, navAnalytics, clube]);
+
+  const shellValorCota = navAnalytics?.currentNAV ?? clube?.valor_cota_inicial ?? null;
+
+  const shellCotasEmitidas = clube?.cotas_emitidas_total
+    ?? cotistas?.data?.reduce((s, c) => s + parseFloat(c.cotas_detidas ?? 0), 0)
+    ?? null;
 
   // ── Build NAV modal pre-filled defaults ──────────────────────────────────────
   const buildNavModalDefaults = useCallback(async () => {
@@ -685,8 +1070,8 @@ export default function ClubePage() {
         );
         setNavSubmitOk(true);
         setNavSubmitting(false);
-        _clubeCache   = null;
-        _clubeCacheTs = 0;
+        _clubeCache[clubeIdParam]   = null;
+        _clubeCacheTs[clubeIdParam] = 0;
         if (_navAutoCloseTimer) clearTimeout(_navAutoCloseTimer);
         _navAutoCloseTimer = setTimeout(() => {
           setNavModalOpen(false);
@@ -702,6 +1087,34 @@ export default function ClubePage() {
       setNavSubmitting(false);
     }
   }, [clube, getToken, navAnalytics]);
+
+  // ── Reenquadramento ───────────────────────────────────────────────────────
+  const handleRegistrarReenquadramento = useCallback(async (alertItem) => {
+    if (!clube?.id) return;
+    try {
+      const token = await getToken();
+      const res = await fetch(
+        `${API_BASE}/api/v1/clubes/${clube.id}/reenquadramento`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            tipo_violacao: alertItem.tipo ?? 'compliance_breach',
+            descricao: alertItem.descricao ?? alertItem.titulo,
+          }),
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        window.alert(`Erro ao registrar: ${err.message ?? res.status}`);
+        return;
+      }
+      const created = await res.json();
+      navigate(`/clube/reenquadramento/${created.id}`);
+    } catch (e) {
+      console.error('[reenquadramento]', e.message);
+    }
+  }, [clube?.id, getToken, navigate]);
 
   // ── Loading ─────────────────────────────────────────────────────────────────
   if (loading) {
@@ -778,79 +1191,61 @@ export default function ClubePage() {
     : `✗ Desenquadrada — ${rvPct}% em renda variável. Abaixo do mínimo legal.`;
 
   const TABS = [
+    { id: 'operacional', label: 'OPERACIONAL' },
     { id: 'visao-geral', label: 'VISÃO GERAL' },
     { id: 'carteira',    label: 'CARTEIRA'    },
     { id: 'cotistas',    label: 'COTISTAS'    },
     { id: 'risco',       label: 'RISCO'       },
+    ...(user?.role === 'admin' ? [{ id: 'estatuto', label: 'ESTATUTO' }] : []),
   ];
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', height: '100vh',
-      overflow: 'hidden', background: BG_PAGE, fontFamily: MONO,
-    }}>
-
-      {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div style={{
-        height: 56, flexShrink: 0, display: 'flex', alignItems: 'center',
-        justifyContent: 'space-between', padding: '0 20px',
-        background: BG_HEAD, borderBottom: `1px solid ${BORDER}`, zIndex: 10,
-      }}>
-        {/* Left */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
-          <button
-            onClick={() => navigate('/app')}
-            style={{
-              background: BG_HEAD, border: 'none', cursor: 'pointer',
-              color: TXT_2, fontSize: 18, padding: '8px 12px',
-              fontFamily: MONO, lineHeight: 1,
-            }}
-            onMouseEnter={e => { e.currentTarget.style.color = TXT_1; }}
-            onMouseLeave={e => { e.currentTarget.style.color = TXT_2; }}
-          >←</button>
-          <span style={{ fontSize: 11, color: ACCENT, letterSpacing: '0.2em' }}>GMT</span>
-          <span style={{ fontSize: 11, color: TXT_3, margin: '0 6px' }}>/</span>
-          <span style={{ fontSize: 11, color: TXT_1, letterSpacing: '0.2em' }}>CLUBE</span>
-        </div>
-
-        {/* Right */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 12, color: TXT_1 }}>{clube?.nome}</span>
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            fontSize: 10, padding: '2px 8px', borderRadius: 3,
-            background: clube?.status === 'ativo'
-              ? 'rgba(0,230,118,0.08)' : 'rgba(251,191,36,0.08)',
-            border: `1px solid ${clube?.status === 'ativo' ? 'rgba(0,230,118,0.3)' : 'rgba(251,191,36,0.3)'}`,
-            color: clube?.status === 'ativo' ? GREEN : AMBER,
-          }}>
-            <span style={{
-              width: 5, height: 5, borderRadius: '50%',
-              background: clube?.status === 'ativo' ? GREEN : AMBER,
-            }} />
-            {clube?.status === 'ativo' ? 'ATIVO' : 'ENCERRADO'}
-          </span>
-          <button
-            onClick={() => navigate('/clube/report')}
-            style={{
-              background: 'transparent',
-              border: `1px solid ${TXT_3}`,
-              color: TXT_3,
-              fontFamily: MONO,
-              fontSize: 10,
-              letterSpacing: '0.1em',
-              padding: '6px 12px',
-              cursor: 'pointer',
-              borderRadius: 3,
-              marginLeft: 8,
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = TXT_2; e.currentTarget.style.color = TXT_2; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = TXT_3; e.currentTarget.style.color = TXT_3; }}
-          >
-            RELATÓRIO
-          </button>
-          {user?.role === 'admin' && (
+    <ClubeShell
+      activePage="painel"
+      clubeId={clubeIdParam}
+      clubeNome={clube?.nome}
+      clubeStatus={clube?.status}
+      patrimonio={shellPatrimonio}
+      valorCota={shellValorCota}
+      cotasEmitidas={shellCotasEmitidas}
+      pendingCount={shellPendingCount}
+      headerLeft={
+        <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '0.14em', color: TXT_2 }}>
+          <span style={{ color: ACCENT }}>PAINEL</span>
+          {activeTab === 'operacional' && <span style={{ color: TXT_3 }}> · Operacional</span>}
+          {activeTab === 'visao-geral' && <span style={{ color: TXT_3 }}> · Visão Geral</span>}
+          {activeTab === 'carteira'    && <span style={{ color: TXT_3 }}> · Carteira</span>}
+          {activeTab === 'cotistas'    && <span style={{ color: TXT_3 }}> · Cotistas</span>}
+          {activeTab === 'risco'       && <span style={{ color: TXT_3 }}> · Risco</span>}
+          {activeTab === 'estatuto'    && <span style={{ color: TXT_3 }}> · Estatuto</span>}
+        </span>
+      }
+      headerRight={
+        <>
+          {activeTab === 'operacional' && (
+            <button
+              onClick={() => fetchOperacional(clube?.id)}
+              disabled={operacionalLoading}
+              style={{
+                background: 'transparent',
+                border: `1px solid ${TXT_3}`,
+                color: operacionalLoading ? TXT_3 : TXT_2,
+                fontFamily: MONO,
+                fontSize: 10,
+                letterSpacing: '0.1em',
+                padding: '6px 12px',
+                cursor: operacionalLoading ? 'not-allowed' : 'pointer',
+                borderRadius: 3,
+                marginLeft: 8,
+              }}
+              onMouseEnter={e => { if (!operacionalLoading) e.currentTarget.style.borderColor = TXT_2; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = TXT_3; }}
+            >
+              {operacionalLoading ? 'ATUALIZANDO...' : '↻ ATUALIZAR'}
+            </button>
+          )}
+          {isManager && (
             <button
               onClick={buildNavModalDefaults}
               style={{
@@ -867,9 +1262,9 @@ export default function ClubePage() {
               }}
             >REGISTRAR NAV</button>
           )}
-        </div>
-      </div>
-
+        </>
+      }
+    >
       {/* ── Tab nav ─────────────────────────────────────────────────────────── */}
       <div style={{
         flexShrink: 0, display: 'flex', alignItems: 'flex-end',
@@ -897,7 +1292,562 @@ export default function ClubePage() {
 
       {/* ── Scrollable content ──────────────────────────────────────────────── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+
+        {/* ── Setup Checklist Banner ──────────────────────────────────────────── */}
+        {setupChecklist && Array.isArray(setupChecklist) && setupChecklist.some(s => !s.done) && (
+          <div style={{
+            flexShrink: 0, marginBottom: 16,
+            background: BG_CARD,
+            borderLeft: `4px solid ${ACCENT}`,
+            padding: '10px 20px',
+            display: 'flex', alignItems: 'center', gap: 20,
+            flexWrap: 'wrap', borderRadius: 4,
+          }}>
+            <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_3, letterSpacing: '0.12em', textTransform: 'uppercase', flexShrink: 0 }}>
+              CONFIGURAÇÃO INICIAL · {setupChecklist.filter(s => s.done).length}/{setupChecklist.length} completos
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: 1 }}>
+              {setupChecklist.map((step) => (
+                <div key={step.step} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '4px 10px', borderRadius: 3,
+                  border: `1px solid ${step.done ? 'rgba(0,230,118,0.3)' : BORDER2}`,
+                  background: step.done ? 'rgba(0,230,118,0.06)' : BG_CARD2,
+                  cursor: step.done ? 'default' : 'pointer',
+                  opacity: step.done ? 0.7 : 1,
+                }}
+                  onClick={() => {
+                    if (!step.done) {
+                      if (step.step === 'cotistas') navigate('/clube/membros');
+                      else if (step.step === 'nav') buildNavModalDefaults();
+                      else if (step.step === 'estatuto') setActiveTab('estatuto');
+                      else if (step.step === 'posicoes') setActiveTab('carteira');
+                    }
+                  }}
+                >
+                  <span style={{ fontFamily: MONO, fontSize: 9, color: step.done ? GREEN : TXT_3 }}>
+                    {step.done ? '✓' : '○'}
+                  </span>
+                  <span style={{
+                    fontFamily: MONO, fontSize: 10,
+                    color: step.done ? TXT_3 : TXT_2,
+                    textDecoration: step.done ? 'line-through' : 'none',
+                  }}>
+                    {step.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Annual Close Banner ──────────────────────────────────────────── */}
+        {annualClose && !annualClose.complete && (
+          <div style={{
+            flexShrink: 0, marginBottom: 16,
+            background: BG_CARD,
+            borderLeft: `4px solid ${GOLD}`,
+            padding: '10px 20px',
+            display: 'flex', alignItems: 'center', gap: 20,
+            flexWrap: 'wrap', borderRadius: 4,
+          }}>
+            <div style={{
+              fontFamily: MONO, fontSize: 10, color: GOLD,
+              letterSpacing: '0.12em', textTransform: 'uppercase', flexShrink: 0,
+            }}>
+              FECHAMENTO {annualClose.year} · {annualClose.completedCount}/5 completos
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: 1 }}>
+              {annualClose.steps.map((step) => (
+                <div key={step.key} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '4px 10px', borderRadius: 3,
+                  border: `1px solid ${step.done ? 'rgba(0,230,118,0.3)' : 'rgba(255,215,0,0.25)'}`,
+                  background: step.done ? 'rgba(0,230,118,0.06)' : 'rgba(255,215,0,0.04)',
+                  cursor: step.done ? 'default' : 'pointer',
+                  opacity: step.done ? 0.7 : 1,
+                }}
+                  onClick={() => {
+                    if (!step.done && step.ctaPath) {
+                      if (step.ctaPath === '/clube' && step.ctaTab) {
+                        setActiveTab(step.ctaTab);
+                      } else {
+                        navigate(step.ctaPath);
+                      }
+                    }
+                  }}
+                >
+                  <span style={{ fontFamily: MONO, fontSize: 9, color: step.done ? GREEN : GOLD }}>
+                    {step.done ? '✓' : '○'}
+                  </span>
+                  <span style={{
+                    fontFamily: MONO, fontSize: 10,
+                    color: step.done ? TXT_3 : TXT_2,
+                    textDecoration: step.done ? 'line-through' : 'none',
+                  }}>
+                    {step.label}
+                  </span>
+                  {step.detail && (
+                    <span style={{ fontFamily: MONO, fontSize: 9, color: RED }}>({step.detail})</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+          {isMember && !isManager && (
+            <WelcomeBanner userId={user?.id} />
+          )}
+
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* TAB — OPERACIONAL                                               */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {activeTab === 'operacional' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+              {/* Loading state */}
+              {operacionalLoading && (
+                <div style={{
+                  padding: '40px 0', textAlign: 'center',
+                  fontFamily: MONO, fontSize: 11, color: TXT_3, letterSpacing: '0.1em',
+                }}>
+                  CARREGANDO OPERACIONAL...
+                </div>
+              )}
+
+              {/* Error state */}
+              {operacionalError && (
+                <div style={{
+                  padding: '12px 16px', borderRadius: 4,
+                  background: 'rgba(255,82,82,0.08)',
+                  border: '1px solid rgba(255,82,82,0.3)',
+                  fontFamily: MONO, fontSize: 11, color: RED,
+                }}>
+                  {operacionalError}
+                </div>
+              )}
+
+              {operacional && !operacionalLoading && (
+                <>
+                  {/* ── SECTION A: Combined alert list ─────────────────────────── */}
+                  {(() => {
+                    // Merge compliance alerts + overdue pendentes into one sorted list
+                    const overdueItems = (operacional.pendentes ?? [])
+                      .filter(p => p.isOverdue)
+                      .map(p => ({
+                        severity: 'CRITICAL',
+                        titulo: `${p.tipo === 'aporte' ? 'Aporte' : 'Resgate'} Vencido`,
+                        descricao: `${p.cotista_nome} — R$ ${Number(p.valor_brl).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} — ${p.diasPendente} dia(s) em atraso`,
+                        tipo: 'overdue_payment',
+                      }));
+                    const allAlerts = [...overdueItems, ...(operacional.alertas_compliance ?? [])];
+                    const order = { CRITICAL: 0, WARNING: 1, INFO: 2 };
+                    allAlerts.sort((a, b) => (order[a.severity] ?? 2) - (order[b.severity] ?? 2));
+
+                    if (allAlerts.length === 0) {
+                      return (
+                        <div style={{
+                          padding: '14px 18px', borderRadius: 6,
+                          background: 'rgba(0,230,118,0.06)',
+                          border: '1px solid rgba(0,230,118,0.25)',
+                          fontFamily: MONO, fontSize: 12, color: GREEN,
+                          display: 'flex', alignItems: 'center', gap: 8,
+                        }}>
+                          <span>✓</span>
+                          <span>Sem alertas ativos — clube em conformidade</span>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{
+                          fontSize: 10, color: TXT_3, letterSpacing: '0.12em',
+                          textTransform: 'uppercase', marginBottom: 2,
+                        }}>
+                          ALERTAS
+                        </div>
+                        {allAlerts.map((alert, i) => {
+                          const color = severityColor(alert.severity);
+                          return (
+                            <div key={i} style={{
+                              display: 'flex', alignItems: 'center', gap: 12,
+                              padding: '10px 14px', borderRadius: 4,
+                              background: `${color}10`,
+                              border: `1px solid ${color}40`,
+                            }}>
+                              {/* Severity pill */}
+                              <span style={{
+                                flexShrink: 0,
+                                fontFamily: MONO, fontSize: 9, fontWeight: 700,
+                                letterSpacing: '0.12em',
+                                padding: '2px 7px', borderRadius: 3,
+                                background: `${color}20`,
+                                border: `1px solid ${color}60`,
+                                color,
+                              }}>
+                                {severityLabel(alert.severity)}
+                              </span>
+                              {/* Content */}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontFamily: MONO, fontSize: 11, color: TXT_1, fontWeight: 600 }}>
+                                  {alert.titulo}
+                                </div>
+                                <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_2, marginTop: 2 }}>
+                                  {alert.descricao}
+                                </div>
+                              </div>
+                              {alert.severity === 'CRITICAL' && alert.tipo === 'compliance_breach' && user?.role === 'admin' && (
+                                <button
+                                  onClick={() => handleRegistrarReenquadramento(alert)}
+                                  style={{
+                                    flexShrink: 0, padding: '3px 8px',
+                                    fontFamily: MONO, fontSize: 9, letterSpacing: '0.06em',
+                                    background: 'transparent',
+                                    border: '1px solid rgba(255,82,82,0.4)',
+                                    color: RED, borderRadius: 3, cursor: 'pointer',
+                                  }}
+                                >REGISTRAR</button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+
+                  {/* ── SECTION B: Operations queue ────────────────────────────── */}
+                  <div>
+                    <div style={{
+                      fontSize: 10, color: TXT_3, letterSpacing: '0.12em',
+                      textTransform: 'uppercase', marginBottom: 8,
+                    }}>
+                      FILA DE OPERAÇÕES
+                    </div>
+
+                    {(operacional.pendentes ?? []).length === 0 ? (
+                      <div style={{
+                        padding: '24px 0', textAlign: 'center',
+                        fontFamily: MONO, fontSize: 11, color: TXT_3,
+                      }}>
+                        Nenhuma operação pendente.
+                      </div>
+                    ) : (
+                      <div style={{
+                        background: BG_CARD, border: `1px solid ${BORDER}`,
+                        borderRadius: 6, overflow: 'hidden',
+                      }}>
+                        {/* Table header */}
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 80px 110px 110px 160px 160px',
+                          gap: 8, padding: '8px 16px',
+                          borderBottom: `1px solid ${BORDER}`,
+                        }}>
+                          {['COTISTA', 'TIPO', 'VALOR', 'SOLICITADO', 'STATUS', 'AÇÃO'].map(h => (
+                            <div key={h} style={{
+                              fontFamily: MONO, fontSize: 10, color: TXT_3,
+                              letterSpacing: '0.08em', textTransform: 'uppercase',
+                            }}>{h}</div>
+                          ))}
+                        </div>
+
+                        {/* Table rows */}
+                        {(operacional.pendentes ?? []).map((p) => {
+                          const rowColor = p.isOverdue ? RED : TXT_1;
+
+                          // Status badge config
+                          const statusConfig = {
+                            aguardando_recursos:   { label: 'AGUARD. RECURSOS', bg: 'rgba(71,85,105,0.25)',  color: TXT_2  },
+                            recursos_confirmados:  { label: 'RECURSOS CONF.',   bg: 'rgba(249,195,0,0.12)',  color: GOLD   },
+                            convertido:            { label: 'CONVERTIDO',        bg: 'rgba(59,130,246,0.12)', color: ACCENT },
+                          };
+                          const badge = statusConfig[p.status] ?? { label: p.status.toUpperCase(), bg: 'transparent', color: TXT_3 };
+
+                          // Determine which action buttons to show
+                          const showConfirmar  = p.status === 'aguardando_recursos';
+                          const showConverter  = p.status === 'recursos_confirmados';
+                          const showPago       = p.status === 'convertido' && p.tipo === 'resgate';
+                          const showCancelar   = true; // always show cancel
+
+                          const patchStatus = async (newStatus) => {
+                            if (newStatus === 'cancelado') {
+                              const ok = window.confirm(
+                                `Confirmar cancelamento da ${p.tipo === 'aporte' ? 'aporte' : 'resgate'} de ${p.cotista_nome}?\n` +
+                                `Esta ação não pode ser desfeita.`
+                              );
+                              if (!ok) return;
+                            }
+                            try {
+                              const token = await getToken();
+                              const res = await fetch(
+                                `${API_BASE}/api/v1/clubes/${clube.id}/movimentacoes/${p.movimentacao_id}/status`,
+                                {
+                                  method: 'PATCH',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    Authorization: `Bearer ${token}`,
+                                  },
+                                  body: JSON.stringify({ status: newStatus }),
+                                }
+                              );
+                              if (!res.ok) {
+                                const err = await res.json().catch(() => ({}));
+                                alert(err.message ?? `Erro ao atualizar status (${res.status})`);
+                                return;
+                              }
+                              // Refresh operacional data without full page reload
+                              fetchOperacional(clube.id);
+                            } catch (e) {
+                              alert(e.message ?? 'Erro de conexão');
+                            }
+                          };
+
+                          return (
+                            <div key={p.movimentacao_id} style={{
+                              display: 'grid',
+                              gridTemplateColumns: '1fr 80px 110px 110px 160px 160px',
+                              gap: 8, padding: '10px 16px',
+                              borderBottom: `1px solid ${BORDER2}`,
+                              background: p.isOverdue ? 'rgba(255,82,82,0.04)' : 'transparent',
+                              alignItems: 'center',
+                            }}>
+                              {/* Cotista */}
+                              <div style={{ fontFamily: MONO, fontSize: 11, color: rowColor }}>
+                                {p.cotista_nome}
+                              </div>
+                              {/* Tipo */}
+                              <div style={{
+                                fontFamily: MONO, fontSize: 10,
+                                color: p.tipo === 'aporte' ? GREEN : AMBER,
+                                textTransform: 'uppercase',
+                              }}>
+                                {p.tipo}
+                              </div>
+                              {/* Valor */}
+                              <div style={{ fontFamily: MONO, fontSize: 11, color: TXT_1 }}>
+                                {Number(p.valor_brl).toLocaleString('pt-BR', {
+                                  style: 'currency', currency: 'BRL',
+                                })}
+                              </div>
+                              {/* Data */}
+                              <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_2 }}>
+                                {p.data_solicitacao
+                                  ? p.data_solicitacao.split('-').reverse().join('/')
+                                  : '—'}
+                              </div>
+                              {/* Status badge */}
+                              <div style={{
+                                display: 'inline-flex', alignItems: 'center',
+                                fontFamily: MONO, fontSize: 9, fontWeight: 600,
+                                letterSpacing: '0.08em', padding: '3px 8px',
+                                borderRadius: 3, background: badge.bg, color: badge.color,
+                                width: 'fit-content',
+                              }}>
+                                {badge.label}
+                              </div>
+                              {/* Actions */}
+                              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                {user?.role === 'admin' && showConfirmar && (
+                                  <button
+                                    onClick={() => patchStatus('recursos_confirmados')}
+                                    style={{
+                                      padding: '3px 8px', fontFamily: MONO, fontSize: 9,
+                                      background: 'transparent',
+                                      border: `1px solid ${GREEN}60`, color: GREEN,
+                                      borderRadius: 3, cursor: 'pointer', letterSpacing: '0.06em',
+                                    }}
+                                  >
+                                    CONFIRMAR
+                                  </button>
+                                )}
+                                {user?.role === 'admin' && showConverter && (
+                                  <button
+                                    onClick={() => patchStatus('convertido')}
+                                    style={{
+                                      padding: '3px 8px', fontFamily: MONO, fontSize: 9,
+                                      background: 'transparent',
+                                      border: `1px solid ${ACCENT}60`, color: ACCENT,
+                                      borderRadius: 3, cursor: 'pointer', letterSpacing: '0.06em',
+                                    }}
+                                  >
+                                    CONVERTER
+                                  </button>
+                                )}
+                                {user?.role === 'admin' && showPago && (
+                                  <button
+                                    onClick={() => patchStatus('pago')}
+                                    style={{
+                                      padding: '3px 8px', fontFamily: MONO, fontSize: 9,
+                                      background: 'transparent',
+                                      border: `1px solid ${GOLD}60`, color: GOLD,
+                                      borderRadius: 3, cursor: 'pointer', letterSpacing: '0.06em',
+                                    }}
+                                  >
+                                    MARCAR PAGO
+                                  </button>
+                                )}
+                                {user?.role === 'admin' && (
+                                  <button
+                                    onClick={() => patchStatus('cancelado')}
+                                    style={{
+                                      padding: '3px 8px', fontFamily: MONO, fontSize: 9,
+                                      background: 'transparent',
+                                      border: `1px solid ${TXT_3}60`, color: TXT_3,
+                                      borderRadius: 3, cursor: 'pointer', letterSpacing: '0.06em',
+                                    }}
+                                  >
+                                    CANCELAR
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── SECTION C + D: Prazos + Caixa side by side ─────────────── */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 16 }}>
+
+                    {/* Próximos Prazos */}
+                    <div>
+                      <div style={{
+                        fontSize: 10, color: TXT_3, letterSpacing: '0.12em',
+                        textTransform: 'uppercase', marginBottom: 8,
+                      }}>
+                        PRÓXIMOS PRAZOS
+                      </div>
+                      <div style={{
+                        display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
+                      }}>
+                        {(operacional.proximos_prazos ?? []).map((prazo, i) => {
+                          const color = severityColor(prazo.severity);
+                          return (
+                            <div key={i} style={{
+                              background: BG_CARD,
+                              border: `1px solid ${color}30`,
+                              borderRadius: 6, padding: '12px 14px',
+                              position: 'relative',
+                            }}>
+                              {/* Severity dot top-right */}
+                              <div style={{
+                                position: 'absolute', top: 10, right: 10,
+                                width: 6, height: 6, borderRadius: '50%',
+                                background: color,
+                              }} />
+                              <div style={{
+                                fontFamily: MONO, fontSize: 10, color: TXT_1,
+                                fontWeight: 600, marginBottom: 4, paddingRight: 16,
+                              }}>
+                                {prazo.titulo}
+                              </div>
+                              <div style={{
+                                fontFamily: MONO, fontSize: 10, color: TXT_2,
+                              }}>
+                                {prazo.descricao}
+                              </div>
+                              {prazo.diasParaPrazo != null && (
+                                <div style={{
+                                  fontFamily: MONO, fontSize: 10,
+                                  color: prazo.diasParaPrazo < 0 ? RED : prazo.diasParaPrazo <= 7 ? GOLD : TXT_3,
+                                  marginTop: 6,
+                                }}>
+                                  {prazo.diasParaPrazo < 0
+                                    ? `${Math.abs(prazo.diasParaPrazo)}d em atraso`
+                                    : prazo.diasParaPrazo === 0
+                                    ? 'Hoje'
+                                    : `${prazo.diasParaPrazo}d restantes`}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {(operacional.proximos_prazos ?? []).length === 0 && (
+                          <div style={{
+                            gridColumn: '1 / -1', padding: '20px 0',
+                            textAlign: 'center', fontFamily: MONO,
+                            fontSize: 11, color: TXT_3,
+                          }}>
+                            Nenhum prazo próximo.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Caixa */}
+                    <div>
+                      <div style={{
+                        fontSize: 10, color: TXT_3, letterSpacing: '0.12em',
+                        textTransform: 'uppercase', marginBottom: 8,
+                      }}>
+                        CAIXA
+                      </div>
+                      <div style={{
+                        background: BG_CARD, border: `1px solid ${BORDER}`,
+                        borderRadius: 6, padding: '16px',
+                      }}>
+                        <div style={{
+                          fontFamily: MONO, fontSize: 10, color: TXT_3,
+                          letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6,
+                        }}>
+                          SALDO ATUAL
+                        </div>
+                        <div style={{
+                          fontFamily: MONO, fontSize: 20, fontWeight: 600,
+                          color: (operacional.caixa?.current_balance ?? 0) >= 0 ? TXT_1 : RED,
+                          marginBottom: 12,
+                        }}>
+                          {Number(operacional.caixa?.current_balance ?? 0).toLocaleString('pt-BR', {
+                            style: 'currency', currency: 'BRL',
+                          })}
+                        </div>
+                        {operacional.caixa?.last_entry ? (
+                          <div style={{
+                            fontFamily: MONO, fontSize: 10, color: TXT_3,
+                            borderTop: `1px solid ${BORDER2}`, paddingTop: 10,
+                          }}>
+                            <div style={{ color: TXT_2, marginBottom: 3 }}>ÚLTIMO LANÇAMENTO</div>
+                            <div>
+                              <span style={{
+                                color: operacional.caixa.last_entry.valor_brl > 0 ? GREEN : RED,
+                              }}>
+                                {Number(operacional.caixa.last_entry.valor_brl).toLocaleString('pt-BR', {
+                                  style: 'currency', currency: 'BRL',
+                                })}
+                              </span>
+                              {' · '}
+                              <span style={{ color: TXT_3 }}>
+                                {operacional.caixa.last_entry.tipo}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{
+                            fontFamily: MONO, fontSize: 10, color: TXT_3,
+                            borderTop: `1px solid ${BORDER2}`, paddingTop: 10,
+                          }}>
+                            Nenhum lançamento registrado.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* ── SECTION E: Open reenquadramento events ──────────────── */}
+                  <RenquadramentoSummary
+                    clubeId={clube?.id}
+                    getToken={getToken}
+                    navigate={navigate}
+                  />
+                </>
+              )}
+            </div>
+          )}
 
           {/* ════════════════════════════════════════════════════════════════ */}
           {/* TAB 1 — VISÃO GERAL                                             */}
@@ -905,6 +1855,9 @@ export default function ClubePage() {
           {activeTab === 'visao-geral' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
+              {/* ── Admin/Gestor view: full dashboard ── */}
+              {meuRole !== 'cotista' && (
+              <>
               {/* KPI cards */}
               <div style={{
                 display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12,
@@ -1081,6 +2034,82 @@ export default function ClubePage() {
                   ))}
                 </div>
               </div>
+              </>
+              )}
+
+              {/* ── Cotista view: personal investor portal ── */}
+              {meuRole === 'cotista' && (() => {
+                const valorCotaAtual = navAnalytics?.currentNAV ?? clube?.valor_cota_inicial ?? 1000;
+                const totalCotasCotista = cotistas?.data?.reduce((s, c) => s + parseFloat(c.cotas_detidas ?? 0), 0) ?? 0;
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <div style={{
+                      padding: '10px 14px', borderRadius: 4,
+                      background: 'rgba(59,130,246,0.08)',
+                      border: '1px solid rgba(59,130,246,0.25)',
+                      fontFamily: MONO, fontSize: 11, color: ACCENT,
+                    }}>
+                      Visão do cotista — dados consolidados do clube
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 12 }}>
+                      <div style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 6, padding: 16 }}>
+                        <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_3, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
+                          VALOR DA COTA
+                        </div>
+                        <div style={{ fontFamily: MONO, fontSize: 20, fontWeight: 600, color: TXT_1 }}>
+                          {valorCotaAtual.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 6 })}
+                        </div>
+                      </div>
+
+                      <div style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 6, padding: 16 }}>
+                        <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_3, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
+                          RETORNO TOTAL
+                        </div>
+                        <div style={{ fontFamily: MONO, fontSize: 20, fontWeight: 600, color: signColor(navAnalytics?.totalReturnPct ?? 0) }}>
+                          {navAnalytics?.totalReturnPct != null
+                            ? `${navAnalytics.totalReturnPct > 0 ? '+' : ''}${navAnalytics.totalReturnPct.toFixed(2)}%`
+                            : '—'}
+                        </div>
+                      </div>
+
+                      <div style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 6, padding: 16 }}>
+                        <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_3, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
+                          PATRIMÔNIO TOTAL
+                        </div>
+                        <div style={{ fontFamily: MONO, fontSize: 20, fontWeight: 600, color: GOLD }}>
+                          {(valorCotaAtual * totalCotasCotista).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </div>
+                      </div>
+
+                      <div style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 6, padding: 16 }}>
+                        <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_3, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
+                          ENQUADRAMENTO
+                        </div>
+                        <div style={{ fontFamily: MONO, fontSize: 14, fontWeight: 600, color: compColor }}>
+                          {rvStatus === 'OK' ? '✓ CONFORME' : rvStatus === 'WARNING' ? '⚠ ATENÇÃO' : '✗ BREACH'}
+                        </div>
+                        <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_3, marginTop: 4 }}>
+                          RV: {((rvCompliance?.percentualRV ?? 0) * 100).toFixed(1)}%
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 6, padding: 16 }}>
+                      <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_3, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 16 }}>
+                        EVOLUÇÃO DA COTA
+                      </div>
+                      <NavChart
+                        navSeries={navAnalytics?.navSeries ?? []}
+                        ibovSeries={navAnalytics?.ibovSeries ?? []}
+                        cdiSeries={navAnalytics?.cdiSeries ?? []}
+                        inceptionNAV={clube?.valor_cota_inicial ?? 1000}
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -1208,6 +2237,160 @@ export default function ClubePage() {
                   </span>
                 </div>
               </div>
+
+              {/* ── CSV Position Import ────────────────────────────────────────── */}
+              {user?.role === 'admin' && (
+                <div style={{
+                  background: BG_CARD, border: `1px solid ${BORDER}`,
+                  borderRadius: 6, padding: 16,
+                }}>
+                  <div style={{
+                    fontSize: 10, color: TXT_3, letterSpacing: '0.12em',
+                    textTransform: 'uppercase', marginBottom: 12,
+                  }}>
+                    IMPORTAR POSIÇÕES (CSV)
+                  </div>
+
+                  <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_2, marginBottom: 12, lineHeight: 1.6 }}>
+                    Formato: <span style={{ color: TXT_1 }}>asset_id,peso_alvo</span> (uma linha por ativo, sem cabeçalho)
+                    <br />
+                    Exemplo: <span style={{ color: TXT_1 }}>petr4,0.25</span> — peso como fração (0.25 = 25%)
+                    <br />
+                    <span style={{ color: AMBER }}>⚠ Esta operação substitui todas as posições atuais.</span>
+                  </div>
+
+                  {!csvPreview && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <label style={{
+                        padding: '6px 14px', fontFamily: MONO, fontSize: 10,
+                        background: 'transparent', border: `1px solid ${TXT_3}`,
+                        color: TXT_2, borderRadius: 3, cursor: 'pointer',
+                        letterSpacing: '0.08em',
+                      }}>
+                        ESCOLHER ARQUIVO
+                        <input
+                          type="file"
+                          accept=".csv,.txt"
+                          style={{ display: 'none' }}
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setCsvError(null);
+                            setCsvPreview(null);
+                            try {
+                              const text = await file.text();
+                              const lines = text.trim().split('\n').filter(l => l.trim());
+                              const rows = [];
+                              for (const line of lines) {
+                                const parts = line.split(',').map(p => p.trim());
+                                if (parts.length < 2) throw new Error(`Linha inválida: "${line}" — esperado formato asset_id,peso_alvo`);
+                                const asset_id = parts[0];
+                                const peso_alvo = parseFloat(parts[1]);
+                                if (!asset_id) throw new Error(`asset_id vazio na linha: "${line}"`);
+                                if (isNaN(peso_alvo) || peso_alvo <= 0 || peso_alvo > 1) throw new Error(`peso_alvo inválido em "${line}" — deve ser > 0 e <= 1`);
+                                rows.push({ asset_id, peso_alvo });
+                              }
+                              if (rows.length === 0) throw new Error('Arquivo vazio ou sem posições válidas.');
+                              const total = rows.reduce((s, r) => s + r.peso_alvo, 0);
+                              if (Math.abs(total - 1.0) > 0.005) throw new Error(`Pesos somam ${(total * 100).toFixed(2)}% — devem somar 100% (tolerância ±0.5%)`);
+                              setCsvPreview(rows);
+                            } catch (err) {
+                              setCsvError(err.message);
+                            }
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                      {csvError && (
+                        <span style={{ fontFamily: MONO, fontSize: 10, color: RED }}>{csvError}</span>
+                      )}
+                    </div>
+                  )}
+
+                  {csvPreview && (
+                    <div>
+                      <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_2, marginBottom: 8 }}>
+                        {csvPreview.length} posições detectadas — verifique antes de confirmar:
+                      </div>
+                      <div style={{
+                        background: BG_CARD2, border: `1px solid ${BORDER2}`,
+                        borderRadius: 4, maxHeight: 200, overflowY: 'auto', marginBottom: 12,
+                      }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 8, padding: '6px 12px', borderBottom: `1px solid ${BORDER2}` }}>
+                          {['ASSET ID', 'PESO'].map(h => (
+                            <div key={h} style={{ fontFamily: MONO, fontSize: 9, color: TXT_3, letterSpacing: '0.1em', textTransform: 'uppercase' }}>{h}</div>
+                          ))}
+                        </div>
+                        {csvPreview.map((row, i) => (
+                          <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 8, padding: '5px 12px', borderBottom: `1px solid ${BORDER2}` }}>
+                            <div style={{ fontFamily: MONO, fontSize: 11, color: ACCENT }}>{row.asset_id}</div>
+                            <div style={{ fontFamily: MONO, fontSize: 11, color: TXT_1 }}>{(row.peso_alvo * 100).toFixed(2)}%</div>
+                          </div>
+                        ))}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 8, padding: '6px 12px' }}>
+                          <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_3 }}>TOTAL</div>
+                          <div style={{ fontFamily: MONO, fontSize: 11, color: GREEN, fontWeight: 600 }}>
+                            {(csvPreview.reduce((s, r) => s + r.peso_alvo, 0) * 100).toFixed(2)}%
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          onClick={() => { setCsvPreview(null); setCsvError(null); }}
+                          style={{
+                            padding: '6px 16px', fontFamily: MONO, fontSize: 10,
+                            background: 'transparent', border: `1px solid ${TXT_3}`,
+                            color: TXT_3, borderRadius: 3, cursor: 'pointer', letterSpacing: '0.08em',
+                          }}
+                        >CANCELAR</button>
+                        <button
+                          disabled={csvImporting}
+                          onClick={async () => {
+                            setCsvImporting(true);
+                            setCsvError(null);
+                            try {
+                              const token = await getToken();
+                              const today = new Date().toISOString().split('T')[0];
+                              const res = await fetch(`${API_BASE}/api/v1/clubes/${clube.id}/posicoes`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                body: JSON.stringify({ posicoes: csvPreview, data_referencia: today }),
+                              });
+                              if (!res.ok) {
+                                const err = await res.json().catch(() => ({}));
+                                throw new Error(err.message ?? `Erro ${res.status}`);
+                              }
+                              const updatedPositions = await res.json();
+                              setPosicoes(updatedPositions);
+                              fetchPositionPrices(updatedPositions);
+                              setCsvPreview(null);
+                              setCsvError(null);
+                              fetchSetupChecklist(clube.id);
+                              _clubeCache[clubeIdParam] = null;
+                              _clubeCacheTs[clubeIdParam] = 0;
+                            } catch (err) {
+                              setCsvError(err.message);
+                            } finally {
+                              setCsvImporting(false);
+                            }
+                          }}
+                          style={{
+                            padding: '6px 16px', fontFamily: MONO, fontSize: 10,
+                            background: csvImporting ? TXT_3 : ACCENT,
+                            border: 'none', color: '#fff', borderRadius: 3,
+                            cursor: csvImporting ? 'not-allowed' : 'pointer',
+                            letterSpacing: '0.08em',
+                          }}
+                        >{csvImporting ? 'IMPORTANDO...' : 'CONFIRMAR IMPORTAÇÃO'}</button>
+                      </div>
+                      {csvError && (
+                        <div style={{ marginTop: 8, fontFamily: MONO, fontSize: 10, color: RED }}>{csvError}</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -1262,6 +2445,7 @@ export default function ClubePage() {
                 </div>
 
                 {/* Rows */}
+                {/* TODO: highlight own row when cotistas.user_id FK is available */}
                 {(cotistas?.data ?? []).map((c, i) => (
                   <div
                     key={c.id}
@@ -1472,6 +2656,355 @@ export default function ClubePage() {
             );
           })()}
 
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {/* TAB — ESTATUTO                                                  */}
+          {/* ════════════════════════════════════════════════════════════════ */}
+          {activeTab === 'estatuto' && user?.role === 'admin' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+              {estatutoLoading && (
+                <div style={{ padding: '40px 0', textAlign: 'center', fontFamily: MONO, fontSize: 11, color: TXT_3, letterSpacing: '0.1em' }}>
+                  CARREGANDO ESTATUTO...
+                </div>
+              )}
+
+              {/* Active statute card */}
+              {estatuto && !estatutoLoading && (
+                <div style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 6, padding: 20 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                    <div>
+                      <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_3, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 4 }}>
+                        VERSÃO ATIVA
+                      </div>
+                      <div style={{ fontFamily: MONO, fontSize: 11, color: TXT_2 }}>
+                        Vigente desde {estatuto.valid_from?.split('-').reverse().join('/')}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowNewStatuteForm(v => !v)}
+                      style={{
+                        padding: '6px 14px', fontFamily: MONO, fontSize: 10,
+                        background: 'transparent', border: `1px solid ${ACCENT}`,
+                        color: ACCENT, borderRadius: 3, cursor: 'pointer', letterSpacing: '0.08em',
+                      }}
+                    >
+                      {showNewStatuteForm ? '× FECHAR' : '+ NOVA VERSÃO'}
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    {[
+                      ['Prazo de Conversão',    `${estatuto.prazo_conversao_dias} dia(s)`],
+                      ['Prazo de Pagamento',    `${estatuto.prazo_pagamento_dias} dia(s)`],
+                      ['Carência',              `${estatuto.carencia_dias} dia(s)`],
+                      ['Taxa de Administração', `${(estatuto.taxa_administracao * 100).toFixed(4)}% a.a.`],
+                      ['Taxa de Performance',   estatuto.taxa_performance > 0 ? `${(estatuto.taxa_performance * 100).toFixed(4)}% sobre ${estatuto.benchmark_performance ?? '—'}` : 'Sem taxa'],
+                      ['IRRF',                  `${(estatuto.irrf_rate * 100).toFixed(2)}%`],
+                      ['Regime Tributário',     (estatuto.regime_tributario ?? '—').toUpperCase()],
+                      ['Derivativos',           estatuto.permite_derivativos ? 'Permitidos (exchange-traded)' : 'Não permitidos'],
+                    ].map(([label, value]) => (
+                      <div key={label} style={{
+                        display: 'flex', justifyContent: 'space-between',
+                        padding: '8px 0', borderBottom: `1px solid ${BORDER2}`,
+                      }}>
+                        <span style={{ fontFamily: MONO, fontSize: 10, color: TXT_3 }}>{label}</span>
+                        <span style={{ fontFamily: MONO, fontSize: 11, color: TXT_1 }}>{value}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {estatuto.politica_investimento && (
+                    <div style={{ marginTop: 16, padding: '12px 14px', background: BG_CARD2, borderRadius: 4 }}>
+                      <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_3, marginBottom: 6 }}>POLÍTICA DE INVESTIMENTO</div>
+                      <div style={{ fontFamily: MONO, fontSize: 11, color: TXT_2, lineHeight: 1.6 }}>
+                        {estatuto.politica_investimento}
+                      </div>
+                    </div>
+                  )}
+
+                  {estatuto.versao_nota && (
+                    <div style={{ marginTop: 10, fontFamily: MONO, fontSize: 10, color: TXT_3 }}>
+                      Nota: {estatuto.versao_nota}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* No statute yet */}
+              {!estatuto && !estatutoLoading && (
+                <div style={{
+                  padding: '32px 0', textAlign: 'center',
+                  fontFamily: MONO, fontSize: 11, color: TXT_3, lineHeight: 1.8,
+                }}>
+                  Nenhum estatuto configurado.<br />
+                  <button
+                    onClick={() => setShowNewStatuteForm(true)}
+                    style={{
+                      marginTop: 12, padding: '8px 20px', fontFamily: MONO, fontSize: 10,
+                      background: 'transparent', border: `1px solid ${ACCENT}`,
+                      color: ACCENT, borderRadius: 3, cursor: 'pointer',
+                    }}
+                  >
+                    + CRIAR ESTATUTO INICIAL
+                  </button>
+                </div>
+              )}
+
+              {/* New statute form */}
+              {showNewStatuteForm && (
+                <div style={{
+                  background: BG_CARD2, border: `1px solid ${ACCENT}40`,
+                  borderRadius: 6, padding: 20,
+                }}>
+                  <div style={{ fontFamily: MONO, fontSize: 10, color: ACCENT, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 16 }}>
+                    NOVA VERSÃO DO ESTATUTO
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                    {[
+                      { key: 'valid_from',           label: 'Data de Vigência *', type: 'date'   },
+                      { key: 'prazo_conversao_dias', label: 'Prazo Conversão (dias)', type: 'number' },
+                      { key: 'prazo_pagamento_dias', label: 'Prazo Pagamento (dias)', type: 'number' },
+                      { key: 'carencia_dias',        label: 'Carência (dias)',    type: 'number' },
+                      { key: 'taxa_administracao',   label: 'Taxa Admin (% a.a.)', type: 'number' },
+                      { key: 'taxa_performance',     label: 'Taxa Performance (%)', type: 'number' },
+                      { key: 'irrf_rate',            label: 'IRRF (%)',           type: 'number' },
+                    ].map(({ key, label, type }) => (
+                      <div key={key}>
+                        <label style={{ fontFamily: MONO, fontSize: 9, color: TXT_3, letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
+                          {label}
+                        </label>
+                        <input
+                          type={type}
+                          value={newStatuteValues[key] ?? ''}
+                          onChange={e => setNewStatuteValues(prev => ({ ...prev, [key]: e.target.value }))}
+                          style={{
+                            width: '100%', boxSizing: 'border-box',
+                            background: BG_CARD, border: `1px solid ${BORDER2}`,
+                            borderRadius: 3, color: TXT_1, fontFamily: MONO, fontSize: 11,
+                            padding: '7px 10px', outline: 'none',
+                          }}
+                        />
+                      </div>
+                    ))}
+
+                    <div>
+                      <label style={{ fontFamily: MONO, fontSize: 9, color: TXT_3, letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
+                        Benchmark Performance
+                      </label>
+                      <select
+                        value={newStatuteValues.benchmark_performance ?? ''}
+                        onChange={e => setNewStatuteValues(prev => ({ ...prev, benchmark_performance: e.target.value }))}
+                        style={{
+                          width: '100%', background: BG_CARD, border: `1px solid ${BORDER2}`,
+                          borderRadius: 3, color: TXT_1, fontFamily: MONO, fontSize: 11,
+                          padding: '7px 10px', outline: 'none',
+                        }}
+                      >
+                        <option value="">Nenhum</option>
+                        <option value="ibov">IBOV</option>
+                        <option value="cdi">CDI</option>
+                        <option value="ipca">IPCA</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ fontFamily: MONO, fontSize: 9, color: TXT_3, letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
+                        Regime Tributário
+                      </label>
+                      <select
+                        value={newStatuteValues.regime_tributario ?? 'fia'}
+                        onChange={e => setNewStatuteValues(prev => ({ ...prev, regime_tributario: e.target.value }))}
+                        style={{
+                          width: '100%', background: BG_CARD, border: `1px solid ${BORDER2}`,
+                          borderRadius: 3, color: TXT_1, fontFamily: MONO, fontSize: 11,
+                          padding: '7px 10px', outline: 'none',
+                        }}
+                      >
+                        <option value="fia">FIA</option>
+                        <option value="geral">Geral</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 14 }}>
+                    <label style={{ fontFamily: MONO, fontSize: 9, color: TXT_3, letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
+                      Permite Derivativos
+                    </label>
+                    <div style={{ display: 'flex', gap: 12 }}>
+                      {[['Não', false], ['Sim (exchange-traded only)', true]].map(([label, val]) => (
+                        <label key={String(val)} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontFamily: MONO, fontSize: 11, color: TXT_2 }}>
+                          <input
+                            type="radio"
+                            name="permite_derivativos"
+                            checked={newStatuteValues.permite_derivativos === val}
+                            onChange={() => setNewStatuteValues(prev => ({ ...prev, permite_derivativos: val }))}
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 14 }}>
+                    <label style={{ fontFamily: MONO, fontSize: 9, color: TXT_3, letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
+                      Política de Investimento
+                    </label>
+                    <textarea
+                      value={newStatuteValues.politica_investimento ?? ''}
+                      onChange={e => setNewStatuteValues(prev => ({ ...prev, politica_investimento: e.target.value }))}
+                      rows={3}
+                      style={{
+                        width: '100%', boxSizing: 'border-box',
+                        background: BG_CARD, border: `1px solid ${BORDER2}`,
+                        borderRadius: 3, color: TXT_1, fontFamily: MONO, fontSize: 11,
+                        padding: '8px 10px', outline: 'none', resize: 'vertical',
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ marginTop: 14 }}>
+                    <label style={{ fontFamily: MONO, fontSize: 9, color: TXT_3, letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
+                      Nota da Versão
+                    </label>
+                    <input
+                      type="text"
+                      value={newStatuteValues.versao_nota ?? ''}
+                      onChange={e => setNewStatuteValues(prev => ({ ...prev, versao_nota: e.target.value }))}
+                      placeholder="ex: Redução de taxa, adição de carência de 30 dias"
+                      style={{
+                        width: '100%', boxSizing: 'border-box',
+                        background: BG_CARD, border: `1px solid ${BORDER2}`,
+                        borderRadius: 3, color: TXT_1, fontFamily: MONO, fontSize: 11,
+                        padding: '7px 10px', outline: 'none',
+                      }}
+                    />
+                  </div>
+
+                  {statuteError && (
+                    <div style={{ marginTop: 10, fontFamily: MONO, fontSize: 10, color: RED }}>{statuteError}</div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                    <button
+                      onClick={() => { setShowNewStatuteForm(false); setStatuteError(null); }}
+                      style={{
+                        padding: '7px 18px', fontFamily: MONO, fontSize: 10,
+                        background: 'transparent', border: `1px solid ${TXT_3}`,
+                        color: TXT_3, borderRadius: 3, cursor: 'pointer', letterSpacing: '0.08em',
+                      }}
+                    >CANCELAR</button>
+                    <button
+                      disabled={!newStatuteValues.valid_from || statuteSubmitting}
+                      onClick={submitNewStatute}
+                      style={{
+                        padding: '7px 18px', fontFamily: MONO, fontSize: 10,
+                        background: (!newStatuteValues.valid_from || statuteSubmitting) ? TXT_3 : ACCENT,
+                        border: 'none', color: '#fff', borderRadius: 3,
+                        cursor: (!newStatuteValues.valid_from || statuteSubmitting) ? 'not-allowed' : 'pointer',
+                        letterSpacing: '0.08em',
+                      }}
+                    >{statuteSubmitting ? 'SALVANDO...' : 'SALVAR NOVA VERSÃO'}</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Version history */}
+              {estatutoHistory.length > 0 && (
+                <div>
+                  <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_3, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>
+                    HISTÓRICO DE VERSÕES ({estatutoHistory.length})
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {estatutoHistory.map((ev, i) => (
+                      <div key={ev.id} style={{
+                        background: BG_CARD, border: `1px solid ${i === 0 ? ACCENT + '40' : BORDER2}`,
+                        borderRadius: 4, padding: '10px 14px',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      }}>
+                        <div>
+                          <span style={{ fontFamily: MONO, fontSize: 11, color: i === 0 ? ACCENT : TXT_2 }}>
+                            {ev.valid_from?.split('-').reverse().join('/')}
+                            {ev.valid_until ? ` → ${ev.valid_until.split('-').reverse().join('/')}` : ' → atual'}
+                          </span>
+                          {ev.versao_nota && (
+                            <span style={{ fontFamily: MONO, fontSize: 10, color: TXT_3, marginLeft: 12 }}>
+                              {ev.versao_nota}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_3 }}>
+                          {(ev.taxa_administracao * 100).toFixed(4)}% a.a.
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Audit log ──────────────────────────────────────────────── */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontFamily: MONO, marginBottom: 10 }}>
+                  <div style={{ fontSize: 10, color: TXT_3, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                    LOG DE AUDITORIA
+                  </div>
+                  <input
+                    type="text" placeholder="Filtrar por ação ou tabela..."
+                    value={auditFilter} onChange={e => setAuditFilter(e.target.value)}
+                    style={{ flex: 1, background: BG_CARD, border: `1px solid ${BORDER2}`, borderRadius: 3, color: TXT_1, fontFamily: MONO, fontSize: 10, padding: '4px 10px', outline: 'none' }}
+                  />
+                </div>
+
+                {auditLoading && (
+                  <div style={{ fontFamily: MONO, fontSize: 11, color: TXT_3, padding: '8px 0' }}>CARREGANDO...</div>
+                )}
+
+                {!auditLoading && (() => {
+                  const filtered = auditLog.filter(entry => {
+                    if (!auditFilter) return true;
+                    const q = auditFilter.toLowerCase();
+                    return (entry.action ?? '').toLowerCase().includes(q) || (entry.table_name ?? '').toLowerCase().includes(q);
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div style={{ fontFamily: MONO, fontSize: 11, color: TXT_3, padding: '8px 0' }}>
+                        {auditLog.length === 0 ? 'Nenhum evento registrado.' : 'Nenhum resultado para o filtro.'}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 5, overflow: 'hidden' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '120px 80px 120px 1fr', gap: 8, padding: '6px 14px', borderBottom: `1px solid ${BORDER2}`, fontFamily: MONO, fontSize: 9, color: TXT_3, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                        {['DATA/HORA', 'AÇÃO', 'TABELA', 'DETALHE'].map(h => <div key={h}>{h}</div>)}
+                      </div>
+                      {filtered.slice(0, 20).map((entry, i) => {
+                        const ac = { create: GREEN, update: ACCENT, delete: RED }[entry.action] ?? TXT_3;
+                        return (
+                          <div key={entry.id ?? i} style={{ display: 'grid', gridTemplateColumns: '120px 80px 120px 1fr', gap: 8, padding: '7px 14px', borderBottom: i < Math.min(filtered.length, 20) - 1 ? `1px solid ${BORDER2}` : 'none', fontFamily: MONO, fontSize: 10, alignItems: 'center' }}>
+                            <div style={{ color: TXT_3, fontSize: 9 }}>{entry.created_at ? new Date(entry.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}</div>
+                            <div style={{ color: ac, fontSize: 9, fontWeight: 700, textTransform: 'uppercase' }}>{entry.action ?? '—'}</div>
+                            <div style={{ color: TXT_2, fontSize: 9 }}>{entry.table_name ?? '—'}</div>
+                            <div style={{ color: TXT_3, fontSize: 9, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {entry.record_id ? `ID: ${entry.record_id}` : ''}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {filtered.length > 20 && (
+                        <div style={{ padding: '6px 14px', borderTop: `1px solid ${BORDER2}`, fontFamily: MONO, fontSize: 9, color: TXT_3, textAlign: 'center' }}>
+                          Mostrando 20 de {filtered.length} eventos
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+
+            </div>
+          )}
+
         </div>
       </div>
 
@@ -1492,6 +3025,6 @@ export default function ClubePage() {
         submitError={navSubmitError}
         submitOk={navSubmitOk}
       />
-    </div>
+    </ClubeShell>
   );
 }
