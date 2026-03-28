@@ -1,214 +1,31 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import styled, { keyframes } from 'styled-components';
 import { useAuth } from '../hooks/useAuth.js';
 
-// ── Animations ─────────────────────────────────────────────────────────────────
-const fadeIn = keyframes`
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
-`;
+const C = {
+  bg:        '#080C18',
+  surface:   '#0D1220',
+  border:    '#1E2740',
+  accent:    '#00BCD4',
+  text:      '#E8EAF0',
+  muted:     '#4A5568',
+  hint:      '#2D3748',
+  error:     '#FF5252',
+  errorBg:   'rgba(255,82,82,0.08)',
+  errorBorder:'rgba(255,82,82,0.3)',
+};
 
-// ── Styled components (mirrors LoginPage aesthetic) ───────────────────────────
-const Page = styled.div`
-  min-height: 100vh;
-  background: #080C18;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'Space Mono', 'Courier New', monospace;
-  padding: 40px 20px;
-`;
+const MONO  = "'Space Mono', 'Courier New', monospace";
+const SANS  = "'DM Sans', sans-serif";
 
-const Panel = styled.div`
-  width: 440px;
-  animation: ${fadeIn} 0.4s ease;
-`;
-
-const Header = styled.div`
-  margin-bottom: 32px;
-  text-align: center;
-`;
-
-const BackLink = styled(Link)`
-  display: inline-block;
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  color: #4A5568;
-  text-decoration: none;
-  text-transform: uppercase;
-  margin-bottom: 20px;
-  transition: color 0.15s;
-  &:hover { color: #8892A4; }
-`;
-
-const Logo = styled.div`
-  font-family: 'DM Sans', sans-serif;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.25em;
-  color: #00BCD4;
-  text-transform: uppercase;
-  margin-bottom: 6px;
-`;
-
-const Title = styled.h1`
-  font-size: 22px;
-  font-weight: 700;
-  color: #E8EAF0;
-  margin: 0 0 4px;
-  font-family: 'DM Sans', sans-serif;
-`;
-
-const Subtitle = styled.p`
-  font-size: 12px;
-  color: #4A5568;
-  margin: 0;
-`;
-
-const Form = styled.form`
-  background: #0D1220;
-  border: 1px solid #1E2740;
-  border-radius: 6px;
-  padding: 32px;
-`;
-
-const Field = styled.div`
-  margin-bottom: 20px;
-`;
-
-const Label = styled.label`
-  display: block;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.15em;
-  color: #4A5568;
-  text-transform: uppercase;
-  margin-bottom: 8px;
-`;
-
-const InputWrap = styled.div`
-  position: relative;
-`;
-
-const Input = styled.input`
-  width: 100%;
-  background: #080C18;
-  border: 1px solid ${p => p.$error ? '#FF5252' : '#1E2740'};
-  border-radius: 4px;
-  color: #E8EAF0;
-  font-family: 'Space Mono', monospace;
-  font-size: 13px;
-  padding: 10px 14px;
-  padding-right: ${p => p.$hasToggle ? '40px' : '14px'};
-  outline: none;
-  box-sizing: border-box;
-  transition: border-color 0.15s;
-
-  &:focus { border-color: ${p => p.$error ? '#FF5252' : '#00BCD4'}; }
-  &::placeholder { color: #2D3748; }
-`;
-
-const EyeBtn = styled.button`
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  color: #4A5568;
-  cursor: pointer;
-  padding: 4px;
-  display: flex;
-  align-items: center;
-  transition: color 0.15s;
-  &:hover { color: #8892A4; }
-`;
-
-const FieldError = styled.div`
-  font-size: 10px;
-  color: #FF5252;
-  margin-top: 6px;
-  letter-spacing: 0.04em;
-`;
-
-// Password strength bar
-const StrengthWrap = styled.div`
-  margin-top: 8px;
-`;
-
-const StrengthBar = styled.div`
-  display: flex;
-  gap: 3px;
-  margin-bottom: 4px;
-`;
-
-const StrengthSegment = styled.div`
-  height: 3px;
-  flex: 1;
-  border-radius: 2px;
-  background: ${p => p.$active ? p.$color : '#1E2740'};
-  transition: background 0.2s;
-`;
-
-const StrengthLabel = styled.div`
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  color: ${p => p.$color || '#4A5568'};
-  text-transform: uppercase;
-`;
-
-const ErrorBanner = styled.div`
-  background: rgba(255, 82, 82, 0.08);
-  border: 1px solid rgba(255, 82, 82, 0.3);
-  border-radius: 4px;
-  color: #FF5252;
-  font-size: 12px;
-  padding: 10px 14px;
-  margin-bottom: 20px;
-`;
-
-const SubmitBtn = styled.button`
-  width: 100%;
-  background: ${p => p.disabled ? '#1E2740' : '#00BCD4'};
-  border: none;
-  border-radius: 4px;
-  color: ${p => p.disabled ? '#4A5568' : '#080C18'};
-  cursor: ${p => p.disabled ? 'not-allowed' : 'pointer'};
-  font-family: 'Space Mono', monospace;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  padding: 12px;
-  text-transform: uppercase;
-  transition: background 0.15s, transform 0.1s;
-
-  &:hover:not(:disabled) { background: #26C6DA; transform: translateY(-1px); }
-  &:active:not(:disabled) { transform: translateY(0); }
-`;
-
-const FooterText = styled.p`
-  text-align: center;
-  font-size: 11px;
-  color: #4A5568;
-  margin-top: 24px;
-  letter-spacing: 0.04em;
-`;
-
-const InlineLink = styled(Link)`
-  color: #00BCD4;
-  text-decoration: none;
-  &:hover { color: #26C6DA; }
-`;
-
-// ── Password strength helpers ──────────────────────────────────────────────────
+// ── Password strength helpers ────────────────────────────────────────────────
 const SPECIAL_RE = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/;
 
 function getStrength(pw) {
-  if (!pw || pw.length < 8) return 0;                              // Weak
-  if (pw.length >= 8 && /[A-Z]/.test(pw) && /[0-9]/.test(pw) && SPECIAL_RE.test(pw)) return 3; // Very Strong
-  if (pw.length >= 8 && /[A-Z]/.test(pw) && /[0-9]/.test(pw))   return 2; // Strong
-  return 1;                                                        // Fair
+  if (!pw || pw.length < 8) return 0;
+  if (pw.length >= 8 && /[A-Z]/.test(pw) && /[0-9]/.test(pw) && SPECIAL_RE.test(pw)) return 3;
+  if (pw.length >= 8 && /[A-Z]/.test(pw) && /[0-9]/.test(pw)) return 2;
+  return 1;
 }
 
 const STRENGTH_META = [
@@ -218,7 +35,7 @@ const STRENGTH_META = [
   { label: 'Very Strong', color: '#00E676' },
 ];
 
-// ── Eye Icon SVGs ──────────────────────────────────────────────────────────────
+// ── Eye Icon SVGs ────────────────────────────────────────────────────────────
 const EyeOpen = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
@@ -232,7 +49,37 @@ const EyeOff = () => (
   </svg>
 );
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// ── Shared inline style helpers ──────────────────────────────────────────────
+const labelStyle = {
+  display: 'block', fontSize: 10, fontWeight: 600,
+  letterSpacing: '0.15em', color: C.muted,
+  textTransform: 'uppercase', marginBottom: 8,
+};
+
+function inputStyle(hasError, hasToggle) {
+  return {
+    width: '100%', background: C.bg,
+    border: `1px solid ${hasError ? C.error : C.border}`,
+    borderRadius: 4, color: C.text, fontFamily: MONO,
+    fontSize: 13, padding: '10px 14px',
+    paddingRight: hasToggle ? 40 : 14,
+    outline: 'none', boxSizing: 'border-box',
+  };
+}
+
+const eyeBtnStyle = {
+  position: 'absolute', right: 10, top: '50%',
+  transform: 'translateY(-50%)', background: 'none',
+  border: 'none', color: C.muted, cursor: 'pointer',
+  padding: 4, display: 'flex', alignItems: 'center',
+};
+
+const fieldErrorStyle = {
+  fontSize: 10, color: C.error, marginTop: 6,
+  letterSpacing: '0.04em',
+};
+
+// ── Component ────────────────────────────────────────────────────────────────
 export default function RegisterPage() {
   const { register, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -295,110 +142,163 @@ export default function RegisterPage() {
   }
 
   const canSubmit = name && email && password && confirmPassword && !submitting;
+  const disabled = !canSubmit;
 
   return (
-    <Page>
-      <Panel>
-        <Header>
-          <BackLink to="/">← Back to home</BackLink>
-          <Logo>Markets Terminal</Logo>
-          <Title>Create Account</Title>
-          <Subtitle>Join the Global Markets Terminal</Subtitle>
-        </Header>
+    <div style={{
+      minHeight: '100vh', background: C.bg, display: 'flex',
+      alignItems: 'center', justifyContent: 'center',
+      fontFamily: MONO, padding: '40px 20px',
+    }}>
+      <div style={{ width: '440px', maxWidth: '100%' }}>
+        {/* Header */}
+        <div style={{ marginBottom: 32, textAlign: 'center' }}>
+          <Link to="/" style={{
+            display: 'inline-block', fontSize: 10,
+            letterSpacing: '0.12em', color: C.muted,
+            textDecoration: 'none', textTransform: 'uppercase',
+            marginBottom: 20,
+          }}>
+            ← Back to home
+          </Link>
+          <div style={{
+            fontFamily: SANS, fontSize: 11, fontWeight: 700,
+            letterSpacing: '0.25em', color: C.accent,
+            textTransform: 'uppercase', marginBottom: 6,
+          }}>
+            Markets Terminal
+          </div>
+          <h1 style={{
+            fontFamily: SANS, fontSize: 22, fontWeight: 700,
+            color: C.text, margin: '0 0 4px',
+          }}>
+            Create Account
+          </h1>
+          <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>
+            Join the Global Markets Terminal
+          </p>
+        </div>
 
-        <Form onSubmit={handleSubmit}>
-          {serverError && <ErrorBanner>⚠ {serverError}</ErrorBanner>}
+        {/* Form */}
+        <form onSubmit={handleSubmit} style={{
+          background: C.surface, border: `1px solid ${C.border}`,
+          borderRadius: 6, padding: 32,
+        }}>
+          {serverError && (
+            <div style={{
+              background: C.errorBg, border: `1px solid ${C.errorBorder}`,
+              borderRadius: 4, color: C.error, fontSize: 12,
+              padding: '10px 14px', marginBottom: 20,
+            }}>
+              ⚠ {serverError}
+            </div>
+          )}
 
           {/* Name */}
-          <Field>
-            <Label>Full Name</Label>
-            <Input
+          <div style={{ marginBottom: 20 }}>
+            <label style={labelStyle}>Full Name</label>
+            <input
               type="text"
               placeholder="Your full name"
               value={name}
               onChange={e => { setName(e.target.value); setFieldErrors(p => ({ ...p, name: '' })); }}
-              $error={!!fieldErrors.name}
               autoFocus
+              style={inputStyle(!!fieldErrors.name, false)}
             />
-            {fieldErrors.name && <FieldError>{fieldErrors.name}</FieldError>}
-          </Field>
+            {fieldErrors.name && <div style={fieldErrorStyle}>{fieldErrors.name}</div>}
+          </div>
 
           {/* Email */}
-          <Field>
-            <Label>Email Address</Label>
-            <Input
+          <div style={{ marginBottom: 20 }}>
+            <label style={labelStyle}>Email Address</label>
+            <input
               type="email"
               placeholder="you@example.com"
               value={email}
               onChange={e => { setEmail(e.target.value); setFieldErrors(p => ({ ...p, email: '' })); }}
-              $error={!!fieldErrors.email}
+              style={inputStyle(!!fieldErrors.email, false)}
             />
-            {fieldErrors.email && <FieldError>{fieldErrors.email}</FieldError>}
-          </Field>
+            {fieldErrors.email && <div style={fieldErrorStyle}>{fieldErrors.email}</div>}
+          </div>
 
           {/* Password */}
-          <Field>
-            <Label>Password</Label>
-            <InputWrap>
-              <Input
+          <div style={{ marginBottom: 20 }}>
+            <label style={labelStyle}>Password</label>
+            <div style={{ position: 'relative' }}>
+              <input
                 type={showPw ? 'text' : 'password'}
                 placeholder="Min. 8 chars, uppercase, number, symbol"
                 value={password}
                 onChange={e => { setPassword(e.target.value); setFieldErrors(p => ({ ...p, password: '' })); }}
-                $error={!!fieldErrors.password}
-                $hasToggle
+                style={inputStyle(!!fieldErrors.password, true)}
               />
-              <EyeBtn type="button" onClick={() => setShowPw(v => !v)}>
+              <button type="button" onClick={() => setShowPw(v => !v)} style={eyeBtnStyle}>
                 {showPw ? <EyeOff /> : <EyeOpen />}
-              </EyeBtn>
-            </InputWrap>
+              </button>
+            </div>
             {/* Strength indicator */}
             {password.length > 0 && (
-              <StrengthWrap>
-                <StrengthBar>
+              <div style={{ marginTop: 8 }}>
+                <div style={{ display: 'flex', gap: 3, marginBottom: 4 }}>
                   {[0,1,2,3].map(i => (
-                    <StrengthSegment
-                      key={i}
-                      $active={i <= strength}
-                      $color={strengthMeta.color}
-                    />
+                    <div key={i} style={{
+                      height: 3, flex: 1, borderRadius: 2,
+                      background: i <= strength ? strengthMeta.color : C.border,
+                    }} />
                   ))}
-                </StrengthBar>
-                <StrengthLabel $color={strengthMeta.color}>{strengthMeta.label}</StrengthLabel>
-              </StrengthWrap>
+                </div>
+                <div style={{
+                  fontSize: 9, letterSpacing: '0.1em',
+                  color: strengthMeta.color, textTransform: 'uppercase',
+                }}>
+                  {strengthMeta.label}
+                </div>
+              </div>
             )}
-            {fieldErrors.password && <FieldError>{fieldErrors.password}</FieldError>}
-          </Field>
+            {fieldErrors.password && <div style={fieldErrorStyle}>{fieldErrors.password}</div>}
+          </div>
 
           {/* Confirm Password */}
-          <Field>
-            <Label>Confirm Password</Label>
-            <InputWrap>
-              <Input
+          <div style={{ marginBottom: 20 }}>
+            <label style={labelStyle}>Confirm Password</label>
+            <div style={{ position: 'relative' }}>
+              <input
                 type={showConfirm ? 'text' : 'password'}
                 placeholder="Repeat your password"
                 value={confirmPassword}
                 onChange={e => { setConfirmPassword(e.target.value); setFieldErrors(p => ({ ...p, confirmPassword: '' })); }}
-                $error={!!fieldErrors.confirmPassword}
-                $hasToggle
+                style={inputStyle(!!fieldErrors.confirmPassword, true)}
               />
-              <EyeBtn type="button" onClick={() => setShowConfirm(v => !v)}>
+              <button type="button" onClick={() => setShowConfirm(v => !v)} style={eyeBtnStyle}>
                 {showConfirm ? <EyeOff /> : <EyeOpen />}
-              </EyeBtn>
-            </InputWrap>
-            {fieldErrors.confirmPassword && <FieldError>{fieldErrors.confirmPassword}</FieldError>}
-          </Field>
+              </button>
+            </div>
+            {fieldErrors.confirmPassword && <div style={fieldErrorStyle}>{fieldErrors.confirmPassword}</div>}
+          </div>
 
-          <SubmitBtn type="submit" disabled={!canSubmit}>
+          <button type="submit" disabled={disabled} style={{
+            width: '100%', background: disabled ? C.border : C.accent,
+            border: 'none', borderRadius: 4,
+            color: disabled ? C.muted : C.bg,
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            fontFamily: MONO, fontSize: 12, fontWeight: 700,
+            letterSpacing: '0.1em', padding: 12,
+            textTransform: 'uppercase',
+          }}>
             {submitting ? 'Creating Account...' : 'Create Account →'}
-          </SubmitBtn>
-        </Form>
+          </button>
+        </form>
 
-        <FooterText>
+        <p style={{
+          textAlign: 'center', fontSize: 11, color: C.muted,
+          marginTop: 24, letterSpacing: '0.04em',
+        }}>
           Already have an account?{' '}
-          <InlineLink to="/login">Sign in →</InlineLink>
-        </FooterText>
-      </Panel>
-    </Page>
+          <Link to="/login" style={{ color: C.accent, textDecoration: 'none' }}>
+            Sign in →
+          </Link>
+        </p>
+      </div>
+    </div>
   );
 }

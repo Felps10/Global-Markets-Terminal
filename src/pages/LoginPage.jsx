@@ -1,171 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import styled, { keyframes } from 'styled-components';
 import { useAuth } from '../hooks/useAuth.js';
 
-// ── Animations ────────────────────────────────────────────────────────────────
-const blink = keyframes`
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0; }
-`;
+const C = {
+  bg:        '#080C18',
+  surface:   '#0D1220',
+  border:    '#1E2740',
+  accent:    '#00BCD4',
+  text:      '#E8EAF0',
+  muted:     '#4A5568',
+  hint:      '#2D3748',
+  error:     '#FF5252',
+  errorBg:   'rgba(255,82,82,0.08)',
+  errorBorder:'rgba(255,82,82,0.3)',
+};
 
-const fadeIn = keyframes`
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
-`;
-
-// ── Styled components ─────────────────────────────────────────────────────────
-const Page = styled.div`
-  min-height: 100vh;
-  background: #080C18;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'Space Mono', 'Courier New', monospace;
-`;
-
-const Panel = styled.div`
-  width: 420px;
-  animation: ${fadeIn} 0.4s ease;
-`;
-
-const Header = styled.div`
-  margin-bottom: 40px;
-  text-align: center;
-`;
-
-const Logo = styled.div`
-  font-family: 'DM Sans', sans-serif;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.25em;
-  color: #00BCD4;
-  text-transform: uppercase;
-  margin-bottom: 6px;
-`;
-
-const Title = styled.h1`
-  font-size: 22px;
-  font-weight: 700;
-  color: #E8EAF0;
-  margin: 0 0 4px;
-  font-family: 'DM Sans', sans-serif;
-`;
-
-const Subtitle = styled.p`
-  font-size: 12px;
-  color: #4A5568;
-  margin: 0;
-`;
-
-const Cursor = styled.span`
-  display: inline-block;
-  width: 8px;
-  height: 14px;
-  background: #00BCD4;
-  vertical-align: middle;
-  margin-left: 2px;
-  animation: ${blink} 1.2s step-end infinite;
-`;
-
-const Form = styled.form`
-  background: #0D1220;
-  border: 1px solid #1E2740;
-  border-radius: 6px;
-  padding: 32px;
-`;
-
-const Field = styled.div`
-  margin-bottom: 20px;
-`;
-
-const Label = styled.label`
-  display: block;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.15em;
-  color: #4A5568;
-  text-transform: uppercase;
-  margin-bottom: 8px;
-`;
-
-const Input = styled.input`
-  width: 100%;
-  background: #080C18;
-  border: 1px solid ${(p) => (p.$error ? '#FF5252' : '#1E2740')};
-  border-radius: 4px;
-  color: #E8EAF0;
-  font-family: 'Space Mono', monospace;
-  font-size: 13px;
-  padding: 10px 14px;
-  outline: none;
-  box-sizing: border-box;
-  transition: border-color 0.15s;
-
-  &:focus {
-    border-color: ${(p) => (p.$error ? '#FF5252' : '#00BCD4')};
-  }
-
-  &::placeholder {
-    color: #2D3748;
-  }
-`;
-
-const ErrorMsg = styled.div`
-  background: rgba(255, 82, 82, 0.08);
-  border: 1px solid rgba(255, 82, 82, 0.3);
-  border-radius: 4px;
-  color: #FF5252;
-  font-size: 12px;
-  padding: 10px 14px;
-  margin-bottom: 20px;
-`;
-
-const SubmitBtn = styled.button`
-  width: 100%;
-  background: ${(p) => (p.disabled ? '#1E2740' : '#00BCD4')};
-  border: none;
-  border-radius: 4px;
-  color: ${(p) => (p.disabled ? '#4A5568' : '#080C18')};
-  cursor: ${(p) => (p.disabled ? 'not-allowed' : 'pointer')};
-  font-family: 'Space Mono', monospace;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  padding: 12px;
-  text-transform: uppercase;
-  transition: background 0.15s, transform 0.1s;
-
-  &:hover:not(:disabled) {
-    background: #26C6DA;
-    transform: translateY(-1px);
-  }
-  &:active:not(:disabled) {
-    transform: translateY(0);
-  }
-`;
-
-const Footer = styled.p`
-  text-align: center;
-  font-size: 10px;
-  color: #2D3748;
-  margin-top: 24px;
-  letter-spacing: 0.05em;
-`;
-
-const SignupFooter = styled.p`
-  text-align: center;
-  font-size: 11px;
-  color: #4A5568;
-  margin-top: 16px;
-  letter-spacing: 0.04em;
-`;
-
-const InlineLink = styled(Link)`
-  color: #00BCD4;
-  text-decoration: none;
-  &:hover { color: #26C6DA; }
-`;
+const MONO  = "'Space Mono', 'Courier New', monospace";
+const SANS  = "'DM Sans', sans-serif";
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function LoginPage() {
@@ -175,6 +26,20 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error,    setError]    = useState('');
   const [loading,  setLoading]  = useState(false);
+
+  useEffect(() => {
+    const id = 'gmt-cursor-style';
+    if (document.getElementById(id)) return;
+    const el = document.createElement('style');
+    el.id = id;
+    el.textContent = `
+      @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+      .gmt-cursor { display:inline-block; width:8px; height:14px;
+        background:#00BCD4; vertical-align:middle; margin-left:2px;
+        animation:blink 1.2s step-end infinite; }
+    `;
+    document.head.appendChild(el);
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -191,54 +56,129 @@ export default function LoginPage() {
     }
   }
 
+  const hasError = !!error;
+  const disabled = loading || !email || !password;
+
   return (
-    <Page>
-      <Panel>
-        <Header>
-          <Logo>Markets Terminal</Logo>
-          <Title>Admin Access<Cursor /></Title>
-          <Subtitle>Authorized personnel only</Subtitle>
-        </Header>
+    <div style={{
+      minHeight: '100vh', background: C.bg, display: 'flex',
+      alignItems: 'center', justifyContent: 'center',
+      fontFamily: MONO, padding: '40px 20px',
+    }}>
+      <div style={{ width: '420px', maxWidth: '100%' }}>
+        {/* Header */}
+        <div style={{ marginBottom: 40, textAlign: 'center' }}>
+          <div style={{
+            fontFamily: SANS, fontSize: 11, fontWeight: 700,
+            letterSpacing: '0.25em', color: C.accent,
+            textTransform: 'uppercase', marginBottom: 6,
+          }}>
+            Markets Terminal
+          </div>
+          <h1 style={{
+            fontFamily: SANS, fontSize: 22, fontWeight: 700,
+            color: C.text, margin: '0 0 4px',
+          }}>
+            Admin Access<span className="gmt-cursor" />
+          </h1>
+          <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>
+            Authorized personnel only
+          </p>
+        </div>
 
-        <Form onSubmit={handleSubmit}>
-          {error && <ErrorMsg>⚠ {error}</ErrorMsg>}
+        {/* Form */}
+        <form onSubmit={handleSubmit} style={{
+          background: C.surface, border: `1px solid ${C.border}`,
+          borderRadius: 6, padding: 32,
+        }}>
+          {error && (
+            <div style={{
+              background: C.errorBg, border: `1px solid ${C.errorBorder}`,
+              borderRadius: 4, color: C.error, fontSize: 12,
+              padding: '10px 14px', marginBottom: 20,
+            }}>
+              ⚠ {error}
+            </div>
+          )}
 
-          <Field>
-            <Label>Email Address</Label>
-            <Input
+          <div style={{ marginBottom: 20 }}>
+            <label style={{
+              display: 'block', fontSize: 10, fontWeight: 600,
+              letterSpacing: '0.15em', color: C.muted,
+              textTransform: 'uppercase', marginBottom: 8,
+            }}>
+              Email Address
+            </label>
+            <input
               type="email"
               placeholder="admin@terminal.local"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              $error={!!error}
               autoFocus
               required
+              style={{
+                width: '100%', background: C.bg,
+                border: `1px solid ${hasError ? C.error : C.border}`,
+                borderRadius: 4, color: C.text, fontFamily: MONO,
+                fontSize: 13, padding: '10px 14px',
+                outline: 'none', boxSizing: 'border-box',
+              }}
             />
-          </Field>
+          </div>
 
-          <Field>
-            <Label>Password</Label>
-            <Input
+          <div style={{ marginBottom: 20 }}>
+            <label style={{
+              display: 'block', fontSize: 10, fontWeight: 600,
+              letterSpacing: '0.15em', color: C.muted,
+              textTransform: 'uppercase', marginBottom: 8,
+            }}>
+              Password
+            </label>
+            <input
               type="password"
               placeholder="••••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              $error={!!error}
               required
+              style={{
+                width: '100%', background: C.bg,
+                border: `1px solid ${hasError ? C.error : C.border}`,
+                borderRadius: 4, color: C.text, fontFamily: MONO,
+                fontSize: 13, padding: '10px 14px',
+                outline: 'none', boxSizing: 'border-box',
+              }}
             />
-          </Field>
+          </div>
 
-          <SubmitBtn type="submit" disabled={loading || !email || !password}>
+          <button type="submit" disabled={disabled} style={{
+            width: '100%', background: disabled ? C.border : C.accent,
+            border: 'none', borderRadius: 4,
+            color: disabled ? C.muted : C.bg,
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            fontFamily: MONO, fontSize: 12, fontWeight: 700,
+            letterSpacing: '0.1em', padding: 12,
+            textTransform: 'uppercase',
+          }}>
             {loading ? 'Authenticating...' : 'Sign In →'}
-          </SubmitBtn>
-        </Form>
+          </button>
+        </form>
 
-        <Footer>Admin access — for system administrators only</Footer>
-        <SignupFooter>
+        <p style={{
+          textAlign: 'center', fontSize: 10, color: C.hint,
+          marginTop: 24, letterSpacing: '0.05em',
+        }}>
+          Admin access — for system administrators only
+        </p>
+        <p style={{
+          textAlign: 'center', fontSize: 11, color: C.muted,
+          marginTop: 16, letterSpacing: '0.04em',
+        }}>
           Don&apos;t have an account?{' '}
-          <InlineLink to="/register">Sign up →</InlineLink>
-        </SignupFooter>
-      </Panel>
-    </Page>
+          <Link to="/register" style={{ color: C.accent, textDecoration: 'none' }}>
+            Sign up →
+          </Link>
+        </p>
+      </div>
+    </div>
   );
 }
