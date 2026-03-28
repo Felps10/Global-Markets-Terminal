@@ -27,13 +27,37 @@ import ClubeTributacaoPage from './pages/ClubeTributacaoPage.jsx';
 import ClubeListPage from './pages/ClubeListPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import ChartResearchPage from './pages/markets/ChartResearchPage.jsx';
+import TerminalProLandingPage from './pages/TerminalProLandingPage.jsx';
+import TerminalMiniPage from './pages/TerminalMiniPage.jsx';
+import ClubeLandingPage from './pages/ClubeLandingPage.jsx';
+import ChartCenterLockedPage from './pages/locked/ChartCenterLockedPage.jsx';
+import ResearchLockedPage from './pages/locked/ResearchLockedPage.jsx';
+import FundamentalLabLockedPage from './pages/locked/FundamentalLabLockedPage.jsx';
+import MacroHubLockedPage from './pages/locked/MacroHubLockedPage.jsx';
+import SignalEngineLockedPage from './pages/locked/SignalEngineLockedPage.jsx';
+import { useAuth } from './hooks/useAuth.js';
+import AuthPanel from './components/AuthPanel.jsx';
 
-export default function App() {
+function GuestGatedRoute({ children, lockedElement }) {
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) return null;
+  return isAuthenticated ? children : lockedElement;
+}
+
+function AppWithPanel() {
+  const { authPanelOpen, authPanelFeature, closeAuthPanel } = useAuth();
+
+  function handleAuthSuccess() {
+    closeAuthPanel();
+  }
+
   return (
-    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <>
       <Routes>
         {/* Public */}
         <Route path="/"          element={<LandingPage />} />
+        <Route path="/terminal"  element={<TerminalProLandingPage />} />
+        <Route path="/mini"      element={<TerminalMiniPage />} />
         <Route path="/login"     element={<LoginPage />} />
         <Route path="/register"  element={<RegisterPage />} />
 
@@ -41,13 +65,11 @@ export default function App() {
         <Route path="/app" element={<Navigate to="/app/global" replace />} />
         <Route
           element={
-            <ProtectedRoute requiredRole={null}>
-              <SelectedAssetProvider>
-                <TickerProvider>
-                  <TerminalLayout />
-                </TickerProvider>
-              </SelectedAssetProvider>
-            </ProtectedRoute>
+            <SelectedAssetProvider>
+              <TickerProvider>
+                <TerminalLayout />
+              </TickerProvider>
+            </SelectedAssetProvider>
           }
         >
           <Route path="/app/global" element={<GlobalMarketsTerminal />} />
@@ -70,52 +92,52 @@ export default function App() {
         />
         <Route path="/admin/taxonomy" element={<Navigate to="/admin" replace />} />
 
-        {/* Markets modules — authenticated users */}
-        <Route
-          path="/markets/heatmap"
-          element={
-            <ProtectedRoute requiredRole={null}>
-              <MarketHeatmapPage />
-            </ProtectedRoute>
-          }
-        />
+        {/* Markets modules — locked pages for guests, actual pages for members */}
+        <Route path="/markets/heatmap" element={<MarketHeatmapPage />} />
         <Route
           path="/markets/research"
           element={
-            <ProtectedRoute requiredRole={null}>
+            <GuestGatedRoute lockedElement={<ResearchLockedPage />}>
               <ChartResearchPage />
-            </ProtectedRoute>
+            </GuestGatedRoute>
           }
         />
-        <Route path="/markets/chart" element={<Navigate to="/markets/research" replace />} />
+        <Route
+          path="/markets/chart"
+          element={
+            <GuestGatedRoute lockedElement={<ChartCenterLockedPage />}>
+              <ChartResearchPage />
+            </GuestGatedRoute>
+          }
+        />
         <Route
           path="/markets/fundamentals"
           element={
-            <ProtectedRoute requiredRole={null}>
+            <GuestGatedRoute lockedElement={<FundamentalLabLockedPage />}>
               <FundamentalLabPage />
-            </ProtectedRoute>
+            </GuestGatedRoute>
           }
         />
         <Route
           path="/markets/macro"
           element={
-            <ProtectedRoute requiredRole={null}>
+            <GuestGatedRoute lockedElement={<MacroHubLockedPage />}>
               <MacroHubPage />
-            </ProtectedRoute>
+            </GuestGatedRoute>
           }
         />
         <Route
           path="/markets/signals"
           element={
-            <ProtectedRoute requiredRole={null}>
+            <GuestGatedRoute lockedElement={<SignalEngineLockedPage />}>
               <SignalEnginePage />
-            </ProtectedRoute>
+            </GuestGatedRoute>
           }
         />
 
-        {/* Clube de Investimento — list entry point */}
+        {/* Clube de Investimento */}
         <Route path="/clubes" element={<ProtectedRoute requiredRole={null}><ClubeListPage /></ProtectedRoute>} />
-        <Route path="/clube" element={<Navigate to="/clubes" replace />} />
+        <Route path="/clube" element={<ClubeLandingPage />} />
 
         {/* Parameterized clube module routes */}
         <Route path="/clube/:id" element={<ProtectedRoute requiredRole="club_member" showDenied={true}><ClubePage /></ProtectedRoute>} />
@@ -129,6 +151,20 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <AuthPanel
+        isOpen={authPanelOpen}
+        onClose={closeAuthPanel}
+        featureName={authPanelFeature}
+        onSuccess={handleAuthSuccess}
+      />
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <AppWithPanel />
     </BrowserRouter>
   );
 }

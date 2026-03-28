@@ -28,38 +28,43 @@ function injectDropdownStyles() {
 
 const MARKETS_ITEMS = [
   {
-    icon: '🔥',
-    label: 'Market Heatmap',
-    description: 'Volume-weighted performance treemap',
-    route: '/markets/heatmap',
+    icon: '📈',
+    label: 'Chart Center',
+    description: 'Interactive price charts & comparisons',
+    route: '/markets/chart',
+    requiresAuth: true,
   },
   {
-    icon: '📊',
-    label: 'Chart & Research',
-    description: 'Interactive charts & deep asset research',
+    icon: '🔬',
+    label: 'Research Terminal',
+    description: 'Deep-dive asset research workspace',
     route: '/markets/research',
+    requiresAuth: true,
   },
   {
     icon: '📊',
     label: 'Fundamental Lab',
     description: 'Multi-asset valuation & metric comparison',
     route: '/markets/fundamentals',
+    requiresAuth: true,
   },
   {
     icon: '🌐',
     label: 'Macro Hub',
     description: 'Global macro dashboards & economic calendar',
     route: '/markets/macro',
+    requiresAuth: true,
   },
   {
     icon: '⚡',
     label: 'Signal Engine',
     description: 'RSI, MACD & technical signal scanner',
     route: '/markets/signals',
+    requiresAuth: true,
   },
 ];
 
-export default function MarketsDropdown() {
+export default function MarketsDropdown({ user }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const navigate = useNavigate();
@@ -144,6 +149,11 @@ export default function MarketsDropdown() {
                         letterSpacing: '0.02em',
                       }}>
                         {item.label}
+                        {item.requiresAuth && !user && (
+                          <span style={{ marginLeft: 5, fontSize: 9, color: '#475569', verticalAlign: 'middle' }}>
+                            🔒
+                          </span>
+                        )}
                       </div>
                       <div style={{
                         fontFamily: "'IBM Plex Sans', sans-serif",

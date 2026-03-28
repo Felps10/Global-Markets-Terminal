@@ -3,6 +3,7 @@
 // Each source has its own fetch helpers, rate-limit guards, and caching.
 
 import { apiClient, ApiHttpError } from './services/apiClient.js';
+import { MINI_ASSETS, MINI_YAHOO_SYMBOLS, MINI_BRAPI_SYMBOLS, MINI_CRYPTO_SYMBOLS } from './data/miniAssets.js';
 
 // ─── API KEYS (from .env.local via Vite) ─────────────────────────────────────
 const FINNHUB_KEY   = import.meta.env.VITE_FINNHUB_KEY  || "";
@@ -1196,4 +1197,107 @@ export function getSourceStatus() {
     bcb:         { active: true,  keyRequired: false, hasKey: true },
     awesomeapi:  { active: true,  keyRequired: false, hasKey: true },
   };
+}
+
+// ─── TERMINAL MINI — curated subset fetch ────────────────────────────────────
+
+/**
+ * fetchMiniPrices — Fetch live prices for Terminal Mini assets
+ *
+ * Reuses existing Yahoo Finance, BRAPI, and CoinGecko fetchers.
+ * Returns a flat map: { [symbol]: { price, changePct, name, group, subgroup, flag } }
+ */
+export async function fetchMiniPrices() {
+  const results = {};
+
+  // Build a minimal assets map for fetchYahooMarketData (it checks .cat for fallback logic)
+  const miniAssetsMap = Object.fromEntries(
+    MINI_ASSETS.filter(a => a.source === 'yahoo').map(a => [a.symbol, { name: a.name, cat: a.subgroup }])
+  );
+
+  // 1. Yahoo Finance batch — global equities, indices, FX, commodities, fixed income
+  if (MINI_YAHOO_SYMBOLS.length > 0) {
+    try {
+      const result = await fetchYahooMarketData(MINI_YAHOO_SYMBOLS, null, {
+        assets: miniAssetsMap,
+        volatility: {},
+        isEquityCat: () => true,
+      });
+      if (result.data) {
+        for (const asset of MINI_ASSETS.filter(a => a.source === 'yahoo')) {
+          const quote = result.data[asset.symbol];
+          if (quote) {
+            results[asset.symbol] = {
+              price:     quote.price ?? null,
+              changePct: quote.changePct ?? null,
+              name:      asset.name,
+              group:     asset.group,
+              subgroup:  asset.subgroup,
+              flag:      asset.flag,
+            };
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Mini] Yahoo fetch failed:', e.message);
+    }
+  }
+
+  // 2. BRAPI — Brasil equities (brapiQuote takes a plain string array)
+  if (MINI_BRAPI_SYMBOLS.length > 0) {
+    try {
+      const brapiData = await brapiQuote(MINI_BRAPI_SYMBOLS);
+      if (brapiData) {
+        for (const asset of MINI_ASSETS.filter(a => a.source === 'brapi')) {
+          const quote = brapiData[asset.symbol];
+          if (quote) {
+            results[asset.symbol] = {
+              price:     quote.price ?? quote.regularMarketPrice ?? null,
+              changePct: quote.changePct ?? quote.regularMarketChangePercent ?? null,
+              name:      asset.name,
+              group:     asset.group,
+              subgroup:  asset.subgroup,
+              flag:      asset.flag,
+            };
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Mini] BRAPI fetch failed:', e.message);
+    }
+  }
+
+  // 3. CoinGecko — crypto (coingeckoPrices takes comma-separated CoinGecko IDs)
+  if (MINI_CRYPTO_SYMBOLS.length > 0) {
+    try {
+      const cgIds = MINI_ASSETS
+        .filter(a => a.source === 'coingecko')
+        .map(a => a.cgId)
+        .filter(Boolean)
+        .join(',');
+
+      if (cgIds) {
+        const cgData = await coingeckoPrices(cgIds);
+        if (cgData) {
+          for (const asset of MINI_ASSETS.filter(a => a.source === 'coingecko')) {
+            const quote = cgData[asset.cgId];
+            if (quote) {
+              results[asset.symbol] = {
+                price:     quote.usd ?? null,
+                changePct: quote.usd_24h_change ?? null,
+                name:      asset.name,
+                group:     asset.group,
+                subgroup:  asset.subgroup,
+                flag:      asset.flag,
+              };
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Mini] CoinGecko fetch failed:', e.message);
+    }
+  }
+
+  return results;
 }

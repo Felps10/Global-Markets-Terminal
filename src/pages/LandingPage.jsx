@@ -3,47 +3,18 @@ import { useNavigate } from 'react-router-dom';
 import styled, { keyframes, createGlobalStyle } from 'styled-components';
 import { useAuth } from '../hooks/useAuth.js';
 import { coingeckoPrices } from '../dataServices.js';
-import { GMTPublicHeader } from '../components/GMTHeader.jsx';
+import { GMTHomepageHeader } from '../components/GMTHeader.jsx';
+import { useTranslation } from 'react-i18next';
 
 // ─── FONTS ────────────────────────────────────────────────────────────────────
 const GlobalFonts = createGlobalStyle`
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Sans:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 `;
-
-// ─── PALETTE ──────────────────────────────────────────────────────────────────
-const C = {
-  bg:       '#040810',
-  surface:  '#080E1A',
-  surface2: '#0C1424',
-  border:   '#1A2540',
-  accent:   '#00C8FF',
-  accentDim:'rgba(0,200,255,0.12)',
-  text:     '#E8EAF0',
-  text2:    '#6B7FA3',
-  text3:    '#3A4F6E',
-  green:    '#00E676',
-  red:      '#FF5252',
-};
 
 // ─── KEYFRAMES ────────────────────────────────────────────────────────────────
-const fadeUp = keyframes`
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
-`;
-
-const pulse = keyframes`
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: 0.4; transform: scale(0.85); }
-`;
-
 const scrollLeft = keyframes`
   0%   { transform: translateX(0); }
   100% { transform: translateX(-50%); }
-`;
-
-const scrollRight = keyframes`
-  0%   { transform: translateX(-50%); }
-  100% { transform: translateX(0); }
 `;
 
 const orbFloat = keyframes`
@@ -52,27 +23,135 @@ const orbFloat = keyframes`
   66%       { transform: translate(-20px, 15px) scale(0.97); }
 `;
 
+const fadeUp = keyframes`
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+`;
+
+// ─── TICKER DATA ──────────────────────────────────────────────────────────────
+const TICKER_ITEMS = [
+  { sym: 'IBOV',    price: 131842, change: +0.74 },
+  { sym: 'S&P 500', price: 5488.12, change: +0.41 },
+  { sym: 'NASDAQ',  price: 17219.55, change: +0.63 },
+  { sym: 'USD/BRL', price: 5.67, change: -0.22 },
+  { sym: 'BTC',     price: null, change: null },
+  { sym: 'PETR4',   price: 38.42, change: +1.83 },
+  { sym: 'BRENT',   price: 74.18, change: -0.31 },
+  { sym: 'SELIC',   price: 14.25, change: 0 },
+  { sym: 'VALE3',   price: 58.91, change: +2.41 },
+  { sym: 'NVDA',    price: 131.28, change: +3.12 },
+  { sym: 'EUR/USD', price: 1.0842, change: -0.18 },
+  { sym: 'GOLD',    price: 2341.50, change: +0.52 },
+];
+
+const PREVIEW_ASSETS = [
+  { sym: 'NVDA', name: 'NVIDIA Corp', price: 131.28, change: +3.12 },
+  { sym: 'AAPL', name: 'Apple Inc', price: 189.84, change: +0.82 },
+  { sym: 'MSFT', name: 'Microsoft', price: 422.15, change: -0.41 },
+  { sym: 'GOOGL', name: 'Alphabet', price: 176.92, change: +1.24 },
+  { sym: 'AMZN', name: 'Amazon', price: 186.47, change: +0.67 },
+  { sym: 'META', name: 'Meta Platforms', price: 504.38, change: -0.23 },
+];
+
+const CAPABILITIES = [
+  { title: 'Terminal Global', tag: 'Gratuito', tagType: 'green', desc: '269 ativos em tempo real \u2014 equities EUA por setor GICS, \u00edndices globais, FX, cripto, commodities e renda fixa.', locked: false },
+  { title: 'Terminal Brasil', tag: 'Gratuito', tagType: 'green', desc: 'B3, SELIC, IPCA, curva de juros, USD/BRL, EUR/BRL e macro dom\u00e9stico.', locked: false },
+  { title: 'Research & Fundamentals', tag: 'Conta gratuita', tagType: 'lock', desc: 'P/L, EPS, ROE, EBITDA e recomenda\u00e7\u00f5es de analistas. Fundamentalista e t\u00e9cnico no mesmo lugar.', locked: true },
+  { title: 'Signal Engine', tag: 'Conta gratuita', tagType: 'lock', desc: 'RSI, MACD e sinais t\u00e9cnicos em tempo real. Alertas de pre\u00e7o por email.', locked: true },
+  { title: 'Watchlist & Alertas', tag: 'Conta gratuita', tagType: 'lock', desc: 'Salve ativos, organize por tema, e receba alertas quando o mercado se mover.', locked: true },
+  { title: 'Clube de Investimento', tag: 'Convite', tagType: 'lock', desc: 'NAV, cotiza\u00e7\u00e3o, hist\u00f3rico de rentabilidade e relat\u00f3rio AI em portugu\u00eas.', locked: true },
+];
+
+const GLOBAL_ROWS = [
+  { sym: 'NVDA', name: 'NVIDIA Corp', price: '$131.28', change: +3.12 },
+  { sym: 'AAPL', name: 'Apple Inc', price: '$189.84', change: +0.82 },
+  { sym: 'BTC', name: 'Bitcoin', price: '$67,432', change: +2.14 },
+  { sym: 'GOLD', name: 'Gold Spot', price: '$2,341', change: +0.52 },
+  { sym: 'EUR/USD', name: 'Euro / Dollar', price: '1.0842', change: -0.18 },
+];
+
+const BRASIL_ROWS = [
+  { sym: 'PETR4', name: 'Petrobras PN', price: 'R$ 38.42', change: +1.83 },
+  { sym: 'VALE3', name: 'Vale ON', price: 'R$ 58.91', change: +2.41 },
+  { sym: 'ITUB4', name: 'Ita\u00fa PN', price: 'R$ 34.18', change: -0.31 },
+  { sym: 'USD/BRL', name: 'D\u00f3lar / Real', price: 'R$ 5.67', change: -0.28 },
+  { sym: 'SELIC', name: 'Taxa Selic', price: '14.25%', change: null },
+];
+
+const METRICS = [
+  { num: '269', label: 'ativos rastreados' },
+  { num: '8', label: 'fontes de dados' },
+  { num: '30s', label: 'ciclo de atualiza\u00e7\u00e3o' },
+  { num: '9', label: 'grupos de ativos' },
+];
+
+const SOURCES = ['Yahoo Finance', 'Finnhub', 'BRAPI', 'BCB / SGS', 'FRED', 'CoinGecko', 'FMP', 'AwesomeAPI'];
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+function formatTickerPrice(sym, price) {
+  if (price == null) return '\u2014';
+  const noPrefix = ['IBOV', 'USD/BRL', 'EUR/USD'];
+  const isSelic = sym === 'SELIC';
+  let formatted;
+  if (price >= 1000) formatted = Math.round(price).toLocaleString();
+  else if (price >= 1) formatted = price.toFixed(2);
+  else formatted = price.toFixed(4);
+  if (isSelic) return `${formatted}%`;
+  if (noPrefix.includes(sym)) return formatted;
+  return `$${formatted}`;
+}
+
 // ─── STYLED COMPONENTS ────────────────────────────────────────────────────────
 
-// Page shell
 const Page = styled.div`
-  background: ${C.bg};
-  color: ${C.text};
+  background: #080f1a;
+  color: rgba(255,255,255,0.92);
   font-family: 'IBM Plex Sans', -apple-system, sans-serif;
   min-height: 100vh;
   overflow-x: hidden;
 `;
 
+const SectionWrap = styled.div`
+  padding: 72px 40px;
+  max-width: 1080px;
+  margin: 0 auto;
+`;
+
+const Eyebrow = styled.div`
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.35);
+  margin-bottom: 12px;
+  text-align: center;
+`;
+
+const SectionTitle = styled.h2`
+  font-family: 'Syne', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.92);
+  text-align: center;
+  margin: 0 0 10px;
+`;
+
+const SectionSub = styled.p`
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 300;
+  color: rgba(255,255,255,0.4);
+  text-align: center;
+  max-width: 520px;
+  margin: 0 auto 48px;
+  line-height: 1.6;
+`;
 
 // ── Hero
 const Hero = styled.section`
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding: 80px 32px 72px;
   position: relative;
   overflow: hidden;
-  padding: 120px 40px 80px;
   text-align: center;
 `;
 
@@ -80,8 +159,8 @@ const GridOverlay = styled.div`
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(0,200,255,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,200,255,0.03) 1px, transparent 1px);
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
   background-size: 60px 60px;
   pointer-events: none;
 `;
@@ -91,8 +170,9 @@ const GradientOrb = styled.div`
   width: 600px;
   height: 600px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(0,200,255,0.06) 0%, transparent 70%);
-  top: 50%; left: 50%;
+  background: radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 70%);
+  top: 50%;
+  left: 50%;
   transform: translate(-50%, -50%);
   animation: ${orbFloat} 14s ease-in-out infinite;
   pointer-events: none;
@@ -101,132 +181,93 @@ const GradientOrb = styled.div`
 const HeroInner = styled.div`
   position: relative;
   z-index: 1;
-  max-width: 760px;
+  max-width: 680px;
+  margin: 0 auto;
   animation: ${fadeUp} 0.8s ease both;
 `;
 
-const Eyebrow = styled.div`
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+const HeroEyebrow = styled.div`
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
-  font-weight: 500;
   letter-spacing: 0.2em;
-  color: ${C.accent};
+  color: rgba(255,255,255,0.35);
   text-transform: uppercase;
-  margin-bottom: 28px;
-`;
-
-const PulseDot = styled.span`
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: ${C.accent};
-  animation: ${pulse} 2s ease-in-out infinite;
-  flex-shrink: 0;
+  margin-bottom: 20px;
 `;
 
 const Headline = styled.h1`
   font-family: 'Syne', sans-serif;
-  font-size: clamp(40px, 7vw, 78px);
+  font-size: clamp(32px, 5vw, 48px);
   font-weight: 800;
-  line-height: 1.08;
-  color: ${C.text};
-  margin: 0 0 28px;
-  letter-spacing: -0.02em;
-
-  em {
-    font-style: normal;
-    color: ${C.accent};
-  }
+  line-height: 1.15;
+  color: white;
+  margin: 0 0 20px;
+  white-space: pre-line;
 `;
 
-const Subheadline = styled.p`
-  font-size: clamp(15px, 2vw, 18px);
+const Subline = styled.p`
+  font-size: 15px;
   font-weight: 300;
-  color: ${C.text2};
+  color: rgba(255,255,255,0.45);
+  max-width: 540px;
+  margin: 0 auto 36px;
   line-height: 1.65;
-  max-width: 560px;
-  margin: 0 auto 44px;
 `;
 
-const HeroCTA = styled.button`
-  background: ${C.accent};
+const CTARow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+`;
+
+const PrimaryBtn = styled.button`
+  background: white;
+  color: #080f1a;
   border: none;
-  border-radius: 2px;
-  color: #040810;
-  cursor: pointer;
+  padding: 10px 28px;
+  border-radius: 8px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.1em;
-  padding: 16px 36px;
-  text-transform: uppercase;
-  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
-
-  &:hover {
-    background: #26D4FF;
-    transform: translateY(-2px);
-    box-shadow: 0 8px 32px rgba(0,200,255,0.25);
-  }
-  &:active { transform: translateY(0); }
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  &:hover { opacity: 0.9; }
 `;
 
-const HeroRegisterLink = styled.button`
-  background: none;
-  border: none;
-  color: ${C.text2};
-  cursor: pointer;
-  display: block;
-  font-family: 'IBM Plex Sans', sans-serif;
-  font-size: 13px;
-  font-weight: 400;
-  margin: 12px auto 0;
-  padding: 4px;
-  transition: color 0.15s;
-
-  &:hover { color: ${C.accent}; }
-`;
-
-const LearnMore = styled.button`
-  background: none;
-  border: none;
-  color: ${C.text3};
-  cursor: pointer;
-  display: block;
+const SecondaryBtn = styled.button`
+  background: transparent;
+  color: rgba(255,255,255,0.6);
+  border: 1px solid rgba(255,255,255,0.2);
+  padding: 10px 28px;
+  border-radius: 8px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  margin: 20px auto 0;
-  padding: 6px;
-  text-transform: uppercase;
-  transition: color 0.15s;
-
-  &:hover { color: ${C.text2}; }
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  &:hover {
+    border-color: rgba(255,255,255,0.4);
+    color: rgba(255,255,255,0.8);
+  }
 `;
 
 // ── Ticker
 const TickerSection = styled.section`
-  border-top: 1px solid ${C.border};
-  border-bottom: 1px solid ${C.border};
+  background: #080f1a;
+  border-top: 0.5px solid rgba(255,255,255,0.06);
+  border-bottom: 0.5px solid rgba(255,255,255,0.06);
   overflow: hidden;
-  background: ${C.surface};
-`;
-
-const TickerRow = styled.div`
-  overflow: hidden;
-  padding: 10px 0;
-  border-bottom: ${p => p.$last ? 'none' : `1px solid ${C.border}`};
+  padding: 8px 0;
 `;
 
 const TickerTrack = styled.div`
   display: flex;
   width: max-content;
-  animation: ${p => p.$reverse ? scrollRight : scrollLeft}
-             ${p => p.$speed || 35}s linear infinite;
-
+  animation: ${scrollLeft} 22s linear infinite;
   &:hover { animation-play-state: paused; }
 `;
 
@@ -234,415 +275,743 @@ const TickerItem = styled.div`
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 0 28px;
-  border-right: 1px solid ${C.border};
+  padding: 0 24px;
   white-space: nowrap;
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
 `;
 
 const TickerDiamond = styled.span`
-  color: ${C.text3};
+  color: rgba(255,255,255,0.2);
   font-size: 8px;
 `;
 
-const TickerSymbol = styled.span`
-  color: ${C.text};
+const TickerSym = styled.span`
+  color: white;
   font-weight: 500;
-  letter-spacing: 0.06em;
 `;
 
 const TickerPrice = styled.span`
-  color: ${C.text2};
+  color: rgba(255,255,255,0.5);
 `;
 
 const TickerChange = styled.span`
-  color: ${p => p.$pos ? C.green : p.$neg ? C.red : C.text3};
-  min-width: 52px;
+  color: ${p => p.$pos ? '#4ade80' : p.$neg ? '#f87171' : 'rgba(255,255,255,0.35)'};
 `;
 
-// ── Trust section
-const TrustSection = styled.section`
-  padding: 64px 40px;
-  background: ${C.surface};
-  border-top: 1px solid ${C.border};
+// ── Capabilities
+const CapGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
 `;
 
-const TrustInner = styled.div`
-  max-width: 900px;
-  margin: 0 auto;
-  text-align: center;
+const CapCard = styled.div`
+  background: rgba(255,255,255,0.03);
+  border: 0.5px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 20px;
+  opacity: ${p => p.$locked ? 0.65 : 1};
 `;
 
-const SectionLabel = styled.div`
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.2em;
-  color: ${C.text3};
-  text-transform: uppercase;
-  margin-bottom: 32px;
-`;
-
-const ProviderRow = styled.div`
+const CapTitle = styled.div`
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.92);
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 0;
-  margin-bottom: 48px;
+  gap: 8px;
+  margin-bottom: 8px;
 `;
 
-const ProviderBadge = styled.div`
+const GreenTag = styled.span`
+  color: #4ade80;
+  background: rgba(74,222,128,0.15);
+  border: 0.5px solid rgba(74,222,128,0.3);
+  border-radius: 20px;
+  font-size: 10px;
+  padding: 2px 8px;
+  font-family: 'JetBrains Mono', monospace;
+`;
+
+const LockTag = styled.span`
+  color: rgba(255,255,255,0.35);
+  border: 0.5px solid rgba(255,255,255,0.15);
+  border-radius: 20px;
+  font-size: 10px;
+  padding: 2px 8px;
+  font-family: 'JetBrains Mono', monospace;
+`;
+
+const CapDesc = styled.div`
+  font-size: 12px;
+  color: rgba(255,255,255,0.4);
+  line-height: 1.6;
+`;
+
+// ── Split section
+const SplitGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  @media (max-width: 700px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const SplitCard = styled.div`
+  border: 0.5px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  overflow: hidden;
+`;
+
+const SplitHeader = styled.div`
+  padding: 14px 16px;
+  border-bottom: 0.5px solid rgba(255,255,255,0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+`;
+
+const MarketName = styled.span`
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.1em;
-  color: ${C.text2};
   text-transform: uppercase;
-  padding: 6px 20px;
-  border-right: 1px solid ${C.border};
-
-  &:last-child { border-right: none; }
-  @media (max-width: 600px) { border-right: none; padding: 6px 12px; }
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.92);
 `;
 
-const TrustGrid = styled.div`
+const IndexChange = styled.span`
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: ${p => p.$pos ? '#4ade80' : p.$neg ? '#f87171' : 'rgba(255,255,255,0.35)'};
+`;
+
+const SplitRow = styled.div`
+  padding: 10px 16px;
+  border-bottom: 0.5px solid rgba(255,255,255,0.04);
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1fr 0.8fr;
+  align-items: center;
+  gap: 4px;
+  &:last-child { border-bottom: none; }
+`;
+
+const RowSym = styled.span`
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: white;
+`;
+
+const RowName = styled.span`
+  font-size: 11px;
+  color: rgba(255,255,255,0.35);
+`;
+
+const RowPrice = styled.span`
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: rgba(255,255,255,0.6);
+`;
+
+const RowChange = styled.span`
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-align: right;
+  color: ${p => p.$pos ? '#4ade80' : p.$neg ? '#f87171' : 'rgba(255,255,255,0.35)'};
+`;
+
+// ── Metrics
+const MetricGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 2px;
-  border: 1px solid ${C.border};
-  border-radius: 4px;
-  overflow: hidden;
-  background: ${C.border};
-
-  @media (max-width: 700px) {
+  gap: 16px;
+  @media (max-width: 600px) {
     grid-template-columns: repeat(2, 1fr);
   }
 `;
 
-const TrustCard = styled.div`
-  background: ${C.surface2};
-  padding: 28px 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-`;
-
-const TrustIcon = styled.div`
-  color: ${C.accent};
-  opacity: 0.8;
-`;
-
-const TrustLabel = styled.div`
-  font-size: 12px;
-  font-weight: 400;
-  color: ${C.text2};
+const MetricItem = styled.div`
   text-align: center;
-  line-height: 1.4;
 `;
 
-// ── Footer
-const FooterBar = styled.footer`
-  border-top: 1px solid ${C.border};
-  padding: 24px 40px;
+const MetricNum = styled.div`
+  font-size: 22px;
+  font-weight: 500;
+  color: white;
+`;
+
+const MetricLabel = styled.div`
+  font-size: 11px;
+  color: rgba(255,255,255,0.35);
+  margin-top: 4px;
+`;
+
+const SourceRow = styled.div`
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  background: ${C.bg};
-
-  @media (max-width: 600px) {
-    flex-direction: column;
-    gap: 16px;
-    text-align: center;
-    padding: 24px 20px;
-  }
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 32px;
 `;
 
-const FooterLogo = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 10px;
-`;
-
-const FooterCopy = styled.span`
+const SourceTag = styled.span`
+  border: 0.5px solid rgba(255,255,255,0.1);
+  border-radius: 20px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
-  color: ${C.text3};
-  letter-spacing: 0.06em;
+  color: rgba(255,255,255,0.3);
+  padding: 4px 10px;
 `;
 
-const FooterLink = styled.button`
-  background: none;
-  border: none;
-  color: ${C.accent};
-  cursor: pointer;
+// ── Terminal Preview
+const MockFrame = styled.div`
+  background: rgba(255,255,255,0.02);
+  border: 0.5px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  overflow: hidden;
+`;
+
+const MockTopBar = styled.div`
+  padding: 8px 12px;
+  border-bottom: 0.5px solid rgba(255,255,255,0.06);
+  display: flex;
+  align-items: center;
+`;
+
+const Dots = styled.div`
+  display: flex;
+  gap: 4px;
+  margin-right: 12px;
+`;
+
+const Dot = styled.div`
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: ${p => p.$color};
+  opacity: 0.6;
+`;
+
+const TabRow = styled.div`
+  display: flex;
+  gap: 0;
+`;
+
+const Tab = styled.div`
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  padding: 0;
-  text-transform: uppercase;
-  transition: color 0.15s;
-  &:hover { color: #26D4FF; }
+  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: ${p => p.$active ? 'rgba(255,255,255,0.06)' : 'transparent'};
+  color: ${p => p.$active ? 'white' : 'rgba(255,255,255,0.3)'};
 `;
 
-// ─── SVG LOGO MARK ────────────────────────────────────────────────────────────
-const LogoMark = styled.svg`
+const MockBody = styled.div`
+  display: flex;
+`;
+
+const Sidebar = styled.div`
+  width: 140px;
+  padding: 10px 12px;
+  border-right: 0.5px solid rgba(255,255,255,0.06);
   flex-shrink: 0;
 `;
 
-function GmtMark({ size = 28 }) {
-  return (
-    <LogoMark width={size} height={size} viewBox="0 0 28 28" fill="none">
-      <rect x="1" y="1" width="26" height="26" rx="2" stroke="#00C8FF" strokeWidth="1.5" />
-      <polyline points="5,20 10,12 14,16 18,9 23,14" stroke="#00C8FF" strokeWidth="1.8"
-        strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <circle cx="23" cy="14" r="2" fill="#00C8FF" />
-    </LogoMark>
-  );
-}
+const SidebarGroup = styled.div`
+  &:not(:first-child) {
+    margin-top: 12px;
+  }
+`;
 
-// ─── TICKER ITEM ──────────────────────────────────────────────────────────────
-function Tick({ sym, price, changePct }) {
-  const hasData  = price != null;
-  const pos      = hasData && changePct > 0;
-  const neg      = hasData && changePct < 0;
-  const sign     = pos ? '+' : '';
-  const arrow    = pos ? '▲' : neg ? '▼' : '';
+const SidebarLabel = styled.div`
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.25);
+  margin-bottom: 6px;
+`;
 
-  return (
-    <TickerItem>
-      <TickerDiamond>◆</TickerDiamond>
-      <TickerSymbol>{sym}</TickerSymbol>
-      <TickerPrice>{hasData ? `$${price >= 1000 ? Math.round(price).toLocaleString() : price >= 1 ? price.toFixed(2) : price.toFixed(4)}` : '—'}</TickerPrice>
-      <TickerChange $pos={pos} $neg={neg}>
-        {hasData ? `${arrow} ${sign}${changePct.toFixed(2)}%` : '—'}
-      </TickerChange>
-    </TickerItem>
-  );
-}
+const SidebarItem = styled.div`
+  font-size: 10px;
+  padding: 3px 0;
+  color: ${p => p.$active ? 'white' : 'rgba(255,255,255,0.35)'};
+`;
 
-// ─── TRUST ICONS ──────────────────────────────────────────────────────────────
-const IconLock = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="11" width="18" height="11" rx="2" />
-    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-  </svg>
-);
-const IconChart = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-  </svg>
-);
-const IconGlobe = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10" />
-    <line x1="2" y1="12" x2="22" y2="12" />
-    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-  </svg>
-);
-const IconZap = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-  </svg>
-);
+const MockContent = styled.div`
+  flex: 1;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  @media (max-width: 600px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+`;
 
-// ─── CURATED TICKER SYMBOLS ───────────────────────────────────────────────────
-// Two rows, different assets for visual variety
-const ROW1_SYMBOLS = [
-  { sym: '^GSPC', label: 'SPX' }, { sym: '^DJI', label: 'DJIA' },
-  { sym: '^IXIC', label: 'NDX' }, { sym: 'AAPL', label: 'AAPL' },
-  { sym: 'MSFT', label: 'MSFT' }, { sym: 'NVDA', label: 'NVDA' },
-  { sym: 'GOOGL', label: 'GOOGL' }, { sym: 'AMZN', label: 'AMZN' },
-  { sym: 'META', label: 'META' }, { sym: 'EURUSD=X', label: 'EUR/USD' },
-  { sym: 'GBPUSD=X', label: 'GBP/USD' }, { sym: 'USDJPY=X', label: 'USD/JPY' },
-];
-const ROW2_SYMBOLS = [
-  { sym: 'JPM', label: 'JPM' }, { sym: 'GS', label: 'GS' },
-  { sym: 'XOM', label: 'XOM' }, { sym: 'CVX', label: 'CVX' },
-  { sym: 'LLY', label: 'LLY' }, { sym: 'UNH', label: 'UNH' },
-  { sym: 'TSM', label: 'TSM' }, { sym: 'AVGO', label: 'AVGO' },
-  { sym: '^FTSE', label: 'FTSE' }, { sym: '^N225', label: 'N225' },
-  { sym: 'USDCAD=X', label: 'USD/CAD' }, { sym: 'AUDUSD=X', label: 'AUD/USD' },
-];
-const CRYPTO_IDS = { BTC: 'bitcoin', ETH: 'ethereum', SOL: 'solana' };
+const AssetCard = styled.div`
+  background: rgba(255,255,255,0.04);
+  border: 0.5px solid rgba(255,255,255,0.07);
+  border-radius: 6px;
+  padding: 8px;
+`;
+
+const ACSym = styled.div`
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: white;
+  font-weight: 500;
+`;
+
+const ACName = styled.div`
+  font-size: 9px;
+  color: rgba(255,255,255,0.3);
+  margin-top: 2px;
+`;
+
+const ACPrice = styled.div`
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: rgba(255,255,255,0.8);
+  margin-top: 6px;
+`;
+
+const ACChange = styled.div`
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  margin-top: 2px;
+  color: ${p => p.$pos ? '#4ade80' : p.$neg ? '#f87171' : 'rgba(255,255,255,0.35)'};
+`;
+
+// ── Final CTA
+const FinalCTA = styled.section`
+  padding: 72px 40px;
+  text-align: center;
+`;
+
+const CTAH2 = styled.h2`
+  font-family: 'Syne', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.92);
+  margin: 0 0 12px;
+`;
+
+const CTAPara = styled.p`
+  font-size: 14px;
+  font-weight: 300;
+  color: rgba(255,255,255,0.4);
+  max-width: 480px;
+  margin: 0 auto 32px;
+  line-height: 1.6;
+`;
+
+// ── Footer
+const FooterWrap = styled.footer`
+  background: #080f1a;
+  border-top: 0.5px solid rgba(255,255,255,0.06);
+  padding: 48px 40px 24px;
+`;
+
+const FooterInner = styled.div`
+  max-width: 1080px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 40px;
+  @media (max-width: 700px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const FooterBrand = styled.div``;
+
+const FooterWordmark = styled.div`
+  font-size: 13px;
+  font-weight: 500;
+  color: white;
+  margin-bottom: 12px;
+`;
+
+const FooterTagline = styled.div`
+  font-size: 11px;
+  color: rgba(255,255,255,0.35);
+  line-height: 1.6;
+`;
+
+const FooterColHeader = styled.div`
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: rgba(255,255,255,0.25);
+  margin-bottom: 12px;
+`;
+
+const FooterLink = styled.div`
+  font-size: 12px;
+  color: rgba(255,255,255,0.35);
+  line-height: 2.2;
+`;
+
+const FooterBottom = styled.div`
+  border-top: 0.5px solid rgba(255,255,255,0.06);
+  margin-top: 32px;
+  padding-top: 20px;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  max-width: 1080px;
+  margin-left: auto;
+  margin-right: auto;
+`;
+
+const FooterSmall = styled.span`
+  font-size: 10px;
+  color: rgba(255,255,255,0.2);
+`;
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 export default function LandingPage() {
-  const navigate         = useNavigate();
+  const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const [tickerData, setTickerData] = useState({});
-  const featuresRef = useRef(null);
+  const { t, i18n } = useTranslation();
+  const [tickerData, setTickerData] = useState(TICKER_ITEMS);
+  const [previewAssets, setPreviewAssets] = useState(PREVIEW_ASSETS);
+  const [lang, setLang] = useState(i18n.language?.startsWith('en') ? 'en' : 'pt');
 
-  // Redirect authenticated users straight to the app
+  function handleLangChange(newLang) {
+    setLang(newLang);
+    i18n.changeLanguage(newLang);
+  }
+
   useEffect(() => {
     if (isAuthenticated) navigate('/app', { replace: true });
   }, [isAuthenticated, navigate]);
 
-  // Fetch ticker prices
-  const fetchTicker = useCallback(async () => {
-    const all = [...ROW1_SYMBOLS, ...ROW2_SYMBOLS];
-    const yahooSyms = all.map(s => s.sym);
-    const next = {};
-
-    // Yahoo Finance via backend proxy / Yahoo query API
-    try {
-      const qs = yahooSyms.map(encodeURIComponent).join('%2C');
-      const res = await fetch(
-        `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${qs}&fields=regularMarketPrice,regularMarketChangePercent`,
-        { headers: { 'Accept': 'application/json' } }
-      );
-      if (res.ok) {
-        const json = await res.json();
-        const results = json?.quoteResponse?.result || [];
-        for (const q of results) {
-          next[q.symbol] = {
-            price:     q.regularMarketPrice,
-            changePct: q.regularMarketChangePercent,
-          };
+  // Fetch BTC price from coingecko
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await coingeckoPrices('bitcoin');
+        if (data?.bitcoin) {
+          setTickerData(prev => prev.map(t =>
+            t.sym === 'BTC'
+              ? { ...t, price: data.bitcoin.usd, change: +(data.bitcoin.usd_24h_change || 0).toFixed(2) }
+              : t
+          ));
         }
-      }
-    } catch { /* silent fail — show placeholders */ }
-
-    // CoinGecko crypto
-    try {
-      const ids = Object.values(CRYPTO_IDS).join(',');
-      const data = await coingeckoPrices(ids);
-      if (data) {
-        for (const [sym, cgId] of Object.entries(CRYPTO_IDS)) {
-          const d = data[cgId];
-          if (d) next[sym] = { price: d.usd, changePct: d.usd_24h_change };
-        }
-      }
-    } catch { /* silent fail */ }
-
-    setTickerData(next);
+      } catch {}
+    })();
   }, []);
 
+  // Price animation for terminal preview
   useEffect(() => {
-    fetchTicker();
-    const id = setInterval(fetchTicker, 30_000);
+    const id = setInterval(() => {
+      setPreviewAssets(prev => prev.map(a => {
+        const drift = (Math.random() - 0.5) * 0.0016;
+        const newPrice = +(a.price * (1 + drift)).toFixed(2);
+        const newChange = +(a.change + drift * 100).toFixed(2);
+        return { ...a, price: newPrice, change: newChange };
+      }));
+    }, 2200);
     return () => clearInterval(id);
-  }, [fetchTicker]);
+  }, []);
 
-  const launch  = () => navigate(isAuthenticated ? '/app' : '/login');
-  const signUp  = () => navigate('/register');
-  const scrollToFeatures = () => featuresRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
 
-  // Build ticker items + crypto row inserts
-  const row1Items = [
-    ...ROW1_SYMBOLS,
-    ...Object.keys(CRYPTO_IDS).map(sym => ({ sym, label: sym })),
-  ];
-  const row2Items = ROW2_SYMBOLS;
-
-  // Duplicate each row for seamless infinite scroll
-  const r1 = [...row1Items, ...row1Items];
-  const r2 = [...row2Items, ...row2Items];
+  const tickerDup = [...tickerData, ...tickerData];
 
   return (
     <>
       <GlobalFonts />
       <Page>
 
-        {/* ── HEADER ────────────────────────────────────────────────────────── */}
-        <GMTPublicHeader
+        {/* ── HEADER ──────────────────────────────────────────────────────── */}
+        <GMTHomepageHeader
+          lang={lang}
+          onLangChange={handleLangChange}
           onSignIn={() => navigate('/login')}
           onSignUp={() => navigate('/register')}
         />
 
-        {/* ── HERO ──────────────────────────────────────────────────────────── */}
+        {/* ── HERO ────────────────────────────────────────────────────────── */}
         <Hero>
           <GridOverlay />
           <GradientOrb />
           <HeroInner>
-            <Eyebrow>
-              <PulseDot />
-              Real-Time Market Intelligence
-            </Eyebrow>
-
+            <HeroEyebrow>{t('hero.eyebrow')}</HeroEyebrow>
             <Headline>
-              The Terminal Built<br />
-              for <em>Serious</em> Investors.
+              {t('hero.headline_1') + '\n' + t('hero.headline_2')}
             </Headline>
-
-            <Subheadline>
-              Track equities, crypto, currencies, commodities and indices
-              across global markets — all in one professional-grade platform.
-            </Subheadline>
-
-            <HeroCTA onClick={launch}>Launch Terminal →</HeroCTA>
-            {!isAuthenticated && (
-              <HeroRegisterLink onClick={signUp}>
-                New to GMT? Create a free account →
-              </HeroRegisterLink>
-            )}
-            <LearnMore onClick={scrollToFeatures}>Learn more ↓</LearnMore>
+            <Subline>
+              {t('hero.subline')}
+            </Subline>
+            <CTARow>
+              <PrimaryBtn onClick={() => navigate('/mini')}>{t('hero.cta_primary')}</PrimaryBtn>
+              <SecondaryBtn onClick={() => navigate('/terminal')}>{t('hero.cta_secondary')}</SecondaryBtn>
+            </CTARow>
           </HeroInner>
         </Hero>
 
-        {/* ── LIVE TICKER ───────────────────────────────────────────────────── */}
-        <div ref={featuresRef}>
-          <TickerSection>
-            <TickerRow>
-              <TickerTrack $speed={38}>
-                {r1.map((s, i) => {
-                  const d = tickerData[s.sym];
-                  return <Tick key={`r1-${i}`} sym={s.label} price={d?.price} changePct={d?.changePct} />;
-                })}
-              </TickerTrack>
-            </TickerRow>
-            <TickerRow $last>
-              <TickerTrack $reverse $speed={42}>
-                {r2.map((s, i) => {
-                  const d = tickerData[s.sym];
-                  return <Tick key={`r2-${i}`} sym={s.label} price={d?.price} changePct={d?.changePct} />;
-                })}
-              </TickerTrack>
-            </TickerRow>
-          </TickerSection>
-        </div>
+        {/* ── TICKER STRIP ────────────────────────────────────────────────── */}
+        <TickerSection>
+          <TickerTrack>
+            {tickerDup.map((t, i) => {
+              const hasData = t.price != null;
+              const pos = hasData && t.change > 0;
+              const neg = hasData && t.change < 0;
+              return (
+                <TickerItem key={i}>
+                  <TickerDiamond>&#9670;</TickerDiamond>
+                  <TickerSym>{t.sym}</TickerSym>
+                  <TickerPrice>{formatTickerPrice(t.sym, t.price)}</TickerPrice>
+                  <TickerChange $pos={pos} $neg={neg}>
+                    {hasData ? `${pos ? '+' : ''}${t.change.toFixed(2)}%` : '\u2014'}
+                  </TickerChange>
+                </TickerItem>
+              );
+            })}
+          </TickerTrack>
+        </TickerSection>
 
-        {/* ── TRUST SIGNALS ─────────────────────────────────────────────────── */}
-        <TrustSection>
-          <TrustInner>
-            <SectionLabel>Market Data Provided By</SectionLabel>
-            <ProviderRow>
-              {['Yahoo Finance','CoinGecko','Finnhub','FRED','FMP','BRAPI','BCB'].map(p => (
-                <ProviderBadge key={p}>{p}</ProviderBadge>
+        {/* ── PRODUCTS ───────────────────────────────────────────────────── */}
+        <section id="capabilities">
+          <SectionWrap>
+            <Eyebrow>{t('products.eyebrow')}</Eyebrow>
+            <SectionTitle>{t('products.title')}</SectionTitle>
+            <SectionSub>{t('products.subtitle')}</SectionSub>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+              {/* Card 1 — Terminal Mini */}
+              <div style={{ border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 28 }}>
+                <div style={{ marginBottom: 16 }}>
+                  <span style={{ color: '#4ade80', background: 'rgba(74,222,128,0.15)', border: '0.5px solid rgba(74,222,128,0.3)', borderRadius: 20, fontSize: 10, padding: '2px 8px', fontFamily: "'JetBrains Mono', monospace" }}>{t('products.mini_label')}</span>
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Syne', sans-serif", color: 'rgba(255,255,255,0.92)', marginBottom: 10 }}>{t('products.mini_name')}</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.6, marginBottom: 20 }}>{t('products.mini_desc')}</div>
+                <div style={{ marginBottom: 20 }}>
+                  {[t('products.mini_f1'), t('products.mini_f2'), t('products.mini_f3'), t('products.mini_f4')].map((f, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.8 }}>
+                      <span style={{ color: '#4ade80', fontSize: 10 }}>✓</span>{f}
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => navigate('/mini')} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 500, letterSpacing: '0.06em', padding: '10px 28px', width: '100%', transition: 'border-color 0.15s, color 0.15s' }}>
+                  {t('products.mini_cta')}
+                </button>
+              </div>
+
+              {/* Card 2 — Terminal Pro (featured) */}
+              <div style={{ border: '1px solid rgba(255,255,255,0.2)', borderRadius: 12, padding: 28, background: 'rgba(255,255,255,0.02)' }}>
+                <div style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ color: '#60a5fa', background: 'rgba(96,165,250,0.15)', border: '0.5px solid rgba(96,165,250,0.3)', borderRadius: 20, fontSize: 10, padding: '2px 8px', fontFamily: "'JetBrains Mono', monospace" }}>{t('products.pro_badge')}</span>
+                  <span style={{ color: 'rgba(255,255,255,0.35)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: 20, fontSize: 10, padding: '2px 8px', fontFamily: "'JetBrains Mono', monospace" }}>{t('products.pro_label')}</span>
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Syne', sans-serif", color: 'rgba(255,255,255,0.92)', marginBottom: 10 }}>{t('products.pro_name')}</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.6, marginBottom: 20 }}>{t('products.pro_desc')}</div>
+                <div style={{ marginBottom: 20 }}>
+                  {[t('products.pro_f1'), t('products.pro_f2'), t('products.pro_f3'), t('products.pro_f4'), t('products.pro_f5')].map((f, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.8 }}>
+                      <span style={{ color: '#4ade80', fontSize: 10 }}>✓</span>{f}
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => navigate('/register')} style={{ background: 'white', border: 'none', borderRadius: 8, color: '#080f1a', cursor: 'pointer', fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 500, letterSpacing: '0.06em', padding: '10px 28px', width: '100%', transition: 'opacity 0.15s' }}>
+                  {t('products.pro_cta')}
+                </button>
+              </div>
+
+              {/* Card 3 — Club Management */}
+              <div style={{ border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 28 }}>
+                <div style={{ marginBottom: 16 }}>
+                  <span style={{ color: '#fbbf24', background: 'rgba(251,191,36,0.15)', border: '0.5px solid rgba(251,191,36,0.3)', borderRadius: 20, fontSize: 10, padding: '2px 8px', fontFamily: "'JetBrains Mono', monospace" }}>{t('products.club_label')}</span>
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Syne', sans-serif", color: 'rgba(255,255,255,0.92)', marginBottom: 10 }}>{t('products.club_name')}</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.6, marginBottom: 20 }}>{t('products.club_desc')}</div>
+                <div style={{ marginBottom: 20 }}>
+                  {[t('products.club_f1'), t('products.club_f2'), t('products.club_f3'), t('products.club_f4')].map((f, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.8 }}>
+                      <span style={{ color: '#4ade80', fontSize: 10 }}>✓</span>{f}
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => navigate('/clube')} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 500, letterSpacing: '0.06em', padding: '10px 28px', width: '100%', transition: 'border-color 0.15s, color 0.15s' }}>
+                  {t('products.club_cta')}
+                </button>
+              </div>
+            </div>
+          </SectionWrap>
+        </section>
+
+        {/* ── GLOBAL vs BRASIL ────────────────────────────────────────────── */}
+        <SectionWrap>
+          <Eyebrow>{t('coverage.eyebrow')}</Eyebrow>
+          <SectionTitle>{t('coverage.title')}</SectionTitle>
+          <SectionSub>{t('coverage.subtitle')}</SectionSub>
+          <SplitGrid>
+            <SplitCard>
+              <SplitHeader>
+                <MarketName>Global</MarketName>
+                <IndexChange $pos>S&amp;P 500 +0.41%</IndexChange>
+              </SplitHeader>
+              {GLOBAL_ROWS.map((r, i) => (
+                <SplitRow key={i}>
+                  <RowSym>{r.sym}</RowSym>
+                  <RowName>{r.name}</RowName>
+                  <RowPrice>{r.price}</RowPrice>
+                  <RowChange $pos={r.change > 0} $neg={r.change < 0}>
+                    {r.change > 0 ? '+' : ''}{r.change.toFixed(2)}%
+                  </RowChange>
+                </SplitRow>
               ))}
-            </ProviderRow>
+            </SplitCard>
+            <SplitCard>
+              <SplitHeader>
+                <MarketName>Brasil</MarketName>
+                <IndexChange $pos>IBOV +0.74%</IndexChange>
+              </SplitHeader>
+              {BRASIL_ROWS.map((r, i) => (
+                <SplitRow key={i}>
+                  <RowSym>{r.sym}</RowSym>
+                  <RowName>{r.name}</RowName>
+                  <RowPrice>{r.price}</RowPrice>
+                  <RowChange $pos={r.change != null && r.change > 0} $neg={r.change != null && r.change < 0}>
+                    {r.change != null ? `${r.change > 0 ? '+' : ''}${r.change.toFixed(2)}%` : '\u2014'}
+                  </RowChange>
+                </SplitRow>
+              ))}
+            </SplitCard>
+          </SplitGrid>
+        </SectionWrap>
 
-            <TrustGrid>
-              <TrustCard>
-                <TrustIcon><IconLock /></TrustIcon>
-                <TrustLabel>JWT Secured<br />Authentication</TrustLabel>
-              </TrustCard>
-              <TrustCard>
-                <TrustIcon><IconChart /></TrustIcon>
-                <TrustLabel>Real-Time<br />Data Feeds</TrustLabel>
-              </TrustCard>
-              <TrustCard>
-                <TrustIcon><IconGlobe /></TrustIcon>
-                <TrustLabel>Global Market<br />Coverage</TrustLabel>
-              </TrustCard>
-              <TrustCard>
-                <TrustIcon><IconZap /></TrustIcon>
-                <TrustLabel>Low-Latency<br />Architecture</TrustLabel>
-              </TrustCard>
-            </TrustGrid>
-          </TrustInner>
-        </TrustSection>
+        {/* ── NUMBERS ─────────────────────────────────────────────────────── */}
+        <SectionWrap>
+          <Eyebrow>{t('numbers.eyebrow')}</Eyebrow>
+          <SectionTitle>{t('numbers.title')}</SectionTitle>
+          <SectionSub>{t('numbers.subtitle')}</SectionSub>
+          <MetricGrid>
+            {[
+              { num: '269', labelKey: 'numbers.assets' },
+              { num: '8',   labelKey: 'numbers.sources' },
+              { num: '30s', labelKey: 'numbers.refresh' },
+              { num: '9',   labelKey: 'numbers.groups' },
+            ].map((m, i) => (
+              <MetricItem key={i}>
+                <MetricNum>{m.num}</MetricNum>
+                <MetricLabel>{t(m.labelKey)}</MetricLabel>
+              </MetricItem>
+            ))}
+          </MetricGrid>
+          <SourceRow>
+            {SOURCES.map(s => (
+              <SourceTag key={s}>{s}</SourceTag>
+            ))}
+          </SourceRow>
+        </SectionWrap>
 
-        {/* ── FOOTER ────────────────────────────────────────────────────────── */}
-        <FooterBar>
-          <FooterLogo>
-            <GmtMark size={22} />
-            <FooterCopy>© 2025 Global Markets Terminal</FooterCopy>
-          </FooterLogo>
-          <FooterLink onClick={launch}>Launch Terminal →</FooterLink>
-        </FooterBar>
+        {/* ── TERMINAL PREVIEW ────────────────────────────────────────────── */}
+        <SectionWrap>
+          <Eyebrow>{t('preview.eyebrow')}</Eyebrow>
+          <SectionTitle>{t('preview.title')}</SectionTitle>
+          <SectionSub>{t('preview.subtitle')}</SectionSub>
+          <MockFrame>
+            <MockTopBar>
+              <Dots>
+                <Dot $color="#ff5f57" />
+                <Dot $color="#ffbd2e" />
+                <Dot $color="#28c840" />
+              </Dots>
+              <TabRow>
+                <Tab $active>Global</Tab>
+                <Tab>Brasil</Tab>
+                <Tab>Research &#128274;</Tab>
+                <Tab>Sinais &#128274;</Tab>
+                <Tab>Clube &#128274;</Tab>
+              </TabRow>
+            </MockTopBar>
+            <MockBody>
+              <Sidebar>
+                <SidebarGroup>
+                  <SidebarLabel>Equities</SidebarLabel>
+                  <SidebarItem $active>Technology</SidebarItem>
+                  <SidebarItem>Semiconductors</SidebarItem>
+                  <SidebarItem>Financials</SidebarItem>
+                  <SidebarItem>Healthcare</SidebarItem>
+                </SidebarGroup>
+                <SidebarGroup>
+                  <SidebarLabel>Digital Assets</SidebarLabel>
+                  <SidebarItem>Crypto</SidebarItem>
+                </SidebarGroup>
+                <SidebarGroup>
+                  <SidebarLabel>Commodities</SidebarLabel>
+                  <SidebarItem>Precious Metals</SidebarItem>
+                  <SidebarItem>Energy</SidebarItem>
+                </SidebarGroup>
+              </Sidebar>
+              <MockContent>
+                {previewAssets.map(a => (
+                  <AssetCard key={a.sym}>
+                    <ACSym>{a.sym}</ACSym>
+                    <ACName>{a.name}</ACName>
+                    <ACPrice>${a.price.toFixed(2)}</ACPrice>
+                    <ACChange $pos={a.change > 0} $neg={a.change < 0}>
+                      {a.change > 0 ? '+' : ''}{a.change.toFixed(2)}%
+                    </ACChange>
+                  </AssetCard>
+                ))}
+              </MockContent>
+            </MockBody>
+          </MockFrame>
+        </SectionWrap>
+
+        {/* ── FINAL CTA ───────────────────────────────────────────────────── */}
+        <FinalCTA>
+          <CTAH2>{t('final_cta.title')}</CTAH2>
+          <CTAPara>{t('final_cta.subtitle')}</CTAPara>
+          <CTARow>
+            <PrimaryBtn onClick={() => navigate('/mini')}>{t('final_cta.primary')}</PrimaryBtn>
+            <SecondaryBtn onClick={() => navigate('/register')}>{t('final_cta.secondary')}</SecondaryBtn>
+          </CTARow>
+        </FinalCTA>
+
+        {/* ── FOOTER ──────────────────────────────────────────────────────── */}
+        <FooterWrap>
+          <FooterInner>
+            <FooterBrand>
+              <FooterWordmark>GMT</FooterWordmark>
+              <FooterTagline>
+                {t('footer.tagline')}
+              </FooterTagline>
+            </FooterBrand>
+            <div>
+              <FooterColHeader>{t('footer.product')}</FooterColHeader>
+              <FooterLink>{t('footer.terminal_global')}</FooterLink>
+              <FooterLink>{t('footer.terminal_brasil')}</FooterLink>
+              <FooterLink>{t('footer.research')}</FooterLink>
+              <FooterLink>{t('footer.signal_engine')}</FooterLink>
+              <FooterLink>{t('footer.clube')}</FooterLink>
+            </div>
+            <div>
+              <FooterColHeader>{t('footer.company')}</FooterColHeader>
+              <FooterLink>{t('footer.sobre')}</FooterLink>
+              <FooterLink>{t('footer.contato')}</FooterLink>
+            </div>
+            <div>
+              <FooterColHeader>{t('footer.legal')}</FooterColHeader>
+              <FooterLink>{t('footer.privacidade')}</FooterLink>
+              <FooterLink>{t('footer.termos')}</FooterLink>
+              <FooterLink>{t('footer.disclaimer_link')}</FooterLink>
+            </div>
+          </FooterInner>
+          <FooterBottom>
+            <FooterSmall>{t('footer.disclaimer')}</FooterSmall>
+            <FooterSmall>{t('footer.data_sources')}</FooterSmall>
+          </FooterBottom>
+        </FooterWrap>
 
       </Page>
     </>

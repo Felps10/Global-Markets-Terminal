@@ -1,5 +1,6 @@
 import { createContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase.js';
+import { trackEvent } from '../services/analytics.js';
 
 export const AuthContext = createContext(null);
 
@@ -18,6 +19,24 @@ export function AuthProvider({ children }) {
   const [user,    setUser]    = useState(null);
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // AuthPanel state — openable from anywhere via useAuth()
+  const [authPanelOpen, setAuthPanelOpen] = useState(false);
+  const [authPanelFeature, setAuthPanelFeature] = useState('default');
+
+  const openAuthPanel = useCallback((featureName = 'default') => {
+    trackEvent('guest_gate_hit', {
+      featureName,
+      trigger: 'auth_panel',
+      surface: typeof window !== 'undefined' ? window.location.pathname : '',
+    });
+    setAuthPanelFeature(featureName);
+    setAuthPanelOpen(true);
+  }, []);
+
+  const closeAuthPanel = useCallback(() => {
+    setAuthPanelOpen(false);
+  }, []);
 
   useEffect(() => {
     // Restore session on mount — Supabase SDK reads from localStorage
@@ -92,6 +111,10 @@ export function AuthProvider({ children }) {
     getToken,
     isAuthenticated: !!user,
     isAdmin:         user?.role === 'admin',
+    authPanelOpen,
+    authPanelFeature,
+    openAuthPanel,
+    closeAuthPanel,
   };
 
   return (

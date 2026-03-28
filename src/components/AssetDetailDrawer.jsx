@@ -20,6 +20,7 @@ import {
   finnhubRecommendation, finnhubNews,
   hasFmpKey, hasFinnhubKey,
 } from '../dataServices.js';
+import { useAuth } from '../hooks/useAuth.js';
 
 // ─── Color tokens ─────────────────────────────────────────────────────────────
 const BG_DRAWER = '#0a1628';
@@ -47,6 +48,59 @@ const INTERVAL_OPTIONS = {
   '5Y':  { default: '1wk', options: ['1d', '1wk', '1mo'] },
   'MAX': { default: '1mo', options: ['1wk', '1mo'] },
 };
+
+// ─── LockedTabCard — shown to guests on gated tabs ───────────────────────────
+function LockedTabCard({ title, description, onUnlock }) {
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '40px 24px',
+      textAlign: 'center',
+      gap: 12,
+    }}>
+      <div style={{ fontSize: 20 }}>🔒</div>
+      <div style={{
+        fontFamily: "'IBM Plex Sans', sans-serif",
+        fontSize: 13,
+        fontWeight: 500,
+        color: '#e2e8f0',
+      }}>
+        {title}
+      </div>
+      <div style={{
+        fontFamily: "'IBM Plex Sans', sans-serif",
+        fontSize: 12,
+        color: '#64748b',
+        lineHeight: 1.5,
+        maxWidth: 260,
+      }}>
+        {description}
+      </div>
+      <button
+        onClick={onUnlock}
+        style={{
+          marginTop: 4,
+          background: 'rgba(255,255,255,0.06)',
+          border: '0.5px solid rgba(255,255,255,0.15)',
+          borderRadius: 7,
+          color: '#e2e8f0',
+          cursor: 'pointer',
+          fontFamily: "'IBM Plex Sans', sans-serif",
+          fontSize: 12,
+          padding: '8px 20px',
+          transition: 'background 0.15s',
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+        onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+      >
+        Criar conta gratuita →
+      </button>
+    </div>
+  );
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function timeAgo(unixSec) {
@@ -273,6 +327,7 @@ function SourceBadge({ source }) {
 export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
   const navigate   = useNavigate();
   const { assets } = useTaxonomy();
+  const { isAuthenticated, openAuthPanel } = useAuth();
 
   // ── Navigation stack ──────────────────────────────────────────────────────
   const [stack, setStack] = useState([]);
@@ -986,41 +1041,65 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
         [...Array(3)].map((_, i) => <Skeleton key={i} height={48} width="100%" mb={8} />)
       ) : newsData?.length > 0 ? (
         <div>
-          {newsData.slice(0, 5).map((item, i) => (
-            <a
-              key={i}
-              href={item.url}
-              target="_blank"
-              rel="noreferrer"
+          {newsData.slice(0, isAuthenticated ? 5 : 3).map((item, i) => {
+            const limit = isAuthenticated ? 5 : 3;
+            return (
+              <a
+                key={i}
+                href={item.url}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: 'block', padding: '8px 0',
+                  borderBottom: i < Math.min(newsData.length, limit) - 1
+                    ? `1px solid rgba(30,41,59,0.45)` : 'none',
+                  textDecoration: 'none',
+                  transition: 'opacity 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.opacity = '0.75'; }}
+                onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
+              >
+                <div style={{
+                  fontFamily: "'IBM Plex Sans', sans-serif",
+                  fontSize: 12, color: TXT_1, lineHeight: 1.4, marginBottom: 4,
+                }}>
+                  {item.headline}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <SourceBadge source={item.source} />
+                  {item.datetime != null && (
+                    <span style={{
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: 9, color: TXT_3,
+                    }}>
+                      {timeAgo(item.datetime)}
+                    </span>
+                  )}
+                </div>
+              </a>
+            );
+          })}
+          {!isAuthenticated && newsData.length > 3 && (
+            <button
+              onClick={() => openAuthPanel('news')}
               style={{
-                display: 'block', padding: '8px 0',
-                borderBottom: i < Math.min(newsData.length, 5) - 1
-                  ? `1px solid rgba(30,41,59,0.45)` : 'none',
-                textDecoration: 'none',
-                transition: 'opacity 0.15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.opacity = '0.75'; }}
-              onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
-            >
-              <div style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
                 fontFamily: "'IBM Plex Sans', sans-serif",
-                fontSize: 12, color: TXT_1, lineHeight: 1.4, marginBottom: 4,
-              }}>
-                {item.headline}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <SourceBadge source={item.source} />
-                {item.datetime != null && (
-                  <span style={{
-                    fontFamily: "'JetBrains Mono', monospace",
-                    fontSize: 9, color: TXT_3,
-                  }}>
-                    {timeAgo(item.datetime)}
-                  </span>
-                )}
-              </div>
-            </a>
-          ))}
+                fontSize: 12,
+                color: TXT_3,
+                padding: '8px 0',
+                width: '100%',
+                textAlign: 'center',
+                transition: 'color 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.color = TXT_1}
+              onMouseLeave={e => e.currentTarget.style.color = TXT_3}
+            >
+              Ver mais notícias →
+            </button>
+          )}
         </div>
       ) : (
         <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: TXT_3 }}>
@@ -1538,7 +1617,14 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
           {/* FUNDAMENTALS TAB */}
           {activeTab === 'fundamentals' && (
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 32px' }}>
-              {!hasFmpKey() ? (
+              {!isAuthenticated ? (
+                <LockedTabCard
+                  featureName="fundamentals"
+                  title="Dados fundamentalistas"
+                  description="P/L, EPS, ROE, EBITDA e recomendações de analistas — disponível para membros."
+                  onUnlock={() => openAuthPanel('fundamentals')}
+                />
+              ) : !hasFmpKey() ? (
                 <div style={{
                   fontFamily: "'IBM Plex Sans', sans-serif",
                   fontSize: 12, color: TXT_3, fontStyle: 'italic', lineHeight: 1.6, padding: '20px 0',
@@ -1631,7 +1717,16 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
           {/* ANALYST TAB */}
           {activeTab === 'analyst' && (
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 32px' }}>
-              {analystSection}
+              {!isAuthenticated ? (
+                <LockedTabCard
+                  featureName="signals"
+                  title="Sinais técnicos"
+                  description="RSI, MACD e análise técnica em tempo real — disponível para membros."
+                  onUnlock={() => openAuthPanel('signals')}
+                />
+              ) : (
+                analystSection
+              )}
             </div>
           )}
 

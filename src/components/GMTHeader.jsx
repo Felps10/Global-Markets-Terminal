@@ -21,7 +21,7 @@ import MarketStatusPill, { MARKETS } from './MarketStatusPill.jsx';
 import TickerStrip from './TickerStrip.jsx';
 import MarketsDropdown from './MarketsDropdown.jsx';
 import { useTaxonomy } from '../context/TaxonomyContext.jsx';
-import { hasRole } from '../lib/roles.js';
+
 
 // ─── Inject nav + dropdown styles ─────────────────────────────────────────────
 const STYLE_ID = 'gmt-header-nav-styles';
@@ -124,6 +124,9 @@ function injectStyles() {
     .gmt-admin-tab:hover { color: #cbd5e1; }
     .gmt-admin-tab.active { color: #e2e8f0; border-bottom-color: #f59e0b; }
     .gmt-admin-tab:focus-visible { outline: 2px solid #f59e0b; outline-offset: 2px; }
+    .gmt-homepage-dropdown-item:hover {
+      background: rgba(255,255,255,0.04);
+    }
   `;
   document.head.appendChild(el);
 }
@@ -232,6 +235,7 @@ function ModeBadge() {
 // ─── Shared top bar (Layer 1) ─────────────────────────────────────────────────
 function TopBar({ user, onMenuOpen, onNav, onLogout, selectedMarketId, setSelectedMarketId }) {
   const [dropOpen, setDropOpen] = useState(false);
+  const navigate = useNavigate();
   const selectedMarket = MARKETS.find(m => m.id === selectedMarketId) || MARKETS[0];
 
   return (
@@ -291,8 +295,8 @@ function TopBar({ user, onMenuOpen, onNav, onLogout, selectedMarketId, setSelect
           <LiveClock tz={selectedMarket.tz} tzLabel={selectedMarket.tzLabel} />
         </div>
         <VDiv mx={16} />
-        <div style={{ position: 'relative' }}>
-          {user && (
+        {user ? (
+          <div style={{ position: 'relative' }}>
             <button className="gmt-user-btn" onClick={() => setDropOpen(o => !o)}>
               <div style={{
                 width: 24, height: 24, borderRadius: 4,
@@ -314,11 +318,49 @@ function TopBar({ user, onMenuOpen, onNav, onLogout, selectedMarketId, setSelect
               )}
               <span style={{ color: '#334155', fontSize: 10 }}>▾</span>
             </button>
-          )}
-          {dropOpen && user && (
-            <UserDropdown user={user} onNav={onNav} onLogout={onLogout} onClose={() => setDropOpen(false)} />
-          )}
-        </div>
+            {dropOpen && (
+              <UserDropdown user={user} onNav={onNav} onLogout={onLogout} onClose={() => setDropOpen(false)} />
+            )}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={() => navigate('/login')}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontSize: 12,
+                color: '#64748b',
+                padding: '4px 8px',
+                transition: 'color 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.color = '#e2e8f0'}
+              onMouseLeave={e => e.currentTarget.style.color = '#64748b'}
+            >
+              Entrar
+            </button>
+            <button
+              onClick={() => navigate('/register')}
+              style={{
+                background: 'rgba(255,255,255,0.06)',
+                border: '0.5px solid rgba(255,255,255,0.15)',
+                borderRadius: 6,
+                cursor: 'pointer',
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontSize: 12,
+                color: '#e2e8f0',
+                padding: '5px 14px',
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+            >
+              Criar conta
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -430,7 +472,7 @@ export default function GMTHeader({
       </button>
 
       {/* Markets dropdown — between Terminal and Heatmap */}
-      <MarketsDropdown />
+      <MarketsDropdown user={user} />
 
       {/* Catalog · News (+ optional Watchlist) */}
       {[
@@ -446,14 +488,22 @@ export default function GMTHeader({
           {item.label}
         </button>
       ))}
-      {hasRole(user?.role, 'club_member') && (
-        <button
-          className={`gmt-nav-item${derivedActivePage === 'clube' ? ' active' : ''}`}
-          onClick={() => navigate('/clubes')}
-        >
-          Clube
-        </button>
-      )}
+      <button
+        className={`gmt-nav-item${derivedActivePage === 'clube' ? ' active' : ''}`}
+        onClick={() => navigate('/clubes')}
+      >
+        Clube
+        {!user && (
+          <span style={{
+            marginLeft: 4,
+            fontSize: 8,
+            color: '#475569',
+            verticalAlign: 'middle',
+          }}>
+            🔒
+          </span>
+        )}
+      </button>
       <div style={{ flex: 1 }} />
       {isTerminalPage && (
         <>
@@ -502,8 +552,9 @@ export default function GMTHeader({
 }
 
 // ─── GMTPublicHeader (landing page, unauthenticated) ──────────────────────────
-export function GMTPublicHeader({ onSignIn, onSignUp }) {
+export function GMTPublicHeader({ onSignIn, onSignUp, navLinks, langToggle }) {
   const [selectedMarketId, setSelectedMarketId] = useState('nyse');
+  const [lang, setLang] = useState('PT');
 
   useEffect(() => { injectStyles(); }, []);
 
@@ -513,79 +564,305 @@ export function GMTPublicHeader({ onSignIn, onSignUp }) {
     <header style={{
       position: 'sticky', top: 0, zIndex: 50,
       background: '#080f1a',
-      borderBottom: '1px solid rgba(51,65,85,0.5)',
+      borderBottom: '0.5px solid rgba(255,255,255,0.08)',
     }}>
       <div style={{
-        height: 48,
+        height: 52,
         display: 'grid',
         gridTemplateColumns: '1fr auto 1fr',
         alignItems: 'center',
         padding: '0 20px',
+        maxWidth: 1200,
+        margin: '0 auto',
       }}>
         {/* LEFT */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
-          <VDiv mx={0} />
           <GmtLogo />
           <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 16, fontWeight: 800, letterSpacing: '0.18em', color: '#e2e8f0', marginLeft: 8 }}>
             GMT
           </span>
-          <span style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 10, color: '#334155', marginLeft: 6, letterSpacing: '0.06em' }}>
-            GLOBAL MARKETS
-          </span>
-          <VDiv />
-          <MarketStatusPill selected={selectedMarketId} setSelected={setSelectedMarketId} />
         </div>
 
-        {/* CENTER */}
-        <div />
+        {/* CENTER — nav links */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+          {navLinks && navLinks.map((link) => (
+            <a
+              key={link.label}
+              href={link.href}
+              style={{
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontSize: 12, fontWeight: 500,
+                color: 'rgba(255,255,255,0.45)',
+                textDecoration: 'none',
+                letterSpacing: '0.03em',
+                transition: 'color 0.15s',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.8)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.45)'; }}
+            >
+              {link.label}
+            </a>
+          ))}
+          {!navLinks && (
+            <>
+              <VDiv mx={0} />
+              <MarketStatusPill selected={selectedMarketId} setSelected={setSelectedMarketId} />
+            </>
+          )}
+        </div>
 
         {/* RIGHT */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0 }}>
-          <div style={{ minWidth: 110 }}>
-            <LiveClock tz={selectedMarket.tz} tzLabel={selectedMarket.tzLabel} />
-          </div>
-          <VDiv mx={16} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+          {!navLinks && (
+            <>
+              <div style={{ minWidth: 110 }}>
+                <LiveClock tz={selectedMarket.tz} tzLabel={selectedMarket.tzLabel} />
+              </div>
+              <VDiv mx={8} />
+            </>
+          )}
+          {langToggle && (
+            <div style={{
+              display: 'flex', border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 20, overflow: 'hidden', marginRight: 8,
+            }}>
+              {['PT', 'EN'].map(l => (
+                <button
+                  key={l}
+                  onClick={() => setLang(l)}
+                  style={{
+                    background: lang === l ? 'rgba(255,255,255,0.1)' : 'transparent',
+                    border: 'none', cursor: 'pointer',
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 9, fontWeight: 500, letterSpacing: '0.06em',
+                    color: lang === l ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)',
+                    padding: '4px 10px',
+                  }}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+          )}
           {onSignIn && (
             <button
               onClick={onSignIn}
               style={{
                 background: 'transparent',
-                border: '1px solid rgba(51,65,85,0.7)',
-                borderRadius: 4,
-                color: '#64748b',
+                border: '1px solid rgba(255,255,255,0.15)',
+                borderRadius: 6,
+                color: 'rgba(255,255,255,0.5)',
                 cursor: 'pointer',
                 fontFamily: "'IBM Plex Sans', sans-serif",
                 fontSize: 12, fontWeight: 500,
                 padding: '6px 16px',
                 transition: 'color 0.15s, border-color 0.15s',
-                marginRight: 8,
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = '#cbd5e1'; e.currentTarget.style.borderColor = 'rgba(100,116,139,0.7)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.borderColor = 'rgba(51,65,85,0.7)'; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.8)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.5)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'; }}
             >
-              Sign In
+              Entrar
             </button>
           )}
           {onSignUp && (
             <button
               onClick={onSignUp}
               style={{
-                background: '#1d4ed8',
-                border: '1px solid #1d4ed8',
-                borderRadius: 4,
-                color: '#fff',
+                background: '#fff',
+                border: '1px solid #fff',
+                borderRadius: 6,
+                color: '#080f1a',
                 cursor: 'pointer',
                 fontFamily: "'IBM Plex Sans', sans-serif",
-                fontSize: 12, fontWeight: 500,
+                fontSize: 12, fontWeight: 600,
                 padding: '6px 16px',
-                transition: 'background 0.15s',
+                transition: 'opacity 0.15s',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#2563eb'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = '#1d4ed8'; }}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
             >
-              Get Started
+              Criar conta
             </button>
           )}
+        </div>
+      </div>
+    </header>
+  );
+}
+
+// ─── GMTHomepageHeader (homepage, product-aware navigation) ──────────────────
+const PRODUCTS_ITEMS = [
+  { name: 'Terminal Mini', desc: 'Mercado ao vivo · gratuito · sem cadastro', href: '/mini' },
+  { name: 'Terminal Pro', desc: 'Terminal completo · research · sinais · watchlist', href: '/terminal' },
+  { name: 'Club Management', desc: 'NAV · cotização · relatório AI para seu clube', href: '/clube' },
+];
+
+export function GMTHomepageHeader({ onSignIn, onSignUp, lang, onLangChange }) {
+  const [productsOpen, setProductsOpen] = useState(false);
+  const productsRef = useRef(null);
+
+  useEffect(() => { injectStyles(); }, []);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (productsRef.current && !productsRef.current.contains(e.target)) setProductsOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <header style={{
+      position: 'sticky', top: 0, zIndex: 50,
+      background: '#080f1a',
+      borderBottom: '0.5px solid rgba(255,255,255,0.08)',
+    }}>
+      <div style={{
+        height: 56,
+        display: 'grid',
+        gridTemplateColumns: '1fr auto 1fr',
+        alignItems: 'center',
+        padding: '0 32px',
+      }}>
+        {/* LEFT — logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <GmtLogo />
+          <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 15, fontWeight: 800, letterSpacing: '0.12em', color: '#e2e8f0' }}>
+            GMT
+          </span>
+        </div>
+
+        {/* CENTER — navigation */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
+          <div ref={productsRef} style={{ position: 'relative' }}>
+            <button
+              onClick={() => setProductsOpen(o => !o)}
+              style={{
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, fontWeight: 400,
+                color: productsOpen ? '#fff' : 'rgba(255,255,255,0.45)',
+                transition: 'color 0.15s', padding: 0,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
+              onMouseLeave={(e) => { if (!productsOpen) e.currentTarget.style.color = 'rgba(255,255,255,0.45)'; }}
+            >
+              Products
+            </button>
+            {productsOpen && (
+              <div style={{
+                position: 'absolute',
+                top: 'calc(100% + 8px)',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                background: '#0c1525',
+                border: '0.5px solid rgba(255,255,255,0.1)',
+                borderRadius: 10,
+                width: 280,
+                overflow: 'hidden',
+                zIndex: 100,
+              }}>
+                {PRODUCTS_ITEMS.map((item, i) => (
+                  <a
+                    key={item.name}
+                    href={item.href}
+                    className="gmt-homepage-dropdown-item"
+                    style={{
+                      display: 'block',
+                      padding: '12px 16px',
+                      borderBottom: i < PRODUCTS_ITEMS.length - 1 ? '0.5px solid rgba(255,255,255,0.06)' : 'none',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    <div style={{ fontSize: 13, fontWeight: 500, color: '#e2e8f0', marginBottom: 3 }}>
+                      {item.name}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
+                      {item.desc}
+                    </div>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+          <a
+            href="#sobre"
+            style={{
+              fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, fontWeight: 400,
+              color: 'rgba(255,255,255,0.45)', textDecoration: 'none', transition: 'color 0.15s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.45)'; }}
+          >
+            Sobre
+          </a>
+          <a
+            href="#precos"
+            style={{
+              fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, fontWeight: 400,
+              color: 'rgba(255,255,255,0.45)', textDecoration: 'none', transition: 'color 0.15s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.45)'; }}
+          >
+            Preços
+          </a>
+        </div>
+
+        {/* RIGHT — actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'flex-end' }}>
+          {/* PT/EN toggle */}
+          <div style={{
+            display: 'flex',
+            border: '0.5px solid rgba(255,255,255,0.12)',
+            borderRadius: 6,
+            overflow: 'hidden',
+          }}>
+            {['pt', 'en'].map(l => (
+              <button
+                key={l}
+                onClick={() => onLangChange(l)}
+                style={{
+                  background: lang === l ? 'rgba(255,255,255,0.12)' : 'transparent',
+                  border: 'none', cursor: 'pointer',
+                  fontFamily: "'IBM Plex Sans', sans-serif",
+                  fontSize: 11,
+                  color: lang === l ? '#fff' : 'rgba(255,255,255,0.3)',
+                  padding: '4px 10px',
+                }}
+              >
+                {l.toUpperCase()}
+              </button>
+            ))}
+          </div>
+
+          {/* Entrar */}
+          <button
+            onClick={onSignIn}
+            style={{
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13,
+              color: 'rgba(255,255,255,0.45)', transition: 'color 0.15s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.45)'; }}
+          >
+            Entrar
+          </button>
+
+          {/* Começar grátis */}
+          <button
+            onClick={onSignUp}
+            style={{
+              background: '#fff', color: '#080f1a', borderRadius: 7, border: 'none',
+              padding: '6px 16px', cursor: 'pointer',
+              fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, fontWeight: 500,
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.9)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; }}
+          >
+            Começar grátis
+          </button>
         </div>
       </div>
     </header>

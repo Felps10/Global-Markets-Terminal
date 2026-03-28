@@ -519,7 +519,7 @@ Instruções:
       }}>
         <div style={{ fontSize: 12, color: RED }}>{error}</div>
         <button
-          onClick={() => navigate('/clube')}
+          onClick={() => navigate('/clubes')}
           style={{
             padding: '8px 20px', background: 'transparent',
             border: `1px solid ${BORDER2}`, borderRadius: 4,
@@ -539,7 +539,7 @@ Instruções:
       }}>
         <div style={{ fontSize: 12, color: TXT_2 }}>Nenhum clube encontrado.</div>
         <button
-          onClick={() => navigate('/clube')}
+          onClick={() => navigate('/clubes')}
           style={{
             padding: '8px 20px', background: 'transparent',
             border: `1px solid ${BORDER2}`, borderRadius: 4,
@@ -594,7 +594,7 @@ Instruções:
         {/* Left */}
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <button
-            onClick={() => navigate('/clube')}
+            onClick={() => navigate('/clubes')}
             style={{
               background: BG_HEAD, border: 'none', cursor: 'pointer',
               color: TXT_2, fontSize: 18, padding: '8px 12px',

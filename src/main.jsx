@@ -1,3 +1,4 @@
+import './i18n.js'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { createGlobalStyle } from 'styled-components'
@@ -7,6 +8,9 @@ import { TaxonomyProvider } from './context/TaxonomyContext.jsx'
 import { PreferencesProvider } from './context/PreferencesContext.jsx'
 import { WatchlistProvider } from './context/WatchlistContext.jsx'
 import './index.css'
+import { initAnalytics } from './services/analytics.js'
+
+initAnalytics()
 
 const GlobalBaseline = createGlobalStyle`
   *, *::before, *::after { box-sizing: border-box; }

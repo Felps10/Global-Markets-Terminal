@@ -22,6 +22,7 @@ import { useSelectedAsset } from './context/SelectedAssetContext.jsx';
 import { usePreferences } from './context/PreferencesContext.jsx';
 import { useWatchlist }   from './context/WatchlistContext.jsx';
 import { isExhausted } from './services/quotaTracker.js';
+import { trackEvent } from './services/analytics.js';
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 
@@ -468,7 +469,7 @@ const DENSITY_CONFIG = {
 // ─── ASSET CARD ───────────────────────────────────────────────────────────────
 export function AssetCard({ symbol, data, onClick, groupLabel, density = "compact" }) {
   const [hovered, setHovered] = useState(false);
-  const { isAuthenticated }           = useAuth();
+  const { isAuthenticated, openAuthPanel } = useAuth();
   const { pin, unpin, isPinned }      = useWatchlist();
   const asset = STATIC_ASSETS_MAP[symbol];
   if (!asset || !data) return null;
@@ -552,23 +553,22 @@ export function AssetCard({ symbol, data, onClick, groupLabel, density = "compac
       </div>
 
       {/* Star / pin button */}
-      {isAuthenticated && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            isPinned('asset', symbol) ? unpin('asset', symbol) : pin('asset', symbol);
-          }}
-          style={{
-            position: "absolute", top: 8, right: 8,
-            background: "transparent", border: "none", cursor: "pointer",
-            fontSize: 14, lineHeight: 1, padding: 2,
-            color: isPinned('asset', symbol) ? "#FFB300" : "var(--c-text-3)",
-            transition: "color 0.15s ease",
-          }}
-        >
-          {isPinned('asset', symbol) ? "★" : "☆"}
-        </button>
-      )}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!isAuthenticated) { openAuthPanel('watchlist'); return; }
+          isPinned('asset', symbol) ? unpin('asset', symbol) : pin('asset', symbol);
+        }}
+        style={{
+          position: "absolute", top: 8, right: 8,
+          background: "transparent", border: "none", cursor: "pointer",
+          fontSize: 14, lineHeight: 1, padding: 2,
+          color: isAuthenticated && isPinned('asset', symbol) ? "#FFB300" : "var(--c-text-3)",
+          transition: "color 0.15s ease",
+        }}
+      >
+        {isAuthenticated && isPinned('asset', symbol) ? "★" : "☆"}
+      </button>
     </div>
   );
 }
@@ -591,7 +591,7 @@ export function ListColumnHeader() {
 // ─── ASSET ROW ────────────────────────────────────────────────────────────────
 export function AssetRow({ symbol, data, rank, onClick }) {
   const [hovered, setHovered] = useState(false);
-  const { isAuthenticated }       = useAuth();
+  const { isAuthenticated, openAuthPanel } = useAuth();
   const { pin, unpin, isPinned }  = useWatchlist();
   const asset = STATIC_ASSETS_MAP[symbol];
   if (!asset || !data) return null;
@@ -633,22 +633,21 @@ export function AssetRow({ symbol, data, rank, onClick }) {
       </div>
       <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", textAlign: "right" }}>{asset.cat !== "fx" ? formatVolume(data.volume) : "—"}</div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
-        {isAuthenticated && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              isPinned('asset', symbol) ? unpin('asset', symbol) : pin('asset', symbol);
-            }}
-            style={{
-              background: "transparent", border: "none", cursor: "pointer",
-              fontSize: 13, lineHeight: 1, padding: "1px 2px",
-              color: isPinned('asset', symbol) ? "#FFB300" : "var(--c-text-3)",
-              transition: "color 0.15s ease", flexShrink: 0,
-            }}
-          >
-            {isPinned('asset', symbol) ? "★" : "☆"}
-          </button>
-        )}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!isAuthenticated) { openAuthPanel('watchlist'); return; }
+            isPinned('asset', symbol) ? unpin('asset', symbol) : pin('asset', symbol);
+          }}
+          style={{
+            background: "transparent", border: "none", cursor: "pointer",
+            fontSize: 13, lineHeight: 1, padding: "1px 2px",
+            color: isAuthenticated && isPinned('asset', symbol) ? "#FFB300" : "var(--c-text-3)",
+            transition: "color 0.15s ease", flexShrink: 0,
+          }}
+        >
+          {isAuthenticated && isPinned('asset', symbol) ? "★" : "☆"}
+        </button>
         <Sparkline data={data.sparkline} positive={positive} width={50} height={22} />
       </div>
     </div>
@@ -940,7 +939,18 @@ export default function GlobalMarketsTerminal() {
   const { prefs }                         = usePreferences();
   const { items: watchlistItems, loading: watchlistLoading, unpin, isPinned } = useWatchlist();
   const { setTickerItems }                = useTicker();
-  const { selectedAsset, setSelectedAsset } = useSelectedAsset();
+  const { selectedAsset, setSelectedAsset: rawSetSelectedAsset } = useSelectedAsset();
+  const handleSelectAsset = useCallback((sym) => {
+    if (!user && sym) {
+      const asset = STATIC_ASSETS_MAP[sym];
+      trackEvent('guest_asset_open', {
+        symbol: sym,
+        name: asset?.name || sym,
+        group: asset?.cat || '',
+      });
+    }
+    rawSetSelectedAsset(sym);
+  }, [user, rawSetSelectedAsset]);
   const [marketData,      setMarketData]      = useState(null);
   const [loading,         setLoading]         = useState(true);
   const [, setLastUpdate]                       = useState(null);
@@ -967,6 +977,13 @@ export default function GlobalMarketsTerminal() {
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
+
+  // ── Guest analytics ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!user) {
+      trackEvent('guest_terminal_entry', { surface: 'global' });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Taxonomy from TaxonomyContext (falls back to static data) ────────────────
   const { globalTaxonomy, groups: ctxGroups, subgroups: ctxSubgroups, loading: taxLoading } = useTaxonomy() ?? {};
@@ -1438,8 +1455,8 @@ export default function GlobalMarketsTerminal() {
 
       <AssetDetailDrawer
         symbol={selectedAsset}
-        onClose={() => setSelectedAsset(null)}
-        onSymbolChange={(sym) => setSelectedAsset(sym)}
+        onClose={() => handleSelectAsset(null)}
+        onSymbolChange={(sym) => handleSelectAsset(sym)}
       />
 
       {/* ── COMMAND BAR ── */}
@@ -1509,7 +1526,7 @@ export default function GlobalMarketsTerminal() {
                 passes={passes}
                 subgroups={ctxSubgroups}
                 groups={ctxGroups}
-                onAssetClick={setSelectedAsset}
+                onAssetClick={handleSelectAsset}
               />
             )}
 
@@ -1519,11 +1536,11 @@ export default function GlobalMarketsTerminal() {
                 {viewMode === "list" && <ListColumnHeader />}
                 {viewMode === "cards" ? (
                   <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${(DENSITY_CONFIG[cardDensity] || DENSITY_CONFIG.compact).assetGridMin}px, 1fr))`, gap: (DENSITY_CONFIG[cardDensity] || DENSITY_CONFIG.compact).assetGap, transition: "all 0.2s ease" }}>
-                    {flatSymbols.map(sym => <AssetCard key={sym} symbol={sym} data={marketData[sym]} onClick={() => setSelectedAsset(sym)} density={cardDensity} />)}
+                    {flatSymbols.map(sym => <AssetCard key={sym} symbol={sym} data={marketData[sym]} onClick={() => handleSelectAsset(sym)} density={cardDensity} />)}
                   </div>
                 ) : (
                   <div style={{ border: "1px solid var(--c-border)", borderRadius: 8, overflow: "hidden" }}>
-                    {flatSymbols.map((sym, idx) => <AssetRow key={sym} symbol={sym} data={marketData[sym]} rank={idx + 1} onClick={() => setSelectedAsset(sym)} />)}
+                    {flatSymbols.map((sym, idx) => <AssetRow key={sym} symbol={sym} data={marketData[sym]} rank={idx + 1} onClick={() => handleSelectAsset(sym)} />)}
                   </div>
                 )}
               </div>
@@ -1559,7 +1576,7 @@ export default function GlobalMarketsTerminal() {
                   <div style={{ marginTop: 16 }}>
                     <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${(DENSITY_CONFIG[cardDensity] || DENSITY_CONFIG.compact).assetGridMin}px, 1fr))`, gap: (DENSITY_CONFIG[cardDensity] || DENSITY_CONFIG.compact).assetGap, transition: "all 0.2s ease" }}>
                       {flatItems.map(({ sym, groupLabel }) => (
-                        <AssetCard key={sym} symbol={sym} data={marketData[sym]} onClick={() => setSelectedAsset(sym)} groupLabel={groupLabel} density={cardDensity} />
+                        <AssetCard key={sym} symbol={sym} data={marketData[sym]} onClick={() => handleSelectAsset(sym)} groupLabel={groupLabel} density={cardDensity} />
                       ))}
                     </div>
                   </div>
@@ -1682,7 +1699,7 @@ export default function GlobalMarketsTerminal() {
                             <>
                               <ListColumnHeader />
                               <div style={{ border: "1px solid var(--c-border)", borderRadius: 8, overflow: "hidden" }}>
-                                {symbols.map((sym, i) => <AssetRow key={sym} symbol={sym} data={marketData[sym]} rank={i + 1} onClick={() => setSelectedAsset(sym)} />)}
+                                {symbols.map((sym, i) => <AssetRow key={sym} symbol={sym} data={marketData[sym]} rank={i + 1} onClick={() => handleSelectAsset(sym)} />)}
                               </div>
                             </>
                           )}
@@ -1753,11 +1770,11 @@ export default function GlobalMarketsTerminal() {
                         {viewMode === "list" && <ListColumnHeader />}
                         {viewMode === "cards" ? (
                           <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${(DENSITY_CONFIG[cardDensity] || DENSITY_CONFIG.compact).assetGridMin}px, 1fr))`, gap: (DENSITY_CONFIG[cardDensity] || DENSITY_CONFIG.compact).assetGap, transition: "all 0.2s ease" }}>
-                            {symbols.map(sym => <AssetCard key={sym} symbol={sym} data={marketData[sym]} onClick={() => setSelectedAsset(sym)} density={cardDensity} />)}
+                            {symbols.map(sym => <AssetCard key={sym} symbol={sym} data={marketData[sym]} onClick={() => handleSelectAsset(sym)} density={cardDensity} />)}
                           </div>
                         ) : (
                           <div style={{ border: "1px solid var(--c-border)", borderRadius: 8, overflow: "hidden" }}>
-                            {symbols.map((sym, i) => <AssetRow key={sym} symbol={sym} data={marketData[sym]} rank={i + 1} onClick={() => setSelectedAsset(sym)} />)}
+                            {symbols.map((sym, i) => <AssetRow key={sym} symbol={sym} data={marketData[sym]} rank={i + 1} onClick={() => handleSelectAsset(sym)} />)}
                           </div>
                         )}
                       </div>
@@ -1850,11 +1867,11 @@ export default function GlobalMarketsTerminal() {
                           {viewMode === "list" && <ListColumnHeader />}
                           {viewMode === "cards" ? (
                             <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${(DENSITY_CONFIG[cardDensity] || DENSITY_CONFIG.compact).assetGridMin}px, 1fr))`, gap: (DENSITY_CONFIG[cardDensity] || DENSITY_CONFIG.compact).assetGap, transition: "all 0.2s ease" }}>
-                              {symbols.map(sym => <AssetCard key={sym} symbol={sym} data={marketData[sym]} onClick={() => setSelectedAsset(sym)} density={cardDensity} />)}
+                              {symbols.map(sym => <AssetCard key={sym} symbol={sym} data={marketData[sym]} onClick={() => handleSelectAsset(sym)} density={cardDensity} />)}
                             </div>
                           ) : (
                             <div style={{ border: "1px solid var(--c-border)", borderRadius: 8, overflow: "hidden" }}>
-                              {symbols.map((sym, i) => <AssetRow key={sym} symbol={sym} data={marketData[sym]} rank={i + 1} onClick={() => setSelectedAsset(sym)} />)}
+                              {symbols.map((sym, i) => <AssetRow key={sym} symbol={sym} data={marketData[sym]} rank={i + 1} onClick={() => handleSelectAsset(sym)} />)}
                             </div>
                           )}
                         </>
