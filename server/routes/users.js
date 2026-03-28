@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { supabase } from '../db.js';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
+import { ADMIN_ASSIGNABLE, MANAGER_ASSIGNABLE } from '../lib/roles.js';
 
 const router = Router();
 
@@ -49,29 +50,48 @@ router.delete('/:id', async (req, res) => {
 
 // PATCH /api/v1/users/:id/role
 router.patch('/:id/role', async (req, res) => {
-  const targetId = req.params.id;
-  const { role } = req.body;
+  const targetId   = req.params.id;
+  const { role }   = req.body;
+  const callerRole = req.user.role;
 
-  if (!role || !['admin', 'user'].includes(role)) {
-    return res.status(400).json({ error: 'BAD_REQUEST', message: 'role must be "admin" or "user"' });
+  const assignable = callerRole === 'admin' ? ADMIN_ASSIGNABLE : MANAGER_ASSIGNABLE;
+
+  if (!role || !assignable.includes(role)) {
+    return res.status(400).json({
+      error:   'BAD_REQUEST',
+      message: `Role must be one of: ${assignable.join(', ')}`,
+    });
   }
 
   if (req.user.id === targetId) {
-    return res.status(403).json({ error: 'FORBIDDEN', message: 'Cannot change your own role' });
+    return res.status(403).json({
+      error:   'FORBIDDEN',
+      message: 'Cannot change your own role',
+    });
   }
 
-  // Fetch existing metadata to preserve other fields
-  const { data: { user: target }, error: fetchError } = await supabase.auth.admin.getUserById(targetId);
+  const { data: { user: target }, error: fetchError } =
+    await supabase.auth.admin.getUserById(targetId);
+
   if (fetchError || !target) {
     return res.status(404).json({ error: 'NOT_FOUND', message: 'User not found' });
   }
 
-  const { data: { user: updated }, error } = await supabase.auth.admin.updateUserById(targetId, {
-    user_metadata: { ...target.user_metadata, role },
-  });
+  if ((target.user_metadata?.role || 'user') === 'admin' && callerRole !== 'admin') {
+    return res.status(403).json({
+      error:   'FORBIDDEN',
+      message: 'Cannot modify an admin account',
+    });
+  }
+
+  const { data: { user: updated }, error } =
+    await supabase.auth.admin.updateUserById(targetId, {
+      user_metadata: { ...target.user_metadata, role },
+    });
+
   if (error) return res.status(500).json({ error: 'DB_ERROR', message: error.message });
 
-  res.json({
+  return res.json({
     id:    updated.id,
     email: updated.email,
     name:  updated.user_metadata?.name || '',

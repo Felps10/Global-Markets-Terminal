@@ -21,6 +21,7 @@ import MarketStatusPill, { MARKETS } from './MarketStatusPill.jsx';
 import TickerStrip from './TickerStrip.jsx';
 import MarketsDropdown from './MarketsDropdown.jsx';
 import { useTaxonomy } from '../context/TaxonomyContext.jsx';
+import { hasRole } from '../lib/roles.js';
 
 // ─── Inject nav + dropdown styles ─────────────────────────────────────────────
 const STYLE_ID = 'gmt-header-nav-styles';
@@ -191,7 +192,7 @@ function UserDropdown({ user, onNav, onLogout, onClose }) {
           </span>
         </button>
       )}
-      <button className="gmt-dropdown-item" onClick={() => { onNav?.('/clube'); onClose(); }}>
+      <button className="gmt-dropdown-item" onClick={() => { onNav?.('/clubes'); onClose(); }}>
         <span>📊</span> Clube
       </button>
       <button className="gmt-dropdown-item" onClick={() => { onNav?.('/app/settings'); onClose(); }}>
@@ -364,7 +365,7 @@ export default function GMTHeader({
     if (pathname.startsWith('/app/catalog')) return 'catalog';
     if (pathname.startsWith('/app/news')) return 'news';
     if (pathname.startsWith('/app/watchlist')) return 'watchlist';
-    if (pathname.startsWith('/clube')) return 'clube';
+    if (pathname.startsWith('/clube') || pathname.startsWith('/clubes')) return 'clube';
     return activePage;
   }, [pathname, activePage]);
 
@@ -445,12 +446,14 @@ export default function GMTHeader({
           {item.label}
         </button>
       ))}
-      <button
-        className={`gmt-nav-item${derivedActivePage === 'clube' ? ' active' : ''}`}
-        onClick={() => navigate('/clube')}
-      >
-        Clube
-      </button>
+      {hasRole(user?.role, 'club_member') && (
+        <button
+          className={`gmt-nav-item${derivedActivePage === 'clube' ? ' active' : ''}`}
+          onClick={() => navigate('/clubes')}
+        >
+          Clube
+        </button>
+      )}
       <div style={{ flex: 1 }} />
       {isTerminalPage && (
         <>

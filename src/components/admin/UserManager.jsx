@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import styled, { keyframes } from 'styled-components';
-import { getUsers, deleteUser } from '../../services/userService.js';
+import { getUsers, deleteUser, patchUserRole } from '../../services/userService.js';
+import { ROLE_LABEL, ADMIN_ASSIGNABLE_ROLES } from '../../lib/roles.js';
 
 // ── Animations ─────────────────────────────────────────────────────────────────
 const fadeIn = keyframes`
@@ -65,6 +66,13 @@ const Td = styled.td`
   vertical-align: middle;
 `;
 
+const ROLE_COLORS = {
+  admin:        { bg: 'rgba(0,188,212,0.12)',   border: 'rgba(0,188,212,0.3)',   color: '#00BCD4' },
+  club_manager: { bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.3)',  color: '#fbbf24' },
+  club_member:  { bg: 'rgba(0,230,118,0.12)',   border: 'rgba(0,230,118,0.3)',   color: '#00E676' },
+  user:         { bg: 'rgba(107,127,163,0.12)', border: 'rgba(107,127,163,0.2)', color: '#6B7FA3' },
+};
+
 const RoleBadge = styled.span`
   display: inline-block;
   padding: 2px 8px;
@@ -73,9 +81,9 @@ const RoleBadge = styled.span`
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  background: ${(p) => p.$admin ? 'rgba(0,188,212,0.12)' : 'rgba(107,127,163,0.12)'};
-  border: 1px solid ${(p) => p.$admin ? 'rgba(0,188,212,0.3)' : 'rgba(107,127,163,0.2)'};
-  color: ${(p) => p.$admin ? '#00BCD4' : '#6B7FA3'};
+  background: ${(p) => (ROLE_COLORS[p.$role] || ROLE_COLORS.user).bg};
+  border: 1px solid ${(p) => (ROLE_COLORS[p.$role] || ROLE_COLORS.user).border};
+  color: ${(p) => (ROLE_COLORS[p.$role] || ROLE_COLORS.user).color};
 `;
 
 const DeleteBtn = styled.button`
@@ -241,6 +249,36 @@ function fmtDate(iso) {
   });
 }
 
+// ── Role selector ─────────────────────────────────────────────────────────────
+function RoleSelector({ user, currentUserId, onSelect }) {
+  const isLocked = user.id === currentUserId || user.role === 'admin';
+  if (isLocked) {
+    return <RoleBadge $role={user.role}>{ROLE_LABEL[user.role]}</RoleBadge>;
+  }
+  return (
+    <select
+      value={user.role}
+      onChange={(e) => onSelect(user, e.target.value)}
+      style={{
+        background:  '#0D1220',
+        border:      '1px solid #1E2740',
+        borderRadius: 3,
+        color:       '#8892A4',
+        fontFamily:  "'Space Mono', monospace",
+        fontSize:    10,
+        letterSpacing: '0.08em',
+        padding:     '3px 6px',
+        cursor:      'pointer',
+        textTransform: 'uppercase',
+      }}
+    >
+      {ADMIN_ASSIGNABLE_ROLES.filter((r) => r !== 'admin').map((r) => (
+        <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+      ))}
+    </select>
+  );
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 export default function UserManager({ currentUserId }) {
   const { toasts, push } = useToast();
@@ -253,6 +291,11 @@ export default function UserManager({ currentUserId }) {
   const [confirming,    setConfirming]    = useState(null); // { id, email }
   const [deleteError,   setDeleteError]   = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Promote modal state
+  const [promotingUser,  setPromotingUser]  = useState(null); // { id, email, name, currentRole, targetRole }
+  const [promoteLoading, setPromoteLoading] = useState(false);
+  const [promoteError,   setPromoteError]   = useState(null);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -283,6 +326,24 @@ export default function UserManager({ currentUserId }) {
       setDeleteError(err.message);
     } finally {
       setDeleteLoading(false);
+    }
+  }
+
+  async function handlePromoteConfirm() {
+    if (!promotingUser) return;
+    setPromoteLoading(true);
+    setPromoteError(null);
+    try {
+      const updated = await patchUserRole(promotingUser.id, promotingUser.targetRole);
+      setUsers((prev) =>
+        prev.map((u) => (u.id === updated.id ? { ...u, role: updated.role } : u))
+      );
+      push(`${promotingUser.name || promotingUser.email} is now ${ROLE_LABEL[promotingUser.targetRole]}`);
+      setPromotingUser(null);
+    } catch (err) {
+      setPromoteError(err.message);
+    } finally {
+      setPromoteLoading(false);
     }
   }
 
@@ -326,7 +387,20 @@ export default function UserManager({ currentUserId }) {
                     <Td style={{ color: '#E8EAF0' }}>{u.email}</Td>
                     <Td>{u.name || <span style={{ color: '#2D3748' }}>—</span>}</Td>
                     <Td>
-                      <RoleBadge $admin={u.role === 'admin'}>{u.role}</RoleBadge>
+                      <RoleSelector
+                        user={u}
+                        currentUserId={currentUserId}
+                        onSelect={(targetUser, targetRole) => {
+                          setPromoteError(null);
+                          setPromotingUser({
+                            id:          targetUser.id,
+                            email:       targetUser.email,
+                            name:        targetUser.name,
+                            currentRole: targetUser.role,
+                            targetRole,
+                          });
+                        }}
+                      />
                     </Td>
                     <Td>{fmtDate(u.created_at)}</Td>
                     <Td>
@@ -372,6 +446,42 @@ export default function UserManager({ currentUserId }) {
                 disabled={deleteLoading}
               >
                 {deleteLoading ? 'Deleting…' : 'Delete'}
+              </ModalConfirmBtn>
+            </ModalActions>
+          </ModalBox>
+        </Overlay>
+      )}
+
+      {/* ── Promote confirm modal ── */}
+      {promotingUser && (
+        <Overlay onClick={() => !promoteLoading && setPromotingUser(null)}>
+          <ModalBox onClick={(e) => e.stopPropagation()}>
+            <ModalTitle>Change role?</ModalTitle>
+            <ModalBody>
+              Change <strong style={{ color: '#E8EAF0' }}>
+                {promotingUser.name || promotingUser.email}
+              </strong> from{' '}
+              <strong style={{ color: '#E8EAF0' }}>
+                {ROLE_LABEL[promotingUser.currentRole]}
+              </strong>{' '}
+              to{' '}
+              <strong style={{ color: '#E8EAF0' }}>
+                {ROLE_LABEL[promotingUser.targetRole]}
+              </strong>?
+            </ModalBody>
+            {promoteError && <ModalError>⚠ {promoteError}</ModalError>}
+            <ModalActions>
+              <ModalCancelBtn
+                onClick={() => setPromotingUser(null)}
+                disabled={promoteLoading}
+              >
+                Cancel
+              </ModalCancelBtn>
+              <ModalConfirmBtn
+                onClick={handlePromoteConfirm}
+                disabled={promoteLoading}
+              >
+                {promoteLoading ? 'Saving…' : 'Confirm'}
               </ModalConfirmBtn>
             </ModalActions>
           </ModalBox>

@@ -37,3 +37,10 @@ export async function getUserById(id) {
 export async function deleteUser(id) {
   return req(`/${id}`, { method: 'DELETE' });
 }
+
+export async function patchUserRole(userId, role) {
+  return req(`/${userId}/role`, {
+    method: 'PATCH',
+    body:   JSON.stringify({ role }),
+  });
+}

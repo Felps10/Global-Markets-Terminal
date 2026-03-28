@@ -18,6 +18,13 @@ import MacroHubPage from './pages/markets/MacroHubPage.jsx';
 import SignalEnginePage from './pages/markets/SignalEnginePage.jsx';
 import ClubePage from './pages/ClubePage.jsx';
 import ClubeReportPage from './pages/ClubeReportPage.jsx';
+import ClubeMembroPage from './pages/ClubeMembroPage.jsx';
+import ClubeSimuladorPage from './pages/ClubeSimuladorPage.jsx';
+import ClubeGovernancaPage from './pages/ClubeGovernancaPage.jsx';
+import ClubeGovernancaDetailPage from './pages/ClubeGovernancaDetailPage.jsx';
+import ClubeReenquadramentoDetailPage from './pages/ClubeReenquadramentoDetailPage.jsx';
+import ClubeTributacaoPage from './pages/ClubeTributacaoPage.jsx';
+import ClubeListPage from './pages/ClubeListPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import ChartResearchPage from './pages/markets/ChartResearchPage.jsx';
 
@@ -106,23 +113,19 @@ export default function App() {
           }
         />
 
-        {/* Clube de Investimento */}
-        <Route
-          path="/clube"
-          element={
-            <ProtectedRoute requiredRole={null}>
-              <ClubePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/clube/report"
-          element={
-            <ProtectedRoute requiredRole={null}>
-              <ClubeReportPage />
-            </ProtectedRoute>
-          }
-        />
+        {/* Clube de Investimento — list entry point */}
+        <Route path="/clubes" element={<ProtectedRoute requiredRole={null}><ClubeListPage /></ProtectedRoute>} />
+        <Route path="/clube" element={<Navigate to="/clubes" replace />} />
+
+        {/* Parameterized clube module routes */}
+        <Route path="/clube/:id" element={<ProtectedRoute requiredRole="club_member" showDenied={true}><ClubePage /></ProtectedRoute>} />
+        <Route path="/clube/:id/membros" element={<ProtectedRoute requiredRole={null}><ClubeMembroPage /></ProtectedRoute>} />
+        <Route path="/clube/:id/simulador" element={<ProtectedRoute requiredRole={null}><ClubeSimuladorPage /></ProtectedRoute>} />
+        <Route path="/clube/:id/report" element={<ProtectedRoute requiredRole="club_member" showDenied={true}><ClubeReportPage /></ProtectedRoute>} />
+        <Route path="/clube/:id/governanca" element={<ProtectedRoute requiredRole={null}><ClubeGovernancaPage /></ProtectedRoute>} />
+        <Route path="/clube/:id/governanca/:aid" element={<ProtectedRoute requiredRole={null}><ClubeGovernancaDetailPage /></ProtectedRoute>} />
+        <Route path="/clube/:id/reenquadramento/:rid" element={<ProtectedRoute requiredRole={null}><ClubeReenquadramentoDetailPage /></ProtectedRoute>} />
+        <Route path="/clube/:id/tributacao" element={<ProtectedRoute requiredRole={null}><ClubeTributacaoPage /></ProtectedRoute>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
