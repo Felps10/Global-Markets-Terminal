@@ -54,9 +54,7 @@ export default function AdminPanel() {
         <TabContent role="tabpanel">
           {activeTab === 'taxonomy' && <TaxonomyManager />}
           {activeTab === 'users' && (
-            <UserManager
-              currentUserId={user?.id}
-            />
+            <UserManager />
           )}
         </TabContent>
       </Page>

@@ -191,8 +191,7 @@ export default function HamburgerMenu({
         {/* Section 4 — Clube */}
         <div style={{ padding: "16px 18px" }}>
           <SectionLabel>CLUBE</SectionLabel>
-          <NavItem icon="💼" label="Dashboard" path="/clube" accent="#8b5cf6" />
-          <NavItem icon="📄" label="Report" path="/clube/report" accent="#8b5cf6" />
+          <NavItem icon="💼" label="Dashboard" path="/clubes" accent="#8b5cf6" />
         </div>
 
         {/* Section 5 — Admin (conditional) */}

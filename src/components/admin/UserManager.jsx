@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { getUsers, deleteUser, patchUserRole } from '../../services/userService.js';
 import { ROLE_LABEL, ADMIN_ASSIGNABLE_ROLES } from '../../lib/roles.js';
+import { useAuth } from '../../hooks/useAuth.js';
 
 // ── Animations ─────────────────────────────────────────────────────────────────
 const fadeIn = keyframes`
@@ -280,7 +281,8 @@ function RoleSelector({ user, currentUserId, onSelect }) {
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
-export default function UserManager({ currentUserId }) {
+export default function UserManager() {
+  const { user: currentUser } = useAuth();
   const { toasts, push } = useToast();
 
   const [users,   setUsers]   = useState([]);
@@ -378,7 +380,7 @@ export default function UserManager({ currentUserId }) {
             </thead>
             <tbody>
               {users.map((u) => {
-                const isSelf = u.id === currentUserId;
+                const isSelf = u.id === currentUser?.id;
                 return (
                   <Tr key={u.id}>
                     <Td style={{ color: '#2D3748', fontFamily: "'Space Mono', monospace" }}>
@@ -389,7 +391,7 @@ export default function UserManager({ currentUserId }) {
                     <Td>
                       <RoleSelector
                         user={u}
-                        currentUserId={currentUserId}
+                        currentUserId={currentUser?.id}
                         onSelect={(targetUser, targetRole) => {
                           setPromoteError(null);
                           setPromotingUser({

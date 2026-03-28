@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 import {
   calculateNAVFromHistory,
@@ -20,6 +20,7 @@ const BORDER2  = 'rgba(51,65,85,0.5)';
 const TXT_1    = '#e2e8f0';
 const TXT_2    = '#94a3b8';
 const TXT_3    = '#475569';
+const TXT_4    = '#334155';
 const ACCENT   = '#3b82f6';
 const GREEN    = '#00E676';
 const RED      = '#FF5252';
@@ -162,7 +163,8 @@ function ReportNavChart({ navSeries, ibovSeries }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function ClubeReportPage() {
   const navigate         = useNavigate();
-  const { getToken }     = useAuth();
+  const { id: clubeIdParam } = useParams();
+  const { getToken, user } = useAuth();
 
   const [clube,      setClube]      = useState(null);
   const [navHistory, setNavHistory] = useState([]);
@@ -178,6 +180,16 @@ export default function ClubeReportPage() {
   const [aiLoading,  setAiLoading]  = useState(false);
   const [aiError,    setAiError]    = useState(null);
 
+  const [movimentacoesPeriodo, setMovimentacoesPeriodo] = useState([]);
+  const [documentos,           setDocumentos]           = useState([]);
+  const [sendingDoc,           setSendingDoc]           = useState(false);
+  const [sendSuccess,          setSendSuccess]          = useState(false);
+
+  const [docFilter,    setDocFilter]    = useState({ tipo: '', search: '' });
+  const [irYear,       setIrYear]       = useState(new Date().getFullYear() - 1);
+  const [irGenerating, setIrGenerating] = useState(false);
+  const [irResult,     setIrResult]     = useState(null);
+
   useEffect(() => { injectPrintStyles(); }, []);
 
   // ── Data fetch ───────────────────────────────────────────────────────────────
@@ -190,28 +202,32 @@ export default function ClubeReportPage() {
         if (!token) throw new Error('Sessão expirada. Faça login novamente.');
         const headers = { Authorization: `Bearer ${token}` };
 
-        const clubesRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes`, { headers });
-        if (!clubesRes.ok) throw new Error('Erro ao carregar clube.');
-        const clubesData = await clubesRes.json();
-        const c = Array.isArray(clubesData) ? clubesData[0] : null;
-        if (!c) { setClube(null); setLoading(false); return; }
+        const clubeRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes/${clubeIdParam}`, { headers });
+        if (!clubeRes.ok) { setClube(null); setLoading(false); return; }
+        const c = await clubeRes.json();
         setClube(c);
 
-        const [posicoesRes, cotistasRes, navRes] = await Promise.all([
+        const [posicoesRes, cotistasRes, navRes, movRes, docsRes] = await Promise.all([
           fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes/${c.id}/posicoes`, { headers }),
           fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes/${c.id}/cotistas`, { headers }),
           fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes/${c.id}/nav`,      { headers }),
+          fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes/${c.id}/movimentacoes?periodo=${period}`, { headers }),
+          fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes/${c.id}/documentos/archive`, { headers }),
         ]);
 
         const posicoesData = posicoesRes.ok ? await posicoesRes.json() : [];
         const cotistasRaw  = cotistasRes.ok ? await cotistasRes.json() : null;
         const navData      = navRes.ok      ? await navRes.json()      : [];
+        const movData      = movRes?.ok     ? await movRes.json()      : [];
+        const docsData     = docsRes?.ok    ? await docsRes.json()     : [];
 
         setPosicoes(Array.isArray(posicoesData) ? posicoesData : []);
         setCotistas(cotistasRaw
           ? { data: cotistasRaw.cotistas ?? [], summary: cotistasRaw.summary ?? {} }
           : null);
         setNavHistory(Array.isArray(navData) ? navData : []);
+        setMovimentacoesPeriodo(Array.isArray(movData) ? movData : []);
+        setDocumentos(Array.isArray(docsData) ? docsData : []);
       } catch (err) {
         setError(err.message ?? 'Erro desconhecido');
       } finally {
@@ -220,6 +236,23 @@ export default function ClubeReportPage() {
     }
     fetchData();
   }, [getToken]);
+
+  // ── Refresh movimentacoes when period changes ──────────────────────────────
+  useEffect(() => {
+    if (!clube?.id) return;
+    async function fetchMovForPeriod() {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL || ''}/api/v1/clubes/${clube.id}/movimentacoes?periodo=${period}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (res.ok) setMovimentacoesPeriodo(await res.json());
+      } catch (_) {}
+    }
+    fetchMovForPeriod();
+  }, [clube?.id, period, getToken]);
 
   // ── Period filtering ─────────────────────────────────────────────────────────
   const periodNavHistory = useMemo(() => {
@@ -380,6 +413,89 @@ Instruções:
     }
   }, [clube, periodAnalytics, periodDrawdown, periodVolatility, posicoes, cotistas, period, rvCompliance]);
 
+  // ── Send report ────────────────────────────────────────────────────────────
+  const sendReport = useCallback(async () => {
+    if (!clube?.id) return;
+    setSendingDoc(true);
+    setSendSuccess(false);
+    try {
+      const token = await getToken();
+      const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+      const base = import.meta.env.VITE_API_URL || '';
+
+      const payload = {
+        tipo: 'anexo_b',
+        periodo: period,
+        payload_json: {
+          clube_nome: clube.nome,
+          periodo: period,
+          valor_cota: cotistas?.summary?.valor_cota_atual ?? null,
+          retorno_periodo: periodAnalytics?.totalReturnPct ?? null,
+          retorno_ibov: periodAnalytics?.ibovReturnPct ?? null,
+          cotistas_count: cotistas?.summary?.total_cotistas ?? null,
+          patrimonio: cotistas?.summary?.patrimonio_total ?? null,
+          generated_at: new Date().toISOString(),
+        },
+      };
+
+      let docId = null;
+      const createRes = await fetch(`${base}/api/v1/clubes/${clube.id}/documentos`, {
+        method: 'POST', headers, body: JSON.stringify(payload),
+      });
+
+      if (createRes.status === 409) {
+        const existing = documentos.find(d => d.tipo === 'anexo_b' && d.periodo === period && !d.cotista_id);
+        docId = existing?.id ?? null;
+      } else if (createRes.ok) {
+        const created = await createRes.json();
+        docId = created.id;
+        setDocumentos(prev => [created, ...prev]);
+      }
+
+      if (!docId) throw new Error('Não foi possível localizar ou criar o registro do documento.');
+
+      const enviadoRes = await fetch(`${base}/api/v1/clubes/${clube.id}/documentos/${docId}/enviado`, {
+        method: 'PATCH', headers,
+      });
+      if (!enviadoRes.ok) throw new Error('Erro ao registrar envio do documento.');
+      const updated = await enviadoRes.json();
+      setDocumentos(prev => prev.map(d => d.id === updated.id ? updated : d));
+      setSendSuccess(true);
+      setTimeout(() => setSendSuccess(false), 3000);
+    } catch (err) {
+      alert(err.message ?? 'Erro ao enviar relatório');
+    } finally {
+      setSendingDoc(false);
+    }
+  }, [clube, period, getToken, documentos, periodAnalytics, cotistas]);
+
+  // ── Generate IR declarations ──────────────────────────────────────────────
+  const generateIR = useCallback(async (year) => {
+    if (!clube?.id) return;
+    setIrGenerating(true);
+    setIrResult(null);
+    try {
+      const token = await getToken();
+      const base  = import.meta.env.VITE_API_URL || '';
+      const res   = await fetch(
+        `${base}/api/v1/clubes/${clube.id}/documentos/ir/${year}`,
+        { method: 'POST', headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) throw new Error(`Erro ao gerar declarações (${res.status})`);
+      const data = await res.json();
+      setIrResult(data);
+      const docsRes = await fetch(
+        `${base}/api/v1/clubes/${clube.id}/documentos/archive`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (docsRes.ok) setDocumentos(await docsRes.json());
+    } catch (err) {
+      alert(err.message ?? 'Erro ao gerar IR');
+    } finally {
+      setIrGenerating(false);
+    }
+  }, [clube?.id, getToken]);
+
   // ── Loading / error states ───────────────────────────────────────────────────
   if (loading) {
     return (
@@ -530,6 +646,24 @@ Instruções:
             EXPORTAR
           </button>
 
+          {/* ENVIAR button */}
+          <button
+            onClick={sendReport}
+            disabled={sendingDoc}
+            style={{
+              padding: '6px 12px',
+              border: `1px solid ${sendSuccess ? GREEN : BORDER2}`,
+              background: sendSuccess ? 'rgba(0,230,118,0.1)' : 'transparent',
+              color: sendSuccess ? GREEN : sendingDoc ? TXT_3 : TXT_2,
+              fontFamily: MONO, fontSize: 10, letterSpacing: '0.1em',
+              cursor: sendingDoc ? 'not-allowed' : 'pointer',
+              borderRadius: 3, marginRight: 8,
+              transition: 'all 0.2s',
+            }}
+          >
+            {sendSuccess ? '✓ ENVIADO' : sendingDoc ? 'ENVIANDO...' : 'ENVIAR AOS COTISTAS'}
+          </button>
+
           {/* GERAR COMENTÁRIO IA */}
           <button
             onClick={generateCommentary}
@@ -546,6 +680,108 @@ Instruções:
           >
             {aiLoading ? 'GERANDO...' : 'GERAR COMENTÁRIO IA'}
           </button>
+        </div>
+      </div>
+
+      {/* ── Document Archive (no-print) ──────────────────────────────────── */}
+      <div className="no-print" style={{ maxWidth: 900, margin: '0 auto', padding: '20px 48px 0' }}>
+        <div style={{ background: BG_CARD2, border: `1px solid ${BORDER2}`, borderRadius: 6, overflow: 'hidden' }}>
+          {/* Archive header */}
+          <div style={{ padding: '12px 16px', borderBottom: `1px solid ${BORDER2}`, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <span style={{ fontFamily: MONO, fontSize: 10, color: TXT_3, letterSpacing: '0.12em', textTransform: 'uppercase', flexShrink: 0 }}>
+              ARQUIVO DE DOCUMENTOS
+            </span>
+            <select value={docFilter.tipo} onChange={e => setDocFilter(f => ({ ...f, tipo: e.target.value }))}
+              style={{ background: BG_CARD, border: `1px solid ${BORDER2}`, color: TXT_2, fontFamily: MONO, fontSize: 10, padding: '4px 8px', borderRadius: 3, outline: 'none' }}>
+              <option value="">Todos os tipos</option>
+              <option value="anexo_b">Anexo B</option>
+              <option value="declaracao_ir">Declaração IR</option>
+              <option value="darf">DARF</option>
+              <option value="relatorio_anual">Relatório Anual</option>
+            </select>
+            <input type="text" placeholder="Filtrar por período ou cotista..." value={docFilter.search}
+              onChange={e => setDocFilter(f => ({ ...f, search: e.target.value }))}
+              style={{ flex: 1, minWidth: 180, background: BG_CARD, border: `1px solid ${BORDER2}`, color: TXT_1, fontFamily: MONO, fontSize: 10, padding: '4px 10px', borderRadius: 3, outline: 'none' }}
+            />
+            {user?.role === 'admin' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                <select value={irYear} onChange={e => setIrYear(Number(e.target.value))}
+                  style={{ background: BG_CARD, border: `1px solid ${BORDER2}`, color: TXT_2, fontFamily: MONO, fontSize: 10, padding: '4px 8px', borderRadius: 3, outline: 'none' }}>
+                  {[0, 1, 2, 3].map(offset => {
+                    const y = new Date().getFullYear() - 1 - offset;
+                    return <option key={y} value={y}>{y}</option>;
+                  })}
+                </select>
+                <button onClick={() => generateIR(irYear)} disabled={irGenerating}
+                  style={{ padding: '4px 12px', fontFamily: MONO, fontSize: 10, background: 'transparent', border: `1px solid ${irGenerating ? TXT_3 : ACCENT}`, color: irGenerating ? TXT_3 : ACCENT, borderRadius: 3, cursor: irGenerating ? 'not-allowed' : 'pointer', letterSpacing: '0.08em', flexShrink: 0 }}>
+                  {irGenerating ? 'GERANDO...' : 'GERAR IR'}
+                </button>
+              </div>
+            )}
+            {irResult && (
+              <span style={{ fontFamily: MONO, fontSize: 10, color: GREEN }}>
+                ✓ {irResult.generated} declarações geradas para {irResult.year}
+              </span>
+            )}
+          </div>
+
+          {/* Document list */}
+          {(() => {
+            const filtered = documentos.filter(doc => {
+              if (docFilter.tipo && doc.tipo !== docFilter.tipo) return false;
+              if (docFilter.search) {
+                const q = docFilter.search.toLowerCase();
+                if (!(doc.periodo ?? '').toLowerCase().includes(q) && !(doc.cotista_nome ?? '').toLowerCase().includes(q)) return false;
+              }
+              return true;
+            });
+
+            if (filtered.length === 0) {
+              return (
+                <div style={{ padding: '24px 16px', textAlign: 'center', fontFamily: MONO, fontSize: 11, color: TXT_3 }}>
+                  {documentos.length === 0
+                    ? 'Nenhum documento gerado ainda. Use ENVIAR AOS COTISTAS para criar o primeiro.'
+                    : 'Nenhum documento corresponde ao filtro.'}
+                </div>
+              );
+            }
+
+            const typeBadges = {
+              anexo_b:         { label: 'ANEXO B',   color: ACCENT },
+              declaracao_ir:   { label: 'IR',         color: GOLD },
+              darf:            { label: 'DARF',       color: AMBER },
+              relatorio_anual: { label: 'REL. ANUAL', color: GREEN },
+            };
+            const statusColors = { enviado: GREEN, gerado: TXT_3, erro: RED };
+
+            return (
+              <div>
+                {filtered.map((doc, i) => {
+                  const tb = typeBadges[doc.tipo] ?? { label: doc.tipo?.toUpperCase() ?? '—', color: TXT_3 };
+                  const sc = statusColors[doc.delivery_status] ?? TXT_3;
+                  return (
+                    <div key={doc.id} style={{
+                      display: 'grid', gridTemplateColumns: '80px 70px 110px 1fr 80px 100px',
+                      gap: 8, padding: '8px 16px',
+                      borderBottom: i < filtered.length - 1 ? `1px solid ${BORDER2}` : 'none',
+                      alignItems: 'center', fontSize: 10, fontFamily: MONO,
+                    }}>
+                      <span style={{ padding: '2px 6px', borderRadius: 3, fontSize: 9, background: `${tb.color}18`, border: `1px solid ${tb.color}40`, color: tb.color, textAlign: 'center' }}>{tb.label}</span>
+                      <span style={{ color: TXT_2 }}>{doc.periodo ?? '—'}</span>
+                      <span style={{ color: TXT_2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{doc.cotista_nome ?? 'Clube'}</span>
+                      <span style={{ color: TXT_3, fontSize: 9 }}>{doc.created_at ? new Date(doc.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
+                      <span style={{ color: TXT_3, fontSize: 9 }}>{doc.retencao_ate ? `até ${doc.retencao_ate.split('-')[0]}` : '—'}</span>
+                      <span style={{ padding: '2px 6px', borderRadius: 3, fontSize: 9, background: `${sc}18`, border: `1px solid ${sc}40`, color: sc, textAlign: 'center', textTransform: 'uppercase' }}>{doc.delivery_status ?? 'gerado'}</span>
+                    </div>
+                  );
+                })}
+                <div style={{ padding: '8px 16px', borderTop: `1px solid ${BORDER2}`, fontFamily: MONO, fontSize: 9, color: TXT_4, display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{filtered.length} documento{filtered.length !== 1 ? 's' : ''}</span>
+                  {filtered.length < documentos.length && <span>{documentos.length - filtered.length} oculto{documentos.length - filtered.length !== 1 ? 's' : ''} pelo filtro</span>}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
@@ -727,6 +963,101 @@ Instruções:
               <span>Patrimônio: {formatCurrency(cotistas?.summary?.patrimonio_total, { compact: true })}</span>
             </div>
           )}
+        </div>
+
+        {/* SECTION 5b — Member movements for period */}
+        <div style={{ marginBottom: 40 }}>
+          <div style={{
+            fontSize: 10, color: TXT_3, letterSpacing: '0.12em',
+            textTransform: 'uppercase', marginBottom: 12,
+          }}>
+            MOVIMENTAÇÕES DO PERÍODO
+          </div>
+          {movimentacoesPeriodo.length === 0 ? (
+            <div style={{ fontFamily: MONO, fontSize: 12, color: TXT_3, padding: '8px 0' }}>
+              Nenhuma movimentação no período.
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  {['DATA', 'COTISTA', 'TIPO', 'VALOR', 'COTAS Δ', 'STATUS'].map(h => (
+                    <th key={h} style={{ ...TH_STYLE, textAlign: h === 'VALOR' || h === 'COTAS Δ' ? 'right' : 'left' }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {movimentacoesPeriodo.map((m, i) => (
+                  <tr key={m.id ?? i}>
+                    <td style={{ ...TD_STYLE }}>{m.data_solicitacao?.split('-').reverse().join('/') ?? '—'}</td>
+                    <td style={{ ...TD_STYLE, color: TXT_1 }}>{m.cotista_nome ?? '—'}</td>
+                    <td style={{ ...TD_STYLE, color: m.tipo === 'aporte' ? GREEN : AMBER, textTransform: 'uppercase' }}>{m.tipo}</td>
+                    <td style={{ ...TD_STYLE, textAlign: 'right' }}>
+                      {Number(m.valor_brl).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </td>
+                    <td style={{ ...TD_STYLE, textAlign: 'right', color: (m.cotas_delta ?? 0) >= 0 ? GREEN : RED }}>
+                      {m.cotas_delta != null ? `${m.cotas_delta > 0 ? '+' : ''}${Number(m.cotas_delta).toFixed(6)}` : '—'}
+                    </td>
+                    <td style={{ ...TD_STYLE, textTransform: 'uppercase', fontSize: 10 }}>{m.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* SECTION 5c — Expense breakdown */}
+        <div style={{ marginBottom: 40 }}>
+          <div style={{
+            fontSize: 10, color: TXT_3, letterSpacing: '0.12em',
+            textTransform: 'uppercase', marginBottom: 12,
+          }}>
+            DEMONSTRATIVO DE DESPESAS
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                {['DESPESA', 'VALOR', '% PATRIMÔNIO'].map(h => (
+                  <th key={h} style={{ ...TH_STYLE, textAlign: h === 'DESPESA' ? 'left' : 'right' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { label: 'Taxa de Administração', note: 'Via ledger' },
+                { label: 'Taxa de Performance',    note: 'Via ledger' },
+                { label: 'Corretagem',             note: 'Via ledger' },
+                { label: 'Outras Despesas',        note: 'Via ledger' },
+              ].map((row, i) => (
+                <tr key={i}>
+                  <td style={{ ...TD_STYLE, color: TXT_2 }}>{row.label}</td>
+                  <td style={{ ...TD_STYLE, textAlign: 'right', color: TXT_3 }}>—</td>
+                  <td style={{ ...TD_STYLE, textAlign: 'right', color: TXT_3, fontSize: 10 }}>{row.note}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ fontFamily: MONO, fontSize: 9, color: TXT_3, marginTop: 8 }}>
+            * Dados de despesas disponíveis após integração com ledger (Fase 2).
+          </div>
+        </div>
+
+        {/* SECTION 5d — Derivatives */}
+        <div style={{ marginBottom: 40 }}>
+          <div style={{
+            fontSize: 10, color: TXT_3, letterSpacing: '0.12em',
+            textTransform: 'uppercase', marginBottom: 12,
+          }}>
+            INSTRUMENTOS DERIVATIVOS
+          </div>
+          <div style={{ fontFamily: MONO, fontSize: 12, color: TXT_2, padding: '8px 0' }}>
+            O clube não utiliza instrumentos derivativos.
+          </div>
+          <div style={{ fontFamily: MONO, fontSize: 9, color: TXT_3, marginTop: 4 }}>
+            Conforme estatuto vigente — derivativos não permitidos.
+          </div>
         </div>
 
         {/* SECTION 6 — AI Commentary */}
