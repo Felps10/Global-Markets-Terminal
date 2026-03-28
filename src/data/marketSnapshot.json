@@ -1,6 +1,6 @@
 {
   "snapshot_date": "2026-03-28",
-  "snapshot_time": "11:04 AM",
+  "snapshot_time": "02:12 PM",
   "snapshot_label": "as of Mar 28 close",
   "assets": {
     "^GSPC": {
@@ -100,16 +100,16 @@
       "changePct": -0.24
     },
     "BTC": {
-      "price": 66685,
-      "changePct": 0.71
+      "price": 66879,
+      "changePct": 1.93
     },
     "ETH": {
-      "price": 2018.19,
-      "changePct": 1.37
+      "price": 2021.49,
+      "changePct": 2.21
     },
     "SOL": {
-      "price": 83.22,
-      "changePct": 0.12
+      "price": 83.4,
+      "changePct": 1.41
     },
     "AMD": {
       "price": 108.42,
