@@ -583,6 +583,85 @@ export default function ClubePage() {
   const [navSubmitError, setNavSubmitError] = useState(null);
   const [navSubmitOk,    setNavSubmitOk]    = useState(false);
 
+  // Member management state
+  const [gmtMembers,     setGmtMembers]     = useState([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [searchEmail,    setSearchEmail]    = useState('');
+  const [searchResults,  setSearchResults]  = useState([]);
+  const [searchLoading,  setSearchLoading]  = useState(false);
+  const [confirmRemove,  setConfirmRemove]  = useState(null);
+  const [linkCopied,     setLinkCopied]     = useState(false);
+
+  // ── Member management ──────────────────────────────────────────────────────
+  const fetchGmtMembers = useCallback(async () => {
+    if (!isManager) return;
+    setMembersLoading(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE}/api/v1/users`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to fetch users');
+      const data = await res.json();
+      setGmtMembers(
+        (data.users || []).filter(u => u.role === 'club_member' || u.role === 'club_manager')
+      );
+    } catch { /* silent */ } finally { setMembersLoading(false); }
+  }, [isManager, getToken]);
+
+  useEffect(() => {
+    if (activeTab === 'cotistas' && isManager) fetchGmtMembers();
+  }, [activeTab, isManager, fetchGmtMembers]);
+
+  // Debounced email search
+  useEffect(() => {
+    if (searchEmail.trim().length < 3) { setSearchResults([]); return; }
+    setSearchLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const token = await getToken();
+        const res = await fetch(
+          `${API_BASE}/api/v1/users/search?email=${encodeURIComponent(searchEmail.trim())}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data.users || []);
+        }
+      } catch { /* silent */ } finally { setSearchLoading(false); }
+    }, 400);
+    return () => { clearTimeout(timer); setSearchLoading(false); };
+  }, [searchEmail, getToken]);
+
+  async function handleAddMember(userId) {
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE}/api/v1/users/${userId}/role`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'club_member' }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      setSearchEmail('');
+      setSearchResults([]);
+      fetchGmtMembers();
+    } catch { /* silent */ }
+  }
+
+  async function handleRemoveMember(userId) {
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE}/api/v1/users/${userId}/role`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'user' }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      setConfirmRemove(null);
+      fetchGmtMembers();
+    } catch { /* silent */ }
+  }
+
   // ── Price fetch ─────────────────────────────────────────────────────────────
   const fetchPositionPrices = useCallback(async (positions) => {
     if (!positions || positions.length === 0) return;
@@ -2399,6 +2478,202 @@ export default function ClubePage() {
           {/* ════════════════════════════════════════════════════════════════ */}
           {activeTab === 'cotistas' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+              {/* ── GESTÃO DE MEMBROS (manager only) ── */}
+              {isManager && (
+                <div style={{
+                  background: BG_CARD, border: `1px solid ${BORDER}`,
+                  borderRadius: 6, overflow: 'hidden',
+                }}>
+                  <div style={{
+                    padding: '10px 16px', borderBottom: `1px solid ${BORDER}`,
+                    fontFamily: MONO, fontSize: 10, fontWeight: 700,
+                    color: TXT_3, letterSpacing: '0.1em', textTransform: 'uppercase',
+                  }}>
+                    GESTÃO DE MEMBROS
+                  </div>
+
+                  {/* Part A — Current GMT members */}
+                  <div style={{ padding: 16 }}>
+                    <div style={{
+                      fontFamily: MONO, fontSize: 9, fontWeight: 700,
+                      color: TXT_3, letterSpacing: '0.1em',
+                      marginBottom: 8, textTransform: 'uppercase',
+                    }}>
+                      MEMBROS ATIVOS ({gmtMembers.length})
+                    </div>
+                    {membersLoading && (
+                      <div style={{ fontFamily: MONO, fontSize: 11, color: TXT_3, padding: '8px 0' }}>
+                        Carregando...
+                      </div>
+                    )}
+                    {!membersLoading && gmtMembers.length === 0 && (
+                      <div style={{ fontFamily: MONO, fontSize: 11, color: TXT_3, padding: '8px 0' }}>
+                        Nenhum membro registrado.
+                      </div>
+                    )}
+                    {!membersLoading && gmtMembers.map(m => (
+                      <div key={m.id} style={{
+                        display: 'grid', gridTemplateColumns: '1fr 1fr auto auto',
+                        alignItems: 'center', gap: 8, padding: '6px 0',
+                        borderBottom: `1px solid ${BORDER}`,
+                      }}>
+                        <span style={{ fontFamily: MONO, fontSize: 11, color: TXT_1 }}>
+                          {m.name || '—'}
+                        </span>
+                        <span style={{ fontFamily: MONO, fontSize: 11, color: TXT_2 }}>
+                          {m.email}
+                        </span>
+                        <span style={{
+                          fontFamily: MONO, fontSize: 9, fontWeight: 700,
+                          letterSpacing: '0.1em', textTransform: 'uppercase',
+                          color: m.role === 'club_manager' ? AMBER : GREEN,
+                        }}>
+                          {m.role === 'club_manager' ? 'MANAGER' : 'MEMBER'}
+                        </span>
+                        {m.role !== 'club_manager' && (
+                          <button
+                            onClick={() => {
+                              if (confirmRemove === m.id) handleRemoveMember(m.id);
+                              else setConfirmRemove(m.id);
+                            }}
+                            onBlur={() => setConfirmRemove(null)}
+                            style={{
+                              background: 'transparent',
+                              border: `1px solid ${confirmRemove === m.id ? AMBER : RED}`,
+                              color: confirmRemove === m.id ? AMBER : RED,
+                              fontFamily: MONO, fontSize: 9, fontWeight: 700,
+                              letterSpacing: '0.06em', padding: '3px 8px',
+                              borderRadius: 3, cursor: 'pointer',
+                            }}
+                          >
+                            {confirmRemove === m.id ? 'Confirmar?' : 'Remover'}
+                          </button>
+                        )}
+                        {m.role === 'club_manager' && <span />}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Part B — Add member by email search */}
+                  <div style={{
+                    padding: 16, borderTop: `1px solid ${BORDER}`,
+                  }}>
+                    <div style={{
+                      fontFamily: MONO, fontSize: 9, fontWeight: 700,
+                      color: TXT_3, letterSpacing: '0.1em',
+                      marginBottom: 8, textTransform: 'uppercase',
+                    }}>
+                      ADICIONAR MEMBRO
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Buscar por email (mín. 3 caracteres)..."
+                      value={searchEmail}
+                      onChange={e => setSearchEmail(e.target.value)}
+                      style={{
+                        width: '100%', boxSizing: 'border-box',
+                        background: BG_CARD2, border: `1px solid ${BORDER}`,
+                        borderRadius: 3, padding: '8px 12px',
+                        fontFamily: MONO, fontSize: 12, color: TXT_1,
+                        outline: 'none',
+                      }}
+                    />
+                    {searchLoading && (
+                      <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_3, marginTop: 6 }}>
+                        Buscando...
+                      </div>
+                    )}
+                    {!searchLoading && searchResults.length > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        {searchResults
+                          .filter(u => u.role !== 'admin')
+                          .map(u => {
+                            const isMemberAlready = u.role === 'club_member' || u.role === 'club_manager';
+                            return (
+                              <div key={u.id} style={{
+                                display: 'grid', gridTemplateColumns: '1fr 1fr auto',
+                                alignItems: 'center', gap: 8, padding: '5px 0',
+                                borderBottom: `1px solid ${BORDER}`,
+                              }}>
+                                <span style={{ fontFamily: MONO, fontSize: 11, color: TXT_1 }}>
+                                  {u.name || '—'}
+                                </span>
+                                <span style={{ fontFamily: MONO, fontSize: 11, color: TXT_2 }}>
+                                  {u.email}
+                                </span>
+                                {isMemberAlready ? (
+                                  <span style={{
+                                    fontFamily: MONO, fontSize: 9, color: TXT_3,
+                                    letterSpacing: '0.06em',
+                                  }}>
+                                    Já é membro
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => handleAddMember(u.id)}
+                                    style={{
+                                      background: 'transparent',
+                                      border: `1px solid ${ACCENT}`,
+                                      color: ACCENT, fontFamily: MONO,
+                                      fontSize: 9, fontWeight: 700,
+                                      letterSpacing: '0.06em', padding: '3px 8px',
+                                      borderRadius: 3, cursor: 'pointer',
+                                    }}
+                                  >
+                                    Adicionar
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
+                    {!searchLoading && searchEmail.trim().length >= 3 && searchResults.filter(u => u.role !== 'admin').length === 0 && (
+                      <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_3, marginTop: 6 }}>
+                        Nenhum usuário encontrado.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Part C — Register link */}
+                  <div style={{
+                    padding: '12px 16px', borderTop: `1px solid ${BORDER}`,
+                    display: 'flex', alignItems: 'center', gap: 10,
+                  }}>
+                    <span style={{
+                      fontFamily: MONO, fontSize: 9, fontWeight: 700,
+                      color: TXT_3, letterSpacing: '0.1em', flexShrink: 0,
+                    }}>
+                      LINK DE REGISTRO
+                    </span>
+                    <span style={{
+                      fontFamily: MONO, fontSize: 11, color: TXT_2,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      flex: 1,
+                    }}>
+                      {window.location.origin + '/register'}
+                    </span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(window.location.origin + '/register');
+                        setLinkCopied(true);
+                        setTimeout(() => setLinkCopied(false), 2000);
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: `1px solid ${linkCopied ? GREEN : BORDER2}`,
+                        color: linkCopied ? GREEN : TXT_2,
+                        fontFamily: MONO, fontSize: 9, fontWeight: 700,
+                        letterSpacing: '0.06em', padding: '3px 10px',
+                        borderRadius: 3, cursor: 'pointer', flexShrink: 0,
+                      }}
+                    >
+                      {linkCopied ? 'Copiado!' : 'Copiar'}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Summary bar */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>

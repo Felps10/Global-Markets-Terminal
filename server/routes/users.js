@@ -1,14 +1,12 @@
 import { Router } from 'express';
 import { supabase } from '../db.js';
-import { authenticate, requireAdmin } from '../middleware/auth.js';
+import { authenticate, requireAdmin, requireRole } from '../middleware/auth.js';
 import { ADMIN_ASSIGNABLE, MANAGER_ASSIGNABLE } from '../lib/roles.js';
 
 const router = Router();
 
-router.use(authenticate, requireAdmin);
-
 // GET /api/v1/users
-router.get('/', async (_req, res) => {
+router.get('/', authenticate, requireRole('club_manager'), async (_req, res) => {
   const { data: { users }, error } = await supabase.auth.admin.listUsers();
   if (error) return res.status(500).json({ error: 'DB_ERROR', message: error.message });
 
@@ -25,7 +23,7 @@ router.get('/', async (_req, res) => {
 });
 
 // DELETE /api/v1/users/:id
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
   const targetId = req.params.id;
 
   if (req.user.id === targetId) {
@@ -48,8 +46,36 @@ router.delete('/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
+// GET /api/v1/users/search?email=
+router.get('/search', authenticate, requireRole('club_manager'), async (req, res) => {
+  const { email } = req.query;
+
+  if (!email || email.trim().length < 3) {
+    return res.status(400).json({
+      error:   'BAD_REQUEST',
+      message: 'email query param required (min 3 chars)',
+    });
+  }
+
+  const { data: { users }, error } = await supabase.auth.admin.listUsers();
+  if (error) return res.status(500).json({ error: 'DB_ERROR', message: error.message });
+
+  const needle  = email.trim().toLowerCase();
+  const matches = users
+    .filter(u => u.email?.toLowerCase().startsWith(needle))
+    .slice(0, 5)
+    .map(u => ({
+      id:    u.id,
+      email: u.email,
+      name:  u.user_metadata?.name || '',
+      role:  u.user_metadata?.role || 'user',
+    }));
+
+  return res.json({ users: matches });
+});
+
 // PATCH /api/v1/users/:id/role
-router.patch('/:id/role', async (req, res) => {
+router.patch('/:id/role', authenticate, requireRole('club_manager'), async (req, res) => {
   const targetId   = req.params.id;
   const { role }   = req.body;
   const callerRole = req.user.role;
