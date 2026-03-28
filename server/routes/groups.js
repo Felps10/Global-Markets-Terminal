@@ -5,7 +5,7 @@ import { authenticate, requireAdmin } from '../middleware/auth.js';
 const router = Router();
 
 // GET /api/v1/groups[?terminalView=global|brazil]
-router.get('/', async (req, res) => {
+router.get('/', authenticate, async (req, res) => {
   const { terminalView } = req.query;
 
   let query = supabase.from('groups').select('*, subgroups(id)').order('sort_order');
@@ -26,7 +26,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/v1/groups/:id
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticate, async (req, res) => {
   const { data: group, error } = await supabase
     .from('groups')
     .select('*')

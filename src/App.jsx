@@ -30,19 +30,67 @@ import ChartResearchPage from './pages/markets/ChartResearchPage.jsx';
 import TerminalProLandingPage from './pages/TerminalProLandingPage.jsx';
 import TerminalMiniPage from './pages/TerminalMiniPage.jsx';
 import ClubeLandingPage from './pages/ClubeLandingPage.jsx';
-import ChartCenterLockedPage from './pages/locked/ChartCenterLockedPage.jsx';
-import ResearchLockedPage from './pages/locked/ResearchLockedPage.jsx';
-import FundamentalLabLockedPage from './pages/locked/FundamentalLabLockedPage.jsx';
-import MacroHubLockedPage from './pages/locked/MacroHubLockedPage.jsx';
-import SignalEngineLockedPage from './pages/locked/SignalEngineLockedPage.jsx';
 import { useAuth } from './hooks/useAuth.js';
 import AuthPanel from './components/AuthPanel.jsx';
+import PublicLayout from './components/PublicLayout.jsx';
+import FeaturesPage from './pages/FeaturesPage.jsx';
+import CoveragePage from './pages/CoveragePage.jsx';
+import PricingPage from './pages/PricingPage.jsx';
 
-function GuestGatedRoute({ children, lockedElement }) {
-  const { isAuthenticated, loading } = useAuth();
-  if (loading) return null;
-  return isAuthenticated ? children : lockedElement;
-}
+/**
+ * ─── ROUTE SECURITY MODEL ─────────────────────────────────────────────────
+ *
+ * PUBLIC routes (no ProtectedRoute — accessible without login):
+ *   /           LandingPage
+ *   /terminal   TerminalProLandingPage
+ *   /mini       TerminalMiniPage
+ *   /login      LoginPage
+ *   /register   RegisterPage
+ *   /features   FeaturesPage
+ *   /coverage   CoveragePage
+ *   /pricing    PricingPage
+ *   /clube      ClubeLandingPage  (marketing page, not the app)
+ *
+ * PROTECTED routes — guard lives on the LAYOUT or the route itself.
+ *
+ *   /app/*         ProtectedRoute requiredRole={null}   any authenticated user
+ *                  Guard is on the /app layout — all child routes inherit it.
+ *                  To add a terminal sub-page: add a child <Route> inside
+ *                  the /app layout block. No additional ProtectedRoute needed.
+ *
+ *   /markets/*     ProtectedRoute requiredRole={null}   any authenticated user
+ *                  Guard is on each route individually (MarketsPageLayout uses
+ *                  children props, not <Outlet />, so nesting is not possible).
+ *                  To add a markets sub-page: copy the pattern from an existing
+ *                  /markets route and add a ProtectedRoute wrapper.
+ *
+ *   /clube/:id/*   ProtectedRoute requiredRole={null} or "club_member"
+ *                  See individual route definitions below for per-route roles.
+ *
+ *   /admin         ProtectedRoute requiredRole="admin"  admin only
+ *
+ * ROLE LADDER (defined in src/lib/roles.js):
+ *   user(0) → club_member(1) → club_manager(2) → admin(3)
+ *   ProtectedRoute passes if user rank >= required rank.
+ *   requiredRole={null} means any authenticated user passes (rank >= 0).
+ *
+ * ADDING A NEW PROTECTED ROUTE — decision tree:
+ *   1. Belongs inside the terminal (/app/*)
+ *      → Add a child <Route path="yourpage" element={<YourPage />} />
+ *        inside the /app layout block. Done — guard inherited.
+ *   2. Belongs in markets (/markets/*)
+ *      → Copy an existing /markets route block including its
+ *        ProtectedRoute wrapper. Change path and element. Done.
+ *   3. Needs a new top-level layout with <Outlet />
+ *      → Wrap the layout element in ProtectedRoute. Never wrap
+ *        individual leaf routes under a layout-based guard.
+ *   4. Standalone protected page (no layout)
+ *      → Wrap in ProtectedRoute with appropriate requiredRole.
+ *
+ * NEVER: add a route that renders privileged content without a
+ * ProtectedRoute somewhere in its ancestor chain.
+ * ──────────────────────────────────────────────────────────────────────────
+ */
 
 function AppWithPanel() {
   const { authPanelOpen, authPanelFeature, closeAuthPanel } = useAuth();
@@ -55,30 +103,35 @@ function AppWithPanel() {
     <>
       <Routes>
         {/* Public */}
-        <Route path="/"          element={<LandingPage />} />
+        <Route path="/"          element={<PublicLayout><LandingPage /></PublicLayout>} />
         <Route path="/terminal"  element={<TerminalProLandingPage />} />
         <Route path="/mini"      element={<TerminalMiniPage />} />
-        <Route path="/login"     element={<LoginPage />} />
-        <Route path="/register"  element={<RegisterPage />} />
+        <Route path="/login"     element={<PublicLayout><LoginPage /></PublicLayout>} />
+        <Route path="/register"  element={<PublicLayout><RegisterPage /></PublicLayout>} />
+        <Route path="/features"  element={<PublicLayout><FeaturesPage /></PublicLayout>} />
+        <Route path="/coverage"  element={<PublicLayout><CoveragePage /></PublicLayout>} />
+        <Route path="/pricing"   element={<PublicLayout><PricingPage /></PublicLayout>} />
 
-        {/* App terminal — nested routes with shared layout */}
-        <Route path="/app" element={<Navigate to="/app/global" replace />} />
+        {/* Terminal — any authenticated user */}
         <Route
+          path="/app"
           element={
-            <SelectedAssetProvider>
-              <TickerProvider>
-                <TerminalLayout />
-              </TickerProvider>
-            </SelectedAssetProvider>
+            <ProtectedRoute requiredRole={null}>
+              <SelectedAssetProvider>
+                <TickerProvider>
+                  <TerminalLayout />
+                </TickerProvider>
+              </SelectedAssetProvider>
+            </ProtectedRoute>
           }
         >
-          <Route path="/app/global" element={<GlobalMarketsTerminal />} />
-          <Route path="/app/brasil" element={<BrazilTerminal />} />
-          <Route path="/app/catalog" element={<CatalogPage />} />
-          <Route path="/app/news" element={<NewsPage />} />
-          {/* Heatmap moved to /markets/heatmap */}
-          <Route path="/app/watchlist" element={<WatchlistPage />} />
-          <Route path="/app/settings" element={<SettingsPage />} />
+          <Route index element={<Navigate to="global" replace />} />
+          <Route path="global"    element={<GlobalMarketsTerminal />} />
+          <Route path="brasil"    element={<BrazilTerminal />} />
+          <Route path="catalog"   element={<CatalogPage />} />
+          <Route path="news"      element={<NewsPage />} />
+          <Route path="watchlist" element={<WatchlistPage />} />
+          <Route path="settings"  element={<SettingsPage />} />
         </Route>
 
         {/* Admin */}
@@ -90,50 +143,22 @@ function AppWithPanel() {
             </ProtectedRoute>
           }
         />
-        <Route path="/admin/taxonomy" element={<Navigate to="/admin" replace />} />
+        <Route
+          path="/admin/taxonomy"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <Navigate to="/admin" replace />
+            </ProtectedRoute>
+          }
+        />
 
-        {/* Markets modules — locked pages for guests, actual pages for members */}
-        <Route path="/markets/heatmap" element={<MarketHeatmapPage />} />
-        <Route
-          path="/markets/research"
-          element={
-            <GuestGatedRoute lockedElement={<ResearchLockedPage />}>
-              <ChartResearchPage />
-            </GuestGatedRoute>
-          }
-        />
-        <Route
-          path="/markets/chart"
-          element={
-            <GuestGatedRoute lockedElement={<ChartCenterLockedPage />}>
-              <ChartResearchPage />
-            </GuestGatedRoute>
-          }
-        />
-        <Route
-          path="/markets/fundamentals"
-          element={
-            <GuestGatedRoute lockedElement={<FundamentalLabLockedPage />}>
-              <FundamentalLabPage />
-            </GuestGatedRoute>
-          }
-        />
-        <Route
-          path="/markets/macro"
-          element={
-            <GuestGatedRoute lockedElement={<MacroHubLockedPage />}>
-              <MacroHubPage />
-            </GuestGatedRoute>
-          }
-        />
-        <Route
-          path="/markets/signals"
-          element={
-            <GuestGatedRoute lockedElement={<SignalEngineLockedPage />}>
-              <SignalEnginePage />
-            </GuestGatedRoute>
-          }
-        />
+        {/* Markets modules — any authenticated user */}
+        <Route path="/markets/heatmap"      element={<ProtectedRoute requiredRole={null}><MarketHeatmapPage /></ProtectedRoute>} />
+        <Route path="/markets/research"     element={<ProtectedRoute requiredRole={null}><ChartResearchPage /></ProtectedRoute>} />
+        <Route path="/markets/chart"        element={<ProtectedRoute requiredRole={null}><ChartResearchPage /></ProtectedRoute>} />
+        <Route path="/markets/fundamentals" element={<ProtectedRoute requiredRole={null}><FundamentalLabPage /></ProtectedRoute>} />
+        <Route path="/markets/macro"        element={<ProtectedRoute requiredRole={null}><MacroHubPage /></ProtectedRoute>} />
+        <Route path="/markets/signals"      element={<ProtectedRoute requiredRole={null}><SignalEnginePage /></ProtectedRoute>} />
 
         {/* Clube de Investimento */}
         <Route path="/clubes" element={<ProtectedRoute requiredRole={null}><ClubeListPage /></ProtectedRoute>} />

@@ -39,11 +39,13 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    // Restore session on mount — Supabase SDK reads from localStorage
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session ? mapUser(session.user) : null);
-      setLoading(false);
+    // One-time purge of stale localStorage tokens (remove after ~1h post-deploy)
+    supabase.auth.signOut().then(() => {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setSession(session);
+        setUser(session ? mapUser(session.user) : null);
+        setLoading(false);
+      });
     });
 
     // Stay in sync with all auth changes

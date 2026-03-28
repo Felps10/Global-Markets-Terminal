@@ -1,1019 +1,1107 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import styled, { keyframes, createGlobalStyle } from 'styled-components';
 import { useAuth } from '../hooks/useAuth.js';
-import { coingeckoPrices } from '../dataServices.js';
-import { GMTHomepageHeader } from '../components/GMTHeader.jsx';
-import { useTranslation } from 'react-i18next';
+import snapshot from '../data/marketSnapshot.json';
 
-// ─── FONTS ────────────────────────────────────────────────────────────────────
-const GlobalFonts = createGlobalStyle`
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
-`;
+const DISPLAY_NAMES = {
+  '^GSPC': 'S&P 500', '^DJI': 'Dow Jones', '^IXIC': 'NASDAQ',
+  'EURUSD=X': 'EUR/USD', 'GBPUSD=X': 'GBP/USD', 'USDJPY=X': 'USD/JPY',
+  'USDCAD=X': 'USD/CAD', 'AUDUSD=X': 'AUD/USD',
+  '^FTSE': 'FTSE 100', '^N225': 'Nikkei 225',
+};
 
-// ─── KEYFRAMES ────────────────────────────────────────────────────────────────
-const scrollLeft = keyframes`
-  0%   { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-`;
-
-const orbFloat = keyframes`
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33%       { transform: translate(30px, -20px) scale(1.05); }
-  66%       { transform: translate(-20px, 15px) scale(0.97); }
-`;
-
-const fadeUp = keyframes`
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
-`;
-
-// ─── TICKER DATA ──────────────────────────────────────────────────────────────
-const TICKER_ITEMS = [
-  { sym: 'IBOV',    price: 131842, change: +0.74 },
-  { sym: 'S&P 500', price: 5488.12, change: +0.41 },
-  { sym: 'NASDAQ',  price: 17219.55, change: +0.63 },
-  { sym: 'USD/BRL', price: 5.67, change: -0.22 },
-  { sym: 'BTC',     price: null, change: null },
-  { sym: 'PETR4',   price: 38.42, change: +1.83 },
-  { sym: 'BRENT',   price: 74.18, change: -0.31 },
-  { sym: 'SELIC',   price: 14.25, change: 0 },
-  { sym: 'VALE3',   price: 58.91, change: +2.41 },
-  { sym: 'NVDA',    price: 131.28, change: +3.12 },
-  { sym: 'EUR/USD', price: 1.0842, change: -0.18 },
-  { sym: 'GOLD',    price: 2341.50, change: +0.52 },
-];
-
-const PREVIEW_ASSETS = [
-  { sym: 'NVDA', name: 'NVIDIA Corp', price: 131.28, change: +3.12 },
-  { sym: 'AAPL', name: 'Apple Inc', price: 189.84, change: +0.82 },
-  { sym: 'MSFT', name: 'Microsoft', price: 422.15, change: -0.41 },
-  { sym: 'GOOGL', name: 'Alphabet', price: 176.92, change: +1.24 },
-  { sym: 'AMZN', name: 'Amazon', price: 186.47, change: +0.67 },
-  { sym: 'META', name: 'Meta Platforms', price: 504.38, change: -0.23 },
-];
-
-const CAPABILITIES = [
-  { title: 'Terminal Global', tag: 'Gratuito', tagType: 'green', desc: '269 ativos em tempo real \u2014 equities EUA por setor GICS, \u00edndices globais, FX, cripto, commodities e renda fixa.', locked: false },
-  { title: 'Terminal Brasil', tag: 'Gratuito', tagType: 'green', desc: 'B3, SELIC, IPCA, curva de juros, USD/BRL, EUR/BRL e macro dom\u00e9stico.', locked: false },
-  { title: 'Research & Fundamentals', tag: 'Conta gratuita', tagType: 'lock', desc: 'P/L, EPS, ROE, EBITDA e recomenda\u00e7\u00f5es de analistas. Fundamentalista e t\u00e9cnico no mesmo lugar.', locked: true },
-  { title: 'Signal Engine', tag: 'Conta gratuita', tagType: 'lock', desc: 'RSI, MACD e sinais t\u00e9cnicos em tempo real. Alertas de pre\u00e7o por email.', locked: true },
-  { title: 'Watchlist & Alertas', tag: 'Conta gratuita', tagType: 'lock', desc: 'Salve ativos, organize por tema, e receba alertas quando o mercado se mover.', locked: true },
-  { title: 'Clube de Investimento', tag: 'Convite', tagType: 'lock', desc: 'NAV, cotiza\u00e7\u00e3o, hist\u00f3rico de rentabilidade e relat\u00f3rio AI em portugu\u00eas.', locked: true },
-];
-
-const GLOBAL_ROWS = [
-  { sym: 'NVDA', name: 'NVIDIA Corp', price: '$131.28', change: +3.12 },
-  { sym: 'AAPL', name: 'Apple Inc', price: '$189.84', change: +0.82 },
-  { sym: 'BTC', name: 'Bitcoin', price: '$67,432', change: +2.14 },
-  { sym: 'GOLD', name: 'Gold Spot', price: '$2,341', change: +0.52 },
-  { sym: 'EUR/USD', name: 'Euro / Dollar', price: '1.0842', change: -0.18 },
-];
-
-const BRASIL_ROWS = [
-  { sym: 'PETR4', name: 'Petrobras PN', price: 'R$ 38.42', change: +1.83 },
-  { sym: 'VALE3', name: 'Vale ON', price: 'R$ 58.91', change: +2.41 },
-  { sym: 'ITUB4', name: 'Ita\u00fa PN', price: 'R$ 34.18', change: -0.31 },
-  { sym: 'USD/BRL', name: 'D\u00f3lar / Real', price: 'R$ 5.67', change: -0.28 },
-  { sym: 'SELIC', name: 'Taxa Selic', price: '14.25%', change: null },
-];
-
-const METRICS = [
-  { num: '269', label: 'ativos rastreados' },
-  { num: '8', label: 'fontes de dados' },
-  { num: '30s', label: 'ciclo de atualiza\u00e7\u00e3o' },
-  { num: '9', label: 'grupos de ativos' },
-];
-
-const SOURCES = ['Yahoo Finance', 'Finnhub', 'BRAPI', 'BCB / SGS', 'FRED', 'CoinGecko', 'FMP', 'AwesomeAPI'];
-
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
-function formatTickerPrice(sym, price) {
-  if (price == null) return '\u2014';
-  const noPrefix = ['IBOV', 'USD/BRL', 'EUR/USD'];
-  const isSelic = sym === 'SELIC';
-  let formatted;
-  if (price >= 1000) formatted = Math.round(price).toLocaleString();
-  else if (price >= 1) formatted = price.toFixed(2);
-  else formatted = price.toFixed(4);
-  if (isSelic) return `${formatted}%`;
-  if (noPrefix.includes(sym)) return formatted;
-  return `$${formatted}`;
+function fmtPrice(p) {
+  if (p >= 10000) return p.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  if (p >= 100)   return p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
 }
 
-// ─── STYLED COMPONENTS ────────────────────────────────────────────────────────
+const TICKER_SYMBOLS = [
+  '^GSPC', '^DJI', '^IXIC', 'AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META',
+  'EURUSD=X', 'GBPUSD=X', 'USDJPY=X',
+  'JPM', 'GS', 'XOM', 'CVX', 'LLY', 'UNH', 'TSM', 'AVGO',
+  '^FTSE', '^N225', 'USDCAD=X', 'AUDUSD=X',
+  'BTC', 'ETH', 'SOL',
+];
+
+const TICKER_ITEMS = TICKER_SYMBOLS
+  .filter(sym => snapshot.assets[sym])
+  .map(sym => {
+    const a = snapshot.assets[sym];
+    return {
+      sym:   DISPLAY_NAMES[sym] || sym,
+      price: fmtPrice(a.price),
+      chg:   `${a.changePct >= 0 ? '+' : ''}${a.changePct.toFixed(2)}%`,
+      pos:   a.changePct >= 0,
+    };
+  });
+
+const COVERAGE_STATS = [
+  { num: '89', label: 'US Equities' },
+  { num: '96', label: 'B3 Assets' },
+  { num: '8', label: 'FX Pairs' },
+  { num: '8', label: 'Indices' },
+  { num: '15', label: 'Commodities' },
+  { num: '3', label: 'Crypto' },
+];
+
+const FEATURE_TAGS = [
+  { tag: 'REAL-TIME', name: 'Live Dashboard' },
+  { tag: 'VISUALIZATION', name: 'Market Heatmap' },
+  { tag: 'BRAZIL', name: 'Brazil Terminal' },
+  { tag: 'STRUCTURE', name: '3-Tier Taxonomy' },
+  { tag: 'RESEARCH', name: 'Analyst Ratings' },
+  { tag: 'FUNDAMENTALS', name: 'Fundamentals Lab' },
+];
+
+const WHY_GMT_PILLS = [
+  'Real-Time Data', 'Multi-Source Resilience', 'Institutional Taxonomy',
+  'Brazil Coverage', 'Quota Management', 'Dark Terminal Aesthetic', 'Free to Start',
+];
+
+const WHY_GMT_CELLS = [
+  { title: '30s Refresh', body: '30-second cycles across all 269 assets. Color-coded gain/loss, collapsible group views.' },
+  { title: '8 Data Sources', body: 'No single API outage takes down the terminal. Automatic fallback built in.' },
+  { title: 'GICS Taxonomy', body: 'Group → Subgroup → Asset hierarchy mirrors MSCI GICS — intuitive for any finance professional.' },
+  { title: 'Brazil First', body: 'Full B3 coverage via BRAPI plus BCB macro — SELIC, IPCA, CDI — direct from source.' },
+  { title: 'Quota Management', body: 'Intelligent rate-limit handling keeps the terminal fast across all free-tier APIs.' },
+  { title: 'Free to Start', body: 'No Bloomberg price tag. Full terminal access from day one, no credit card required.' },
+];
+
+const TESTIMONIALS = [
+  {
+    quote: "Finally a terminal that treats Brazilian markets as a first-class citizen alongside US equities. The B3 coverage combined with BCB macro data in one view is exactly what I was missing.",
+    name: "Ana Souza",
+    role: "Portfolio Manager, São Paulo",
+  },
+  {
+    quote: "The three-tier taxonomy is the killer feature. Every asset organized exactly how I think about markets — by GICS sector, not just alphabetically.",
+    name: "Carlos Mendes",
+    role: "Independent Analyst, Rio de Janeiro",
+  },
+  {
+    quote: "Eight data sources, one interface, zero context-switching. GMT does in one screen what used to take five browser tabs.",
+    name: "Rafael Lima",
+    role: "CIO, Family Office",
+  },
+  {
+    quote: "The heatmap alone is worth it. Seeing the entire asset universe in one treemap at market open tells me in 10 seconds what would have taken 30 minutes.",
+    name: "Beatriz Costa",
+    role: "Equity Researcher, Brasília",
+  },
+];
+
+const DATA_SOURCES = [
+  { name: 'Yahoo Finance', desc: 'Equities, ETFs, Indices, FX — US stocks, global indices, 8 major currency pairs' },
+  { name: 'Finnhub + FMP', desc: 'Real-time quotes, analyst recommendations, fundamentals & ratios TTM' },
+  { name: 'BRAPI + BCB', desc: 'Brazilian B3 equities, SELIC, IPCA, CDI — direct from Banco Central do Brasil' },
+  { name: 'CoinGecko + FRED', desc: 'BTC, ETH, SOL spot prices — Fed Funds Rate, CPI, GDP, treasury yields' },
+];
 
-const Page = styled.div`
-  background: #080f1a;
-  color: rgba(255,255,255,0.92);
-  font-family: 'IBM Plex Sans', -apple-system, sans-serif;
-  min-height: 100vh;
-  overflow-x: hidden;
-`;
-
-const SectionWrap = styled.div`
-  padding: 72px 40px;
-  max-width: 1080px;
-  margin: 0 auto;
-`;
-
-const Eyebrow = styled.div`
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: rgba(255,255,255,0.35);
-  margin-bottom: 12px;
-  text-align: center;
-`;
-
-const SectionTitle = styled.h2`
-  font-family: 'Syne', sans-serif;
-  font-size: 28px;
-  font-weight: 700;
-  color: rgba(255,255,255,0.92);
-  text-align: center;
-  margin: 0 0 10px;
-`;
-
-const SectionSub = styled.p`
-  font-family: 'IBM Plex Sans', sans-serif;
-  font-size: 14px;
-  font-weight: 300;
-  color: rgba(255,255,255,0.4);
-  text-align: center;
-  max-width: 520px;
-  margin: 0 auto 48px;
-  line-height: 1.6;
-`;
-
-// ── Hero
-const Hero = styled.section`
-  padding: 80px 32px 72px;
-  position: relative;
-  overflow: hidden;
-  text-align: center;
-`;
-
-const GridOverlay = styled.div`
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-  background-size: 60px 60px;
-  pointer-events: none;
-`;
-
-const GradientOrb = styled.div`
-  position: absolute;
-  width: 600px;
-  height: 600px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 70%);
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  animation: ${orbFloat} 14s ease-in-out infinite;
-  pointer-events: none;
-`;
-
-const HeroInner = styled.div`
-  position: relative;
-  z-index: 1;
-  max-width: 680px;
-  margin: 0 auto;
-  animation: ${fadeUp} 0.8s ease both;
-`;
-
-const HeroEyebrow = styled.div`
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.2em;
-  color: rgba(255,255,255,0.35);
-  text-transform: uppercase;
-  margin-bottom: 20px;
-`;
-
-const Headline = styled.h1`
-  font-family: 'Syne', sans-serif;
-  font-size: clamp(32px, 5vw, 48px);
-  font-weight: 800;
-  line-height: 1.15;
-  color: white;
-  margin: 0 0 20px;
-  white-space: pre-line;
-`;
-
-const Subline = styled.p`
-  font-size: 15px;
-  font-weight: 300;
-  color: rgba(255,255,255,0.45);
-  max-width: 540px;
-  margin: 0 auto 36px;
-  line-height: 1.65;
-`;
-
-const CTARow = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  flex-wrap: wrap;
-`;
-
-const PrimaryBtn = styled.button`
-  background: white;
-  color: #080f1a;
-  border: none;
-  padding: 10px 28px;
-  border-radius: 8px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  cursor: pointer;
-  transition: opacity 0.15s;
-  &:hover { opacity: 0.9; }
-`;
-
-const SecondaryBtn = styled.button`
-  background: transparent;
-  color: rgba(255,255,255,0.6);
-  border: 1px solid rgba(255,255,255,0.2);
-  padding: 10px 28px;
-  border-radius: 8px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
-  &:hover {
-    border-color: rgba(255,255,255,0.4);
-    color: rgba(255,255,255,0.8);
-  }
-`;
-
-// ── Ticker
-const TickerSection = styled.section`
-  background: #080f1a;
-  border-top: 0.5px solid rgba(255,255,255,0.06);
-  border-bottom: 0.5px solid rgba(255,255,255,0.06);
-  overflow: hidden;
-  padding: 8px 0;
-`;
-
-const TickerTrack = styled.div`
-  display: flex;
-  width: max-content;
-  animation: ${scrollLeft} 22s linear infinite;
-  &:hover { animation-play-state: paused; }
-`;
-
-const TickerItem = styled.div`
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 24px;
-  white-space: nowrap;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-`;
-
-const TickerDiamond = styled.span`
-  color: rgba(255,255,255,0.2);
-  font-size: 8px;
-`;
-
-const TickerSym = styled.span`
-  color: white;
-  font-weight: 500;
-`;
-
-const TickerPrice = styled.span`
-  color: rgba(255,255,255,0.5);
-`;
-
-const TickerChange = styled.span`
-  color: ${p => p.$pos ? '#4ade80' : p.$neg ? '#f87171' : 'rgba(255,255,255,0.35)'};
-`;
-
-// ── Capabilities
-const CapGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 16px;
-`;
-
-const CapCard = styled.div`
-  background: rgba(255,255,255,0.03);
-  border: 0.5px solid rgba(255,255,255,0.08);
-  border-radius: 10px;
-  padding: 20px;
-  opacity: ${p => p.$locked ? 0.65 : 1};
-`;
-
-const CapTitle = styled.div`
-  font-size: 14px;
-  font-weight: 600;
-  color: rgba(255,255,255,0.92);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-`;
-
-const GreenTag = styled.span`
-  color: #4ade80;
-  background: rgba(74,222,128,0.15);
-  border: 0.5px solid rgba(74,222,128,0.3);
-  border-radius: 20px;
-  font-size: 10px;
-  padding: 2px 8px;
-  font-family: 'JetBrains Mono', monospace;
-`;
-
-const LockTag = styled.span`
-  color: rgba(255,255,255,0.35);
-  border: 0.5px solid rgba(255,255,255,0.15);
-  border-radius: 20px;
-  font-size: 10px;
-  padding: 2px 8px;
-  font-family: 'JetBrains Mono', monospace;
-`;
-
-const CapDesc = styled.div`
-  font-size: 12px;
-  color: rgba(255,255,255,0.4);
-  line-height: 1.6;
-`;
-
-// ── Split section
-const SplitGrid = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  @media (max-width: 700px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const SplitCard = styled.div`
-  border: 0.5px solid rgba(255,255,255,0.08);
-  border-radius: 10px;
-  overflow: hidden;
-`;
-
-const SplitHeader = styled.div`
-  padding: 14px 16px;
-  border-bottom: 0.5px solid rgba(255,255,255,0.06);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-`;
-
-const MarketName = styled.span`
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: rgba(255,255,255,0.92);
-`;
-
-const IndexChange = styled.span`
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  color: ${p => p.$pos ? '#4ade80' : p.$neg ? '#f87171' : 'rgba(255,255,255,0.35)'};
-`;
-
-const SplitRow = styled.div`
-  padding: 10px 16px;
-  border-bottom: 0.5px solid rgba(255,255,255,0.04);
-  display: grid;
-  grid-template-columns: 1fr 1.2fr 1fr 0.8fr;
-  align-items: center;
-  gap: 4px;
-  &:last-child { border-bottom: none; }
-`;
-
-const RowSym = styled.span`
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  color: white;
-`;
-
-const RowName = styled.span`
-  font-size: 11px;
-  color: rgba(255,255,255,0.35);
-`;
-
-const RowPrice = styled.span`
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  color: rgba(255,255,255,0.6);
-`;
-
-const RowChange = styled.span`
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  text-align: right;
-  color: ${p => p.$pos ? '#4ade80' : p.$neg ? '#f87171' : 'rgba(255,255,255,0.35)'};
-`;
-
-// ── Metrics
-const MetricGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  @media (max-width: 600px) {
-    grid-template-columns: repeat(2, 1fr);
-  }
-`;
-
-const MetricItem = styled.div`
-  text-align: center;
-`;
-
-const MetricNum = styled.div`
-  font-size: 22px;
-  font-weight: 500;
-  color: white;
-`;
-
-const MetricLabel = styled.div`
-  font-size: 11px;
-  color: rgba(255,255,255,0.35);
-  margin-top: 4px;
-`;
-
-const SourceRow = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 32px;
-`;
-
-const SourceTag = styled.span`
-  border: 0.5px solid rgba(255,255,255,0.1);
-  border-radius: 20px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  color: rgba(255,255,255,0.3);
-  padding: 4px 10px;
-`;
-
-// ── Terminal Preview
-const MockFrame = styled.div`
-  background: rgba(255,255,255,0.02);
-  border: 0.5px solid rgba(255,255,255,0.1);
-  border-radius: 10px;
-  overflow: hidden;
-`;
-
-const MockTopBar = styled.div`
-  padding: 8px 12px;
-  border-bottom: 0.5px solid rgba(255,255,255,0.06);
-  display: flex;
-  align-items: center;
-`;
-
-const Dots = styled.div`
-  display: flex;
-  gap: 4px;
-  margin-right: 12px;
-`;
-
-const Dot = styled.div`
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: ${p => p.$color};
-  opacity: 0.6;
-`;
-
-const TabRow = styled.div`
-  display: flex;
-  gap: 0;
-`;
-
-const Tab = styled.div`
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  padding: 4px 10px;
-  border-radius: 4px;
-  background: ${p => p.$active ? 'rgba(255,255,255,0.06)' : 'transparent'};
-  color: ${p => p.$active ? 'white' : 'rgba(255,255,255,0.3)'};
-`;
-
-const MockBody = styled.div`
-  display: flex;
-`;
-
-const Sidebar = styled.div`
-  width: 140px;
-  padding: 10px 12px;
-  border-right: 0.5px solid rgba(255,255,255,0.06);
-  flex-shrink: 0;
-`;
-
-const SidebarGroup = styled.div`
-  &:not(:first-child) {
-    margin-top: 12px;
-  }
-`;
-
-const SidebarLabel = styled.div`
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: rgba(255,255,255,0.25);
-  margin-bottom: 6px;
-`;
-
-const SidebarItem = styled.div`
-  font-size: 10px;
-  padding: 3px 0;
-  color: ${p => p.$active ? 'white' : 'rgba(255,255,255,0.35)'};
-`;
-
-const MockContent = styled.div`
-  flex: 1;
-  padding: 12px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  @media (max-width: 600px) {
-    grid-template-columns: repeat(2, 1fr);
-  }
-`;
-
-const AssetCard = styled.div`
-  background: rgba(255,255,255,0.04);
-  border: 0.5px solid rgba(255,255,255,0.07);
-  border-radius: 6px;
-  padding: 8px;
-`;
-
-const ACSym = styled.div`
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  color: white;
-  font-weight: 500;
-`;
-
-const ACName = styled.div`
-  font-size: 9px;
-  color: rgba(255,255,255,0.3);
-  margin-top: 2px;
-`;
-
-const ACPrice = styled.div`
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  color: rgba(255,255,255,0.8);
-  margin-top: 6px;
-`;
-
-const ACChange = styled.div`
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  margin-top: 2px;
-  color: ${p => p.$pos ? '#4ade80' : p.$neg ? '#f87171' : 'rgba(255,255,255,0.35)'};
-`;
-
-// ── Final CTA
-const FinalCTA = styled.section`
-  padding: 72px 40px;
-  text-align: center;
-`;
-
-const CTAH2 = styled.h2`
-  font-family: 'Syne', sans-serif;
-  font-size: 24px;
-  font-weight: 700;
-  color: rgba(255,255,255,0.92);
-  margin: 0 0 12px;
-`;
-
-const CTAPara = styled.p`
-  font-size: 14px;
-  font-weight: 300;
-  color: rgba(255,255,255,0.4);
-  max-width: 480px;
-  margin: 0 auto 32px;
-  line-height: 1.6;
-`;
-
-// ── Footer
-const FooterWrap = styled.footer`
-  background: #080f1a;
-  border-top: 0.5px solid rgba(255,255,255,0.06);
-  padding: 48px 40px 24px;
-`;
-
-const FooterInner = styled.div`
-  max-width: 1080px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
-  gap: 40px;
-  @media (max-width: 700px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const FooterBrand = styled.div``;
-
-const FooterWordmark = styled.div`
-  font-size: 13px;
-  font-weight: 500;
-  color: white;
-  margin-bottom: 12px;
-`;
-
-const FooterTagline = styled.div`
-  font-size: 11px;
-  color: rgba(255,255,255,0.35);
-  line-height: 1.6;
-`;
-
-const FooterColHeader = styled.div`
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  color: rgba(255,255,255,0.25);
-  margin-bottom: 12px;
-`;
-
-const FooterLink = styled.div`
-  font-size: 12px;
-  color: rgba(255,255,255,0.35);
-  line-height: 2.2;
-`;
-
-const FooterBottom = styled.div`
-  border-top: 0.5px solid rgba(255,255,255,0.06);
-  margin-top: 32px;
-  padding-top: 20px;
-  display: flex;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  max-width: 1080px;
-  margin-left: auto;
-  margin-right: auto;
-`;
-
-const FooterSmall = styled.span`
-  font-size: 10px;
-  color: rgba(255,255,255,0.2);
-`;
-
-// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 export default function LandingPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const { t, i18n } = useTranslation();
-  const [tickerData, setTickerData] = useState(TICKER_ITEMS);
-  const [previewAssets, setPreviewAssets] = useState(PREVIEW_ASSETS);
-  const [lang, setLang] = useState(i18n.language?.startsWith('en') ? 'en' : 'pt');
-
-  function handleLangChange(newLang) {
-    setLang(newLang);
-    i18n.changeLanguage(newLang);
-  }
+  const [hoveredCard, setHoveredCard] = useState(null);
+  const [tickerPaused, setTickerPaused] = useState(false);
+  const [primaryHover, setPrimaryHover] = useState(false);
+  const [secondaryHover, setSecondaryHover] = useState(false);
+  const [ctaHovered, setCtaHovered] = useState(false);
+  const [signInLinkHover, setSignInLinkHover] = useState(false);
+  const [coverageLinkHover, setCoverageLinkHover] = useState(false);
+  const [featuresLinkHover, setFeaturesLinkHover] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) navigate('/app', { replace: true });
   }, [isAuthenticated, navigate]);
 
-  // Fetch BTC price from coingecko
   useEffect(() => {
-    (async () => {
-      try {
-        const data = await coingeckoPrices('bitcoin');
-        if (data?.bitcoin) {
-          setTickerData(prev => prev.map(t =>
-            t.sym === 'BTC'
-              ? { ...t, price: data.bitcoin.usd, change: +(data.bitcoin.usd_24h_change || 0).toFixed(2) }
-              : t
-          ));
-        }
-      } catch {}
-    })();
+    const observer = new IntersectionObserver(
+      (entries) => entries.forEach(e => {
+        if (e.isIntersecting) e.target.classList.add('visible');
+      }),
+      { threshold: 0.12 }
+    );
+    document.querySelectorAll('.gmt-section-reveal')
+      .forEach(el => observer.observe(el));
+    return () => observer.disconnect();
   }, []);
 
-  // Price animation for terminal preview
-  useEffect(() => {
-    const id = setInterval(() => {
-      setPreviewAssets(prev => prev.map(a => {
-        const drift = (Math.random() - 0.5) * 0.0016;
-        const newPrice = +(a.price * (1 + drift)).toFixed(2);
-        const newChange = +(a.change + drift * 100).toFixed(2);
-        return { ...a, price: newPrice, change: newChange };
-      }));
-    }, 2200);
-    return () => clearInterval(id);
-  }, []);
-
-  const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
-
-  const tickerDup = [...tickerData, ...tickerData];
+  const goLogin    = () => navigate('/login');
+  const goRegister = () => navigate('/register');
 
   return (
     <>
-      <GlobalFonts />
-      <Page>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes blink {
+          0%,100% { opacity: 1; } 50% { opacity: 0.2; }
+        }
+        @keyframes tickerScroll {
+          from { transform: translateX(0); }
+          to   { transform: translateX(-50%); }
+        }
+        @keyframes nodePulse {
+          0%,100% { opacity: 0.6; } 50% { opacity: 1; }
+        }
+        .hero-text { animation: fadeInUp 0.8s ease both; }
+        .hero-sub  { animation: fadeInUp 0.8s 0.15s ease both; }
+        .hero-cta  { animation: fadeInUp 0.8s 0.3s ease both; }
+        .gmt-node  { animation: nodePulse 3s ease-in-out infinite; }
+        .gmt-blink { animation: blink 1.5s ease-in-out infinite; }
+        .gmt-section-reveal {
+          opacity: 0;
+          transform: translateY(16px);
+          transition: opacity 500ms ease, transform 500ms ease;
+        }
+        .gmt-section-reveal.visible {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      `}</style>
+      <div style={{
+        background: '#080f1a',
+        color: 'rgba(255,255,255,0.92)',
+        fontFamily: "'IBM Plex Sans', sans-serif",
+      }}>
 
-        {/* ── HEADER ──────────────────────────────────────────────────────── */}
-        <GMTHomepageHeader
-          lang={lang}
-          onLangChange={handleLangChange}
-          onSignIn={() => navigate('/login')}
-          onSignUp={() => navigate('/register')}
-        />
+        {/* ── HERO ──────────────────────────────────────────────────────── */}
+        <section style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          minHeight: '100vh',
+          alignItems: 'center',
+          padding: '160px 80px 80px',
+          gap: 60,
+        }}>
+          {/* LEFT — Globe SVG */}
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <svg
+              viewBox="0 0 400 400"
+              style={{
+                width: '100%',
+                maxWidth: 420,
+                filter: 'drop-shadow(0 0 40px rgba(59,130,246,0.12))',
+              }}
+            >
+              {/* Outer circle */}
+              <circle cx={200} cy={200} r={160} stroke="#3b82f6" strokeWidth={1} fill="none" opacity={0.6} />
 
-        {/* ── HERO ────────────────────────────────────────────────────────── */}
-        <Hero>
-          <GridOverlay />
-          <GradientOrb />
-          <HeroInner>
-            <HeroEyebrow>{t('hero.eyebrow')}</HeroEyebrow>
-            <Headline>
-              {t('hero.headline_1') + '\n' + t('hero.headline_2')}
-            </Headline>
-            <Subline>
-              {t('hero.subline')}
-            </Subline>
-            <CTARow>
-              <PrimaryBtn onClick={() => navigate('/mini')}>{t('hero.cta_primary')}</PrimaryBtn>
-              <SecondaryBtn onClick={() => navigate('/terminal')}>{t('hero.cta_secondary')}</SecondaryBtn>
-            </CTARow>
-          </HeroInner>
-        </Hero>
+              {/* Latitude ellipses */}
+              <ellipse cx={200} cy={110} rx={160} ry={40} fill="none" stroke="#3b82f6" strokeWidth={0.6} opacity={0.3} />
+              <ellipse cx={200} cy={145} rx={160} ry={90} fill="none" stroke="#3b82f6" strokeWidth={0.6} opacity={0.3} />
+              <ellipse cx={200} cy={200} rx={160} ry={160} fill="none" stroke="#3b82f6" strokeWidth={0.6} opacity={0.3} />
+              <ellipse cx={200} cy={255} rx={160} ry={90} fill="none" stroke="#3b82f6" strokeWidth={0.6} opacity={0.3} />
+              <ellipse cx={200} cy={290} rx={160} ry={40} fill="none" stroke="#3b82f6" strokeWidth={0.6} opacity={0.3} />
 
-        {/* ── TICKER STRIP ────────────────────────────────────────────────── */}
-        <TickerSection>
-          <TickerTrack>
-            {tickerDup.map((t, i) => {
-              const hasData = t.price != null;
-              const pos = hasData && t.change > 0;
-              const neg = hasData && t.change < 0;
-              return (
-                <TickerItem key={i}>
-                  <TickerDiamond>&#9670;</TickerDiamond>
-                  <TickerSym>{t.sym}</TickerSym>
-                  <TickerPrice>{formatTickerPrice(t.sym, t.price)}</TickerPrice>
-                  <TickerChange $pos={pos} $neg={neg}>
-                    {hasData ? `${pos ? '+' : ''}${t.change.toFixed(2)}%` : '\u2014'}
-                  </TickerChange>
-                </TickerItem>
-              );
-            })}
-          </TickerTrack>
-        </TickerSection>
+              {/* Longitude lines */}
+              {[0, 30, 60, 90, 120, 150].map(deg => (
+                <ellipse
+                  key={deg}
+                  cx={200} cy={200} rx={160} ry={160}
+                  fill="none" stroke="#3b82f6" strokeWidth={0.5} opacity={0.2}
+                  transform={`rotate(${deg}, 200, 200)`}
+                />
+              ))}
 
-        {/* ── PRODUCTS ───────────────────────────────────────────────────── */}
-        <section id="capabilities">
-          <SectionWrap>
-            <Eyebrow>{t('products.eyebrow')}</Eyebrow>
-            <SectionTitle>{t('products.title')}</SectionTitle>
-            <SectionSub>{t('products.subtitle')}</SectionSub>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-              {/* Card 1 — Terminal Mini */}
-              <div style={{ border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 28 }}>
-                <div style={{ marginBottom: 16 }}>
-                  <span style={{ color: '#4ade80', background: 'rgba(74,222,128,0.15)', border: '0.5px solid rgba(74,222,128,0.3)', borderRadius: 20, fontSize: 10, padding: '2px 8px', fontFamily: "'JetBrains Mono', monospace" }}>{t('products.mini_label')}</span>
-                </div>
-                <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Syne', sans-serif", color: 'rgba(255,255,255,0.92)', marginBottom: 10 }}>{t('products.mini_name')}</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.6, marginBottom: 20 }}>{t('products.mini_desc')}</div>
-                <div style={{ marginBottom: 20 }}>
-                  {[t('products.mini_f1'), t('products.mini_f2'), t('products.mini_f3'), t('products.mini_f4')].map((f, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.8 }}>
-                      <span style={{ color: '#4ade80', fontSize: 10 }}>✓</span>{f}
-                    </div>
-                  ))}
-                </div>
-                <button onClick={() => navigate('/mini')} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 500, letterSpacing: '0.06em', padding: '10px 28px', width: '100%', transition: 'border-color 0.15s, color 0.15s' }}>
-                  {t('products.mini_cta')}
-                </button>
-              </div>
+              {/* Pulsing nodes */}
+              {[
+                { cx: 200, cy: 40,  delay: '0s' },
+                { cx: 200, cy: 360, delay: '0.4s' },
+                { cx: 40,  cy: 200, delay: '0.8s' },
+                { cx: 360, cy: 200, delay: '1.2s' },
+                { cx: 130, cy: 115, delay: '1.6s' },
+                { cx: 270, cy: 115, delay: '2.0s' },
+              ].map((node, i) => (
+                <circle
+                  key={i}
+                  cx={node.cx} cy={node.cy} r={3.5}
+                  fill="#3b82f6"
+                  className="gmt-node"
+                  style={{ animationDelay: node.delay }}
+                />
+              ))}
+            </svg>
+          </div>
 
-              {/* Card 2 — Terminal Pro (featured) */}
-              <div style={{ border: '1px solid rgba(255,255,255,0.2)', borderRadius: 12, padding: 28, background: 'rgba(255,255,255,0.02)' }}>
-                <div style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ color: '#60a5fa', background: 'rgba(96,165,250,0.15)', border: '0.5px solid rgba(96,165,250,0.3)', borderRadius: 20, fontSize: 10, padding: '2px 8px', fontFamily: "'JetBrains Mono', monospace" }}>{t('products.pro_badge')}</span>
-                  <span style={{ color: 'rgba(255,255,255,0.35)', border: '0.5px solid rgba(255,255,255,0.15)', borderRadius: 20, fontSize: 10, padding: '2px 8px', fontFamily: "'JetBrains Mono', monospace" }}>{t('products.pro_label')}</span>
-                </div>
-                <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Syne', sans-serif", color: 'rgba(255,255,255,0.92)', marginBottom: 10 }}>{t('products.pro_name')}</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.6, marginBottom: 20 }}>{t('products.pro_desc')}</div>
-                <div style={{ marginBottom: 20 }}>
-                  {[t('products.pro_f1'), t('products.pro_f2'), t('products.pro_f3'), t('products.pro_f4'), t('products.pro_f5')].map((f, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.8 }}>
-                      <span style={{ color: '#4ade80', fontSize: 10 }}>✓</span>{f}
-                    </div>
-                  ))}
-                </div>
-                <button onClick={() => navigate('/register')} style={{ background: 'white', border: 'none', borderRadius: 8, color: '#080f1a', cursor: 'pointer', fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 500, letterSpacing: '0.06em', padding: '10px 28px', width: '100%', transition: 'opacity 0.15s' }}>
-                  {t('products.pro_cta')}
-                </button>
-              </div>
-
-              {/* Card 3 — Club Management */}
-              <div style={{ border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 28 }}>
-                <div style={{ marginBottom: 16 }}>
-                  <span style={{ color: '#fbbf24', background: 'rgba(251,191,36,0.15)', border: '0.5px solid rgba(251,191,36,0.3)', borderRadius: 20, fontSize: 10, padding: '2px 8px', fontFamily: "'JetBrains Mono', monospace" }}>{t('products.club_label')}</span>
-                </div>
-                <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Syne', sans-serif", color: 'rgba(255,255,255,0.92)', marginBottom: 10 }}>{t('products.club_name')}</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.6, marginBottom: 20 }}>{t('products.club_desc')}</div>
-                <div style={{ marginBottom: 20 }}>
-                  {[t('products.club_f1'), t('products.club_f2'), t('products.club_f3'), t('products.club_f4')].map((f, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.8 }}>
-                      <span style={{ color: '#4ade80', fontSize: 10 }}>✓</span>{f}
-                    </div>
-                  ))}
-                </div>
-                <button onClick={() => navigate('/clube')} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 500, letterSpacing: '0.06em', padding: '10px 28px', width: '100%', transition: 'border-color 0.15s, color 0.15s' }}>
-                  {t('products.club_cta')}
-                </button>
-              </div>
+          {/* RIGHT — Text content */}
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{
+              fontFamily: "'IBM Plex Sans', sans-serif",
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: '0.2em',
+              color: '#3b82f6',
+              marginBottom: 24,
+              textTransform: 'uppercase',
+            }}>
+              INSTITUTIONAL MARKET INTELLIGENCE
             </div>
-          </SectionWrap>
+
+            <h1 className="hero-text" style={{
+              fontFamily: "'Syne', sans-serif",
+              fontWeight: 800,
+              fontSize: 'clamp(48px, 6vw, 80px)',
+              lineHeight: 1.05,
+              whiteSpace: 'pre-line',
+              marginBottom: 24,
+              marginTop: 0,
+            }}>
+              {'One terminal.\nEvery market.'}
+            </h1>
+
+            <p className="hero-sub" style={{
+              fontFamily: "'IBM Plex Sans', sans-serif",
+              fontSize: 16,
+              fontWeight: 300,
+              color: 'rgba(255,255,255,0.55)',
+              lineHeight: 1.65,
+              maxWidth: 440,
+              marginBottom: 44,
+              marginTop: 0,
+            }}>
+              GMT aggregates real-time data from 8 professional sources — equities, fixed income,
+              FX, crypto, commodities, and Brazilian markets — into one structured terminal built
+              for serious investors.
+            </p>
+
+            <div className="hero-cta" style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              <button
+                onClick={goLogin}
+                onMouseEnter={() => setPrimaryHover(true)}
+                onMouseLeave={() => setPrimaryHover(false)}
+                style={{
+                  background: primaryHover ? '#2563eb' : '#3b82f6',
+                  color: '#080f1a',
+                  border: 'none',
+                  fontFamily: "'IBM Plex Sans', sans-serif",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  letterSpacing: '0.1em',
+                  padding: '14px 32px',
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                  transition: 'background 0.15s',
+                }}
+              >
+                Launch Terminal
+              </button>
+              <button
+                onClick={goRegister}
+                onMouseEnter={() => setSecondaryHover(true)}
+                onMouseLeave={() => setSecondaryHover(false)}
+                style={{
+                  background: 'transparent',
+                  border: secondaryHover
+                    ? '1px solid rgba(59,130,246,0.7)'
+                    : '1px solid rgba(59,130,246,0.3)',
+                  color: secondaryHover
+                    ? 'rgba(255,255,255,0.9)'
+                    : 'rgba(255,255,255,0.6)',
+                  fontFamily: "'IBM Plex Sans', sans-serif",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  letterSpacing: '0.1em',
+                  padding: '14px 32px',
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                  transition: 'border-color 0.15s, color 0.15s',
+                }}
+              >
+                Create Free Account
+              </button>
+            </div>
+
+            <div style={{
+              marginTop: 24,
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 11,
+              color: 'rgba(255,255,255,0.25)',
+              letterSpacing: '0.08em',
+            }}>
+              269 assets · 9 groups · 36 subgroups
+            </div>
+          </div>
         </section>
 
-        {/* ── GLOBAL vs BRASIL ────────────────────────────────────────────── */}
-        <SectionWrap>
-          <Eyebrow>{t('coverage.eyebrow')}</Eyebrow>
-          <SectionTitle>{t('coverage.title')}</SectionTitle>
-          <SectionSub>{t('coverage.subtitle')}</SectionSub>
-          <SplitGrid>
-            <SplitCard>
-              <SplitHeader>
-                <MarketName>Global</MarketName>
-                <IndexChange $pos>S&amp;P 500 +0.41%</IndexChange>
-              </SplitHeader>
-              {GLOBAL_ROWS.map((r, i) => (
-                <SplitRow key={i}>
-                  <RowSym>{r.sym}</RowSym>
-                  <RowName>{r.name}</RowName>
-                  <RowPrice>{r.price}</RowPrice>
-                  <RowChange $pos={r.change > 0} $neg={r.change < 0}>
-                    {r.change > 0 ? '+' : ''}{r.change.toFixed(2)}%
-                  </RowChange>
-                </SplitRow>
-              ))}
-            </SplitCard>
-            <SplitCard>
-              <SplitHeader>
-                <MarketName>Brasil</MarketName>
-                <IndexChange $pos>IBOV +0.74%</IndexChange>
-              </SplitHeader>
-              {BRASIL_ROWS.map((r, i) => (
-                <SplitRow key={i}>
-                  <RowSym>{r.sym}</RowSym>
-                  <RowName>{r.name}</RowName>
-                  <RowPrice>{r.price}</RowPrice>
-                  <RowChange $pos={r.change != null && r.change > 0} $neg={r.change != null && r.change < 0}>
-                    {r.change != null ? `${r.change > 0 ? '+' : ''}${r.change.toFixed(2)}%` : '\u2014'}
-                  </RowChange>
-                </SplitRow>
-              ))}
-            </SplitCard>
-          </SplitGrid>
-        </SectionWrap>
+        {/* Bottom separator */}
+        <div style={{
+          height: 1,
+          background: 'linear-gradient(90deg, transparent, rgba(59,130,246,0.3) 30%, rgba(59,130,246,0.3) 70%, transparent)',
+        }} />
 
-        {/* ── NUMBERS ─────────────────────────────────────────────────────── */}
-        <SectionWrap>
-          <Eyebrow>{t('numbers.eyebrow')}</Eyebrow>
-          <SectionTitle>{t('numbers.title')}</SectionTitle>
-          <SectionSub>{t('numbers.subtitle')}</SectionSub>
-          <MetricGrid>
-            {[
-              { num: '269', labelKey: 'numbers.assets' },
-              { num: '8',   labelKey: 'numbers.sources' },
-              { num: '30s', labelKey: 'numbers.refresh' },
-              { num: '9',   labelKey: 'numbers.groups' },
-            ].map((m, i) => (
-              <MetricItem key={i}>
-                <MetricNum>{m.num}</MetricNum>
-                <MetricLabel>{t(m.labelKey)}</MetricLabel>
-              </MetricItem>
-            ))}
-          </MetricGrid>
-          <SourceRow>
-            {SOURCES.map(s => (
-              <SourceTag key={s}>{s}</SourceTag>
-            ))}
-          </SourceRow>
-        </SectionWrap>
+        {/* ── TICKER STRIP ──────────────────────────────────────────────── */}
+        <div style={{
+          background: '#040810',
+          borderTop: '1px solid rgba(59,130,246,0.08)',
+          borderBottom: '1px solid rgba(59,130,246,0.08)',
+          height: 48,
+          display: 'flex',
+          alignItems: 'center',
+          overflow: 'hidden',
+        }}>
+          {/* LIVE label */}
+          <div style={{
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '0 20px',
+            borderRight: '1px solid rgba(255,255,255,0.06)',
+          }}>
+            <div
+              className="gmt-blink"
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: '#3b82f6',
+              }}
+            />
+            <span style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 9,
+              letterSpacing: '0.2em',
+              color: '#3b82f6',
+              fontWeight: 600,
+            }}>
+              LIVE
+            </span>
+          </div>
 
-        {/* ── TERMINAL PREVIEW ────────────────────────────────────────────── */}
-        <SectionWrap>
-          <Eyebrow>{t('preview.eyebrow')}</Eyebrow>
-          <SectionTitle>{t('preview.title')}</SectionTitle>
-          <SectionSub>{t('preview.subtitle')}</SectionSub>
-          <MockFrame>
-            <MockTopBar>
-              <Dots>
-                <Dot $color="#ff5f57" />
-                <Dot $color="#ffbd2e" />
-                <Dot $color="#28c840" />
-              </Dots>
-              <TabRow>
-                <Tab $active>Global</Tab>
-                <Tab>Brasil</Tab>
-                <Tab>Research &#128274;</Tab>
-                <Tab>Sinais &#128274;</Tab>
-                <Tab>Clube &#128274;</Tab>
-              </TabRow>
-            </MockTopBar>
-            <MockBody>
-              <Sidebar>
-                <SidebarGroup>
-                  <SidebarLabel>Equities</SidebarLabel>
-                  <SidebarItem $active>Technology</SidebarItem>
-                  <SidebarItem>Semiconductors</SidebarItem>
-                  <SidebarItem>Financials</SidebarItem>
-                  <SidebarItem>Healthcare</SidebarItem>
-                </SidebarGroup>
-                <SidebarGroup>
-                  <SidebarLabel>Digital Assets</SidebarLabel>
-                  <SidebarItem>Crypto</SidebarItem>
-                </SidebarGroup>
-                <SidebarGroup>
-                  <SidebarLabel>Commodities</SidebarLabel>
-                  <SidebarItem>Precious Metals</SidebarItem>
-                  <SidebarItem>Energy</SidebarItem>
-                </SidebarGroup>
-              </Sidebar>
-              <MockContent>
-                {previewAssets.map(a => (
-                  <AssetCard key={a.sym}>
-                    <ACSym>{a.sym}</ACSym>
-                    <ACName>{a.name}</ACName>
-                    <ACPrice>${a.price.toFixed(2)}</ACPrice>
-                    <ACChange $pos={a.change > 0} $neg={a.change < 0}>
-                      {a.change > 0 ? '+' : ''}{a.change.toFixed(2)}%
-                    </ACChange>
-                  </AssetCard>
+          {/* Scrolling area */}
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <div
+              onMouseEnter={() => setTickerPaused(true)}
+              onMouseLeave={() => setTickerPaused(false)}
+              style={{
+                display: 'flex',
+                width: 'max-content',
+                animationName: 'tickerScroll',
+                animationDuration: '45s',
+                animationTimingFunction: 'linear',
+                animationIterationCount: 'infinite',
+                animationPlayState: tickerPaused ? 'paused' : 'running',
+              }}
+            >
+              {[...TICKER_ITEMS, ...TICKER_ITEMS].map((item, i) => (
+                <div key={i} style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '0 24px',
+                  borderRight: '1px solid rgba(255,255,255,0.05)',
+                  whiteSpace: 'nowrap',
+                }}>
+                  <span style={{
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 11,
+                    fontWeight: 500,
+                    color: 'rgba(255,255,255,0.65)',
+                  }}>{item.sym}</span>
+                  <span style={{
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 11,
+                    color: 'rgba(255,255,255,0.35)',
+                  }}>{item.price}</span>
+                  <span style={{
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 11,
+                    color: item.pos ? '#00E676' : '#f87171',
+                  }}>{item.chg}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div style={{
+          textAlign: 'center',
+          fontSize: 10,
+          color: '#2D3748',
+          fontFamily: "'JetBrains Mono', monospace",
+          letterSpacing: '0.5px',
+          paddingBottom: 8,
+        }}>
+          {snapshot.snapshot_label} · sign in for live prices
+        </div>
+
+        {/* ── THE PLATFORM ──────────────────────────────────────────────── */}
+        <section className="gmt-section-reveal" style={{ background: '#080f1a', padding: '120px 80px' }}>
+          <div style={{
+            maxWidth: 1100,
+            margin: '0 auto',
+            display: 'grid',
+            gridTemplateColumns: '2fr 3fr',
+            gap: 80,
+            alignItems: 'start',
+          }}>
+            {/* LEFT COLUMN */}
+            <div>
+              <div style={{
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: '0.25em',
+                color: '#3b82f6',
+                marginBottom: 16,
+                textTransform: 'uppercase',
+              }}>
+                THE PLATFORM
+              </div>
+
+              <h2 style={{
+                fontFamily: "'Syne', sans-serif",
+                fontWeight: 800,
+                fontSize: 'clamp(28px, 3.5vw, 44px)',
+                color: 'rgba(255,255,255,0.92)',
+                lineHeight: 1.1,
+                whiteSpace: 'pre-line',
+                marginBottom: 24,
+                marginTop: 0,
+              }}>
+                {'Built for the\nserious investor.'}
+              </h2>
+
+              <p style={{
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontSize: 14,
+                fontWeight: 300,
+                color: 'rgba(255,255,255,0.5)',
+                lineHeight: 1.7,
+                marginBottom: 40,
+                marginTop: 0,
+              }}>
+                GMT is a real-time market intelligence platform that consolidates
+                data from Bloomberg-grade sources into a single structured interface.
+                Built for investors, analysts, and finance professionals who need
+                broad market coverage without constant context-switching.
+              </p>
+
+              {/* Gold divider */}
+              <div style={{
+                width: 32,
+                height: 1,
+                background: '#3b82f6',
+                opacity: 0.4,
+                marginBottom: 40,
+              }} />
+
+              <div style={{
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: '0.25em',
+                color: '#3b82f6',
+                marginBottom: 16,
+                textTransform: 'uppercase',
+              }}>
+                OUR PHILOSOPHY
+              </div>
+
+              <p style={{
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontSize: 14,
+                fontWeight: 300,
+                color: 'rgba(255,255,255,0.5)',
+                lineHeight: 1.7,
+                marginTop: 0,
+              }}>
+                The serious investor shouldn't need five browser tabs to understand
+                one portfolio. GMT exists to change that — bringing institutional-quality
+                market intelligence to professionals who don't have a Bloomberg terminal
+                subscription.
+              </p>
+            </div>
+
+            {/* RIGHT COLUMN */}
+            <div>
+              <div style={{
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: '0.25em',
+                color: '#3b82f6',
+                marginBottom: 20,
+                textTransform: 'uppercase',
+              }}>
+                DATA SOURCES
+              </div>
+
+              <p style={{
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontSize: 14,
+                fontWeight: 300,
+                color: 'rgba(255,255,255,0.45)',
+                lineHeight: 1.6,
+                marginBottom: 28,
+                marginTop: 0,
+              }}>
+                Eight professional-grade APIs — each selected for reliability, depth,
+                and coverage of the asset classes that matter most.
+              </p>
+
+              <div style={{
+                border: '1px solid rgba(255,255,255,0.06)',
+                borderRadius: 4,
+                overflow: 'hidden',
+              }}>
+                {DATA_SOURCES.map((src, i) => (
+                  <div key={i} style={{
+                    padding: '18px 24px',
+                    borderBottom: i < DATA_SOURCES.length - 1
+                      ? '1px solid rgba(255,255,255,0.04)'
+                      : 'none',
+                  }}>
+                    <div style={{
+                      fontFamily: "'IBM Plex Sans', sans-serif",
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: 'rgba(255,255,255,0.8)',
+                      marginBottom: 4,
+                    }}>
+                      {src.name}
+                    </div>
+                    <div style={{
+                      fontFamily: "'IBM Plex Sans', sans-serif",
+                      fontSize: 12,
+                      fontWeight: 300,
+                      color: 'rgba(255,255,255,0.4)',
+                      lineHeight: 1.5,
+                    }}>
+                      {src.desc}
+                    </div>
+                  </div>
                 ))}
-              </MockContent>
-            </MockBody>
-          </MockFrame>
-        </SectionWrap>
-
-        {/* ── FINAL CTA ───────────────────────────────────────────────────── */}
-        <FinalCTA>
-          <CTAH2>{t('final_cta.title')}</CTAH2>
-          <CTAPara>{t('final_cta.subtitle')}</CTAPara>
-          <CTARow>
-            <PrimaryBtn onClick={() => navigate('/mini')}>{t('final_cta.primary')}</PrimaryBtn>
-            <SecondaryBtn onClick={() => navigate('/register')}>{t('final_cta.secondary')}</SecondaryBtn>
-          </CTARow>
-        </FinalCTA>
-
-        {/* ── FOOTER ──────────────────────────────────────────────────────── */}
-        <FooterWrap>
-          <FooterInner>
-            <FooterBrand>
-              <FooterWordmark>GMT</FooterWordmark>
-              <FooterTagline>
-                {t('footer.tagline')}
-              </FooterTagline>
-            </FooterBrand>
-            <div>
-              <FooterColHeader>{t('footer.product')}</FooterColHeader>
-              <FooterLink>{t('footer.terminal_global')}</FooterLink>
-              <FooterLink>{t('footer.terminal_brasil')}</FooterLink>
-              <FooterLink>{t('footer.research')}</FooterLink>
-              <FooterLink>{t('footer.signal_engine')}</FooterLink>
-              <FooterLink>{t('footer.clube')}</FooterLink>
+              </div>
             </div>
-            <div>
-              <FooterColHeader>{t('footer.company')}</FooterColHeader>
-              <FooterLink>{t('footer.sobre')}</FooterLink>
-              <FooterLink>{t('footer.contato')}</FooterLink>
-            </div>
-            <div>
-              <FooterColHeader>{t('footer.legal')}</FooterColHeader>
-              <FooterLink>{t('footer.privacidade')}</FooterLink>
-              <FooterLink>{t('footer.termos')}</FooterLink>
-              <FooterLink>{t('footer.disclaimer_link')}</FooterLink>
-            </div>
-          </FooterInner>
-          <FooterBottom>
-            <FooterSmall>{t('footer.disclaimer')}</FooterSmall>
-            <FooterSmall>{t('footer.data_sources')}</FooterSmall>
-          </FooterBottom>
-        </FooterWrap>
+          </div>
+        </section>
 
-      </Page>
+        {/* ── WHY GMT ─────────────────────────────────────────────────── */}
+        <section className="gmt-section-reveal" style={{ background: '#080f1a', padding: '100px 80px' }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+            {/* Section header */}
+            <div style={{ marginBottom: 48 }}>
+              <div style={{
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: '0.25em',
+                color: '#3b82f6',
+                textTransform: 'uppercase',
+                marginBottom: 16,
+              }}>
+                WHY GMT
+              </div>
+              <h2 style={{
+                fontFamily: "'Syne', sans-serif",
+                fontWeight: 800,
+                fontSize: 'clamp(28px, 3.5vw, 44px)',
+                color: 'rgba(255,255,255,0.92)',
+                marginBottom: 0,
+                marginTop: 0,
+              }}>
+                What sets it apart.
+              </h2>
+            </div>
+
+            {/* Feature pills */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 56 }}>
+              {WHY_GMT_PILLS.map((pill, i) => (
+                <span key={i} style={{
+                  border: '1px solid rgba(59,130,246,0.2)',
+                  borderRadius: 2,
+                  padding: '8px 18px',
+                  fontFamily: "'IBM Plex Sans', sans-serif",
+                  fontSize: 12,
+                  fontWeight: 400,
+                  color: 'rgba(255,255,255,0.55)',
+                  background: 'rgba(59,130,246,0.04)',
+                }}>
+                  {pill}
+                </span>
+              ))}
+            </div>
+
+            {/* Description grid */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: window.innerWidth < 600 ? '1fr' : 'repeat(3, 1fr)',
+              gap: 0,
+              border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: 4,
+              overflow: 'hidden',
+            }}>
+              {WHY_GMT_CELLS.map((cell, index) => (
+                <div key={index} style={{
+                  padding: '28px 28px',
+                  borderRight: [0, 1, 3, 4].includes(index)
+                    ? '1px solid rgba(255,255,255,0.06)'
+                    : 'none',
+                  borderBottom: index < 3
+                    ? '1px solid rgba(255,255,255,0.06)'
+                    : 'none',
+                }}>
+                  <div style={{
+                    fontFamily: "'IBM Plex Sans', sans-serif",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: 'rgba(255,255,255,0.75)',
+                    marginBottom: 8,
+                  }}>
+                    {cell.title}
+                  </div>
+                  <div style={{
+                    fontFamily: "'IBM Plex Sans', sans-serif",
+                    fontSize: 13,
+                    fontWeight: 300,
+                    color: 'rgba(255,255,255,0.38)',
+                    lineHeight: 1.6,
+                  }}>
+                    {cell.body}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── COVERAGE TEASER ─────────────────────────────────────────── */}
+        <section className="gmt-section-reveal" style={{
+          background: '#040810',
+          padding: '80px 80px',
+          borderTop: '1px solid rgba(255,255,255,0.04)',
+        }}>
+          <div style={{
+            maxWidth: 1100,
+            margin: '0 auto',
+            display: 'grid',
+            gridTemplateColumns: window.innerWidth < 768 ? '1fr' : '1fr 1fr',
+            gap: 64,
+            alignItems: 'center',
+          }}>
+            {/* Left — text */}
+            <div>
+              <div style={{
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: '0.25em',
+                color: '#3b82f6',
+                textTransform: 'uppercase',
+                marginBottom: 16,
+              }}>
+                COVERAGE
+              </div>
+              <h2 style={{
+                fontFamily: "'Syne', sans-serif",
+                fontWeight: 800,
+                fontSize: 'clamp(28px, 3.5vw, 44px)',
+                whiteSpace: 'pre-line',
+                color: 'rgba(255,255,255,0.92)',
+                marginBottom: 16,
+                marginTop: 0,
+              }}>
+                {'269 assets.\nSix asset classes.'}
+              </h2>
+              <p style={{
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontSize: 15,
+                fontWeight: 300,
+                color: 'rgba(255,255,255,0.45)',
+                lineHeight: 1.7,
+                marginBottom: 32,
+                marginTop: 0,
+              }}>
+                From US equities mapped to GICS sectors, to Brazilian B3 stocks,
+                crypto, FX, commodities, and fixed income — every market that
+                matters to a serious portfolio.
+              </p>
+              <button
+                onClick={() => navigate('/coverage')}
+                onMouseEnter={() => setCoverageLinkHover(true)}
+                onMouseLeave={() => setCoverageLinkHover(false)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontFamily: "'IBM Plex Sans', sans-serif",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: coverageLinkHover ? '#2563eb' : '#3b82f6',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                  transition: 'color 150ms',
+                }}
+              >
+                Explore full coverage
+                <span style={{
+                  display: 'inline-block',
+                  transform: coverageLinkHover ? 'translateX(3px)' : 'translateX(0)',
+                  transition: 'transform 150ms ease',
+                }}>→</span>
+              </button>
+            </div>
+
+            {/* Right — stats grid */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '1px',
+              background: 'rgba(59,130,246,0.07)',
+              borderRadius: 4,
+              overflow: 'hidden',
+            }}>
+              {COVERAGE_STATS.map((s, i) => (
+                <div key={i} style={{
+                  background: '#040810',
+                  padding: '20px 16px',
+                  textAlign: 'center',
+                }}>
+                  <div style={{
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 20,
+                    fontWeight: 600,
+                    color: '#3b82f6',
+                    marginBottom: 4,
+                  }}>
+                    {s.num}
+                  </div>
+                  <div style={{
+                    fontFamily: "'IBM Plex Sans', sans-serif",
+                    fontSize: 10,
+                    color: 'rgba(255,255,255,0.3)',
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                  }}>
+                    {s.label}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── FEATURES TEASER ─────────────────────────────────────────── */}
+        <section className="gmt-section-reveal" style={{
+          background: '#080f1a',
+          padding: '80px 80px',
+          borderTop: '1px solid rgba(255,255,255,0.04)',
+        }}>
+          <div style={{
+            maxWidth: 1100,
+            margin: '0 auto',
+            display: 'grid',
+            gridTemplateColumns: window.innerWidth < 768 ? '1fr' : '1fr 1fr',
+            gap: 64,
+            alignItems: 'center',
+          }}>
+            {/* Left — feature tags grid */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: '1px',
+              background: 'rgba(59,130,246,0.06)',
+              borderRadius: 4,
+              overflow: 'hidden',
+            }}>
+              {FEATURE_TAGS.map((f, i) => (
+                <div key={i} style={{
+                  background: '#080f1a',
+                  padding: '18px 20px',
+                }}>
+                  <div style={{
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 9,
+                    fontWeight: 600,
+                    letterSpacing: '0.2em',
+                    color: 'rgba(59,130,246,0.5)',
+                    textTransform: 'uppercase',
+                    marginBottom: 6,
+                  }}>
+                    {f.tag}
+                  </div>
+                  <div style={{
+                    fontFamily: "'IBM Plex Sans', sans-serif",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: 'rgba(255,255,255,0.65)',
+                  }}>
+                    {f.name}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Right — text */}
+            <div>
+              <div style={{
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: '0.25em',
+                color: '#3b82f6',
+                textTransform: 'uppercase',
+                marginBottom: 16,
+              }}>
+                FEATURES
+              </div>
+              <h2 style={{
+                fontFamily: "'Syne', sans-serif",
+                fontWeight: 800,
+                fontSize: 'clamp(28px, 3.5vw, 44px)',
+                whiteSpace: 'pre-line',
+                color: 'rgba(255,255,255,0.92)',
+                marginBottom: 16,
+                marginTop: 0,
+              }}>
+                {'Six tools.\nOne terminal.'}
+              </h2>
+              <p style={{
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontSize: 15,
+                fontWeight: 300,
+                color: 'rgba(255,255,255,0.45)',
+                lineHeight: 1.7,
+                marginBottom: 32,
+                marginTop: 0,
+              }}>
+                Real-time dashboard, volume-weighted heatmap, Brazil terminal,
+                institutional taxonomy, analyst ratings, and fundamentals —
+                all in one structured interface.
+              </p>
+              <button
+                onClick={() => navigate('/features')}
+                onMouseEnter={() => setFeaturesLinkHover(true)}
+                onMouseLeave={() => setFeaturesLinkHover(false)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontFamily: "'IBM Plex Sans', sans-serif",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: featuresLinkHover ? '#2563eb' : '#3b82f6',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                  transition: 'color 150ms',
+                }}
+              >
+                See all features
+                <span style={{
+                  display: 'inline-block',
+                  transform: featuresLinkHover ? 'translateX(3px)' : 'translateX(0)',
+                  transition: 'transform 150ms ease',
+                }}>→</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* ── WHAT USERS SAY ──────────────────────────────────────────── */}
+        <section className="gmt-section-reveal" style={{ background: '#040810', padding: '100px 80px' }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+            {/* Section header */}
+            <div style={{ textAlign: 'center', marginBottom: 56 }}>
+              <div style={{
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: '0.25em',
+                color: '#3b82f6',
+                textTransform: 'uppercase',
+                marginBottom: 16,
+              }}>
+                WHAT USERS SAY
+              </div>
+              <h2 style={{
+                fontFamily: "'Syne', sans-serif",
+                fontWeight: 800,
+                fontSize: 'clamp(28px, 3.5vw, 44px)',
+                color: 'rgba(255,255,255,0.92)',
+                marginTop: 0,
+                marginBottom: 0,
+              }}>
+                Trusted by serious investors.
+              </h2>
+            </div>
+
+            {/* Testimonial cards */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
+              gap: 24,
+            }}>
+              {TESTIMONIALS.map((t, i) => (
+                <div key={i} style={{
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  borderRadius: 4,
+                  padding: '32px 32px 28px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}>
+                  <span style={{
+                    fontFamily: "'Syne', sans-serif",
+                    fontSize: 48,
+                    lineHeight: 1,
+                    color: 'rgba(59,130,246,0.25)',
+                    marginBottom: 8,
+                    display: 'block',
+                  }}>
+                    ❝
+                  </span>
+                  <p style={{
+                    fontFamily: "'IBM Plex Sans', sans-serif",
+                    fontSize: 14,
+                    fontWeight: 300,
+                    color: 'rgba(255,255,255,0.65)',
+                    lineHeight: 1.7,
+                    fontStyle: 'italic',
+                    marginBottom: 28,
+                    marginTop: 0,
+                    flex: 1,
+                  }}>
+                    {t.quote}
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: '50%',
+                      background: 'rgba(59,130,246,0.15)',
+                      border: '1px solid rgba(59,130,246,0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: '#3b82f6',
+                    }}>
+                      {t.name.charAt(0)}
+                    </div>
+                    <div>
+                      <div style={{
+                        fontFamily: "'IBM Plex Sans', sans-serif",
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: 'rgba(255,255,255,0.8)',
+                      }}>
+                        {t.name}
+                      </div>
+                      <div style={{
+                        fontFamily: "'IBM Plex Sans', sans-serif",
+                        fontSize: 12,
+                        fontWeight: 300,
+                        color: 'rgba(255,255,255,0.35)',
+                        marginTop: 3,
+                      }}>
+                        {t.role}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── FINAL CTA ───────────────────────────────────────────────── */}
+        <section className="gmt-section-reveal" style={{
+          background: 'linear-gradient(180deg, #080f1a 0%, #04080f 100%)',
+          padding: '160px 80px',
+          textAlign: 'center',
+          borderTop: '1px solid rgba(59,130,246,0.15)',
+        }}>
+          <div style={{ maxWidth: 700, margin: '0 auto' }}>
+            <div style={{
+              fontFamily: "'IBM Plex Sans', sans-serif",
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: '0.25em',
+              color: '#3b82f6',
+              textTransform: 'uppercase',
+              marginBottom: 24,
+            }}>
+              START NOW
+            </div>
+
+            <h2 style={{
+              fontFamily: "'Syne', sans-serif",
+              fontWeight: 800,
+              fontSize: 'clamp(36px, 5vw, 64px)',
+              color: 'rgba(255,255,255,0.95)',
+              lineHeight: 1.1,
+              whiteSpace: 'pre-line',
+              marginBottom: 20,
+              marginTop: 0,
+            }}>
+              {'Intelligence without\nthe Bloomberg price tag.'}
+            </h2>
+
+            <p style={{
+              fontFamily: "'IBM Plex Sans', sans-serif",
+              fontSize: 15,
+              fontWeight: 300,
+              color: 'rgba(255,255,255,0.4)',
+              marginBottom: 48,
+              marginTop: 0,
+            }}>
+              Free to start. No credit card. Full terminal access.
+            </p>
+
+            <button
+              onClick={goRegister}
+              onMouseEnter={() => setCtaHovered(true)}
+              onMouseLeave={() => setCtaHovered(false)}
+              style={{
+                background: ctaHovered ? '#2563eb' : '#3b82f6',
+                color: '#080f1a',
+                border: 'none',
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontSize: 14,
+                fontWeight: 600,
+                letterSpacing: '0.1em',
+                padding: '16px 48px',
+                borderRadius: 2,
+                cursor: 'pointer',
+                transition: 'background 0.15s',
+              }}
+            >
+              Create Free Account
+            </button>
+
+            <button
+              onClick={goLogin}
+              onMouseEnter={() => setSignInLinkHover(true)}
+              onMouseLeave={() => setSignInLinkHover(false)}
+              style={{
+                display: 'block',
+                marginTop: 20,
+                marginLeft: 'auto',
+                marginRight: 'auto',
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontSize: 12,
+                color: signInLinkHover ? '#3b82f6' : 'rgba(255,255,255,0.3)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'color 0.15s',
+              }}
+            >
+              Already have an account? Sign in →
+            </button>
+          </div>
+        </section>
+      </div>
     </>
   );
 }

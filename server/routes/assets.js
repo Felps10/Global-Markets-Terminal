@@ -5,7 +5,7 @@ import { authenticate, requireAdmin } from '../middleware/auth.js';
 const router = Router();
 
 // GET /api/v1/assets[?subgroupId=&groupId=&terminal_view=]
-router.get('/', async (req, res) => {
+router.get('/', authenticate, async (req, res) => {
   try {
     const { subgroupId, groupId, terminal_view } = req.query;
 

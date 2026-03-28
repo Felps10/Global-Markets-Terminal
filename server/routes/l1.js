@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { supabase } from '../db.js';
+import { authenticate } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -14,7 +15,7 @@ function validateL1(l1Id, res) {
 }
 
 // GET /api/v1/l1 — all L1 nodes
-router.get('/', async (_req, res) => {
+router.get('/', authenticate, async (_req, res) => {
   try {
     const { data, error } = await supabase
       .from('l1_nodes')
@@ -28,7 +29,7 @@ router.get('/', async (_req, res) => {
 });
 
 // GET /api/v1/l1/:l1Id/groups — all L2 groups belonging to a given L1
-router.get('/:l1Id/groups', async (req, res) => {
+router.get('/:l1Id/groups', authenticate, async (req, res) => {
   const { l1Id } = req.params;
   if (!validateL1(l1Id, res)) return;
 
@@ -46,7 +47,7 @@ router.get('/:l1Id/groups', async (req, res) => {
 });
 
 // GET /api/v1/l1/:l1Id/groups/:groupId/subgroups — L3 subgroups for a group, validated against L1
-router.get('/:l1Id/groups/:groupId/subgroups', async (req, res) => {
+router.get('/:l1Id/groups/:groupId/subgroups', authenticate, async (req, res) => {
   const { l1Id, groupId } = req.params;
   if (!validateL1(l1Id, res)) return;
 
@@ -76,7 +77,7 @@ router.get('/:l1Id/groups/:groupId/subgroups', async (req, res) => {
 
 // GET /api/v1/l1/:l1Id/assets — all assets belonging to a given L1
 // Optional query params: ?groupId=  ?subgroupId=
-router.get('/:l1Id/assets', async (req, res) => {
+router.get('/:l1Id/assets', authenticate, async (req, res) => {
   const { l1Id } = req.params;
   const { groupId, subgroupId } = req.query;
   if (!validateL1(l1Id, res)) return;

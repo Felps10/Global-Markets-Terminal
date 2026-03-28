@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import { supabase } from '../db.js';
-import { authenticate, requireAdmin, requireRole } from '../middleware/auth.js';
+import { authenticate, requireAdmin } from '../middleware/auth.js';
 import { ADMIN_ASSIGNABLE, MANAGER_ASSIGNABLE } from '../lib/roles.js';
 
 const router = Router();
 
 // GET /api/v1/users
-router.get('/', authenticate, requireRole('club_manager'), async (_req, res) => {
+router.get('/', authenticate, requireAdmin, async (_req, res) => {
   const { data: { users }, error } = await supabase.auth.admin.listUsers();
   if (error) return res.status(500).json({ error: 'DB_ERROR', message: error.message });
 
@@ -47,7 +47,7 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
 });
 
 // GET /api/v1/users/search?email=
-router.get('/search', authenticate, requireRole('club_manager'), async (req, res) => {
+router.get('/search', authenticate, requireAdmin, async (req, res) => {
   const { email } = req.query;
 
   if (!email || email.trim().length < 3) {
@@ -75,7 +75,7 @@ router.get('/search', authenticate, requireRole('club_manager'), async (req, res
 });
 
 // PATCH /api/v1/users/:id/role
-router.patch('/:id/role', authenticate, requireRole('club_manager'), async (req, res) => {
+router.patch('/:id/role', authenticate, requireAdmin, async (req, res) => {
   const targetId   = req.params.id;
   const { role }   = req.body;
   const callerRole = req.user.role;

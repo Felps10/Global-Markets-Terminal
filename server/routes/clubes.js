@@ -135,7 +135,7 @@ router.put('/:id', authenticate, requireRole('club_manager'), async (req, res) =
 // ── POSICOES ROUTES ───────────────────────────────────────────────────────────
 
 // GET /api/v1/clubes/:id/posicoes
-router.get('/:id/posicoes', authenticate, async (req, res) => {
+router.get('/:id/posicoes', authenticate, requireRole('club_member'), async (req, res) => {
   const { id } = req.params;
 
   const { data: posicoes, error: posError } = await supabase
@@ -234,7 +234,7 @@ router.put('/:id/posicoes', authenticate, requireRole('club_manager'), async (re
 // ── COTISTAS ROUTES ───────────────────────────────────────────────────────────
 
 // GET /api/v1/clubes/:id/cotistas
-router.get('/:id/cotistas', authenticate, async (req, res) => {
+router.get('/:id/cotistas', authenticate, requireRole('club_member'), async (req, res) => {
   const { id } = req.params;
 
   const [cotistasRes, navRes] = await Promise.all([
@@ -320,7 +320,7 @@ router.put('/:id/cotistas/:cid', authenticate, requireRole('club_manager'), asyn
 // Express matches the static segment before the dynamic parameter.
 
 // GET /api/v1/clubes/:id/nav
-router.get('/:id/nav', authenticate, async (req, res) => {
+router.get('/:id/nav', authenticate, requireRole('club_member'), async (req, res) => {
   const { id } = req.params;
   const { data, error } = await supabase
     .from('nav_historico')
@@ -332,7 +332,7 @@ router.get('/:id/nav', authenticate, async (req, res) => {
 });
 
 // GET /api/v1/clubes/:id/nav/latest  — must stay above any /:id/nav/:date route
-router.get('/:id/nav/latest', authenticate, async (req, res) => {
+router.get('/:id/nav/latest', authenticate, requireRole('club_member'), async (req, res) => {
   const { id } = req.params;
   const { data, error } = await supabase
     .from('nav_historico')
@@ -402,7 +402,7 @@ router.post('/:id/nav', authenticate, requireRole('club_manager'), async (req, r
 // ── COMPLIANCE ROUTE ──────────────────────────────────────────────────────────
 
 // GET /api/v1/clubes/:id/compliance
-router.get('/:id/compliance', authenticate, async (req, res) => {
+router.get('/:id/compliance', authenticate, requireRole('club_member'), async (req, res) => {
   const { id } = req.params;
 
   // Fetch posicoes
@@ -478,7 +478,7 @@ router.get('/:id/compliance', authenticate, async (req, res) => {
 // ── ROUTE GROUP 1 — ESTATUTO ────────────────────────────────────────────────
 
 // GET /api/v1/clubes/:id/estatuto/active
-router.get('/:id/estatuto/active', authenticate, async (req, res) => {
+router.get('/:id/estatuto/active', authenticate, requireRole('club_member'), async (req, res) => {
   const { id } = req.params;
   const onDate = req.query.on;
 
@@ -507,7 +507,7 @@ router.get('/:id/estatuto/active', authenticate, async (req, res) => {
 });
 
 // GET /api/v1/clubes/:id/estatuto/history
-router.get('/:id/estatuto/history', authenticate, async (req, res) => {
+router.get('/:id/estatuto/history', authenticate, requireRole('club_member'), async (req, res) => {
   const { id } = req.params;
   const { data, error } = await supabase
     .from('estatuto_versoes')
@@ -602,7 +602,7 @@ router.post('/:id/estatuto', authenticate, requireRole('club_manager'), async (r
 // ── ROUTE GROUP 2 — MOVIMENTAÇÕES ───────────────────────────────────────────
 
 // GET /api/v1/clubes/:id/movimentacoes
-router.get('/:id/movimentacoes', authenticate, async (req, res) => {
+router.get('/:id/movimentacoes', authenticate, requireRole('club_member'), async (req, res) => {
   const { id } = req.params;
   const { status, tipo, cotista_id, periodo } = req.query;
 
@@ -947,7 +947,7 @@ router.patch('/:id/movimentacoes/:mid/status', authenticate, requireRole('club_m
 // ── ROUTE GROUP 3 — LEDGER ──────────────────────────────────────────────────
 
 // GET /api/v1/clubes/:id/ledger
-router.get('/:id/ledger', authenticate, async (req, res) => {
+router.get('/:id/ledger', authenticate, requireRole('club_member'), async (req, res) => {
   const { id } = req.params;
 
   const [entriesRes, clubeRes] = await Promise.all([
@@ -967,7 +967,7 @@ router.get('/:id/ledger', authenticate, async (req, res) => {
 // ── ROUTE GROUP 4 — OPERACIONAL ─────────────────────────────────────────────
 
 // GET /api/v1/clubes/:id/operacional
-router.get('/:id/operacional', authenticate, async (req, res) => {
+router.get('/:id/operacional', authenticate, requireRole('club_member'), async (req, res) => {
   const { id } = req.params;
 
   const results = await Promise.allSettled([
@@ -1160,7 +1160,7 @@ router.get('/:id/operacional', authenticate, async (req, res) => {
 // ── ROUTE GROUP 5 — SETUP CHECKLIST ─────────────────────────────────────────
 
 // GET /api/v1/clubes/:id/setup-checklist
-router.get('/:id/setup-checklist', authenticate, async (req, res) => {
+router.get('/:id/setup-checklist', authenticate, requireRole('club_member'), async (req, res) => {
   const { id } = req.params;
 
   const [estatutoRes, cotistasRes, posicoesRes, navRes] = await Promise.all([
@@ -1187,7 +1187,7 @@ router.get('/:id/setup-checklist', authenticate, async (req, res) => {
 // ── ROUTE GROUP 6 — DOCUMENTOS ──────────────────────────────────────────────
 
 // GET /api/v1/clubes/:id/documentos
-router.get('/:id/documentos', authenticate, async (req, res) => {
+router.get('/:id/documentos', authenticate, requireRole('club_member'), async (req, res) => {
   const { id } = req.params;
   const { cotista_id } = req.query;
 
@@ -1313,7 +1313,7 @@ router.get('/:id/meu-role', authenticate, async (req, res) => {
 // ── ROUTE GROUP 8 — ASSEMBLEIAS ──��──────────────────────────────────────────
 
 // GET /api/v1/clubes/:id/assembleias
-router.get('/:id/assembleias', authenticate, async (req, res) => {
+router.get('/:id/assembleias', authenticate, requireRole('club_member'), async (req, res) => {
   const { id } = req.params;
   const { data, error } = await supabase
     .from('assembleias')
@@ -1384,7 +1384,7 @@ router.post('/:id/assembleias', authenticate, requireRole('club_manager'), async
 });
 
 // GET /api/v1/clubes/:id/assembleias/:aid
-router.get('/:id/assembleias/:aid', authenticate, async (req, res) => {
+router.get('/:id/assembleias/:aid', authenticate, requireRole('club_member'), async (req, res) => {
   const { id, aid } = req.params;
 
   const { data: assembleia, error: aErr } = await supabase
@@ -1522,7 +1522,7 @@ router.post('/:id/assembleias/:aid/votos', authenticate, async (req, res) => {
 // ── ROUTE GROUP 9 — REENQUADRAMENTO ─────────────────────────────────────────
 
 // GET /api/v1/clubes/:id/reenquadramento
-router.get('/:id/reenquadramento', authenticate, async (req, res) => {
+router.get('/:id/reenquadramento', authenticate, requireRole('club_member'), async (req, res) => {
   const { id } = req.params;
   const { data, error } = await supabase
     .from('reenquadramento_events')
@@ -1569,7 +1569,7 @@ router.post('/:id/reenquadramento', authenticate, requireRole('club_manager'), a
 });
 
 // GET /api/v1/clubes/:id/reenquadramento/:rid
-router.get('/:id/reenquadramento/:rid', authenticate, async (req, res) => {
+router.get('/:id/reenquadramento/:rid', authenticate, requireRole('club_member'), async (req, res) => {
   const { id, rid } = req.params;
   const { data, error } = await supabase
     .from('reenquadramento_events')
@@ -1793,7 +1793,7 @@ router.post('/:id/tributacao/executar', authenticate, requireRole('club_manager'
 });
 
 // GET /api/v1/clubes/:id/tributacao/historico
-router.get('/:id/tributacao/historico', authenticate, async (req, res) => {
+router.get('/:id/tributacao/historico', authenticate, requireRole('club_member'), async (req, res) => {
   const { id } = req.params;
   // Fetch from audit_log for tributacao events
   const { data, error } = await supabase
@@ -1809,7 +1809,7 @@ router.get('/:id/tributacao/historico', authenticate, async (req, res) => {
 // ── ROUTE GROUP 11 — DOCUMENT ARCHIVE + IR ──────────────────────────────────
 
 // GET /api/v1/clubes/:id/documentos/archive
-router.get('/:id/documentos/archive', authenticate, async (req, res) => {
+router.get('/:id/documentos/archive', authenticate, requireRole('club_member'), async (req, res) => {
   const { id } = req.params;
   const { tipo, periodo, cotista_id, limit: lim } = req.query;
   const maxRows = Math.min(Number(lim) || 50, 200);
@@ -1918,7 +1918,7 @@ router.post('/:id/documentos/ir/:year', authenticate, requireRole('club_manager'
 // ── ROUTE GROUP 12 — ANNUAL CLOSE ───────────────────────────────────────────
 
 // GET /api/v1/clubes/:id/annual-close/:year
-router.get('/:id/annual-close/:year', authenticate, async (req, res) => {
+router.get('/:id/annual-close/:year', authenticate, requireRole('club_member'), async (req, res) => {
   const { id, year } = req.params;
   const yearNum = Number(year);
 

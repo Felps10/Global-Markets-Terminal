@@ -127,6 +127,35 @@ function injectStyles() {
     .gmt-homepage-dropdown-item:hover {
       background: rgba(255,255,255,0.04);
     }
+    .gmt-pub-nav-item {
+      position: relative;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0 16px;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      transition: color 150ms;
+    }
+    .gmt-pub-nav-item:hover { color: rgba(255,255,255,0.9); }
+    .gmt-pub-mobile-menu { animation: menuFadeIn 250ms ease both; }
+    @keyframes menuFadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @media (max-width: 768px) {
+      .gmt-pub-nav-item { display: none !important; }
+      .gmt-pub-hamburger { display: flex !important; }
+    }
+    @media (min-width: 769px) {
+      .gmt-pub-hamburger { display: none !important; }
+    }
   `;
   document.head.appendChild(el);
 }
@@ -552,107 +581,111 @@ export default function GMTHeader({
 }
 
 // ─── GMTPublicHeader (landing page, unauthenticated) ──────────────────────────
-export function GMTPublicHeader({ onSignIn, onSignUp, navLinks, langToggle }) {
+const PUBLIC_NAV = [
+  { label: 'Features', path: '/features' },
+  { label: 'Coverage', path: '/coverage' },
+  { label: 'Pricing',  path: '/pricing'  },
+];
+
+export function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) {
+  const [scrolled, setScrolled] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
   const navigate = useNavigate();
-  const [selectedMarketId, setSelectedMarketId] = useState('nyse');
-  const [lang, setLang] = useState('PT');
 
   useEffect(() => { injectStyles(); }, []);
 
-  const selectedMarket = MARKETS.find(m => m.id === selectedMarketId) || MARKETS[0];
+  useEffect(() => {
+    if (!isHome) { setScrolled(true); return; }
+    const handler = () => setScrolled(window.scrollY > 80);
+    window.addEventListener('scroll', handler, { passive: true });
+    handler();
+    return () => window.removeEventListener('scroll', handler);
+  }, [isHome]);
+
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') setMobileOpen(false); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  // Close mobile menu on route change
+  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
+
+  const isActive = (path) => location.pathname === path;
+  const handleSignIn = onSignIn || (() => navigate('/login'));
+  const handleSignUp = onSignUp || (() => navigate('/register'));
 
   return (
-    <header style={{
-      position: 'sticky', top: 0, zIndex: 50,
-      background: '#080f1a',
-      borderBottom: '0.5px solid rgba(255,255,255,0.08)',
-    }}>
-      <div style={{
-        height: 52,
-        display: 'grid',
-        gridTemplateColumns: '1fr auto 1fr',
-        alignItems: 'center',
-        padding: '0 20px',
-        maxWidth: 1200,
-        margin: '0 auto',
+    <>
+      <header style={{
+        position: 'fixed',
+        top: 0, left: 0, right: 0,
+        zIndex: 100,
+        transition: 'background 300ms ease, border-color 300ms ease, backdrop-filter 300ms ease',
+        background: scrolled ? '#080f1a' : 'transparent',
+        borderBottom: scrolled
+          ? '1px solid rgba(59,130,246,0.15)'
+          : '1px solid transparent',
+        backdropFilter: scrolled ? 'blur(12px)' : 'none',
       }}>
-        {/* LEFT */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+        <div style={{
+          height: 52,
+          display: 'flex',
+          alignItems: 'center',
+          padding: '0 20px',
+          maxWidth: 1200,
+          margin: '0 auto',
+        }}>
+          {/* LEFT — Logo */}
           <div
             onClick={() => navigate('/')}
-            style={{ display: 'flex', alignItems: 'center', gap: 0, cursor: 'pointer' }}
+            style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', flexShrink: 0 }}
           >
             <GmtLogo />
             <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 16, fontWeight: 800, letterSpacing: '0.18em', color: '#e2e8f0', marginLeft: 8 }}>
               GMT
             </span>
           </div>
-        </div>
 
-        {/* CENTER — nav links */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-          {navLinks && navLinks.map((link) => (
-            <a
-              key={link.label}
-              href={link.href}
-              style={{
-                fontFamily: "'IBM Plex Sans', sans-serif",
-                fontSize: 12, fontWeight: 500,
-                color: 'rgba(255,255,255,0.45)',
-                textDecoration: 'none',
-                letterSpacing: '0.03em',
-                transition: 'color 0.15s',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.8)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.45)'; }}
-            >
-              {link.label}
-            </a>
-          ))}
-          {!navLinks && (
-            <>
-              <VDiv mx={0} />
-              <MarketStatusPill selected={selectedMarketId} setSelected={setSelectedMarketId} />
-            </>
-          )}
-        </div>
+          {/* CENTER — Desktop nav links */}
+          <nav style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0,
+            marginLeft: 40,
+            height: 52,
+          }}>
+            {PUBLIC_NAV.map(item => (
+              <button
+                key={item.path}
+                className="gmt-pub-nav-item"
+                onClick={() => navigate(item.path)}
+                style={{
+                  color: isActive(item.path) ? '#3b82f6' : 'rgba(255,255,255,0.5)',
+                }}
+              >
+                {item.label}
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 16,
+                  right: 16,
+                  height: 2,
+                  background: '#3b82f6',
+                  opacity: isActive(item.path) ? 1 : 0,
+                  transition: 'opacity 200ms ease',
+                }} />
+              </button>
+            ))}
+          </nav>
 
-        {/* RIGHT */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
-          {!navLinks && (
-            <>
-              <div style={{ minWidth: 110 }}>
-                <LiveClock tz={selectedMarket.tz} tzLabel={selectedMarket.tzLabel} />
-              </div>
-              <VDiv mx={8} />
-            </>
-          )}
-          {langToggle && (
-            <div style={{
-              display: 'flex', border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: 20, overflow: 'hidden', marginRight: 8,
-            }}>
-              {['PT', 'EN'].map(l => (
-                <button
-                  key={l}
-                  onClick={() => setLang(l)}
-                  style={{
-                    background: lang === l ? 'rgba(255,255,255,0.1)' : 'transparent',
-                    border: 'none', cursor: 'pointer',
-                    fontFamily: "'JetBrains Mono', monospace",
-                    fontSize: 9, fontWeight: 500, letterSpacing: '0.06em',
-                    color: lang === l ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)',
-                    padding: '4px 10px',
-                  }}
-                >
-                  {l}
-                </button>
-              ))}
-            </div>
-          )}
-          {onSignIn && (
+          <div style={{ flex: 1 }} />
+
+          {/* RIGHT — Desktop auth buttons */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             <button
-              onClick={onSignIn}
+              onClick={handleSignIn}
               style={{
                 background: 'transparent',
                 border: '1px solid rgba(255,255,255,0.15)',
@@ -667,32 +700,137 @@ export function GMTPublicHeader({ onSignIn, onSignUp, navLinks, langToggle }) {
               onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.8)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.5)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'; }}
             >
-              Entrar
+              Sign In
             </button>
-          )}
-          {onSignUp && (
             <button
-              onClick={onSignUp}
+              onClick={handleSignUp}
               style={{
-                background: '#fff',
-                border: '1px solid #fff',
+                background: '#3b82f6',
+                border: '1px solid #3b82f6',
                 borderRadius: 6,
                 color: '#080f1a',
                 cursor: 'pointer',
                 fontFamily: "'IBM Plex Sans', sans-serif",
                 fontSize: 12, fontWeight: 600,
                 padding: '6px 16px',
-                transition: 'opacity 0.15s',
+                transition: 'background 0.15s',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#2563eb'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = '#3b82f6'; }}
             >
-              Criar conta
+              Create Account
             </button>
-          )}
+          </div>
+
+          {/* Hamburger — mobile only */}
+          <button
+            onClick={() => setMobileOpen(o => !o)}
+            style={{
+              display: 'none',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 8,
+              marginLeft: 'auto',
+              flexDirection: 'column',
+              gap: 5,
+            }}
+            className="gmt-pub-hamburger"
+          >
+            <div style={{
+              width: 18, height: 1.5, background: 'rgba(255,255,255,0.6)', borderRadius: 1,
+              transition: 'transform 200ms ease, opacity 200ms ease',
+              transform: mobileOpen ? 'rotate(45deg) translate(4.5px, 4.5px)' : 'none',
+            }} />
+            <div style={{
+              width: 18, height: 1.5, background: 'rgba(255,255,255,0.6)', borderRadius: 1,
+              transition: 'opacity 200ms ease',
+              opacity: mobileOpen ? 0 : 1,
+            }} />
+            <div style={{
+              width: 18, height: 1.5, background: 'rgba(255,255,255,0.6)', borderRadius: 1,
+              transition: 'transform 200ms ease, opacity 200ms ease',
+              transform: mobileOpen ? 'rotate(-45deg) translate(4.5px, -4.5px)' : 'none',
+            }} />
+          </button>
         </div>
-      </div>
-    </header>
+      </header>
+
+      {/* Mobile menu overlay */}
+      {mobileOpen && (
+        <div
+          className="gmt-pub-mobile-menu"
+          style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            zIndex: 99,
+            background: 'rgba(8,15,26,0.98)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 32,
+          }}
+        >
+          {PUBLIC_NAV.map(item => (
+            <button
+              key={item.path}
+              onClick={() => { setMobileOpen(false); navigate(item.path); }}
+              style={{
+                background: 'none',
+                border: 'none',
+                borderBottom: '1px solid rgba(255,255,255,0.06)',
+                cursor: 'pointer',
+                fontFamily: "'Syne', sans-serif",
+                fontSize: 28,
+                fontWeight: 700,
+                color: isActive(item.path) ? '#3b82f6' : 'rgba(255,255,255,0.85)',
+                padding: '12px 0',
+                width: 240,
+                textAlign: 'center',
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+          <div style={{ height: 24 }} />
+          <button
+            onClick={() => { setMobileOpen(false); handleSignIn(); }}
+            style={{
+              background: 'transparent',
+              border: '1px solid rgba(59,130,246,0.4)',
+              borderRadius: 4,
+              color: 'rgba(255,255,255,0.8)',
+              cursor: 'pointer',
+              fontFamily: "'IBM Plex Sans', sans-serif",
+              fontSize: 14,
+              fontWeight: 500,
+              padding: '14px 0',
+              width: 240,
+            }}
+          >
+            Sign In
+          </button>
+          <button
+            onClick={() => { setMobileOpen(false); handleSignUp(); }}
+            style={{
+              background: '#3b82f6',
+              border: 'none',
+              borderRadius: 4,
+              color: '#080f1a',
+              cursor: 'pointer',
+              fontFamily: "'IBM Plex Sans', sans-serif",
+              fontSize: 14,
+              fontWeight: 600,
+              padding: '14px 0',
+              width: 240,
+            }}
+          >
+            Create Account
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 

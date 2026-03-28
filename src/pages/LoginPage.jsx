@@ -1,46 +1,42 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
-import { GMTPublicHeader } from '../components/GMTHeader.jsx';
 
-const C = {
-  bg:        '#080C18',
-  surface:   '#0D1220',
-  border:    '#1E2740',
-  accent:    '#00BCD4',
-  text:      '#E8EAF0',
-  muted:     '#4A5568',
-  hint:      '#2D3748',
-  error:     '#FF5252',
-  errorBg:   'rgba(255,82,82,0.08)',
-  errorBorder:'rgba(255,82,82,0.3)',
-};
+// ── Small decorative globe (same as landing hero, scaled to 200×200) ────────
+function MiniGlobe() {
+  return (
+    <svg viewBox="0 0 200 200" width={160} height={160} style={{ opacity: 0.35 }}>
+      <circle cx={100} cy={100} r={80} stroke="#3b82f6" strokeWidth={1} fill="none" opacity={0.6} />
+      <ellipse cx={100} cy={55}  rx={80} ry={20} fill="none" stroke="#3b82f6" strokeWidth={0.6} opacity={0.3} />
+      <ellipse cx={100} cy={72}  rx={80} ry={45} fill="none" stroke="#3b82f6" strokeWidth={0.6} opacity={0.3} />
+      <ellipse cx={100} cy={100} rx={80} ry={80} fill="none" stroke="#3b82f6" strokeWidth={0.6} opacity={0.3} />
+      <ellipse cx={100} cy={128} rx={80} ry={45} fill="none" stroke="#3b82f6" strokeWidth={0.6} opacity={0.3} />
+      <ellipse cx={100} cy={145} rx={80} ry={20} fill="none" stroke="#3b82f6" strokeWidth={0.6} opacity={0.3} />
+      {[0, 30, 60, 90, 120, 150].map(deg => (
+        <ellipse key={deg} cx={100} cy={100} rx={80} ry={80}
+          fill="none" stroke="#3b82f6" strokeWidth={0.5} opacity={0.2}
+          transform={`rotate(${deg}, 100, 100)`} />
+      ))}
+      {[
+        [100, 20], [100, 180], [20, 100], [180, 100], [65, 57], [135, 57],
+      ].map(([cx, cy], i) => (
+        <circle key={i} cx={cx} cy={cy} r={2} fill="#3b82f6" opacity={0.5} />
+      ))}
+    </svg>
+  );
+}
 
-const MONO  = "'Space Mono', 'Courier New', monospace";
-const SANS  = "'DM Sans', sans-serif";
-
-// ── Component ─────────────────────────────────────────────────────────────────
 export default function LoginPage() {
-  const { login }   = useAuth();
-  const navigate    = useNavigate();
-  const [email,    setEmail]    = useState('');
+  const { login } = useAuth();
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error,    setError]    = useState('');
-  const [loading,  setLoading]  = useState(false);
-
-  useEffect(() => {
-    const id = 'gmt-cursor-style';
-    if (document.getElementById(id)) return;
-    const el = document.createElement('style');
-    el.id = id;
-    el.textContent = `
-      @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-      .gmt-cursor { display:inline-block; width:8px; height:14px;
-        background:#00BCD4; vertical-align:middle; margin-left:2px;
-        animation:blink 1.2s step-end infinite; }
-    `;
-    document.head.appendChild(el);
-  }, []);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
+  const [submitHover, setSubmitHover] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -57,143 +53,281 @@ export default function LoginPage() {
     }
   }
 
-  const hasError = !!error;
-  const disabled = loading || !email || !password;
+  const inputBase = {
+    width: '100%',
+    boxSizing: 'border-box',
+    background: 'rgba(255,255,255,0.03)',
+    borderRadius: 4,
+    color: 'rgba(255,255,255,0.85)',
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: 13,
+    padding: '11px 14px',
+    outline: 'none',
+    transition: 'border-color 150ms',
+  };
+
+  const labelBase = {
+    display: 'block',
+    fontFamily: "'IBM Plex Sans', sans-serif",
+    fontSize: 10,
+    fontWeight: 600,
+    letterSpacing: '0.12em',
+    color: 'rgba(255,255,255,0.35)',
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  };
 
   return (
     <>
-    <GMTPublicHeader onSignIn={() => {}} onSignUp={() => navigate('/register')} />
-    <div style={{
-      minHeight: '100vh', background: C.bg, display: 'flex',
-      alignItems: 'flex-start', justifyContent: 'center',
-      fontFamily: MONO, padding: '40px 20px', paddingTop: 60,
-    }}>
-      <div style={{ width: '420px', maxWidth: '100%' }}>
-        {/* Back link */}
-        <div style={{ textAlign: 'center', marginBottom: 8 }}>
-          <Link to="/" style={{
-            display: 'inline-block', fontSize: 10,
-            letterSpacing: '0.12em', color: C.muted,
-            textDecoration: 'none', textTransform: 'uppercase',
-            marginBottom: 20, transition: 'color 0.15s',
-          }}>
-            ← Back to Terminal
-          </Link>
-        </div>
-        {/* Header */}
-        <div style={{ marginBottom: 40, textAlign: 'center' }}>
+      <style>{`
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(12px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .gmt-form-panel { animation: fadeInUp 280ms ease both; }
+      `}</style>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        minHeight: 'calc(100vh - 86px - 80px)',
+      }}>
+        {/* LEFT PANEL */}
+        <div style={{
+          background: '#040810',
+          borderRight: '1px solid rgba(255,255,255,0.04)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '60px 48px',
+          position: 'relative',
+          overflow: 'hidden',
+        }}>
+          <MiniGlobe />
           <div style={{
-            fontFamily: SANS, fontSize: 11, fontWeight: 700,
-            letterSpacing: '0.25em', color: C.accent,
-            textTransform: 'uppercase', marginBottom: 6,
+            fontFamily: "'Syne', sans-serif",
+            fontWeight: 800,
+            fontSize: 18,
+            letterSpacing: '0.2em',
+            color: 'rgba(255,255,255,0.25)',
+            marginTop: 24,
+            textAlign: 'center',
           }}>
-            Markets Terminal
+            GMT
           </div>
-          <h1 style={{
-            fontFamily: SANS, fontSize: 22, fontWeight: 700,
-            color: C.text, margin: '0 0 4px',
+          <div style={{
+            fontFamily: "'IBM Plex Sans', sans-serif",
+            fontSize: 13,
+            fontWeight: 300,
+            color: 'rgba(255,255,255,0.2)',
+            textAlign: 'center',
+            lineHeight: 1.6,
+            whiteSpace: 'pre-line',
+            marginTop: 8,
           }}>
-            Welcome Back<span className="gmt-cursor" />
-          </h1>
-          <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>
-            Sign in to your GMT account
-          </p>
+            {'Institutional market intelligence\nfor serious investors.'}
+          </div>
+          <div style={{
+            position: 'absolute',
+            bottom: 40,
+            display: 'flex',
+            gap: 24,
+          }}>
+            {[
+              { num: '269', label: 'ASSETS' },
+              { num: '8', label: 'SOURCES' },
+              { num: '30s', label: 'REFRESH' },
+            ].map((s, i) => (
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <span style={{
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: 'rgba(59,130,246,0.5)',
+                }}>{s.num}</span>
+                <span style={{
+                  fontFamily: "'IBM Plex Sans', sans-serif",
+                  fontSize: 9,
+                  color: 'rgba(255,255,255,0.2)',
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase',
+                  marginTop: 4,
+                }}>{s.label}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} style={{
-          background: C.surface, border: `1px solid ${C.border}`,
-          borderRadius: 6, padding: 32,
+        {/* RIGHT PANEL */}
+        <div style={{
+          background: '#080f1a',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '60px 48px',
         }}>
-          {error && (
+          <div className="gmt-form-panel" style={{ width: '100%', maxWidth: 400 }}>
+            <h1 style={{
+              fontFamily: "'Syne', sans-serif",
+              fontWeight: 800,
+              fontSize: 28,
+              color: 'rgba(255,255,255,0.92)',
+              marginBottom: 8,
+              marginTop: 0,
+            }}>
+              Welcome back.
+            </h1>
+            <p style={{
+              fontFamily: "'IBM Plex Sans', sans-serif",
+              fontSize: 14,
+              fontWeight: 300,
+              color: 'rgba(255,255,255,0.4)',
+              marginBottom: 40,
+              marginTop: 0,
+            }}>
+              Sign in to your GMT account.
+            </p>
+
+            {error && (
+              <div style={{
+                background: 'rgba(248,113,113,0.08)',
+                border: '1px solid rgba(248,113,113,0.25)',
+                borderRadius: 4,
+                padding: '10px 14px',
+                marginBottom: 20,
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontSize: 13,
+                color: '#f87171',
+              }}>
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit}>
+              {/* Email */}
+              <div style={{ marginBottom: 20 }}>
+                <label style={labelBase}>EMAIL ADDRESS</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  onFocus={() => setEmailFocused(true)}
+                  onBlur={() => setEmailFocused(false)}
+                  autoFocus
+                  required
+                  style={{
+                    ...inputBase,
+                    border: error
+                      ? '1px solid rgba(248,113,113,0.5)'
+                      : emailFocused
+                        ? '1px solid rgba(59,130,246,0.5)'
+                        : '1px solid rgba(255,255,255,0.08)',
+                  }}
+                />
+              </div>
+
+              {/* Password */}
+              <div style={{ marginBottom: 20 }}>
+                <label style={labelBase}>PASSWORD</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    onFocus={() => setPasswordFocused(true)}
+                    onBlur={() => setPasswordFocused(false)}
+                    required
+                    style={{
+                      ...inputBase,
+                      paddingRight: 44,
+                      border: error
+                        ? '1px solid rgba(248,113,113,0.5)'
+                        : passwordFocused
+                          ? '1px solid rgba(59,130,246,0.5)'
+                          : '1px solid rgba(255,255,255,0.08)',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(v => !v)}
+                    style={{
+                      position: 'absolute',
+                      right: 12,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: 4,
+                      color: 'rgba(255,255,255,0.25)',
+                      fontSize: 14,
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.6)'}
+                    onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.25)'}
+                  >
+                    {showPassword ? '●' : '○'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={loading}
+                onMouseEnter={() => setSubmitHover(true)}
+                onMouseLeave={() => setSubmitHover(false)}
+                style={{
+                  width: '100%',
+                  padding: 13,
+                  marginTop: 24,
+                  background: loading
+                    ? 'rgba(59,130,246,0.4)'
+                    : submitHover ? '#2563eb' : '#3b82f6',
+                  color: '#080f1a',
+                  border: 'none',
+                  borderRadius: 4,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  fontFamily: "'IBM Plex Sans', sans-serif",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  letterSpacing: '0.08em',
+                  transition: 'background 150ms',
+                }}
+              >
+                {loading ? 'Signing in…' : 'Sign In'}
+              </button>
+            </form>
+
             <div style={{
-              background: C.errorBg, border: `1px solid ${C.errorBorder}`,
-              borderRadius: 4, color: C.error, fontSize: 12,
-              padding: '10px 14px', marginBottom: 20,
+              marginTop: 24,
+              textAlign: 'center',
+              fontFamily: "'IBM Plex Sans', sans-serif",
+              fontSize: 12,
+              color: 'rgba(255,255,255,0.2)',
             }}>
-              ⚠ {error}
+              Don't have an account?{' '}
+              <button
+                onClick={() => navigate('/register')}
+                style={{
+                  fontFamily: "'IBM Plex Sans', sans-serif",
+                  fontSize: 12,
+                  color: '#3b82f6',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                  transition: 'color 150ms',
+                }}
+                onMouseEnter={e => e.currentTarget.style.color = '#2563eb'}
+                onMouseLeave={e => e.currentTarget.style.color = '#3b82f6'}
+              >
+                Create one →
+              </button>
             </div>
-          )}
-
-          <div style={{ marginBottom: 20 }}>
-            <label style={{
-              display: 'block', fontSize: 10, fontWeight: 600,
-              letterSpacing: '0.15em', color: C.muted,
-              textTransform: 'uppercase', marginBottom: 8,
-            }}>
-              Email Address
-            </label>
-            <input
-              type="email"
-              placeholder="your@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoFocus
-              required
-              style={{
-                width: '100%', background: C.bg,
-                border: `1px solid ${hasError ? C.error : C.border}`,
-                borderRadius: 4, color: C.text, fontFamily: MONO,
-                fontSize: 13, padding: '10px 14px',
-                outline: 'none', boxSizing: 'border-box',
-              }}
-            />
           </div>
-
-          <div style={{ marginBottom: 20 }}>
-            <label style={{
-              display: 'block', fontSize: 10, fontWeight: 600,
-              letterSpacing: '0.15em', color: C.muted,
-              textTransform: 'uppercase', marginBottom: 8,
-            }}>
-              Password
-            </label>
-            <input
-              type="password"
-              placeholder="••••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              style={{
-                width: '100%', background: C.bg,
-                border: `1px solid ${hasError ? C.error : C.border}`,
-                borderRadius: 4, color: C.text, fontFamily: MONO,
-                fontSize: 13, padding: '10px 14px',
-                outline: 'none', boxSizing: 'border-box',
-              }}
-            />
-          </div>
-
-          <button type="submit" disabled={disabled} style={{
-            width: '100%', background: disabled ? C.border : C.accent,
-            border: 'none', borderRadius: 4,
-            color: disabled ? C.muted : C.bg,
-            cursor: disabled ? 'not-allowed' : 'pointer',
-            fontFamily: MONO, fontSize: 12, fontWeight: 700,
-            letterSpacing: '0.1em', padding: 12,
-            textTransform: 'uppercase',
-          }}>
-            {loading ? 'Authenticating...' : 'Sign In →'}
-          </button>
-        </form>
-
-        <p style={{
-          textAlign: 'center', fontSize: 10, color: C.hint,
-          marginTop: 24, letterSpacing: '0.05em',
-        }}>
-          Global Markets Terminal · Real-time market intelligence
-        </p>
-        <p style={{
-          textAlign: 'center', fontSize: 11, color: C.muted,
-          marginTop: 16, letterSpacing: '0.04em',
-        }}>
-          Don&apos;t have an account?{' '}
-          <Link to="/register" style={{ color: C.accent, textDecoration: 'none' }}>
-            Sign up →
-          </Link>
-        </p>
+        </div>
       </div>
-    </div>
     </>
   );
 }

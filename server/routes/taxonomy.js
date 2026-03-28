@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { supabase } from '../db.js';
+import { authenticate } from '../middleware/auth.js';
 
 const router = Router();
 
 // GET /api/v1/taxonomy[?view=global|brazil|all]  — full nested tree: Groups → Subgroups → Assets
-router.get('/', async (req, res) => {
+router.get('/', authenticate, async (req, res) => {
   const { view } = req.query; // 'global', 'brazil', or omitted/'all'
 
   let groupsQuery   = supabase.from('groups').select('*').order('sort_order');
@@ -65,7 +66,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/v1/taxonomy/tree — full 3-level nested tree: L1 → Groups → Subgroups (with asset_count)
-router.get('/tree', async (req, res) => {
+router.get('/tree', authenticate, async (req, res) => {
   try {
     const [l1Res, groupsRes, subgroupsRes, countsRes] = await Promise.all([
       supabase.from('l1_nodes').select('*').order('sort_order'),

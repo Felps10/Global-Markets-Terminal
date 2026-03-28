@@ -1,0 +1,115 @@
+{
+  "snapshot_date": "2026-03-28",
+  "snapshot_time": "08:51 AM",
+  "snapshot_label": "as of Mar 28 close",
+  "assets": {
+    "^GSPC": {
+      "price": 6368.85,
+      "changePct": -1.67
+    },
+    "^DJI": {
+      "price": 45166.64,
+      "changePct": -1.73
+    },
+    "^IXIC": {
+      "price": 20948.357,
+      "changePct": -2.15
+    },
+    "AAPL": {
+      "price": 248.8,
+      "changePct": -1.62
+    },
+    "MSFT": {
+      "price": 356.77,
+      "changePct": -2.51
+    },
+    "NVDA": {
+      "price": 167.52,
+      "changePct": -2.17
+    },
+    "GOOGL": {
+      "price": 274.34,
+      "changePct": -2.36
+    },
+    "AMZN": {
+      "price": 199.34,
+      "changePct": -4.02
+    },
+    "META": {
+      "price": 525.72,
+      "changePct": -4.02
+    },
+    "EURUSD=X": {
+      "price": 1.151,
+      "changePct": -0.25
+    },
+    "GBPUSD=X": {
+      "price": 1.3261,
+      "changePct": -0.55
+    },
+    "USDJPY=X": {
+      "price": 160.286,
+      "changePct": 0.41
+    },
+    "JPM": {
+      "price": 282.84,
+      "changePct": -3.02
+    },
+    "GS": {
+      "price": 802.89,
+      "changePct": -2.4
+    },
+    "XOM": {
+      "price": 170.99,
+      "changePct": 3.36
+    },
+    "CVX": {
+      "price": 211.15,
+      "changePct": 1.62
+    },
+    "LLY": {
+      "price": 878.24,
+      "changePct": -2.09
+    },
+    "UNH": {
+      "price": 259.02,
+      "changePct": -3.37
+    },
+    "TSM": {
+      "price": 326.74,
+      "changePct": 0.19
+    },
+    "AVGO": {
+      "price": 300.68,
+      "changePct": -2.82
+    },
+    "^FTSE": {
+      "price": 9967.35,
+      "changePct": -0.05
+    },
+    "^N225": {
+      "price": 53373.07,
+      "changePct": -0.43
+    },
+    "USDCAD=X": {
+      "price": 1.3892,
+      "changePct": 0.25
+    },
+    "AUDUSD=X": {
+      "price": 0.6873,
+      "changePct": -0.24
+    },
+    "BTC": {
+      "price": 66358,
+      "changePct": -0.28
+    },
+    "ETH": {
+      "price": 1997.66,
+      "changePct": 0.56
+    },
+    "SOL": {
+      "price": 82.71,
+      "changePct": -0.55
+    }
+  }
+}

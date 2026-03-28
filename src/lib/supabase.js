@@ -9,4 +9,9 @@ if (!supabaseUrl || !supabaseAnon) {
   );
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnon);
+export const supabase = createClient(supabaseUrl, supabaseAnon, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+  },
+});

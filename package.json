@@ -15,7 +15,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "seed": "node --input-type=module --eval \"import('./server/seed.js').then(async m => { await m.seedIfEmpty(); await m.logTaxonomyCounts(); })\"",
-    "test": "vitest"
+    "test": "vitest",
+    "snapshot": "node scripts/captureSnapshot.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.2",
@@ -35,6 +36,9 @@
     "styled-components": "^6.3.11"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@vitejs/plugin-react": "^4.3.4",
     "babel-plugin-styled-components": "^2.1.4",
     "concurrently": "^9.0.0",
