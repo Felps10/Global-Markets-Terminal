@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
+import { GMTPublicHeader } from '../components/GMTHeader.jsx';
 
 const C = {
   bg:        '#080C18',
@@ -145,10 +146,12 @@ export default function RegisterPage() {
   const disabled = !canSubmit;
 
   return (
+    <>
+    <GMTPublicHeader onSignIn={() => navigate('/login')} onSignUp={() => {}} />
     <div style={{
       minHeight: '100vh', background: C.bg, display: 'flex',
-      alignItems: 'center', justifyContent: 'center',
-      fontFamily: MONO, padding: '40px 20px',
+      alignItems: 'flex-start', justifyContent: 'center',
+      fontFamily: MONO, padding: '40px 20px', paddingTop: 60,
     }}>
       <div style={{ width: '440px', maxWidth: '100%' }}>
         {/* Header */}
@@ -157,9 +160,9 @@ export default function RegisterPage() {
             display: 'inline-block', fontSize: 10,
             letterSpacing: '0.12em', color: C.muted,
             textDecoration: 'none', textTransform: 'uppercase',
-            marginBottom: 20,
+            marginBottom: 20, transition: 'color 0.15s',
           }}>
-            ← Back to home
+            ← Back to Terminal
           </Link>
           <div style={{
             fontFamily: SANS, fontSize: 11, fontWeight: 700,
@@ -300,5 +303,6 @@ export default function RegisterPage() {
         </p>
       </div>
     </div>
+    </>
   );
 }

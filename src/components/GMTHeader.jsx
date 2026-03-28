@@ -553,6 +553,7 @@ export default function GMTHeader({
 
 // ─── GMTPublicHeader (landing page, unauthenticated) ──────────────────────────
 export function GMTPublicHeader({ onSignIn, onSignUp, navLinks, langToggle }) {
+  const navigate = useNavigate();
   const [selectedMarketId, setSelectedMarketId] = useState('nyse');
   const [lang, setLang] = useState('PT');
 
@@ -577,10 +578,15 @@ export function GMTPublicHeader({ onSignIn, onSignUp, navLinks, langToggle }) {
       }}>
         {/* LEFT */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
-          <GmtLogo />
-          <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 16, fontWeight: 800, letterSpacing: '0.18em', color: '#e2e8f0', marginLeft: 8 }}>
-            GMT
-          </span>
+          <div
+            onClick={() => navigate('/')}
+            style={{ display: 'flex', alignItems: 'center', gap: 0, cursor: 'pointer' }}
+          >
+            <GmtLogo />
+            <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 16, fontWeight: 800, letterSpacing: '0.18em', color: '#e2e8f0', marginLeft: 8 }}>
+              GMT
+            </span>
+          </div>
         </div>
 
         {/* CENTER — nav links */}

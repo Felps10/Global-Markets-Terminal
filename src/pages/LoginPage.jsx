@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
+import { GMTPublicHeader } from '../components/GMTHeader.jsx';
 
 const C = {
   bg:        '#080C18',
@@ -60,12 +61,25 @@ export default function LoginPage() {
   const disabled = loading || !email || !password;
 
   return (
+    <>
+    <GMTPublicHeader onSignIn={() => {}} onSignUp={() => navigate('/register')} />
     <div style={{
       minHeight: '100vh', background: C.bg, display: 'flex',
-      alignItems: 'center', justifyContent: 'center',
-      fontFamily: MONO, padding: '40px 20px',
+      alignItems: 'flex-start', justifyContent: 'center',
+      fontFamily: MONO, padding: '40px 20px', paddingTop: 60,
     }}>
       <div style={{ width: '420px', maxWidth: '100%' }}>
+        {/* Back link */}
+        <div style={{ textAlign: 'center', marginBottom: 8 }}>
+          <Link to="/" style={{
+            display: 'inline-block', fontSize: 10,
+            letterSpacing: '0.12em', color: C.muted,
+            textDecoration: 'none', textTransform: 'uppercase',
+            marginBottom: 20, transition: 'color 0.15s',
+          }}>
+            ← Back to Terminal
+          </Link>
+        </div>
         {/* Header */}
         <div style={{ marginBottom: 40, textAlign: 'center' }}>
           <div style={{
@@ -79,10 +93,10 @@ export default function LoginPage() {
             fontFamily: SANS, fontSize: 22, fontWeight: 700,
             color: C.text, margin: '0 0 4px',
           }}>
-            Admin Access<span className="gmt-cursor" />
+            Welcome Back<span className="gmt-cursor" />
           </h1>
           <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>
-            Authorized personnel only
+            Sign in to your GMT account
           </p>
         </div>
 
@@ -111,7 +125,7 @@ export default function LoginPage() {
             </label>
             <input
               type="email"
-              placeholder="admin@terminal.local"
+              placeholder="your@email.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoFocus
@@ -167,7 +181,7 @@ export default function LoginPage() {
           textAlign: 'center', fontSize: 10, color: C.hint,
           marginTop: 24, letterSpacing: '0.05em',
         }}>
-          Admin access — for system administrators only
+          Global Markets Terminal · Real-time market intelligence
         </p>
         <p style={{
           textAlign: 'center', fontSize: 11, color: C.muted,
@@ -180,5 +194,6 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+    </>
   );
 }
