@@ -1,6 +1,6 @@
 {
   "snapshot_date": "2026-03-28",
-  "snapshot_time": "08:51 AM",
+  "snapshot_time": "09:54 AM",
   "snapshot_label": "as of Mar 28 close",
   "assets": {
     "^GSPC": {
@@ -100,16 +100,125 @@
       "changePct": -0.24
     },
     "BTC": {
-      "price": 66358,
-      "changePct": -0.28
+      "price": 66801,
+      "changePct": 0.88
     },
     "ETH": {
-      "price": 1997.66,
-      "changePct": 0.56
+      "price": 2024.59,
+      "changePct": 2.28
     },
     "SOL": {
-      "price": 82.71,
-      "changePct": -0.55
+      "price": 83.37,
+      "changePct": 0.29
+    },
+    "AMD": {
+      "price": 108.42,
+      "changePct": -1.84,
+      "name": "AMD"
+    },
+    "AXP": {
+      "price": 261.37,
+      "changePct": -0.92,
+      "name": "American Express"
+    },
+    "ABBV": {
+      "price": 198.54,
+      "changePct": 0.31,
+      "name": "AbbVie"
+    },
+    "COST": {
+      "price": 983.86,
+      "changePct": 0.43,
+      "name": "Costco"
+    },
+    "AMT": {
+      "price": 191.24,
+      "changePct": -0.67,
+      "name": "American Tower"
+    },
+    "BA": {
+      "price": 190.52,
+      "changePct": -1.98,
+      "name": "Boeing"
+    },
+    "BE": {
+      "price": 133.24,
+      "changePct": -0.21,
+      "name": "Bloom Energy"
+    },
+    "BP": {
+      "price": 27.84,
+      "changePct": -0.55,
+      "name": "BP"
+    },
+    "BYDDY": {
+      "price": 12.39,
+      "changePct": -5.42,
+      "name": "BYD"
+    },
+    "BIIB": {
+      "price": 183.84,
+      "changePct": -3.78,
+      "name": "Biogen"
+    },
+    "CAT": {
+      "price": 348.91,
+      "changePct": -1.14,
+      "name": "Caterpillar"
+    },
+    "EWY": {
+      "price": 58.43,
+      "changePct": 0.87,
+      "name": "South Korea ETF"
+    },
+    "GC=F": {
+      "price": 3085.4,
+      "changePct": 0.62,
+      "name": "Gold Futures"
+    },
+    "BNO": {
+      "price": 21.47,
+      "changePct": -1.23,
+      "name": "US Brent Oil Fund"
+    },
+    "CANE": {
+      "price": 10.62,
+      "changePct": -0.09,
+      "name": "Teucrium Sugar Fund"
+    },
+    "DVY": {
+      "price": 117.83,
+      "changePct": 0.18,
+      "name": "iShares Select Dividend"
+    },
+    "HYG": {
+      "price": 77.42,
+      "changePct": -0.24,
+      "name": "iShares High Yield Bond"
+    },
+    "BIL": {
+      "price": 91.48,
+      "changePct": 0.01,
+      "name": "SPDR Bloomberg T-Bill"
+    },
+    "AGG": {
+      "price": 94.37,
+      "changePct": -0.31,
+      "name": "iShares US Aggregate Bond"
+    },
+    "PETR4": {
+      "price": 49.41,
+      "changePct": 2.89
+    },
+    "ACWI11": {
+      "price": 142.18,
+      "changePct": 0.43,
+      "name": "iShares MSCI ACWI"
+    },
+    "ALZR11": {
+      "price": 92.74,
+      "changePct": -0.31,
+      "name": "Alianza Trust Renda"
     }
   }
 }

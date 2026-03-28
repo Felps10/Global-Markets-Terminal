@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import MiniHeader from '../components/MiniHeader.jsx';
-import { fetchMiniPrices } from '../dataServices.js';
-import { MINI_GLOBAL_ASSETS, MINI_BRASIL_ASSETS } from '../data/miniAssets.js';
+import { MINI_ASSETS, MINI_GLOBAL_ASSETS, MINI_BRASIL_ASSETS } from '../data/miniAssets.js';
+import snapshot from '../data/marketSnapshot.json';
 import { trackEvent } from '../services/analytics.js';
 
 // ─── Price formatting ────────────────────────────────────────────────────────
@@ -119,11 +119,24 @@ function injectMiniStyles() {
 export default function TerminalMiniPage() {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
-  const [mode, setMode]               = useState('global');
-  const [prices, setPrices]           = useState({});
-  const [loading, setLoading]         = useState(true);
-  const [lang, setLang]               = useState(i18n.language?.startsWith('en') ? 'en' : 'pt');
-  const [lastUpdated, setLastUpdated] = useState(null);
+  const [mode, setMode] = useState('global');
+  const [lang, setLang] = useState(i18n.language?.startsWith('en') ? 'en' : 'pt');
+
+  // Build prices map from snapshot + miniAssets metadata
+  // name comes from static metadata, not from the price feed
+  const prices = Object.fromEntries(
+    MINI_ASSETS.map(asset => [
+      asset.symbol,
+      {
+        price:     snapshot.assets[asset.symbol]?.price     ?? null,
+        changePct: snapshot.assets[asset.symbol]?.changePct ?? null,
+        name:      asset.name,
+        group:     asset.group,
+        subgroup:  asset.subgroup,
+        flag:      asset.flag,
+      }
+    ])
+  );
 
   function handleLangChange(newLang) {
     setLang(newLang);
@@ -136,25 +149,6 @@ export default function TerminalMiniPage() {
   useEffect(() => {
     trackEvent('guest_terminal_entry', { surface: 'mini' });
   }, []);
-
-  // Fetch prices
-  const fetchPrices = useCallback(async () => {
-    try {
-      const data = await fetchMiniPrices();
-      setPrices(data);
-      setLastUpdated(new Date());
-    } catch (e) {
-      console.warn('[TerminalMini] fetch failed:', e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchPrices();
-    const interval = setInterval(fetchPrices, 30_000);
-    return () => clearInterval(interval);
-  }, [fetchPrices]);
 
   const assets = mode === 'brasil' ? MINI_BRASIL_ASSETS : MINI_GLOBAL_ASSETS;
 
@@ -202,16 +196,13 @@ export default function TerminalMiniPage() {
         gap: 10,
         alignContent: 'start',
       }}>
-        {loading
-          ? [...Array(6)].map((_, i) => <SkeletonCard key={i} />)
-          : assets.map(asset => (
-              <MiniAssetCard
-                key={asset.symbol}
-                symbol={asset.symbol}
-                data={prices[asset.symbol]}
-              />
-            ))
-        }
+        {assets.map(asset => (
+          <MiniAssetCard
+            key={asset.symbol}
+            symbol={asset.symbol}
+            data={prices[asset.symbol]}
+          />
+        ))}
       </div>
 
       {/* Upgrade CTA strip */}
@@ -268,9 +259,7 @@ export default function TerminalMiniPage() {
           GMT · Terminal Mini
         </span>
         <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', fontFamily: "'JetBrains Mono', monospace" }}>
-          {lastUpdated
-            ? `${t('mini.updated')} ${lastUpdated.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
-            : t('mini.loading')}
+          {snapshot.snapshot_label} · sign in for live prices
         </span>
         <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', fontFamily: "'JetBrains Mono', monospace" }}>
           {t('mini.data_sources')}

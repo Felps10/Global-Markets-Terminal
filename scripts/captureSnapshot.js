@@ -19,14 +19,20 @@ import { dirname, join } from 'path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SNAPSHOT_PATH = join(__dirname, '../src/data/marketSnapshot.json');
 
-// ── Symbol lists — must match LandingPage.jsx exactly ───────────────────────
+// ── Symbol lists — LandingPage + Terminal Mini ──────────────────────────────
 const YAHOO_SYMBOLS = [
+  // LandingPage ticker
   '^GSPC', '^DJI', '^IXIC',
   'AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META',
   'EURUSD=X', 'GBPUSD=X', 'USDJPY=X',
   'JPM', 'GS', 'XOM', 'CVX', 'LLY', 'UNH', 'TSM', 'AVGO',
   '^FTSE', '^N225',
   'USDCAD=X', 'AUDUSD=X',
+  // Terminal Mini additions
+  'AMD', 'AXP', 'ABBV', 'COST', 'AMT', 'BA', 'BE', 'BP',
+  'BYDDY', 'BIIB', 'CAT', 'EWY',
+  'GC=F', 'BNO', 'CANE',
+  'DVY', 'HYG', 'BIL', 'AGG',
 ];
 
 const CRYPTO_IDS = {
@@ -34,6 +40,8 @@ const CRYPTO_IDS = {
   ETH: 'ethereum',
   SOL: 'solana',
 };
+
+const BRAPI_SYMBOLS = ['PETR4', 'ACWI11', 'ALZR11'];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function loadExisting() {
@@ -150,6 +158,46 @@ async function fetchCrypto(cryptoIds) {
   return results;
 }
 
+// ── Fetch BRAPI (B3 equities) ─────────────────────────────────────────────────
+async function fetchBrapi(symbols) {
+  const results = {};
+
+  for (const ticker of symbols) {
+    try {
+      const res = await fetch(
+        `https://brapi.dev/api/quote/${ticker}`,
+        {
+          headers: { 'Accept': 'application/json' },
+          signal: AbortSignal.timeout(15000),
+        }
+      );
+
+      if (!res.ok) {
+        console.warn(`  ✗ ${ticker} — HTTP ${res.status}`);
+        continue;
+      }
+
+      const json = await res.json();
+      const q = json?.results?.[0];
+      if (q) {
+        results[ticker] = {
+          price:     Math.round(q.regularMarketPrice * 100) / 100,
+          changePct: Math.round(q.regularMarketChangePercent * 100) / 100,
+        };
+        console.log(
+          `  ✓ ${ticker.padEnd(12)} ` +
+          `R$${q.regularMarketPrice.toFixed(2).padStart(10)}  ` +
+          `${q.regularMarketChangePercent >= 0 ? '+' : ''}${q.regularMarketChangePercent.toFixed(2)}%`
+        );
+      }
+    } catch (err) {
+      console.warn(`  ✗ ${ticker} — ${err.message}`);
+    }
+  }
+
+  return results;
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
   const now = new Date();
@@ -161,19 +209,22 @@ async function main() {
   const existing = loadExisting();
   const previous = existing.assets || {};
 
-  console.log('[1/2] Fetching Yahoo Finance...');
+  console.log('[1/3] Fetching Yahoo Finance...');
   const yahooResults = await fetchYahoo(YAHOO_SYMBOLS);
 
-  console.log('\n[2/2] Fetching CoinGecko...');
+  console.log('\n[2/3] Fetching CoinGecko...');
   const cryptoResults = await fetchCrypto(CRYPTO_IDS);
 
+  console.log('\n[3/3] Fetching BRAPI (B3 equities)...');
+  const brapiResults = await fetchBrapi(BRAPI_SYMBOLS);
+
   // Merge: new results override previous; failed symbols keep previous value
-  const assets = { ...previous, ...yahooResults, ...cryptoResults };
+  const assets = { ...previous, ...yahooResults, ...cryptoResults, ...brapiResults };
 
   // Count successes and failures
-  const allSymbols = [...YAHOO_SYMBOLS, ...Object.keys(CRYPTO_IDS)];
-  const succeeded = allSymbols.filter(s => yahooResults[s] || cryptoResults[s]);
-  const failed = allSymbols.filter(s => !yahooResults[s] && !cryptoResults[s]);
+  const allSymbols = [...YAHOO_SYMBOLS, ...Object.keys(CRYPTO_IDS), ...BRAPI_SYMBOLS];
+  const succeeded = allSymbols.filter(s => yahooResults[s] || cryptoResults[s] || brapiResults[s]);
+  const failed = allSymbols.filter(s => !yahooResults[s] && !cryptoResults[s] && !brapiResults[s]);
 
   if (failed.length > 0) {
     console.log(`\n[captureSnapshot] ⚠ Failed symbols (keeping previous values): ${failed.join(', ')}`);

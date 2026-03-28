@@ -36,6 +36,8 @@ import PublicLayout from './components/PublicLayout.jsx';
 import FeaturesPage from './pages/FeaturesPage.jsx';
 import CoveragePage from './pages/CoveragePage.jsx';
 import PricingPage from './pages/PricingPage.jsx';
+import AboutPage from './pages/AboutPage.jsx';
+import CommunityPage from './pages/CommunityPage.jsx';
 
 /**
  * ─── ROUTE SECURITY MODEL ─────────────────────────────────────────────────
@@ -49,6 +51,8 @@ import PricingPage from './pages/PricingPage.jsx';
  *   /features   FeaturesPage
  *   /coverage   CoveragePage
  *   /pricing    PricingPage
+ *   /about      AboutPage
+ *   /community  CommunityPage
  *   /clube      ClubeLandingPage  (marketing page, not the app)
  *
  * PROTECTED routes — guard lives on the LAYOUT or the route itself.
@@ -111,6 +115,8 @@ function AppWithPanel() {
         <Route path="/features"  element={<PublicLayout><FeaturesPage /></PublicLayout>} />
         <Route path="/coverage"  element={<PublicLayout><CoveragePage /></PublicLayout>} />
         <Route path="/pricing"   element={<PublicLayout><PricingPage /></PublicLayout>} />
+        <Route path="/about"     element={<PublicLayout><AboutPage /></PublicLayout>} />
+        <Route path="/community" element={<PublicLayout><CommunityPage /></PublicLayout>} />
 
         {/* Terminal — any authenticated user */}
         <Route

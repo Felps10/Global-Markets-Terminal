@@ -581,19 +581,42 @@ export default function GMTHeader({
 }
 
 // ─── GMTPublicHeader (landing page, unauthenticated) ──────────────────────────
-const PUBLIC_NAV = [
-  { label: 'Features', path: '/features' },
-  { label: 'Coverage', path: '/coverage' },
-  { label: 'Pricing',  path: '/pricing'  },
+const PUBLIC_NAV_BEFORE_PRODUCTS = [
+  { label: 'About', path: '/about' },
+];
+
+const PUBLIC_NAV_AFTER_PRODUCTS = [
+  { label: 'Features',  path: '/features'  },
+  { label: 'Coverage',  path: '/coverage'  },
+  { label: 'Pricing',   path: '/pricing'   },
+  { label: 'Community', path: '/community' },
+];
+
+const PRODUCTS_ITEMS = [
+  { name: 'Terminal Mini',   desc: 'Mercado ao vivo · gratuito · sem cadastro',       href: '/mini'     },
+  { name: 'Terminal Pro',    desc: 'Terminal completo · research · sinais · watchlist', href: '/terminal' },
+  { name: 'Club Management', desc: 'NAV · cotização · relatório AI para seu clube',    href: '/clube'    },
 ];
 
 export function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [productsOpen, setProductsOpen] = useState(false);
+  const productsRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => { injectStyles(); }, []);
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (productsRef.current && !productsRef.current.contains(e.target)) {
+        setProductsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   useEffect(() => {
     if (!isHome) { setScrolled(true); return; }
@@ -656,7 +679,91 @@ export function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) {
             marginLeft: 40,
             height: 52,
           }}>
-            {PUBLIC_NAV.map(item => (
+            {/* About — before Products */}
+            {PUBLIC_NAV_BEFORE_PRODUCTS.map(item => (
+              <button
+                key={item.path}
+                className="gmt-pub-nav-item"
+                onClick={() => navigate(item.path)}
+                style={{
+                  color: isActive(item.path) ? '#3b82f6' : 'rgba(255,255,255,0.5)',
+                }}
+              >
+                {item.label}
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 16,
+                  right: 16,
+                  height: 2,
+                  background: '#3b82f6',
+                  opacity: isActive(item.path) ? 1 : 0,
+                  transition: 'opacity 200ms ease',
+                }} />
+              </button>
+            ))}
+
+            {/* Products dropdown */}
+            <div ref={productsRef} style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center' }}>
+              <button
+                onClick={() => setProductsOpen(o => !o)}
+                className="gmt-pub-nav-item"
+                style={{
+                  color: productsOpen ? '#fff' : 'rgba(255,255,255,0.5)',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
+                onMouseLeave={(e) => { if (!productsOpen) e.currentTarget.style.color = 'rgba(255,255,255,0.5)'; }}
+              >
+                Products
+                <span style={{ marginLeft: 4, fontSize: 9, opacity: 0.6 }}>
+                  {productsOpen ? '▲' : '▼'}
+                </span>
+              </button>
+              {productsOpen && (
+                <div style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 8px)',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: '#0c1525',
+                  border: '0.5px solid rgba(255,255,255,0.1)',
+                  borderRadius: 10,
+                  width: 280,
+                  overflow: 'hidden',
+                  zIndex: 100,
+                }}>
+                  {PRODUCTS_ITEMS.map((item, i) => (
+                    <button
+                      key={item.name}
+                      onClick={() => { navigate(item.href); setProductsOpen(false); }}
+                      className="gmt-homepage-dropdown-item"
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        padding: '12px 16px',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        borderBottom: i < PRODUCTS_ITEMS.length - 1
+                          ? '0.5px solid rgba(255,255,255,0.06)'
+                          : 'none',
+                      }}
+                    >
+                      <div style={{ fontSize: 13, fontWeight: 500, color: '#e2e8f0', marginBottom: 3 }}>
+                        {item.name}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
+                        {item.desc}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Features, Coverage, Pricing, Community — after Products */}
+            {PUBLIC_NAV_AFTER_PRODUCTS.map(item => (
               <button
                 key={item.path}
                 className="gmt-pub-nav-item"
@@ -772,7 +879,65 @@ export function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) {
             gap: 32,
           }}
         >
-          {PUBLIC_NAV.map(item => (
+          {/* About — before Products */}
+          {PUBLIC_NAV_BEFORE_PRODUCTS.map(item => (
+            <button
+              key={item.path}
+              onClick={() => { setMobileOpen(false); navigate(item.path); }}
+              style={{
+                background: 'none',
+                border: 'none',
+                borderBottom: '1px solid rgba(255,255,255,0.06)',
+                cursor: 'pointer',
+                fontFamily: "'Syne', sans-serif",
+                fontSize: 28,
+                fontWeight: 700,
+                color: isActive(item.path) ? '#3b82f6' : 'rgba(255,255,255,0.85)',
+                padding: '12px 0',
+                width: 240,
+                textAlign: 'center',
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+
+          {/* Products section in mobile menu */}
+          <div style={{ width: '100%', maxWidth: 280 }}>
+            <div style={{
+              fontSize: 10, fontWeight: 600, letterSpacing: '0.1em',
+              color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase',
+              marginBottom: 12, paddingLeft: 4,
+            }}>
+              Products
+            </div>
+            {PRODUCTS_ITEMS.map(item => (
+              <button
+                key={item.name}
+                onClick={() => { setMobileOpen(false); navigate(item.href); }}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  padding: '10px 4px',
+                  background: 'none',
+                  border: 'none',
+                  borderBottom: '0.5px solid rgba(255,255,255,0.06)',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 500, color: '#e2e8f0' }}>
+                  {item.name}
+                </div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
+                  {item.desc}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Features, Coverage, Pricing, Community — after Products */}
+          {PUBLIC_NAV_AFTER_PRODUCTS.map(item => (
             <button
               key={item.path}
               onClick={() => { setMobileOpen(false); navigate(item.path); }}
@@ -835,13 +1000,8 @@ export function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) {
 }
 
 // ─── GMTHomepageHeader (homepage, product-aware navigation) ──────────────────
-const PRODUCTS_ITEMS = [
-  { name: 'Terminal Mini', desc: 'Mercado ao vivo · gratuito · sem cadastro', href: '/mini' },
-  { name: 'Terminal Pro', desc: 'Terminal completo · research · sinais · watchlist', href: '/terminal' },
-  { name: 'Club Management', desc: 'NAV · cotização · relatório AI para seu clube', href: '/clube' },
-];
-
 export function GMTHomepageHeader({ onSignIn, onSignUp, lang, onLangChange }) {
+  const navigate = useNavigate();
   const [productsOpen, setProductsOpen] = useState(false);
   const productsRef = useRef(null);
 
@@ -878,6 +1038,20 @@ export function GMTHomepageHeader({ onSignIn, onSignUp, lang, onLangChange }) {
 
         {/* CENTER — navigation */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
+          <button
+            onClick={() => navigate('/about')}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13,
+              fontWeight: 400, color: 'rgba(255,255,255,0.45)',
+              textDecoration: 'none', transition: 'color 0.15s',
+              padding: 0,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.45)'; }}
+          >
+            About
+          </button>
           <div ref={productsRef} style={{ position: 'relative' }}>
             <button
               onClick={() => setProductsOpen(o => !o)}
@@ -906,15 +1080,19 @@ export function GMTHomepageHeader({ onSignIn, onSignUp, lang, onLangChange }) {
                 zIndex: 100,
               }}>
                 {PRODUCTS_ITEMS.map((item, i) => (
-                  <a
+                  <button
                     key={item.name}
-                    href={item.href}
+                    onClick={() => { navigate(item.href); setProductsOpen(false); }}
                     className="gmt-homepage-dropdown-item"
                     style={{
                       display: 'block',
+                      width: '100%',
                       padding: '12px 16px',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      textAlign: 'left',
                       borderBottom: i < PRODUCTS_ITEMS.length - 1 ? '0.5px solid rgba(255,255,255,0.06)' : 'none',
-                      textDecoration: 'none',
                     }}
                   >
                     <div style={{ fontSize: 13, fontWeight: 500, color: '#e2e8f0', marginBottom: 3 }}>
@@ -923,33 +1101,25 @@ export function GMTHomepageHeader({ onSignIn, onSignUp, lang, onLangChange }) {
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
                       {item.desc}
                     </div>
-                  </a>
+                  </button>
                 ))}
               </div>
             )}
           </div>
-          <a
-            href="#sobre"
+          <button
+            onClick={() => navigate('/pricing')}
             style={{
-              fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, fontWeight: 400,
-              color: 'rgba(255,255,255,0.45)', textDecoration: 'none', transition: 'color 0.15s',
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13,
+              fontWeight: 400, color: 'rgba(255,255,255,0.45)',
+              textDecoration: 'none', transition: 'color 0.15s',
+              padding: 0,
             }}
             onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.45)'; }}
           >
-            Sobre
-          </a>
-          <a
-            href="#precos"
-            style={{
-              fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, fontWeight: 400,
-              color: 'rgba(255,255,255,0.45)', textDecoration: 'none', transition: 'color 0.15s',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.45)'; }}
-          >
-            Preços
-          </a>
+            Pricing
+          </button>
         </div>
 
         {/* RIGHT — actions */}
