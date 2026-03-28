@@ -593,9 +593,16 @@ const PUBLIC_NAV_AFTER_PRODUCTS = [
 ];
 
 const PRODUCTS_ITEMS = [
-  { name: 'Terminal Mini',   desc: 'Mercado ao vivo · gratuito · sem cadastro',       href: '/mini'     },
-  { name: 'Terminal Pro',    desc: 'Terminal completo · research · sinais · watchlist', href: '/terminal' },
-  { name: 'Club Management', desc: 'NAV · cotização · relatório AI para seu clube',    href: '/clube'    },
+  {
+    name: 'GMT Mini',
+    desc: 'Mercado ao vivo · gratuito · sem cadastro',
+    href: '/mini',
+  },
+  {
+    name: 'GMT Pro',
+    desc: 'Terminal completo · research · sinais · watchlist',
+    href: '/terminal',
+  },
 ];
 
 export function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) {
@@ -785,6 +792,46 @@ export function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) {
                 }} />
               </button>
             ))}
+
+            {/* Clube — separate product, gold accent */}
+            <button
+              onClick={() => navigate('/clube')}
+              style={{
+                position: 'relative',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontSize: 13,
+                fontWeight: 600,
+                padding: '0 16px',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                color: location.pathname.startsWith('/clube')
+                  ? '#F9C300'
+                  : 'rgba(249,195,0,0.55)',
+                transition: 'color 150ms',
+                letterSpacing: '0.01em',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#F9C300'; }}
+              onMouseLeave={(e) => {
+                if (!location.pathname.startsWith('/clube')) {
+                  e.currentTarget.style.color = 'rgba(249,195,0,0.55)';
+                }
+              }}
+            >
+              Clube
+              <span style={{
+                marginLeft: 5,
+                fontSize: 9,
+                color: 'rgba(249,195,0,0.4)',
+                fontWeight: 400,
+                letterSpacing: '0.05em',
+              }}>
+                →
+              </span>
+            </button>
           </nav>
 
           <div style={{ flex: 1 }} />
@@ -958,6 +1005,31 @@ export function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) {
               {item.label}
             </button>
           ))}
+
+          {/* Clube — separate product */}
+          <div style={{
+            width: '100%',
+            height: '0.5px',
+            background: 'rgba(249,195,0,0.15)',
+            margin: '8px 0',
+          }} />
+          <button
+            onClick={() => { setMobileOpen(false); navigate('/clube'); }}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontFamily: "'IBM Plex Sans', sans-serif",
+              fontSize: 18,
+              fontWeight: 600,
+              color: '#F9C300',
+              letterSpacing: '0.01em',
+              padding: '4px 0',
+            }}
+          >
+            Clube →
+          </button>
+
           <div style={{ height: 24 }} />
           <button
             onClick={() => { setMobileOpen(false); handleSignIn(); }}

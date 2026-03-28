@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth.js';
 
 const BG_PAGE  = '#080f1a';
 const BG_HEAD  = '#0a1628';
@@ -14,7 +15,7 @@ const ACCENT   = '#3b82f6';
 const GREEN    = '#00E676';
 const RED      = '#FF5252';
 const AMBER    = '#fbbf24';
-const GOLD     = '#FFD700';
+const GOLD     = '#F9C300';
 const MONO     = "'JetBrains Mono', monospace";
 
 const ICON_PAINEL = (
@@ -56,16 +57,124 @@ const ICON_TRIBUTACAO = (
   </svg>
 );
 
-function buildNavItems(clubeId) {
-  const base = clubeId ? `/clube/${clubeId}` : '/clube';
-  return [
-    { id: 'painel',     label: 'PAINEL',     path: base,                 section: 'operacoes',  icon: ICON_PAINEL,     soon: false },
-    { id: 'membros',    label: 'MEMBROS',    path: `${base}/membros`,    section: 'operacoes',  icon: ICON_MEMBROS,    soon: false },
-    { id: 'simulador',  label: 'SIMULADOR',  path: `${base}/simulador`,  section: 'operacoes',  icon: ICON_SIMULADOR,  soon: false },
-    { id: 'relatorio',  label: 'RELATÓRIO',  path: `${base}/report`,     section: 'operacoes',  icon: ICON_RELATORIO,  soon: false },
-    { id: 'governanca', label: 'GOVERNANÇA', path: `${base}/governanca`, section: 'governanca', icon: ICON_GOVERNANCA, soon: false },
-    { id: 'tributacao', label: 'TRIBUTAÇÃO', path: `${base}/tributacao`, section: 'governanca', icon: ICON_TRIBUTACAO,  soon: false },
+const ICON_PERFORMANCE = (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={1.5}>
+    <path d="M1 11 L4 7 L7 9 L13 3"/>
+    <path d="M10 3h3v3"/>
+  </svg>
+);
+const ICON_NAV = (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={1.5}>
+    <rect x="2" y="3" width="10" height="8" rx="1"/>
+    <line x1="5" y1="6" x2="9" y2="6"/>
+    <line x1="5" y1="8.5" x2="9" y2="8.5"/>
+  </svg>
+);
+const ICON_COMPLIANCE = (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={1.5}>
+    <path d="M7 1L2 4v3c0 3.3 2.2 5.8 5 6.3C9.8 12.8 12 10.3 12 7V4L7 1z"/>
+    <path d="M5 7l2 2 3-3"/>
+  </svg>
+);
+const ICON_DOCUMENTOS = (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={1.5}>
+    <path d="M3 1h5l3 3v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z"/>
+    <path d="M8 1v3h3"/>
+  </svg>
+);
+
+function buildNavItems(clubeId, isManager) {
+  const base = `/clube/${clubeId}`;
+
+  const memberItems = [
+    {
+      id:      'painel',
+      label:   'Meu Clube',
+      path:    base,
+      section: 'clube',
+      icon:    ICON_PAINEL,
+      soon:    false,
+    },
+    {
+      id:      'performance',
+      label:   'Performance',
+      path:    null,
+      section: 'clube',
+      icon:    ICON_PERFORMANCE,
+      soon:    true,
+    },
+    {
+      id:      'relatorio',
+      label:   'Relatórios',
+      path:    `${base}/report`,
+      section: 'clube',
+      icon:    ICON_RELATORIO,
+      soon:    false,
+    },
+    {
+      id:      'governanca',
+      label:   'Governança',
+      path:    `${base}/governanca`,
+      section: 'clube',
+      icon:    ICON_GOVERNANCA,
+      soon:    false,
+    },
+    {
+      id:      'tributacao',
+      label:   'Legal',
+      path:    `${base}/tributacao`,
+      section: 'clube',
+      icon:    ICON_TRIBUTACAO,
+      soon:    false,
+    },
+    {
+      id:      'simulador',
+      label:   'Simulador',
+      path:    `${base}/simulador`,
+      section: 'clube',
+      icon:    ICON_SIMULADOR,
+      soon:    false,
+    },
   ];
+
+  const managerItems = [
+    {
+      id:      'membros',
+      label:   'Membros',
+      path:    `${base}/membros`,
+      section: 'gestao',
+      icon:    ICON_MEMBROS,
+      soon:    false,
+    },
+    {
+      id:      'nav',
+      label:   'NAV',
+      path:    base,
+      section: 'gestao',
+      icon:    ICON_NAV,
+      soon:    false,
+    },
+    {
+      id:      'compliance',
+      label:   'Compliance',
+      path:    `${base}/reenquadramento`,
+      section: 'gestao',
+      icon:    ICON_COMPLIANCE,
+      soon:    false,
+    },
+    {
+      id:      'documentos',
+      label:   'Documentos',
+      path:    null,
+      section: 'gestao',
+      icon:    ICON_DOCUMENTOS,
+      soon:    true,
+    },
+  ];
+
+  return isManager
+    ? [...memberItems, ...managerItems]
+    : memberItems;
 }
 
 export default function ClubeShell({
@@ -73,7 +182,11 @@ export default function ClubeShell({
   pendingCount, headerLeft, headerRight, children,
 }) {
   const navigate = useNavigate();
-  const navItems = buildNavItems(clubeId);
+  const { user } = useAuth();
+  const role = user?.role ?? 'user';
+  const isManager = role === 'club_manager' || role === 'admin';
+  const isMember  = role === 'club_member' || isManager;
+  const navItems = buildNavItems(clubeId, isManager);
 
   const [open, setOpen] = useState(() => {
     try {
@@ -147,7 +260,7 @@ export default function ClubeShell({
                   style={{
                     width: 6, height: 6, borderRadius: '50%',
                     background: item.soon ? 'rgba(71,85,105,0.2)' : item.id === activePage ? ACCENT : 'rgba(71,85,105,0.55)',
-                    cursor: item.soon ? 'default' : 'pointer',
+                    cursor: item.soon ? 'not-allowed' : 'pointer',
                     transition: 'background 0.15s',
                   }}
                 />
@@ -190,11 +303,14 @@ export default function ClubeShell({
 
           {/* Nav items */}
           <nav style={{ flex: 1, padding: '8px 0', overflowY: 'auto' }}>
-            {['operacoes', 'governanca'].map((section) => {
-              const sectionItems = navItems.filter(i => i.section === section);
-              const sectionLabel = section === 'operacoes' ? 'Operações' : 'Governança';
+            {(isManager
+              ? [{ id: 'clube', label: 'Clube' }, { id: 'gestao', label: 'Gestão' }]
+              : [{ id: 'clube', label: 'Clube' }]
+            ).map((section) => {
+              const sectionItems = navItems.filter(i => i.section === section.id);
+              const sectionLabel = section.label;
               return (
-                <div key={section}>
+                <div key={section.id}>
                   <div style={{
                     fontSize: 9, color: TXT_4, letterSpacing: '0.14em',
                     textTransform: 'uppercase', padding: '10px 14px 4px', whiteSpace: 'nowrap',
@@ -214,7 +330,7 @@ export default function ClubeShell({
                           color: item.soon ? TXT_4 : isActive ? TXT_1 : TXT_3,
                           background: isActive ? 'rgba(59,130,246,0.08)' : 'transparent',
                           borderLeft: `2px solid ${isActive ? ACCENT : 'transparent'}`,
-                          cursor: item.soon ? 'default' : 'pointer',
+                          cursor: item.soon ? 'not-allowed' : 'pointer',
                           whiteSpace: 'nowrap',
                           transition: 'background 0.1s, color 0.1s',
                         }}

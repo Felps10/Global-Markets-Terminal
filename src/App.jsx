@@ -23,13 +23,18 @@ import ClubeSimuladorPage from './pages/ClubeSimuladorPage.jsx';
 import ClubeGovernancaPage from './pages/ClubeGovernancaPage.jsx';
 import ClubeGovernancaDetailPage from './pages/ClubeGovernancaDetailPage.jsx';
 import ClubeReenquadramentoDetailPage from './pages/ClubeReenquadramentoDetailPage.jsx';
+import ClubeReenquadramentoPage from './pages/ClubeReenquadramentoPage.jsx';
 import ClubeTributacaoPage from './pages/ClubeTributacaoPage.jsx';
 import ClubeListPage from './pages/ClubeListPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import ChartResearchPage from './pages/markets/ChartResearchPage.jsx';
 import TerminalProLandingPage from './pages/TerminalProLandingPage.jsx';
 import TerminalMiniPage from './pages/TerminalMiniPage.jsx';
-import ClubeLandingPage from './pages/ClubeLandingPage.jsx';
+import ClubeLandingPage    from './clube/pages/ClubeLandingPage.jsx';
+import ComoFuncionaPage    from './clube/pages/ComoFuncionaPage.jsx';
+import ParaGestoresPage    from './clube/pages/ParaGestoresPage.jsx';
+import ParaMembrosPage     from './clube/pages/ParaMembrosPage.jsx';
+import ContatoPage         from './clube/pages/ContatoPage.jsx';
 import { useAuth } from './hooks/useAuth.js';
 import AuthPanel from './components/AuthPanel.jsx';
 import PublicLayout from './components/PublicLayout.jsx';
@@ -53,7 +58,11 @@ import CommunityPage from './pages/CommunityPage.jsx';
  *   /pricing    PricingPage
  *   /about      AboutPage
  *   /community  CommunityPage
- *   /clube      ClubeLandingPage  (marketing page, not the app)
+ *   /clube                  ClubeLandingPage    (Clube GMT marketing)
+ *   /clube/como-funciona    ComoFuncionaPage    (public)
+ *   /clube/para-gestores    ParaGestoresPage    (public)
+ *   /clube/para-membros     ParaMembrosPage     (public)
+ *   /clube/contato          ContatoPage         (public)
  *
  * PROTECTED routes — guard lives on the LAYOUT or the route itself.
  *
@@ -168,7 +177,13 @@ function AppWithPanel() {
 
         {/* Clube de Investimento */}
         <Route path="/clubes" element={<ProtectedRoute requiredRole={null}><ClubeListPage /></ProtectedRoute>} />
-        <Route path="/clube" element={<ClubeLandingPage />} />
+
+        {/* Clube GMT — public marketing pages */}
+        <Route path="/clube"               element={<ClubeLandingPage />}  />
+        <Route path="/clube/como-funciona" element={<ComoFuncionaPage />}  />
+        <Route path="/clube/para-gestores" element={<ParaGestoresPage />}  />
+        <Route path="/clube/para-membros"  element={<ParaMembrosPage />}   />
+        <Route path="/clube/contato"       element={<ContatoPage />}       />
 
         {/* Parameterized clube module routes */}
         <Route path="/clube/:id" element={<ProtectedRoute requiredRole="club_member" showDenied={true}><ClubePage /></ProtectedRoute>} />
@@ -177,6 +192,7 @@ function AppWithPanel() {
         <Route path="/clube/:id/report" element={<ProtectedRoute requiredRole="club_member" showDenied={true}><ClubeReportPage /></ProtectedRoute>} />
         <Route path="/clube/:id/governanca" element={<ProtectedRoute requiredRole={null}><ClubeGovernancaPage /></ProtectedRoute>} />
         <Route path="/clube/:id/governanca/:aid" element={<ProtectedRoute requiredRole={null}><ClubeGovernancaDetailPage /></ProtectedRoute>} />
+        <Route path="/clube/:id/reenquadramento" element={<ProtectedRoute requiredRole={null}><ClubeReenquadramentoPage /></ProtectedRoute>} />
         <Route path="/clube/:id/reenquadramento/:rid" element={<ProtectedRoute requiredRole={null}><ClubeReenquadramentoDetailPage /></ProtectedRoute>} />
         <Route path="/clube/:id/tributacao" element={<ProtectedRoute requiredRole={null}><ClubeTributacaoPage /></ProtectedRoute>} />
 
