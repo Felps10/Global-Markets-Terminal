@@ -1,7 +1,7 @@
 {
-  "snapshot_date": "2026-03-28",
-  "snapshot_time": "02:12 PM",
-  "snapshot_label": "as of Mar 28 close",
+  "snapshot_date": "2026-03-29",
+  "snapshot_time": "01:41 AM",
+  "snapshot_label": "as of Mar 29 close",
   "assets": {
     "^GSPC": {
       "price": 6368.85,
@@ -100,111 +100,92 @@
       "changePct": -0.24
     },
     "BTC": {
-      "price": 66879,
-      "changePct": 1.93
+      "price": 66608,
+      "changePct": 0.55
     },
     "ETH": {
-      "price": 2021.49,
-      "changePct": 2.21
+      "price": 2000.25,
+      "changePct": 0.46
     },
     "SOL": {
-      "price": 83.4,
-      "changePct": 1.41
+      "price": 82.56,
+      "changePct": -0.05
     },
     "AMD": {
-      "price": 108.42,
-      "changePct": -1.84,
-      "name": "AMD"
+      "price": 201.99,
+      "changePct": -0.87
     },
     "AXP": {
-      "price": 261.37,
-      "changePct": -0.92,
-      "name": "American Express"
+      "price": 292.27,
+      "changePct": -2.38
     },
     "ABBV": {
-      "price": 198.54,
-      "changePct": 0.31,
-      "name": "AbbVie"
+      "price": 209.4,
+      "changePct": -0.81
     },
     "COST": {
       "price": 983.86,
-      "changePct": 0.43,
-      "name": "Costco"
+      "changePct": 0.43
     },
     "AMT": {
-      "price": 191.24,
-      "changePct": -0.67,
-      "name": "American Tower"
+      "price": 169.52,
+      "changePct": 0.36
     },
     "BA": {
       "price": 190.52,
-      "changePct": -1.98,
-      "name": "Boeing"
+      "changePct": -1.98
     },
     "BE": {
       "price": 133.24,
-      "changePct": -0.21,
-      "name": "Bloom Energy"
+      "changePct": -0.21
     },
     "BP": {
-      "price": 27.84,
-      "changePct": -0.55,
-      "name": "BP"
+      "price": 46.68,
+      "changePct": 1.1
     },
     "BYDDY": {
       "price": 12.39,
-      "changePct": -5.42,
-      "name": "BYD"
+      "changePct": -5.42
     },
     "BIIB": {
       "price": 183.84,
-      "changePct": -3.78,
-      "name": "Biogen"
+      "changePct": -3.78
     },
     "CAT": {
-      "price": 348.91,
-      "changePct": -1.14,
-      "name": "Caterpillar"
+      "price": 695.4,
+      "changePct": -1.11
     },
     "EWY": {
-      "price": 58.43,
-      "changePct": 0.87,
-      "name": "South Korea ETF"
+      "price": 120.98,
+      "changePct": 0.83
     },
     "GC=F": {
-      "price": 3085.4,
-      "changePct": 0.62,
-      "name": "Gold Futures"
+      "price": 4524.3,
+      "changePct": 2.62
     },
     "BNO": {
-      "price": 21.47,
-      "changePct": -1.23,
-      "name": "US Brent Oil Fund"
+      "price": 52.7,
+      "changePct": 4.25
     },
     "CANE": {
       "price": 10.62,
-      "changePct": -0.09,
-      "name": "Teucrium Sugar Fund"
+      "changePct": -0.09
     },
     "DVY": {
-      "price": 117.83,
-      "changePct": 0.18,
-      "name": "iShares Select Dividend"
+      "price": 149.5,
+      "changePct": -0.35
     },
     "HYG": {
-      "price": 77.42,
-      "changePct": -0.24,
-      "name": "iShares High Yield Bond"
+      "price": 78.72,
+      "changePct": -0.25
     },
     "BIL": {
-      "price": 91.48,
-      "changePct": 0.01,
-      "name": "SPDR Bloomberg T-Bill"
+      "price": 91.63,
+      "changePct": 0.03
     },
     "AGG": {
-      "price": 94.37,
-      "changePct": -0.31,
-      "name": "iShares US Aggregate Bond"
+      "price": 98.54,
+      "changePct": -0.01
     },
     "PETR4": {
       "price": 49.41,

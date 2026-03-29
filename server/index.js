@@ -16,6 +16,7 @@ import watchlistRoutes   from './routes/watchlist.js';
 import preferencesRoutes from './routes/preferences.js';
 import clubeRoutes       from './routes/clubes.js';
 import yahooRoutes       from './routes/yahoo.js';
+import snapshotRoutes    from './routes/snapshot.js';
 
 const PORT = process.env.PORT || 4000;
 const app  = express();
@@ -58,6 +59,11 @@ app.use('/api/v1/preferences', preferencesRoutes);
 // Do not add authenticate here — script has no Bearer token
 // Browser clients must use /proxy/yahoo which requires auth
 app.use('/api/yahoo',          yahooRoutes);
+
+// /api/v1/snapshot — PUBLIC (no auth)
+// Serves market snapshot to unauthenticated public pages.
+// Data is non-sensitive delayed market prices.
+app.use('/api/v1/snapshot', snapshotRoutes);
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/api/v1/health', (_req, res) => res.json({ status: 'ok', ts: Date.now() }));

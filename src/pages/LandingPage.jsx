@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
-import snapshot from '../data/marketSnapshot.json';
+import { useSnapshot } from '../hooks/useSnapshot.js';
 
 const DISPLAY_NAMES = {
   '^GSPC': 'S&P 500', '^DJI': 'Dow Jones', '^IXIC': 'NASDAQ',
@@ -24,17 +24,19 @@ const TICKER_SYMBOLS = [
   'BTC', 'ETH', 'SOL',
 ];
 
-const TICKER_ITEMS = TICKER_SYMBOLS
-  .filter(sym => snapshot.assets[sym])
-  .map(sym => {
-    const a = snapshot.assets[sym];
-    return {
-      sym:   DISPLAY_NAMES[sym] || sym,
-      price: fmtPrice(a.price),
-      chg:   `${a.changePct >= 0 ? '+' : ''}${a.changePct.toFixed(2)}%`,
-      pos:   a.changePct >= 0,
-    };
-  });
+function buildTickerItems(assets) {
+  return TICKER_SYMBOLS
+    .filter(sym => assets[sym])
+    .map(sym => {
+      const a = assets[sym];
+      return {
+        sym:   DISPLAY_NAMES[sym] || sym,
+        price: fmtPrice(a.price),
+        chg:   `${a.changePct >= 0 ? '+' : ''}${a.changePct.toFixed(2)}%`,
+        pos:   a.changePct >= 0,
+      };
+    });
+}
 
 const COVERAGE_STATS = [
   { num: '89', label: 'US Equities' },
@@ -101,6 +103,8 @@ const DATA_SOURCES = [
 export default function LandingPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const { assets: tickerAssets, snapshotLabel } = useSnapshot();
+  const TICKER_ITEMS = buildTickerItems(tickerAssets);
   const [hoveredCard, setHoveredCard] = useState(null);
   const [tickerPaused, setTickerPaused] = useState(false);
   const [primaryHover, setPrimaryHover] = useState(false);
@@ -425,7 +429,7 @@ export default function LandingPage() {
           letterSpacing: '0.5px',
           paddingBottom: 8,
         }}>
-          {snapshot.snapshot_label} · sign in for live prices
+          {snapshotLabel} · sign in for live prices
         </div>
 
         {/* ── THE PLATFORM ──────────────────────────────────────────────── */}

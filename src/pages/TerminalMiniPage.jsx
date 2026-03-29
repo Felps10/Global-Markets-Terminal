@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import MiniHeader from '../components/MiniHeader.jsx';
 import { MINI_ASSETS, MINI_GLOBAL_ASSETS, MINI_BRASIL_ASSETS } from '../data/miniAssets.js';
-import snapshot from '../data/marketSnapshot.json';
+import { useSnapshot } from '../hooks/useSnapshot.js';
 import { trackEvent } from '../services/analytics.js';
 
 // ─── Price formatting ────────────────────────────────────────────────────────
@@ -122,14 +122,16 @@ export default function TerminalMiniPage() {
   const [mode, setMode] = useState('global');
   const [lang, setLang] = useState(i18n.language?.startsWith('en') ? 'en' : 'pt');
 
+  const { assets: snapshotAssets, snapshotLabel } = useSnapshot();
+
   // Build prices map from snapshot + miniAssets metadata
   // name comes from static metadata, not from the price feed
   const prices = Object.fromEntries(
     MINI_ASSETS.map(asset => [
       asset.symbol,
       {
-        price:     snapshot.assets[asset.symbol]?.price     ?? null,
-        changePct: snapshot.assets[asset.symbol]?.changePct ?? null,
+        price:     snapshotAssets[asset.symbol]?.price     ?? null,
+        changePct: snapshotAssets[asset.symbol]?.changePct ?? null,
         name:      asset.name,
         group:     asset.group,
         subgroup:  asset.subgroup,
@@ -259,7 +261,7 @@ export default function TerminalMiniPage() {
           GMT · Terminal Mini
         </span>
         <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', fontFamily: "'JetBrains Mono', monospace" }}>
-          {snapshot.snapshot_label} · sign in for live prices
+          {snapshotLabel} · sign in for live prices
         </span>
         <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', fontFamily: "'JetBrains Mono', monospace" }}>
           {t('mini.data_sources')}

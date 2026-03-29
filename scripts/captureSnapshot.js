@@ -12,12 +12,60 @@
  * Failed symbols preserve their previous value from the existing file.
  */
 
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { createClient } from '@supabase/supabase-js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Load .env if it exists (local dev only)
+// In Railway cron, env vars are injected automatically
+const envPath = join(__dirname, '../.env');
+if (existsSync(envPath)) {
+  const envContent = readFileSync(envPath, 'utf8');
+  for (const line of envContent.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIndex = trimmed.indexOf('=');
+    if (eqIndex === -1) continue;
+    const key = trimmed.slice(0, eqIndex).trim();
+    const val = trimmed.slice(eqIndex + 1).trim();
+    if (key && !process.env[key]) {
+      process.env[key] = val;
+    }
+  }
+  console.log('[captureSnapshot] Loaded .env file');
+}
+
 const SNAPSHOT_PATH = join(__dirname, '../src/data/marketSnapshot.json');
+
+// Production Railway backend URL
+// Locally: uses VITE_API_URL from .env
+// In Railway cron: uses RAILWAY_BACKEND_URL env var
+const API_BASE = process.env.RAILWAY_BACKEND_URL
+  || process.env.VITE_API_URL
+  || 'http://localhost:4000';
+
+console.log(`[captureSnapshot] API_BASE: ${API_BASE}`);
+
+// Supabase client for writing snapshot to DB
+const supabaseUrl = process.env.SUPABASE_URL
+  || process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+let supabase = null;
+if (supabaseUrl && supabaseKey) {
+  supabase = createClient(supabaseUrl, supabaseKey, {
+    auth: { persistSession: false },
+  });
+  console.log('[captureSnapshot] Supabase client initialized');
+} else {
+  console.warn(
+    '[captureSnapshot] ⚠ Supabase credentials missing — ' +
+    'will write to file only'
+  );
+}
 
 // ── Symbol lists — LandingPage + Terminal Mini ──────────────────────────────
 const YAHOO_SYMBOLS = [
@@ -67,14 +115,12 @@ function formatDate(date) {
 async function fetchYahoo(symbols) {
   const results = {};
 
-  // Try local Express server first (has crumb/cookie session)
-  // Falls back silently if server is not running
-  const LOCAL_YAHOO = 'http://localhost:4000/api/yahoo/v7/finance/quote';
+  const YAHOO_URL = `${API_BASE}/api/yahoo/v7/finance/quote`;
   const qs = symbols.map(encodeURIComponent).join('%2C');
 
   try {
     const res = await fetch(
-      `${LOCAL_YAHOO}?symbols=${qs}&fields=regularMarketPrice,regularMarketChangePercent`,
+      `${YAHOO_URL}?symbols=${qs}&fields=regularMarketPrice,regularMarketChangePercent`,
       {
         headers: { 'Accept': 'application/json' },
         signal: AbortSignal.timeout(15000),
@@ -82,8 +128,8 @@ async function fetchYahoo(symbols) {
     );
 
     if (!res.ok) {
-      console.error(`[Yahoo] Local proxy returned HTTP ${res.status}`);
-      console.error('[Yahoo] Is the Express server running? (npm run start:server)');
+      console.error(`[Yahoo] Backend returned HTTP ${res.status}`);
+      console.error('[Yahoo] Check RAILWAY_BACKEND_URL or start local server');
       return results;
     }
 
@@ -112,8 +158,7 @@ async function fetchYahoo(symbols) {
 
   } catch (err) {
     if (err.name === 'TimeoutError' || err.cause?.code === 'ECONNREFUSED') {
-      console.error('[Yahoo] Could not reach local server — is it running?');
-      console.error('[Yahoo] Run: npm run start:server, then retry npm run snapshot');
+      console.error('[Yahoo] Could not reach backend — check RAILWAY_BACKEND_URL or start local server');
     } else {
       console.error(`[Yahoo] Fetch error: ${err.message}`);
     }
@@ -161,38 +206,37 @@ async function fetchCrypto(cryptoIds) {
 // ── Fetch BRAPI (B3 equities) ─────────────────────────────────────────────────
 async function fetchBrapi(symbols) {
   const results = {};
+  const brapiToken = process.env.VITE_BRAPI_TOKEN || '';
+  const url = `https://brapi.dev/api/quote/${symbols.join(',')}?token=${brapiToken}`;
 
-  for (const ticker of symbols) {
-    try {
-      const res = await fetch(
-        `https://brapi.dev/api/quote/${ticker}`,
-        {
-          headers: { 'Accept': 'application/json' },
-          signal: AbortSignal.timeout(15000),
-        }
-      );
+  try {
+    const res = await fetch(url, {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(15000),
+    });
 
-      if (!res.ok) {
-        console.warn(`  ✗ ${ticker} — HTTP ${res.status}`);
-        continue;
-      }
-
-      const json = await res.json();
-      const q = json?.results?.[0];
-      if (q) {
-        results[ticker] = {
-          price:     Math.round(q.regularMarketPrice * 100) / 100,
-          changePct: Math.round(q.regularMarketChangePercent * 100) / 100,
-        };
-        console.log(
-          `  ✓ ${ticker.padEnd(12)} ` +
-          `R$${q.regularMarketPrice.toFixed(2).padStart(10)}  ` +
-          `${q.regularMarketChangePercent >= 0 ? '+' : ''}${q.regularMarketChangePercent.toFixed(2)}%`
-        );
-      }
-    } catch (err) {
-      console.warn(`  ✗ ${ticker} — ${err.message}`);
+    if (!res.ok) {
+      console.error(`[BRAPI] HTTP ${res.status}`);
+      return results;
     }
+
+    const json = await res.json();
+    const quotes = json?.results || [];
+
+    for (const q of quotes) {
+      results[q.symbol] = {
+        price:     Math.round((q.regularMarketPrice ?? 0) * 100) / 100,
+        changePct: Math.round((q.regularMarketChangePercent ?? 0) * 100) / 100,
+      };
+      console.log(
+        `  ✓ ${q.symbol.padEnd(12)} ` +
+        `R$${(q.regularMarketPrice ?? 0).toFixed(2).padStart(10)}  ` +
+        `${(q.regularMarketChangePercent ?? 0) >= 0 ? '+' : ''}` +
+        `${(q.regularMarketChangePercent ?? 0).toFixed(2)}%`
+      );
+    }
+  } catch (err) {
+    console.error(`[BRAPI] Fetch error: ${err.message}`);
   }
 
   return results;
@@ -202,8 +246,6 @@ async function fetchBrapi(symbols) {
 async function main() {
   const now = new Date();
   console.log(`\n[captureSnapshot] Starting — ${now.toISOString()}`);
-  console.log('[captureSnapshot] Note: Express server must be running for Yahoo data.');
-  console.log('[captureSnapshot]       Start it with: npm run start:server\n');
 
   // Load existing snapshot to use as fallback for failed symbols
   const existing = loadExisting();
@@ -237,10 +279,40 @@ async function main() {
     assets,
   };
 
+  // Write to Supabase market_snapshot table
+  if (supabase) {
+    try {
+      const { error: insertError } = await supabase
+        .from('market_snapshot')
+        .insert({
+          snapshot_date:  snapshot.snapshot_date,
+          snapshot_label: snapshot.snapshot_label,
+          assets:         snapshot.assets,
+        });
+
+      if (insertError) {
+        console.error(
+          '[captureSnapshot] Supabase insert error:',
+          insertError.message
+        );
+      } else {
+        console.log(
+          '[captureSnapshot] ✓ Written to Supabase market_snapshot table'
+        );
+      }
+    } catch (err) {
+      console.error(
+        '[captureSnapshot] Supabase write failed:',
+        err.message
+      );
+    }
+  }
+
+  // Always write static fallback file
   writeFileSync(SNAPSHOT_PATH, JSON.stringify(snapshot, null, 2));
+  console.log(`[captureSnapshot] ✓ Written to static fallback file`);
 
   console.log(`\n[captureSnapshot] ✓ Done — ${succeeded.length}/${allSymbols.length} symbols updated`);
-  console.log(`[captureSnapshot] Written to ${SNAPSHOT_PATH}\n`);
 }
 
 main().catch(err => {
