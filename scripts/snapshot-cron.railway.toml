@@ -1,0 +1,16 @@
+# railway.toml for the snapshot-cron service
+# This file is referenced in Railway dashboard under
+# snapshot-cron → Settings → Config as Code → Config File Path
+# Set Config File Path to: scripts/snapshot-cron.railway.toml
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm install"
+
+[deploy]
+startCommand = "node scripts/captureSnapshot.js"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+[cron]
+schedule = "0 19 * * 1-5"
