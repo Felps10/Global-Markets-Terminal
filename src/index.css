@@ -61,3 +61,15 @@ body {
   --c-accent-br-muted: rgba(245,197,24,0.05);
   --c-accent-br-text:  #0C0A00;
 }
+
+/* ── Brazil context override ──────────────────────────────────────────────
+   Any element with data-context="brazil" swaps the accent family to gold.
+   ClubeShell sets this on its root div — no component changes needed.
+   ─────────────────────────────────────────────────────────────────────── */
+[data-context="brazil"] {
+  --c-accent:       var(--c-accent-br);        /* #F5C518 */
+  --c-accent-dim:   var(--c-accent-br-dim);
+  --c-accent-muted: var(--c-accent-br-muted);
+  --c-accent-text:  var(--c-accent-br-text);
+  --c-accent-hover: #d4a800;
+}

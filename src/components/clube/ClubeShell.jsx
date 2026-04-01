@@ -202,7 +202,7 @@ export default function ClubeShell({
   };
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: BG_PAGE, fontFamily: MONO }}>
+    <div data-theme="dark" data-context="brazil" style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: BG_PAGE, fontFamily: MONO }}>
 
       {/* ── SIDEBAR ── */}
       <div style={{
