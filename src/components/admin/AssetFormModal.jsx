@@ -39,7 +39,7 @@ const Input    = styled.input`
   border-radius: 4px; color: #E8EAF0;
   font-family: 'Space Mono', monospace; font-size: 13px;
   padding: 9px 12px; outline: none; box-sizing: border-box;
-  &:focus { border-color: ${(p) => (p.$error ? '#FF5252' : '#00BCD4')}; }
+  &:focus { border-color: ${(p) => (p.$error ? '#FF5252' : '#3b82f6')}; }
 `;
 const Select   = styled.select`
   width: 100%; background: #080C18;
@@ -48,7 +48,7 @@ const Select   = styled.select`
   font-family: 'Space Mono', monospace; font-size: 13px;
   padding: 9px 12px; outline: none; box-sizing: border-box;
   cursor: pointer;
-  &:focus { border-color: ${(p) => (p.$error ? '#FF5252' : '#00BCD4')}; }
+  &:focus { border-color: ${(p) => (p.$error ? '#FF5252' : '#3b82f6')}; }
 `;
 const Textarea = styled.textarea`
   width: 100%; background: #080C18;
@@ -57,7 +57,7 @@ const Textarea = styled.textarea`
   font-family: 'Space Mono', monospace; font-size: 12px;
   padding: 9px 12px; outline: none; resize: vertical;
   min-height: 80px; box-sizing: border-box;
-  &:focus { border-color: ${(p) => (p.$error ? '#FF5252' : '#00BCD4')}; }
+  &:focus { border-color: ${(p) => (p.$error ? '#FF5252' : '#3b82f6')}; }
 `;
 const FieldError = styled.div`font-size: 11px; color: #FF5252; margin-top: 4px;`;
 const Row2 = styled.div`
@@ -90,7 +90,7 @@ const CancelBtn = styled(Btn)`
   &:hover { border-color: #4A5568; color: #E8EAF0; }
 `;
 const SaveBtn = styled(Btn)`
-  background: ${(p) => (p.disabled ? '#1E2740' : '#00BCD4')};
+  background: ${(p) => (p.disabled ? '#1E2740' : '#3b82f6')};
   border: 1px solid transparent;
   color: ${(p) => (p.disabled ? '#4A5568' : '#080C18')};
   cursor: ${(p) => (p.disabled ? 'not-allowed' : 'pointer')};
@@ -360,7 +360,7 @@ export default function AssetFormModal({
                   type="checkbox"
                   checked={active}
                   onChange={(e) => setActive(e.target.checked)}
-                  style={{ accentColor: '#00BCD4', cursor: 'pointer', width: 14, height: 14 }}
+                  style={{ accentColor: '#3b82f6', cursor: 'pointer', width: 14, height: 14 }}
                 />
                 Active
               </label>

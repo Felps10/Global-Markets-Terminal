@@ -15,6 +15,23 @@ body {
   --c-text-3:       rgba(255,255,255,0.2);
   --c-panel:        #0e1016;
   --c-overlay:      rgba(0,0,0,0.7);
+
+  /* Accent — UI interactions (buttons, active nav, focus, links) */
+  --c-accent:          #3b82f6;
+  --c-accent-dim:      rgba(59,130,246,0.12);
+  --c-accent-muted:    rgba(59,130,246,0.06);
+  --c-accent-text:     #ffffff;
+  --c-accent-hover:    #2563eb;
+
+  /* Accent — market data ink (live dot, charts, sparklines, source badges) */
+  --c-accent-data:     #00C8FF;
+  --c-accent-data-dim: rgba(0,200,255,0.12);
+
+  /* Accent — Brazil / Clube context (overrides --c-accent in data-context="brazil") */
+  --c-accent-br:       #F5C518;
+  --c-accent-br-dim:   rgba(245,197,24,0.12);
+  --c-accent-br-muted: rgba(245,197,24,0.06);
+  --c-accent-br-text:  #0C0A00;
 }
 [data-theme="light"] {
   --c-bg-root:      linear-gradient(180deg, #f2f4fb 0%, #e8eaf6 100%);
@@ -26,4 +43,21 @@ body {
   --c-text-3:       rgba(10,10,18,0.3);
   --c-panel:        #eef0f9;
   --c-overlay:      rgba(0,0,0,0.35);
+
+  /* Accent — UI interactions */
+  --c-accent:          #3b82f6;
+  --c-accent-dim:      rgba(59,130,246,0.10);
+  --c-accent-muted:    rgba(59,130,246,0.05);
+  --c-accent-text:     #ffffff;
+  --c-accent-hover:    #2563eb;
+
+  /* Accent — market data ink */
+  --c-accent-data:     #00C8FF;
+  --c-accent-data-dim: rgba(0,200,255,0.10);
+
+  /* Accent — Brazil / Clube context */
+  --c-accent-br:       #F5C518;
+  --c-accent-br-dim:   rgba(245,197,24,0.10);
+  --c-accent-br-muted: rgba(245,197,24,0.05);
+  --c-accent-br-text:  #0C0A00;
 }
