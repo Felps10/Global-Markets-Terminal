@@ -281,7 +281,7 @@ export default function CoveragePage() {
                 padding: 0,
                 transition: 'color 150ms',
               }}
-              onMouseEnter={e => e.currentTarget.style.color = '#3b82f6'}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--c-accent)'}
               onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.25)'}
             >
               Home
@@ -302,7 +302,7 @@ export default function CoveragePage() {
             fontSize: 10,
             fontWeight: 600,
             letterSpacing: '0.25em',
-            color: '#3b82f6',
+            color: 'var(--c-accent)',
             textTransform: 'uppercase',
             marginBottom: 16,
           }}>
@@ -345,7 +345,7 @@ export default function CoveragePage() {
                   fontFamily: "'JetBrains Mono', monospace",
                   fontSize: 28,
                   fontWeight: 600,
-                  color: '#3b82f6',
+                  color: 'var(--c-accent)',
                 }}>{s.num}</span>
                 <span style={{
                   fontSize: 11,
@@ -369,7 +369,7 @@ export default function CoveragePage() {
                 fontSize: 10,
                 fontWeight: 600,
                 letterSpacing: '0.25em',
-                color: '#3b82f6',
+                color: 'var(--c-accent)',
                 textTransform: 'uppercase',
                 marginBottom: 16,
               }}>
@@ -396,7 +396,7 @@ export default function CoveragePage() {
               overflow: 'hidden',
             }}>
               {GLOBAL_COVERAGE.map((item, i) =>
-                renderCard(item, i, hoveredGlobal, setHoveredGlobal, '#3b82f6', '#080f1a')
+                renderCard(item, i, hoveredGlobal, setHoveredGlobal, 'var(--c-accent)', '#080f1a')
               )}
             </div>
           </div>
@@ -490,7 +490,7 @@ export default function CoveragePage() {
               onMouseEnter={() => setCtaHover(true)}
               onMouseLeave={() => setCtaHover(false)}
               style={{
-                background: ctaHover ? '#2563eb' : '#3b82f6',
+                background: ctaHover ? 'var(--c-accent-hover)' : 'var(--c-accent)',
                 color: '#080f1a',
                 border: 'none',
                 fontFamily: "'IBM Plex Sans', sans-serif",
@@ -514,7 +514,7 @@ export default function CoveragePage() {
                 margin: '20px auto 0',
                 fontFamily: "'IBM Plex Sans', sans-serif",
                 fontSize: 12,
-                color: signInHover ? '#3b82f6' : 'rgba(255,255,255,0.3)',
+                color: signInHover ? 'var(--c-accent)' : 'rgba(255,255,255,0.3)',
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',

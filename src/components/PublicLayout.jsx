@@ -7,7 +7,7 @@ export default function PublicLayout({ children }) {
   const isHome = location.pathname === '/';
 
   return (
-    <div style={{ minHeight: '100vh', background: '#080f1a', display: 'flex', flexDirection: 'column' }}>
+    <div data-theme="dark" style={{ minHeight: '100vh', background: '#080f1a', display: 'flex', flexDirection: 'column' }}>
       <GMTPublicHeader isHome={isHome} />
       <main style={{ flex: 1 }}>
         {children}

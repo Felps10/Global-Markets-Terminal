@@ -68,7 +68,7 @@ function AccessDenied() {
         marginTop:     8,
         fontFamily:    "'JetBrains Mono', monospace",
         fontSize:      12,
-        color:         '#3b82f6',
+        color:         'var(--c-accent)',
         textDecoration:'none',
         letterSpacing: '0.08em',
       }}>

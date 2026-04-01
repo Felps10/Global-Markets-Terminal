@@ -39,7 +39,7 @@ const Select = styled.select`
   font-family: 'Space Mono', monospace; font-size: 12px;
   padding: 9px 12px; outline: none; box-sizing: border-box;
   cursor: pointer; margin-bottom: 20px;
-  &:focus { border-color: #3b82f6; }
+  &:focus { border-color: var(--c-accent); }
 `;
 const AssetPreview = styled.div`
   background: #080C18;
@@ -59,7 +59,7 @@ const AssetRow = styled.div`
 const AssetSymbol = styled.span`
   font-family: 'Space Mono', monospace;
   font-size: 11px; font-weight: 700;
-  color: #3b82f6; min-width: 70px;
+  color: var(--c-accent); min-width: 70px;
 `;
 const AssetName = styled.span`
   font-family: 'Space Mono', monospace;

@@ -103,7 +103,7 @@ const AdminBadge = styled.span`
   background: rgba(0, 188, 212, 0.12);
   border: 1px solid rgba(0, 188, 212, 0.3);
   border-radius: 3px;
-  color: #3b82f6;
+  color: var(--c-accent);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.2em;
@@ -176,14 +176,14 @@ const AddBtn = styled.button`
   background: transparent;
   border: 1px solid #1E2740;
   border-radius: 4px;
-  color: #3b82f6;
+  color: var(--c-accent);
   cursor: pointer;
   font-family: 'Space Mono', monospace;
   font-size: 10px;
   letter-spacing: 0.05em;
   padding: 4px 10px;
   transition: all 0.15s;
-  &:hover { background: rgba(59,130,246,0.08); border-color: #3b82f6; }
+  &:hover { background: var(--c-accent-muted); border-color: var(--c-accent); }
 `;
 
 const ColBody = styled.div`
@@ -199,7 +199,7 @@ const ListRow = styled.div`
   border-bottom: 1px solid #0D1220;
   cursor: pointer;
   background: ${(p) => (p.$active ? 'rgba(0,188,212,0.07)' : 'transparent')};
-  border-left: 3px solid ${(p) => (p.$active ? '#3b82f6' : 'transparent')};
+  border-left: 3px solid ${(p) => (p.$active ? 'var(--c-accent)' : 'transparent')};
   transition: background 0.1s;
   display: flex;
   align-items: center;
@@ -250,8 +250,8 @@ const IconBtn = styled.button`
   transition: all 0.1s;
   &:hover {
     background: ${(p) => (p.$danger ? 'rgba(255,82,82,0.1)' : 'rgba(0,188,212,0.1)')};
-    border-color: ${(p) => (p.$danger ? '#FF5252' : '#3b82f6')};
-    color: ${(p) => (p.$danger ? '#FF5252' : '#3b82f6')};
+    border-color: ${(p) => (p.$danger ? '#FF5252' : 'var(--c-accent)')};
+    color: ${(p) => (p.$danger ? '#FF5252' : 'var(--c-accent)')};
   }
 `;
 
@@ -259,7 +259,7 @@ const TypeBadge = styled.span`
   background: rgba(0, 188, 212, 0.08);
   border: 1px solid rgba(0, 188, 212, 0.2);
   border-radius: 3px;
-  color: #3b82f6;
+  color: var(--c-accent);
   font-size: 9px;
   letter-spacing: 0.1em;
   padding: 1px 6px;
@@ -289,7 +289,7 @@ const L1SectionHeader = styled.div`
 const AssetSymbolLabel = styled.span`
   font-size: 12px;
   font-weight: 700;
-  color: #3b82f6;
+  color: var(--c-accent);
   font-family: 'Space Mono', monospace;
   min-width: 70px;
 `;

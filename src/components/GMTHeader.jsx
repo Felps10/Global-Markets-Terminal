@@ -56,10 +56,10 @@ function injectStyles() {
       left: 0;
       right: 0;
       height: 2px;
-      background: #3b82f6;
+      background: var(--c-accent);
       border-radius: 2px 2px 0 0;
     }
-    .gmt-nav-item:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
+    .gmt-nav-item:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
     .gmt-user-btn {
       display: inline-flex;
       align-items: center;
@@ -165,10 +165,10 @@ function GmtLogo() {
   return (
     <svg width="22" height="22" viewBox="0 0 22 22" fill="none" style={{ flexShrink: 0 }}>
       <rect width="22" height="22" rx="4" fill="rgba(59,130,246,0.15)" />
-      <rect x="3"  y="14" width="3" height="5"  rx="1" fill="#3b82f6" />
-      <rect x="7"  y="10" width="3" height="9"  rx="1" fill="#3b82f6" opacity="0.85" />
-      <rect x="11" y="6"  width="3" height="13" rx="1" fill="#3b82f6" opacity="0.7" />
-      <rect x="15" y="3"  width="3" height="16" rx="1" fill="#3b82f6" opacity="0.55" />
+      <rect x="3"  y="14" width="3" height="5"  rx="1" fill="var(--c-accent)" />
+      <rect x="7"  y="10" width="3" height="9"  rx="1" fill="var(--c-accent)" opacity="0.85" />
+      <rect x="11" y="6"  width="3" height="13" rx="1" fill="var(--c-accent)" opacity="0.7" />
+      <rect x="15" y="3"  width="3" height="16" rx="1" fill="var(--c-accent)" opacity="0.55" />
     </svg>
   );
 }
@@ -693,7 +693,7 @@ export function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) {
                 className="gmt-pub-nav-item"
                 onClick={() => navigate(item.path)}
                 style={{
-                  color: isActive(item.path) ? '#3b82f6' : 'rgba(255,255,255,0.5)',
+                  color: isActive(item.path) ? 'var(--c-accent)' : 'rgba(255,255,255,0.5)',
                 }}
               >
                 {item.label}
@@ -703,7 +703,7 @@ export function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) {
                   left: 16,
                   right: 16,
                   height: 2,
-                  background: '#3b82f6',
+                  background: 'var(--c-accent)',
                   opacity: isActive(item.path) ? 1 : 0,
                   transition: 'opacity 200ms ease',
                 }} />
@@ -776,7 +776,7 @@ export function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) {
                 className="gmt-pub-nav-item"
                 onClick={() => navigate(item.path)}
                 style={{
-                  color: isActive(item.path) ? '#3b82f6' : 'rgba(255,255,255,0.5)',
+                  color: isActive(item.path) ? 'var(--c-accent)' : 'rgba(255,255,255,0.5)',
                 }}
               >
                 {item.label}
@@ -786,7 +786,7 @@ export function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) {
                   left: 16,
                   right: 16,
                   height: 2,
-                  background: '#3b82f6',
+                  background: 'var(--c-accent)',
                   opacity: isActive(item.path) ? 1 : 0,
                   transition: 'opacity 200ms ease',
                 }} />
@@ -859,8 +859,8 @@ export function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) {
             <button
               onClick={handleSignUp}
               style={{
-                background: '#3b82f6',
-                border: '1px solid #3b82f6',
+                background: 'var(--c-accent)',
+                border: '1px solid var(--c-accent)',
                 borderRadius: 6,
                 color: '#080f1a',
                 cursor: 'pointer',
@@ -869,8 +869,8 @@ export function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) {
                 padding: '6px 16px',
                 transition: 'background 0.15s',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#2563eb'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = '#3b82f6'; }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--c-accent-hover)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--c-accent)'; }}
             >
               Create Account
             </button>
@@ -939,7 +939,7 @@ export function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) {
                 fontFamily: "'Syne', sans-serif",
                 fontSize: 28,
                 fontWeight: 700,
-                color: isActive(item.path) ? '#3b82f6' : 'rgba(255,255,255,0.85)',
+                color: isActive(item.path) ? 'var(--c-accent)' : 'rgba(255,255,255,0.85)',
                 padding: '12px 0',
                 width: 240,
                 textAlign: 'center',
@@ -996,7 +996,7 @@ export function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) {
                 fontFamily: "'Syne', sans-serif",
                 fontSize: 28,
                 fontWeight: 700,
-                color: isActive(item.path) ? '#3b82f6' : 'rgba(255,255,255,0.85)',
+                color: isActive(item.path) ? 'var(--c-accent)' : 'rgba(255,255,255,0.85)',
                 padding: '12px 0',
                 width: 240,
                 textAlign: 'center',
@@ -1051,7 +1051,7 @@ export function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) {
           <button
             onClick={() => { setMobileOpen(false); handleSignUp(); }}
             style={{
-              background: '#3b82f6',
+              background: 'var(--c-accent)',
               border: 'none',
               borderRadius: 4,
               color: '#080f1a',

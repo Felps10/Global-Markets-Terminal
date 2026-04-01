@@ -13,7 +13,7 @@ const BORDER2  = 'rgba(51,65,85,0.5)';
 const TXT_1    = '#e2e8f0';
 const TXT_2    = '#94a3b8';
 const TXT_3    = '#475569';
-const ACCENT   = '#3b82f6';
+const ACCENT   = 'var(--c-accent)';
 const GREEN    = '#00E676';
 const RED      = '#FF5252';
 const AMBER    = '#fbbf24';
@@ -245,7 +245,7 @@ Instruções:
               style={{
                 padding: '5px 11px', fontFamily: MONO, fontSize: 10, borderRadius: 3,
                 cursor: patching ? 'not-allowed' : 'pointer', letterSpacing: '0.08em',
-                background: act.destructive ? 'transparent' : 'rgba(59,130,246,0.12)',
+                background: act.destructive ? 'transparent' : 'var(--c-accent-dim)',
                 border: `1px solid ${act.destructive ? TXT_3 + '60' : 'rgba(59,130,246,0.4)'}`,
                 color: act.destructive ? TXT_3 : ACCENT,
               }}
@@ -424,7 +424,7 @@ Instruções:
                   REDIGIR MANUALMENTE
                 </button>
                 <button onClick={generateAta} disabled={ataLoading}
-                  style={{ padding: '8px 16px', fontFamily: MONO, fontSize: 10, background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.4)', color: ACCENT, borderRadius: 3, cursor: ataLoading ? 'not-allowed' : 'pointer' }}>
+                  style={{ padding: '8px 16px', fontFamily: MONO, fontSize: 10, background: 'var(--c-accent-dim)', border: '1px solid rgba(59,130,246,0.4)', color: ACCENT, borderRadius: 3, cursor: ataLoading ? 'not-allowed' : 'pointer' }}>
                   {ataLoading ? 'GERANDO...' : '✨ GERAR COM IA'}
                 </button>
               </div>

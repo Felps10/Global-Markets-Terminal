@@ -17,7 +17,7 @@ const BG_CARD = '#0d1824';
 const TXT_1   = '#e2e8f0';
 const TXT_2   = '#94a3b8';
 const TXT_3   = '#475569';
-const ACCENT  = '#3b82f6';
+const ACCENT  = 'var(--c-accent)';
 const GREEN   = '#00E676';
 const RED     = '#FF5252';
 const AMBER   = '#fbbf24';
@@ -217,7 +217,7 @@ const RELEASE_TO_FRED_KEY = {
 
 const CATEGORY_COLORS = {
   inflation:  AMBER,
-  employment: '#3b82f6',
+  employment: 'var(--c-accent)',
   growth:     GREEN,
   rates:      '#a855f7',
   housing:    '#fb923c',
@@ -255,7 +255,7 @@ function Sparkline({ observations }) {
 
   return (
     <svg width="100%" height={48} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-      <polyline points={fillPoints} fill="rgba(59,130,246,0.08)" stroke="none" />
+      <polyline points={fillPoints} fill="var(--c-accent-muted)" stroke="none" />
       <polyline points={linePoints} fill="none" stroke={ACCENT} strokeWidth="1.5" />
     </svg>
   );

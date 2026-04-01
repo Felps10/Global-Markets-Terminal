@@ -68,7 +68,7 @@ const Td = styled.td`
 `;
 
 const ROLE_COLORS = {
-  admin:        { bg: 'rgba(59,130,246,0.12)',   border: 'rgba(59,130,246,0.3)',   color: '#3b82f6' },
+  admin:        { bg: 'var(--c-accent-dim)',   border: 'rgba(59,130,246,0.3)',   color: 'var(--c-accent)' },
   club_manager: { bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.3)',  color: '#fbbf24' },
   club_member:  { bg: 'rgba(0,230,118,0.12)',   border: 'rgba(0,230,118,0.3)',   color: '#00E676' },
   user:         { bg: 'rgba(107,127,163,0.12)', border: 'rgba(107,127,163,0.2)', color: '#6B7FA3' },

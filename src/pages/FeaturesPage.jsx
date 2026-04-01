@@ -127,7 +127,7 @@ export default function FeaturesPage() {
                 padding: 0,
                 transition: 'color 150ms',
               }}
-              onMouseEnter={e => e.currentTarget.style.color = '#3b82f6'}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--c-accent)'}
               onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.25)'}
             >
               Home
@@ -154,7 +154,7 @@ export default function FeaturesPage() {
             fontSize: 10,
             fontWeight: 600,
             letterSpacing: '0.25em',
-            color: '#3b82f6',
+            color: 'var(--c-accent)',
             textTransform: 'uppercase',
             marginBottom: 16,
           }}>
@@ -205,7 +205,7 @@ export default function FeaturesPage() {
                     background: '#080f1a',
                     padding: '40px 32px',
                     borderLeft: hoveredFeature === index
-                      ? '2px solid #3b82f6'
+                      ? '2px solid var(--c-accent)'
                       : '2px solid transparent',
                     transition: 'border-left 0.15s',
                   }}
@@ -215,7 +215,7 @@ export default function FeaturesPage() {
                     fontSize: 9,
                     fontWeight: 600,
                     letterSpacing: '0.2em',
-                    color: '#3b82f6',
+                    color: 'var(--c-accent)',
                     textTransform: 'uppercase',
                     marginBottom: 14,
                   }}>
@@ -280,7 +280,7 @@ export default function FeaturesPage() {
                 fontSize: 10,
                 fontWeight: 600,
                 letterSpacing: '0.25em',
-                color: '#3b82f6',
+                color: 'var(--c-accent)',
                 textTransform: 'uppercase',
                 marginBottom: 16,
               }}>
@@ -318,7 +318,7 @@ export default function FeaturesPage() {
                       fontFamily: "'JetBrains Mono', monospace",
                       fontSize: 48,
                       fontWeight: 600,
-                      color: 'rgba(59,130,246,0.12)',
+                      color: 'var(--c-accent-dim)',
                       lineHeight: 1,
                       marginBottom: 16,
                     }}>
@@ -391,7 +391,7 @@ export default function FeaturesPage() {
               onMouseEnter={() => setCtaHover(true)}
               onMouseLeave={() => setCtaHover(false)}
               style={{
-                background: ctaHover ? '#2563eb' : '#3b82f6',
+                background: ctaHover ? 'var(--c-accent-hover)' : 'var(--c-accent)',
                 color: '#080f1a',
                 border: 'none',
                 fontFamily: "'IBM Plex Sans', sans-serif",
@@ -415,7 +415,7 @@ export default function FeaturesPage() {
                 margin: '20px auto 0',
                 fontFamily: "'IBM Plex Sans', sans-serif",
                 fontSize: 12,
-                color: signInHover ? '#3b82f6' : 'rgba(255,255,255,0.3)',
+                color: signInHover ? 'var(--c-accent)' : 'rgba(255,255,255,0.3)',
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',

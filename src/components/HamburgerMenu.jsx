@@ -180,10 +180,10 @@ export default function HamburgerMenu({
         {/* Section 3 — Markets */}
         <div style={{ padding: "16px 18px" }}>
           <SectionLabel>MARKETS</SectionLabel>
-          <NavItem icon="📊" label="Chart & Research" path="/markets/research" accent="#3b82f6" />
-          <NavItem icon="📐" label="Fundamentals" path="/markets/fundamentals" accent="#3b82f6" />
-          <NavItem icon="🌍" label="Macro Hub" path="/markets/macro" accent="#3b82f6" />
-          <NavItem icon="⚡" label="Signals" path="/markets/signals" accent="#3b82f6" />
+          <NavItem icon="📊" label="Chart & Research" path="/markets/research" accent="var(--c-accent)" />
+          <NavItem icon="📐" label="Fundamentals" path="/markets/fundamentals" accent="var(--c-accent)" />
+          <NavItem icon="🌍" label="Macro Hub" path="/markets/macro" accent="var(--c-accent)" />
+          <NavItem icon="⚡" label="Signals" path="/markets/signals" accent="var(--c-accent)" />
         </div>
 
         <Divider />

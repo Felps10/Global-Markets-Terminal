@@ -237,7 +237,7 @@ export default function SettingsPage() {
         <ReadOnlyField value={user?.email || '—'} />
       </Row>
       <Row label="Role">
-        <Badge color={user?.role === 'admin' ? '#f59e0b' : '#3b82f6'}>
+        <Badge color={user?.role === 'admin' ? '#f59e0b' : 'var(--c-accent)'}>
           {(user?.role || 'user').toUpperCase()}
         </Badge>
       </Row>

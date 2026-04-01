@@ -27,7 +27,7 @@ const BORDER2  = 'rgba(51,65,85,0.5)';
 const TXT_1    = '#e2e8f0';
 const TXT_2    = '#94a3b8';
 const TXT_3    = '#475569';
-const ACCENT   = '#3b82f6';
+const ACCENT   = 'var(--c-accent)';
 const GREEN    = '#00E676';
 const RED      = '#FF5252';
 const AMBER    = '#fbbf24';
@@ -493,7 +493,7 @@ function WelcomeBanner({ userId }) {
     <div style={{
       marginBottom: 20,
       padding: '12px 16px',
-      background: 'rgba(59,130,246,0.08)',
+      background: 'var(--c-accent-muted)',
       border: '1px solid rgba(59,130,246,0.25)',
       borderRadius: 6,
       display: 'flex',
@@ -1641,7 +1641,7 @@ export default function ClubePage() {
                           const statusConfig = {
                             aguardando_recursos:   { label: 'AGUARD. RECURSOS', bg: 'rgba(71,85,105,0.25)',  color: TXT_2  },
                             recursos_confirmados:  { label: 'RECURSOS CONF.',   bg: 'rgba(249,195,0,0.12)',  color: GOLD   },
-                            convertido:            { label: 'CONVERTIDO',        bg: 'rgba(59,130,246,0.12)', color: ACCENT },
+                            convertido:            { label: 'CONVERTIDO',        bg: 'var(--c-accent-dim)', color: ACCENT },
                           };
                           const badge = statusConfig[p.status] ?? { label: p.status.toUpperCase(), bg: 'transparent', color: TXT_3 };
 
@@ -2125,7 +2125,7 @@ export default function ClubePage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                     <div style={{
                       padding: '10px 14px', borderRadius: 4,
-                      background: 'rgba(59,130,246,0.08)',
+                      background: 'var(--c-accent-muted)',
                       border: '1px solid rgba(59,130,246,0.25)',
                       fontFamily: MONO, fontSize: 11, color: ACCENT,
                     }}>

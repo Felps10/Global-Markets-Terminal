@@ -52,7 +52,7 @@ const Input = styled.input`
   padding: 9px 12px;
   outline: none;
   box-sizing: border-box;
-  &:focus { border-color: ${(p) => (p.$error ? '#FF5252' : '#3b82f6')}; }
+  &:focus { border-color: ${(p) => (p.$error ? '#FF5252' : 'var(--c-accent)')}; }
 `;
 
 const Textarea = styled.textarea`
@@ -68,14 +68,14 @@ const Textarea = styled.textarea`
   resize: vertical;
   min-height: 72px;
   box-sizing: border-box;
-  &:focus { border-color: #3b82f6; }
+  &:focus { border-color: var(--c-accent); }
 `;
 
 const SlugPreview = styled.div`
   font-size: 11px;
   color: #4A5568;
   margin-top: 4px;
-  span { color: #3b82f6; }
+  span { color: var(--c-accent); }
 `;
 
 const FieldError = styled.div`
@@ -121,7 +121,7 @@ const CancelBtn = styled(Btn)`
 `;
 
 const SaveBtn = styled(Btn)`
-  background: ${(p) => (p.disabled ? '#1E2740' : '#3b82f6')};
+  background: ${(p) => (p.disabled ? '#1E2740' : 'var(--c-accent)')};
   border: 1px solid transparent;
   color: ${(p) => (p.disabled ? '#4A5568' : '#080C18')};
   cursor: ${(p) => (p.disabled ? 'not-allowed' : 'pointer')};
@@ -150,7 +150,7 @@ const RadioLabel = styled.label`
   font-size: 12px;
   color: #8892A4;
   cursor: pointer;
-  input { cursor: pointer; accent-color: #3b82f6; }
+  input { cursor: pointer; accent-color: var(--c-accent); }
 `;
 
 const Row2 = styled.div`

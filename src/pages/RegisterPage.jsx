@@ -13,28 +13,28 @@ function getStrength(pw) {
   return 1;
 }
 
-const STRENGTH_COLORS = ['', '#f87171', '#fb923c', '#3b82f6', '#00E676'];
+const STRENGTH_COLORS = ['', '#f87171', '#fb923c', 'var(--c-accent)', '#00E676'];
 const STRENGTH_LABELS = ['', 'WEAK', 'FAIR', 'GOOD', 'STRONG'];
 
 // ── Small decorative globe ──────────────────────────────────────────────────
 function MiniGlobe() {
   return (
     <svg viewBox="0 0 200 200" width={160} height={160} style={{ opacity: 0.35 }}>
-      <circle cx={100} cy={100} r={80} stroke="#3b82f6" strokeWidth={1} fill="none" opacity={0.6} />
-      <ellipse cx={100} cy={55}  rx={80} ry={20} fill="none" stroke="#3b82f6" strokeWidth={0.6} opacity={0.3} />
-      <ellipse cx={100} cy={72}  rx={80} ry={45} fill="none" stroke="#3b82f6" strokeWidth={0.6} opacity={0.3} />
-      <ellipse cx={100} cy={100} rx={80} ry={80} fill="none" stroke="#3b82f6" strokeWidth={0.6} opacity={0.3} />
-      <ellipse cx={100} cy={128} rx={80} ry={45} fill="none" stroke="#3b82f6" strokeWidth={0.6} opacity={0.3} />
-      <ellipse cx={100} cy={145} rx={80} ry={20} fill="none" stroke="#3b82f6" strokeWidth={0.6} opacity={0.3} />
+      <circle cx={100} cy={100} r={80} stroke="var(--c-accent)" strokeWidth={1} fill="none" opacity={0.6} />
+      <ellipse cx={100} cy={55}  rx={80} ry={20} fill="none" stroke="var(--c-accent)" strokeWidth={0.6} opacity={0.3} />
+      <ellipse cx={100} cy={72}  rx={80} ry={45} fill="none" stroke="var(--c-accent)" strokeWidth={0.6} opacity={0.3} />
+      <ellipse cx={100} cy={100} rx={80} ry={80} fill="none" stroke="var(--c-accent)" strokeWidth={0.6} opacity={0.3} />
+      <ellipse cx={100} cy={128} rx={80} ry={45} fill="none" stroke="var(--c-accent)" strokeWidth={0.6} opacity={0.3} />
+      <ellipse cx={100} cy={145} rx={80} ry={20} fill="none" stroke="var(--c-accent)" strokeWidth={0.6} opacity={0.3} />
       {[0, 30, 60, 90, 120, 150].map(deg => (
         <ellipse key={deg} cx={100} cy={100} rx={80} ry={80}
-          fill="none" stroke="#3b82f6" strokeWidth={0.5} opacity={0.2}
+          fill="none" stroke="var(--c-accent)" strokeWidth={0.5} opacity={0.2}
           transform={`rotate(${deg}, 100, 100)`} />
       ))}
       {[
         [100, 20], [100, 180], [20, 100], [180, 100], [65, 57], [135, 57],
       ].map(([cx, cy], i) => (
-        <circle key={i} cx={cx} cy={cy} r={2} fill="#3b82f6" opacity={0.5} />
+        <circle key={i} cx={cx} cy={cy} r={2} fill="var(--c-accent)" opacity={0.5} />
       ))}
     </svg>
   );
@@ -439,7 +439,7 @@ export default function RegisterPage() {
                   marginTop: 24,
                   background: !canSubmit
                     ? 'rgba(255,255,255,0.05)'
-                    : submitHover ? '#2563eb' : '#3b82f6',
+                    : submitHover ? 'var(--c-accent-hover)' : 'var(--c-accent)',
                   color: !canSubmit ? 'rgba(255,255,255,0.2)' : '#080f1a',
                   border: 'none',
                   borderRadius: 4,
@@ -468,15 +468,15 @@ export default function RegisterPage() {
                 style={{
                   fontFamily: "'IBM Plex Sans', sans-serif",
                   fontSize: 12,
-                  color: '#3b82f6',
+                  color: 'var(--c-accent)',
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
                   padding: 0,
                   transition: 'color 150ms',
                 }}
-                onMouseEnter={e => e.currentTarget.style.color = '#2563eb'}
-                onMouseLeave={e => e.currentTarget.style.color = '#3b82f6'}
+                onMouseEnter={e => e.currentTarget.style.color = 'var(--c-accent-hover)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'var(--c-accent)'}
               >
                 Sign in →
               </button>

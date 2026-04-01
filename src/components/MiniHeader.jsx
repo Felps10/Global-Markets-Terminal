@@ -26,10 +26,10 @@ export default function MiniHeader({ lang, onLangChange }) {
       <div style={{ display: 'flex', alignItems: 'center' }}>
         <svg width="18" height="18" viewBox="0 0 22 22" fill="none">
           <rect width="22" height="22" rx="4" fill="rgba(59,130,246,0.15)" />
-          <rect x="3" y="14" width="3" height="5" rx="1" fill="#3b82f6" />
-          <rect x="7" y="10" width="3" height="9" rx="1" fill="#3b82f6" opacity="0.85" />
-          <rect x="11" y="6" width="3" height="13" rx="1" fill="#3b82f6" opacity="0.7" />
-          <rect x="15" y="3" width="3" height="16" rx="1" fill="#3b82f6" opacity="0.55" />
+          <rect x="3" y="14" width="3" height="5" rx="1" fill="var(--c-accent)" />
+          <rect x="7" y="10" width="3" height="9" rx="1" fill="var(--c-accent)" opacity="0.85" />
+          <rect x="11" y="6" width="3" height="13" rx="1" fill="var(--c-accent)" opacity="0.7" />
+          <rect x="15" y="3" width="3" height="16" rx="1" fill="var(--c-accent)" opacity="0.55" />
         </svg>
         <span style={{
           fontFamily: "'IBM Plex Sans', sans-serif",
