@@ -16,14 +16,14 @@ const BG_CARD = '#0d1824';
 const TXT_1   = '#e2e8f0';
 const TXT_2   = '#94a3b8';
 const TXT_3   = '#475569';
-const ACCENT  = '#3b82f6';
+const ACCENT  = 'var(--c-accent)';
 const GREEN   = '#00E676';
 const RED     = '#FF5252';
 const ORANGE  = '#f59e0b';
 const AMBER   = '#fbbf24';
 
 // ─── Position colors — chip = bar = table header (consistent) ─────────────────
-const POS_COLORS = ['#3b82f6', '#f59e0b', '#00E676', '#a855f7', '#FF5252'];
+const POS_COLORS = ['var(--c-accent)', '#f59e0b', '#00E676', '#a855f7', '#FF5252'];
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 function fmtNum(v, d = 2) {

@@ -1645,7 +1645,7 @@ export default function GlobalMarketsTerminal() {
                         style={{
                           display: "flex", alignItems: "center",
                           height: 40, padding: "0 16px",
-                          borderLeft: `3px solid ${isOpen ? "#3b82f6" : borderAccent}`,
+                          borderLeft: `3px solid ${isOpen ? "var(--c-accent)" : borderAccent}`,
                           cursor: "pointer",
                           transition: "background 0.15s ease",
                           userSelect: "none",
@@ -1667,7 +1667,7 @@ export default function GlobalMarketsTerminal() {
                         <span style={{
                           fontFamily: "'JetBrains Mono', monospace",
                           fontSize: 16, lineHeight: 1,
-                          color: isOpen ? "#3b82f6" : "var(--c-text-3)",
+                          color: isOpen ? "var(--c-accent)" : "var(--c-text-3)",
                           transition: "transform 0.25s ease, color 0.15s ease",
                           transform: isOpen ? "rotate(90deg)" : "rotate(0deg)",
                           display: "inline-block",

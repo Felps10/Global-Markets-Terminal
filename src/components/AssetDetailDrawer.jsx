@@ -29,7 +29,7 @@ const BORDER    = 'rgba(30,41,59,0.8)';
 const TXT_1     = '#e2e8f0';
 const TXT_2     = '#94a3b8';
 const TXT_3     = '#475569';
-const ACCENT    = '#3b82f6';
+const ACCENT    = 'var(--c-accent)';
 const GREEN     = '#00E676';
 const RED       = '#FF5252';
 
@@ -1687,14 +1687,14 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
                       width: '100%', padding: '10px 16px',
                       fontFamily: "'JetBrains Mono', monospace",
                       fontSize: 11, fontWeight: 600, letterSpacing: '0.04em',
-                      color: ACCENT, background: 'rgba(59,130,246,0.08)',
+                      color: ACCENT, background: 'var(--c-accent-muted)',
                       border: '1px solid rgba(59,130,246,0.25)',
                       borderRadius: 6, cursor: 'pointer',
                       transition: 'all 0.15s ease',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                     }}
                     onMouseEnter={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.15)'; e.currentTarget.style.borderColor = 'rgba(59,130,246,0.4)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(59,130,246,0.08)'; e.currentTarget.style.borderColor = 'rgba(59,130,246,0.25)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'var(--c-accent-muted)'; e.currentTarget.style.borderColor = 'rgba(59,130,246,0.25)'; }}
                   >
                     Compare with peers →
                   </button>

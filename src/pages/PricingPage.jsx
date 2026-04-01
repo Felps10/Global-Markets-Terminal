@@ -80,7 +80,7 @@ export default function PricingPage() {
   }, []);
 
   function renderCell(value, tier) {
-    if (value === true) return <span style={{ color: tier === 'free' ? '#00E676' : '#3b82f6' }}>✓</span>;
+    if (value === true) return <span style={{ color: tier === 'free' ? '#00E676' : 'var(--c-accent)' }}>✓</span>;
     if (value === false) return <span style={{ color: 'rgba(255,255,255,0.15)' }}>—</span>;
     return <span style={{
       color: tier === 'free' ? 'rgba(255,255,255,0.5)' : 'rgba(59,130,246,0.7)',
@@ -128,7 +128,7 @@ export default function PricingPage() {
                 background: 'none', border: 'none', cursor: 'pointer',
                 padding: 0, transition: 'color 150ms',
               }}
-              onMouseEnter={e => e.currentTarget.style.color = '#3b82f6'}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--c-accent)'}
               onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.25)'}
             >Home</button>
             <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.15)', margin: '0 8px' }}>/</span>
@@ -137,7 +137,7 @@ export default function PricingPage() {
 
           <div style={{
             fontSize: 10, fontWeight: 600, letterSpacing: '0.25em',
-            color: '#3b82f6', textTransform: 'uppercase', marginBottom: 16,
+            color: 'var(--c-accent)', textTransform: 'uppercase', marginBottom: 16,
           }}>PRICING</div>
 
           <h1 style={{
@@ -172,7 +172,7 @@ export default function PricingPage() {
                 onClick={() => setIsAnnual(a => !a)}
                 style={{
                   width: 44, height: 24, borderRadius: 12,
-                  background: isAnnual ? '#3b82f6' : 'rgba(255,255,255,0.1)',
+                  background: isAnnual ? 'var(--c-accent)' : 'rgba(255,255,255,0.1)',
                   border: isAnnual ? 'none' : '1px solid rgba(255,255,255,0.15)',
                   cursor: 'pointer', position: 'relative',
                   transition: 'background 200ms ease',
@@ -196,7 +196,7 @@ export default function PricingPage() {
               {isAnnual && (
                 <span style={{
                   fontSize: 11, fontWeight: 600,
-                  color: '#ffffff', background: '#3b82f6',
+                  color: '#ffffff', background: 'var(--c-accent)',
                   borderRadius: 10, padding: '2px 10px', marginLeft: 4,
                 }}>SAVE 20%</span>
               )}
@@ -273,11 +273,11 @@ export default function PricingPage() {
                 <div style={{
                   position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)',
                   fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 9, fontWeight: 700,
-                  letterSpacing: '0.15em', color: '#ffffff', background: '#3b82f6',
+                  letterSpacing: '0.15em', color: '#ffffff', background: 'var(--c-accent)',
                   borderRadius: 10, padding: '3px 12px', whiteSpace: 'nowrap',
                 }}>MOST POPULAR</div>
 
-                <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 18, color: '#3b82f6', marginBottom: 8 }}>Pro</div>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 18, color: 'var(--c-accent)', marginBottom: 8 }}>Pro</div>
                 <div style={{ display: 'flex', alignItems: 'baseline' }}>
                   <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 40, color: 'rgba(255,255,255,0.92)' }}>${proPrice}</span>
                   <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.3)', marginLeft: 4 }}>/month</span>
@@ -298,7 +298,7 @@ export default function PricingPage() {
                   'All 8 data sources',
                 ].map((f, i) => (
                   <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10 }}>
-                    <span style={{ color: '#3b82f6', fontSize: 13, flexShrink: 0, marginTop: 1 }}>✓</span>
+                    <span style={{ color: 'var(--c-accent)', fontSize: 13, flexShrink: 0, marginTop: 1 }}>✓</span>
                     <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.4 }}>{f}</span>
                   </div>
                 ))}
@@ -309,7 +309,7 @@ export default function PricingPage() {
                   onMouseLeave={() => setProCTAHovered(false)}
                   style={{
                     width: '100%', marginTop: 28, padding: 13,
-                    background: proCTAHovered ? '#2563eb' : '#3b82f6',
+                    background: proCTAHovered ? 'var(--c-accent-hover)' : 'var(--c-accent)',
                     color: '#080f1a', border: 'none',
                     borderRadius: 4, cursor: 'pointer',
                     fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, fontWeight: 600,
@@ -340,7 +340,7 @@ export default function PricingPage() {
                   'Dedicated support',
                 ].map((f, i) => (
                   <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10 }}>
-                    <span style={{ color: '#3b82f6', fontSize: 13, flexShrink: 0, marginTop: 1 }}>✓</span>
+                    <span style={{ color: 'var(--c-accent)', fontSize: 13, flexShrink: 0, marginTop: 1 }}>✓</span>
                     <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.4 }}>{f}</span>
                   </div>
                 ))}
@@ -351,9 +351,9 @@ export default function PricingPage() {
                   onMouseLeave={() => setClubCTAHovered(false)}
                   style={{
                     width: '100%', marginTop: 28, padding: 13,
-                    background: clubCTAHovered ? 'rgba(59,130,246,0.08)' : 'transparent',
-                    border: clubCTAHovered ? '1px solid #3b82f6' : '1px solid rgba(59,130,246,0.4)',
-                    color: '#3b82f6',
+                    background: clubCTAHovered ? 'var(--c-accent-muted)' : 'transparent',
+                    border: clubCTAHovered ? '1px solid var(--c-accent)' : '1px solid rgba(59,130,246,0.4)',
+                    color: 'var(--c-accent)',
                     borderRadius: 4, cursor: 'pointer',
                     fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, fontWeight: 500,
                     transition: 'background 150ms, border-color 150ms',
@@ -372,7 +372,7 @@ export default function PricingPage() {
           <div style={{ maxWidth: 1100, margin: '0 auto' }}>
             <div style={{
               fontSize: 10, fontWeight: 600, letterSpacing: '0.25em',
-              color: '#3b82f6', textTransform: 'uppercase', marginBottom: 16,
+              color: 'var(--c-accent)', textTransform: 'uppercase', marginBottom: 16,
             }}>FULL COMPARISON</div>
             <h2 style={{
               fontFamily: "'Syne', sans-serif", fontWeight: 800,
@@ -389,7 +389,7 @@ export default function PricingPage() {
                         padding: '12px 20px',
                         fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 11,
                         fontWeight: 600, letterSpacing: '0.1em',
-                        color: h === 'Pro' ? '#3b82f6'
+                        color: h === 'Pro' ? 'var(--c-accent)'
                           : h === 'Club Member' ? 'rgba(59,130,246,0.6)'
                           : 'rgba(255,255,255,0.35)',
                         textTransform: 'uppercase',
@@ -455,7 +455,7 @@ export default function PricingPage() {
             <div style={{ textAlign: 'center', marginBottom: 48 }}>
               <div style={{
                 fontSize: 10, fontWeight: 600, letterSpacing: '0.25em',
-                color: '#3b82f6', textTransform: 'uppercase', marginBottom: 16,
+                color: 'var(--c-accent)', textTransform: 'uppercase', marginBottom: 16,
               }}>FAQ</div>
               <h2 style={{
                 fontFamily: "'Syne', sans-serif", fontWeight: 800,
@@ -524,7 +524,7 @@ export default function PricingPage() {
                 onMouseEnter={() => setCtaHover(true)}
                 onMouseLeave={() => setCtaHover(false)}
                 style={{
-                  background: ctaHover ? '#2563eb' : '#3b82f6',
+                  background: ctaHover ? 'var(--c-accent-hover)' : 'var(--c-accent)',
                   color: '#080f1a', border: 'none',
                   fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 14, fontWeight: 600,
                   letterSpacing: '0.1em', padding: '16px 48px',
@@ -538,7 +538,7 @@ export default function PricingPage() {
                 style={{
                   background: 'transparent',
                   border: secHover ? '1px solid rgba(59,130,246,0.7)' : '1px solid rgba(59,130,246,0.3)',
-                  color: secHover ? '#2563eb' : '#3b82f6',
+                  color: secHover ? 'var(--c-accent-hover)' : 'var(--c-accent)',
                   fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 14, fontWeight: 600,
                   letterSpacing: '0.1em', padding: '16px 48px',
                   borderRadius: 2, cursor: 'pointer',

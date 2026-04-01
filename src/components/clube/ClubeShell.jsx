@@ -11,7 +11,7 @@ const TXT_1    = '#e2e8f0';
 const TXT_2    = '#94a3b8';
 const TXT_3    = '#475569';
 const TXT_4    = '#334155';
-const ACCENT   = '#3b82f6';
+const ACCENT   = 'var(--c-accent)';
 const GREEN    = '#00E676';
 const RED      = '#FF5252';
 const AMBER    = '#fbbf24';
@@ -328,7 +328,7 @@ export default function ClubeShell({
                           padding: '7px 14px',
                           fontSize: 11, letterSpacing: '0.08em',
                           color: item.soon ? TXT_4 : isActive ? TXT_1 : TXT_3,
-                          background: isActive ? 'rgba(59,130,246,0.08)' : 'transparent',
+                          background: isActive ? 'var(--c-accent-muted)' : 'transparent',
                           borderLeft: `2px solid ${isActive ? ACCENT : 'transparent'}`,
                           cursor: item.soon ? 'not-allowed' : 'pointer',
                           whiteSpace: 'nowrap',

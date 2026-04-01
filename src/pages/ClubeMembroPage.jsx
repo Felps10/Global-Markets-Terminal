@@ -16,7 +16,7 @@ const BORDER2  = 'rgba(51,65,85,0.5)';
 const TXT_1    = '#e2e8f0';
 const TXT_2    = '#94a3b8';
 const TXT_3    = '#475569';
-const ACCENT   = '#3b82f6';
+const ACCENT   = 'var(--c-accent)';
 const GREEN    = '#00E676';
 const RED      = '#FF5252';
 const AMBER    = '#fbbf24';
@@ -33,7 +33,7 @@ const SUITABILITY_COLORS = {
 const STATUS_BADGE = {
   aguardando_recursos:  { label: 'AGUARD. RECURSOS', bg: 'rgba(71,85,105,0.25)',  color: TXT_3  },
   recursos_confirmados: { label: 'RECURSOS CONF.',   bg: 'rgba(249,195,0,0.12)',  color: GOLD   },
-  convertido:           { label: 'CONVERTIDO',        bg: 'rgba(59,130,246,0.12)', color: ACCENT },
+  convertido:           { label: 'CONVERTIDO',        bg: 'var(--c-accent-dim)', color: ACCENT },
   pago:                 { label: 'PAGO',               bg: 'rgba(0,230,118,0.12)', color: GREEN  },
   cancelado:            { label: 'CANCELADO',          bg: 'rgba(255,82,82,0.08)', color: RED    },
 };
@@ -230,7 +230,7 @@ export default function ClubeMembroPage() {
           <button
             onClick={() => setShowAddModal(true)}
             style={{
-              background: 'rgba(59,130,246,0.12)',
+              background: 'var(--c-accent-dim)',
               border: '1px solid rgba(59,130,246,0.4)',
               color: ACCENT, fontFamily: MONO, fontSize: 10,
               letterSpacing: '0.1em', padding: '5px 11px',

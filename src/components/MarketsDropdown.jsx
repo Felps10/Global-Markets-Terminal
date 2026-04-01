@@ -20,7 +20,7 @@ function injectDropdownStyles() {
     }
     .markets-dropdown-item.item-active {
       background: rgba(59,130,246,0.06) !important;
-      border-left: 3px solid #3b82f6;
+      border-left: 3px solid var(--c-accent);
     }
   `;
   document.head.appendChild(el);
@@ -134,7 +134,7 @@ export default function MarketsDropdown({ user }) {
                       padding: '12px 16px',
                       background: 'transparent',
                       border: 'none',
-                      borderLeft: itemActive ? '3px solid #3b82f6' : '3px solid transparent',
+                      borderLeft: itemActive ? '3px solid var(--c-accent)' : '3px solid transparent',
                       cursor: 'pointer',
                       textAlign: 'left',
                     }}
@@ -145,7 +145,7 @@ export default function MarketsDropdown({ user }) {
                         fontFamily: "'JetBrains Mono', monospace",
                         fontSize: 12,
                         fontWeight: itemActive ? 600 : 500,
-                        color: itemActive ? '#3b82f6' : '#e2e8f0',
+                        color: itemActive ? 'var(--c-accent)' : '#e2e8f0',
                         letterSpacing: '0.02em',
                       }}>
                         {item.label}

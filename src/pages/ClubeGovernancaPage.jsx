@@ -13,7 +13,7 @@ const BORDER2  = 'rgba(51,65,85,0.5)';
 const TXT_1    = '#e2e8f0';
 const TXT_2    = '#94a3b8';
 const TXT_3    = '#475569';
-const ACCENT   = '#3b82f6';
+const ACCENT   = 'var(--c-accent)';
 const GREEN    = '#00E676';
 const RED      = '#FF5252';
 const AMBER    = '#fbbf24';
@@ -163,7 +163,7 @@ export default function ClubeGovernancaPage() {
           <button
             onClick={() => setShowForm(true)}
             style={{
-              background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.4)',
+              background: 'var(--c-accent-dim)', border: '1px solid rgba(59,130,246,0.4)',
               color: ACCENT, fontFamily: MONO, fontSize: 10,
               letterSpacing: '0.1em', padding: '5px 11px',
               cursor: 'pointer', borderRadius: 3,

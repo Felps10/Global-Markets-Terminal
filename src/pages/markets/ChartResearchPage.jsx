@@ -23,7 +23,7 @@ const BG_CARD = '#0d1824';
 const TXT_1   = '#e2e8f0';
 const TXT_2   = '#94a3b8';
 const TXT_3   = '#475569';
-const ACCENT  = '#3b82f6';
+const ACCENT  = 'var(--c-accent)';
 const GREEN   = '#00E676';
 const RED     = '#FF5252';
 const ORANGE  = '#f59e0b';
@@ -148,7 +148,7 @@ function TabBtn({ label, active, onClick, disabled }) {
     <button
       onClick={disabled ? undefined : onClick}
       style={{
-        background:    active ? 'rgba(59,130,246,0.12)' : 'transparent',
+        background:    active ? 'var(--c-accent-dim)' : 'transparent',
         border:        active ? '1px solid rgba(59,130,246,0.4)' : '1px solid transparent',
         borderRadius:  4,
         color:         disabled ? '#334155' : active ? ACCENT : TXT_3,

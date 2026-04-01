@@ -188,25 +188,25 @@ export default function LandingPage() {
               style={{
                 width: '100%',
                 maxWidth: 420,
-                filter: 'drop-shadow(0 0 40px rgba(59,130,246,0.12))',
+                filter: 'drop-shadow(0 0 40px var(--c-accent-dim))',
               }}
             >
               {/* Outer circle */}
-              <circle cx={200} cy={200} r={160} stroke="#3b82f6" strokeWidth={1} fill="none" opacity={0.6} />
+              <circle cx={200} cy={200} r={160} stroke="var(--c-accent)" strokeWidth={1} fill="none" opacity={0.6} />
 
               {/* Latitude ellipses */}
-              <ellipse cx={200} cy={110} rx={160} ry={40} fill="none" stroke="#3b82f6" strokeWidth={0.6} opacity={0.3} />
-              <ellipse cx={200} cy={145} rx={160} ry={90} fill="none" stroke="#3b82f6" strokeWidth={0.6} opacity={0.3} />
-              <ellipse cx={200} cy={200} rx={160} ry={160} fill="none" stroke="#3b82f6" strokeWidth={0.6} opacity={0.3} />
-              <ellipse cx={200} cy={255} rx={160} ry={90} fill="none" stroke="#3b82f6" strokeWidth={0.6} opacity={0.3} />
-              <ellipse cx={200} cy={290} rx={160} ry={40} fill="none" stroke="#3b82f6" strokeWidth={0.6} opacity={0.3} />
+              <ellipse cx={200} cy={110} rx={160} ry={40} fill="none" stroke="var(--c-accent)" strokeWidth={0.6} opacity={0.3} />
+              <ellipse cx={200} cy={145} rx={160} ry={90} fill="none" stroke="var(--c-accent)" strokeWidth={0.6} opacity={0.3} />
+              <ellipse cx={200} cy={200} rx={160} ry={160} fill="none" stroke="var(--c-accent)" strokeWidth={0.6} opacity={0.3} />
+              <ellipse cx={200} cy={255} rx={160} ry={90} fill="none" stroke="var(--c-accent)" strokeWidth={0.6} opacity={0.3} />
+              <ellipse cx={200} cy={290} rx={160} ry={40} fill="none" stroke="var(--c-accent)" strokeWidth={0.6} opacity={0.3} />
 
               {/* Longitude lines */}
               {[0, 30, 60, 90, 120, 150].map(deg => (
                 <ellipse
                   key={deg}
                   cx={200} cy={200} rx={160} ry={160}
-                  fill="none" stroke="#3b82f6" strokeWidth={0.5} opacity={0.2}
+                  fill="none" stroke="var(--c-accent)" strokeWidth={0.5} opacity={0.2}
                   transform={`rotate(${deg}, 200, 200)`}
                 />
               ))}
@@ -223,7 +223,7 @@ export default function LandingPage() {
                 <circle
                   key={i}
                   cx={node.cx} cy={node.cy} r={3.5}
-                  fill="#3b82f6"
+                  fill="var(--c-accent)"
                   className="gmt-node"
                   style={{ animationDelay: node.delay }}
                 />
@@ -238,7 +238,7 @@ export default function LandingPage() {
               fontSize: 11,
               fontWeight: 600,
               letterSpacing: '0.2em',
-              color: '#3b82f6',
+              color: 'var(--c-accent)',
               marginBottom: 24,
               textTransform: 'uppercase',
             }}>
@@ -278,7 +278,7 @@ export default function LandingPage() {
                 onMouseEnter={() => setPrimaryHover(true)}
                 onMouseLeave={() => setPrimaryHover(false)}
                 style={{
-                  background: primaryHover ? '#2563eb' : '#3b82f6',
+                  background: primaryHover ? 'var(--c-accent-hover)' : 'var(--c-accent)',
                   color: '#080f1a',
                   border: 'none',
                   fontFamily: "'IBM Plex Sans', sans-serif",
@@ -340,8 +340,8 @@ export default function LandingPage() {
         {/* ── TICKER STRIP ──────────────────────────────────────────────── */}
         <div style={{
           background: '#040810',
-          borderTop: '1px solid rgba(59,130,246,0.08)',
-          borderBottom: '1px solid rgba(59,130,246,0.08)',
+          borderTop: '1px solid var(--c-accent-muted)',
+          borderBottom: '1px solid var(--c-accent-muted)',
           height: 48,
           display: 'flex',
           alignItems: 'center',
@@ -362,14 +362,14 @@ export default function LandingPage() {
                 width: 6,
                 height: 6,
                 borderRadius: '50%',
-                background: '#3b82f6',
+                background: 'var(--c-accent)',
               }}
             />
             <span style={{
               fontFamily: "'JetBrains Mono', monospace",
               fontSize: 9,
               letterSpacing: '0.2em',
-              color: '#3b82f6',
+              color: 'var(--c-accent)',
               fontWeight: 600,
             }}>
               LIVE
@@ -449,7 +449,7 @@ export default function LandingPage() {
                 fontSize: 10,
                 fontWeight: 600,
                 letterSpacing: '0.25em',
-                color: '#3b82f6',
+                color: 'var(--c-accent)',
                 marginBottom: 16,
                 textTransform: 'uppercase',
               }}>
@@ -488,7 +488,7 @@ export default function LandingPage() {
               <div style={{
                 width: 32,
                 height: 1,
-                background: '#3b82f6',
+                background: 'var(--c-accent)',
                 opacity: 0.4,
                 marginBottom: 40,
               }} />
@@ -498,7 +498,7 @@ export default function LandingPage() {
                 fontSize: 10,
                 fontWeight: 600,
                 letterSpacing: '0.25em',
-                color: '#3b82f6',
+                color: 'var(--c-accent)',
                 marginBottom: 16,
                 textTransform: 'uppercase',
               }}>
@@ -527,7 +527,7 @@ export default function LandingPage() {
                 fontSize: 10,
                 fontWeight: 600,
                 letterSpacing: '0.25em',
-                color: '#3b82f6',
+                color: 'var(--c-accent)',
                 marginBottom: 20,
                 textTransform: 'uppercase',
               }}>
@@ -594,7 +594,7 @@ export default function LandingPage() {
                 fontSize: 10,
                 fontWeight: 600,
                 letterSpacing: '0.25em',
-                color: '#3b82f6',
+                color: 'var(--c-accent)',
                 textTransform: 'uppercase',
                 marginBottom: 16,
               }}>
@@ -694,7 +694,7 @@ export default function LandingPage() {
                 fontSize: 10,
                 fontWeight: 600,
                 letterSpacing: '0.25em',
-                color: '#3b82f6',
+                color: 'var(--c-accent)',
                 textTransform: 'uppercase',
                 marginBottom: 16,
               }}>
@@ -735,7 +735,7 @@ export default function LandingPage() {
                   fontFamily: "'IBM Plex Sans', sans-serif",
                   fontSize: 13,
                   fontWeight: 500,
-                  color: coverageLinkHover ? '#2563eb' : '#3b82f6',
+                  color: coverageLinkHover ? 'var(--c-accent-hover)' : 'var(--c-accent)',
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
@@ -771,7 +771,7 @@ export default function LandingPage() {
                     fontFamily: "'JetBrains Mono', monospace",
                     fontSize: 20,
                     fontWeight: 600,
-                    color: '#3b82f6',
+                    color: 'var(--c-accent)',
                     marginBottom: 4,
                   }}>
                     {s.num}
@@ -849,7 +849,7 @@ export default function LandingPage() {
                 fontSize: 10,
                 fontWeight: 600,
                 letterSpacing: '0.25em',
-                color: '#3b82f6',
+                color: 'var(--c-accent)',
                 textTransform: 'uppercase',
                 marginBottom: 16,
               }}>
@@ -890,7 +890,7 @@ export default function LandingPage() {
                   fontFamily: "'IBM Plex Sans', sans-serif",
                   fontSize: 13,
                   fontWeight: 500,
-                  color: featuresLinkHover ? '#2563eb' : '#3b82f6',
+                  color: featuresLinkHover ? 'var(--c-accent-hover)' : 'var(--c-accent)',
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
@@ -919,7 +919,7 @@ export default function LandingPage() {
                 fontSize: 10,
                 fontWeight: 600,
                 letterSpacing: '0.25em',
-                color: '#3b82f6',
+                color: 'var(--c-accent)',
                 textTransform: 'uppercase',
                 marginBottom: 16,
               }}>
@@ -988,7 +988,7 @@ export default function LandingPage() {
                       fontFamily: "'JetBrains Mono', monospace",
                       fontSize: 11,
                       fontWeight: 600,
-                      color: '#3b82f6',
+                      color: 'var(--c-accent)',
                     }}>
                       {t.name.charAt(0)}
                     </div>
@@ -1031,7 +1031,7 @@ export default function LandingPage() {
               fontSize: 10,
               fontWeight: 600,
               letterSpacing: '0.25em',
-              color: '#3b82f6',
+              color: 'var(--c-accent)',
               textTransform: 'uppercase',
               marginBottom: 24,
             }}>
@@ -1067,7 +1067,7 @@ export default function LandingPage() {
               onMouseEnter={() => setCtaHovered(true)}
               onMouseLeave={() => setCtaHovered(false)}
               style={{
-                background: ctaHovered ? '#2563eb' : '#3b82f6',
+                background: ctaHovered ? 'var(--c-accent-hover)' : 'var(--c-accent)',
                 color: '#080f1a',
                 border: 'none',
                 fontFamily: "'IBM Plex Sans', sans-serif",
@@ -1094,7 +1094,7 @@ export default function LandingPage() {
                 marginRight: 'auto',
                 fontFamily: "'IBM Plex Sans', sans-serif",
                 fontSize: 12,
-                color: signInLinkHover ? '#3b82f6' : 'rgba(255,255,255,0.3)',
+                color: signInLinkHover ? 'var(--c-accent)' : 'rgba(255,255,255,0.3)',
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
