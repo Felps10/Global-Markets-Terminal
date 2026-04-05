@@ -38,6 +38,12 @@ if (existsSync(envPath)) {
   console.log('[captureSnapshot] Loaded .env file');
 }
 
+import {
+  YAHOO_SYMBOLS,
+  CRYPTO_IDS,
+  BRAPI_SYMBOLS,
+} from '../server/lib/terminalSymbols.js';
+
 const SNAPSHOT_PATH = join(__dirname, '../src/data/marketSnapshot.json');
 
 // Production Railway backend URL
@@ -66,30 +72,6 @@ if (supabaseUrl && supabaseKey) {
     'will write to file only'
   );
 }
-
-// ── Symbol lists — LandingPage + Terminal Mini ──────────────────────────────
-const YAHOO_SYMBOLS = [
-  // LandingPage ticker
-  '^GSPC', '^DJI', '^IXIC',
-  'AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META',
-  'EURUSD=X', 'GBPUSD=X', 'USDJPY=X',
-  'JPM', 'GS', 'XOM', 'CVX', 'LLY', 'UNH', 'TSM', 'AVGO',
-  '^FTSE', '^N225',
-  'USDCAD=X', 'AUDUSD=X',
-  // Terminal Mini additions
-  'AMD', 'AXP', 'ABBV', 'COST', 'AMT', 'BA', 'BE', 'BP',
-  'BYDDY', 'BIIB', 'CAT', 'EWY',
-  'GC=F', 'BNO', 'CANE',
-  'DVY', 'HYG', 'BIL', 'AGG',
-];
-
-const CRYPTO_IDS = {
-  BTC: 'bitcoin',
-  ETH: 'ethereum',
-  SOL: 'solana',
-};
-
-const BRAPI_SYMBOLS = ['PETR4', 'ACWI11', 'ALZR11'];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function loadExisting() {

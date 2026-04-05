@@ -16,7 +16,9 @@ import preferencesRoutes from './routes/preferences.js';
 import clubeRoutes       from './routes/clubes.js';
 import yahooRoutes       from './routes/yahoo.js';
 import snapshotRoutes    from './routes/snapshot.js';
+import quotesRoutes      from './routes/quotes.js';
 import brazilMacroRoutes from './routes/brazilMacro.js';
+import { start as startQuoteFetcher, stop as stopQuoteFetcher } from './services/quoteFetchManager.js';
 
 const PORT = process.env.PORT || 4000;
 const app  = express();
@@ -64,6 +66,11 @@ app.use('/api/yahoo',          yahooRoutes);
 // Serves market snapshot to unauthenticated public pages.
 // Data is non-sensitive delayed market prices.
 app.use('/api/v1/snapshot', snapshotRoutes);
+
+// /api/v1/quotes — PUBLIC (no auth)
+// Server-side cached Yahoo + CoinGecko data. All clients read from this
+// instead of each hitting external APIs independently through the proxy.
+app.use('/api/v1/quotes', quotesRoutes);
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/api/v1/health', (_req, res) => res.json({ status: 'ok', ts: Date.now() }));
@@ -126,6 +133,7 @@ async function start() {
     console.log('│    PUT    /api/v1/preferences                        │');
     console.log('│    GET    /api/v1/clubes                             │');
     console.log('│    POST   /api/v1/clubes                             │');
+    console.log('│    GET    /api/v1/quotes/live                        │');
     console.log('│    GET    /api/yahoo/v7/finance/quote                │');
     console.log('│    GET    /api/yahoo/v8/finance/chart                │');
     console.log('│    ANY    /proxy/yahoo/*  (Yahoo crumb/cookie proxy) │');
@@ -153,6 +161,10 @@ async function start() {
   }
   console.log('[startup] Supabase connectivity check — OK');
 
+  // Start server-side quote fetcher — consolidates all Yahoo/CoinGecko
+  // requests into one periodic fetch per interval (N users = 1 request)
+  startQuoteFetcher();
+
   if (process.env.NODE_ENV !== 'production') {
     await seedClubeDemo();
   }
@@ -160,6 +172,7 @@ async function start() {
   // Graceful shutdown — Railway sends SIGTERM before stopping a deployment
   process.on('SIGTERM', () => {
     console.log('[shutdown] SIGTERM received — closing HTTP server gracefully');
+    stopQuoteFetcher();
     server.close(() => {
       console.log('[shutdown] HTTP server closed');
       process.exit(0);

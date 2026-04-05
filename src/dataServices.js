@@ -773,7 +773,7 @@ function generateSparkline(basePrice, vol, points = 30) {
   return arr;
 }
 
-function parseYahooResults(results, prevData, assets, volatility) {
+export function parseYahooResults(results, prevData, assets, volatility) {
   const data = {};
   results.forEach((q) => {
     const sym = q.symbol;
@@ -1300,4 +1300,65 @@ export async function fetchMiniPrices() {
   }
 
   return results;
+}
+
+// ─── SERVER-SIDE CACHED QUOTES ───────────────────────────────────────────────
+
+/**
+ * Fetch from the server-side cached endpoint.
+ * Returns { yahoo, crypto, meta } or null on failure.
+ * This is the primary data source — all clients share one server-side cache.
+ */
+export async function fetchLiveQuotes() {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/quotes/live`, {
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch the latest market snapshot as a fallback.
+ * Transforms the flat snapshot shape into the market data shape
+ * that the terminal components expect.
+ */
+export async function fetchSnapshotFallback() {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/snapshot`, {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    const snap = await res.json();
+    if (!snap?.assets) return null;
+
+    // Transform { symbol: { price, changePct } } → { symbol: { price, change, changePct, ... } }
+    const data = {};
+    for (const [sym, d] of Object.entries(snap.assets)) {
+      const price     = d.price || 0;
+      const changePct = d.changePct || 0;
+      const prevClose = price / (1 + changePct / 100);
+      data[sym] = {
+        price,
+        change:           price - prevClose,
+        changePct,
+        prevClose,
+        high:             price,
+        low:              price,
+        volume:           null,
+        marketCap:        null,
+        fiftyTwoWeekHigh: null,
+        fiftyTwoWeekLow:  null,
+        sparkline:        generateSparkline(prevClose, 0.005),
+        source:           'snapshot',
+      };
+    }
+
+    return { data, snapshotLabel: snap.snapshot_label || null };
+  } catch {
+    return null;
+  }
 }

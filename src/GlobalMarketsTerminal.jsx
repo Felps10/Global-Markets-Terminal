@@ -13,6 +13,9 @@ import {
   getSourceStatus,
   fetchYahooMarketData,
   fetchYahooChartData,
+  fetchLiveQuotes,
+  fetchSnapshotFallback,
+  parseYahooResults,
 } from "./dataServices.js";
 import { SUBGROUPS as STATIC_SUBGROUPS_ARRAY } from './data/subgroups.js';
 import { ASSETS    as STATIC_ASSETS_ARRAY    } from './data/assets.js';
@@ -982,6 +985,8 @@ export default function GlobalMarketsTerminal() {
   }, [user, rawSetSelectedAsset]);
   const [marketData,      setMarketData]      = useState(null);
   const [loading,         setLoading]         = useState(true);
+  const [dataSource,      setDataSource]      = useState('live');   // 'live' | 'stale' | 'direct' | 'snapshot'
+  const [snapshotLabel,   setSnapshotLabel]   = useState(null);
   const [, setLastUpdate]                       = useState(null);
   const [activeFilter,    setActiveFilter]    = useState("all");
   const [sortMode,        setSortMode]        = useState("default");
@@ -1098,18 +1103,78 @@ export default function GlobalMarketsTerminal() {
   };
 
   const loadData = useCallback(async () => {
-    // Fetch Yahoo data + CoinGecko crypto in parallel, using dynamic ASSETS from taxonomy
     const currentAssets = assetsRef.current;
     try {
-      const [result, cryptoData] = await Promise.all([
-        fetchMarketData(prevDataRef.current, currentAssets),
-        fetchCryptoData(currentAssets),
-      ]);
+      let merged = {};
+      let source = 'live';
+
+      // ── Tier 1: Server-side cached quotes (1 request for all data) ──
+      const live = await fetchLiveQuotes();
+      if (live?.yahoo?.length) {
+        // Parse Yahoo results with sparkline rolling (same as direct fetch)
+        const yahooData = parseYahooResults(
+          live.yahoo, prevDataRef.current, currentAssets, VOLATILITY
+        );
+        merged = { ...yahooData };
+        source = live.meta?.source || 'live';
+      }
+      if (live?.crypto && Object.keys(live.crypto).length > 0) {
+        // Parse CoinGecko data into market data shape
+        const cryptoAssets = Object.entries(currentAssets).filter(([, a]) => a.isCrypto);
+        for (const [sym, asset] of cryptoAssets) {
+          const d = live.crypto[asset.cgId];
+          if (!d) continue;
+          const price     = d.usd || 0;
+          const change24  = d.usd_24h_change || 0;
+          const prevPrice = price / (1 + change24 / 100);
+          merged[sym] = {
+            price,
+            change:           price - prevPrice,
+            changePct:        change24,
+            prevClose:        prevPrice,
+            high:             price,
+            low:              price,
+            volume:           d.usd_24h_vol || null,
+            marketCap:        d.usd_market_cap || null,
+            fiftyTwoWeekHigh: null,
+            fiftyTwoWeekLow:  null,
+            sparkline:        generateSparkline(prevPrice, (VOLATILITY.crypto || 0.035) * 0.3),
+            source:           "coingecko",
+          };
+        }
+      }
+
+      // ── Tier 2: Direct client→proxy fetches (existing behavior) ──
+      if (Object.keys(merged).length === 0) {
+        const [result, cryptoData] = await Promise.all([
+          fetchMarketData(prevDataRef.current, currentAssets),
+          fetchCryptoData(currentAssets),
+        ]);
+        merged = { ...(result.data || {}), ...cryptoData };
+        source = 'direct';
+      }
+
+      // ── Tier 3: Snapshot fallback (last resort) ──
+      if (Object.keys(merged).length === 0) {
+        const snap = await fetchSnapshotFallback();
+        if (snap?.data && Object.keys(snap.data).length > 0) {
+          merged = snap.data;
+          source = 'snapshot';
+          setSnapshotLabel(snap.snapshotLabel);
+        }
+      }
+
       if (!mountedRef.current) return;
-      const merged = { ...(result.data || {}), ...cryptoData };
+
       if (Object.keys(merged).length > 0) {
         prevDataRef.current = merged;
         setMarketData(merged);
+        setDataSource(source);
+        if (source === 'snapshot') {
+          // Keep snapshot label from above
+        } else {
+          setSnapshotLabel(null);
+        }
       } else if (prevDataRef.current && Object.keys(prevDataRef.current).length > 0) {
         setMarketData(prevDataRef.current);
       } else {
@@ -1125,14 +1190,34 @@ export default function GlobalMarketsTerminal() {
     }
   }, []);
 
-  const refreshInterval = (prefs.refreshInterval || 30) * 1000;
+  const baseRefreshInterval = (prefs.refreshInterval || 30) * 1000;
 
   useEffect(() => {
     if (taxLoading) return;
-    loadData();
-    intervalRef.current = setInterval(loadData, refreshInterval);
-    return () => clearInterval(intervalRef.current);
-  }, [taxLoading, loadData, refreshInterval]);
+
+    // Smart polling: 30s during US market hours, 2min off-hours, 5min weekends.
+    // Reduces Yahoo/CoinGecko request volume when prices aren't moving.
+    function getSmartInterval() {
+      const now    = new Date();
+      const utcDay = now.getUTCDay(); // 0=Sun, 6=Sat
+      const utcH   = now.getUTCHours();
+      if (utcDay === 0 || utcDay === 6) return 300_000;            // Weekend: 5 min
+      if (utcH >= 13 && utcH < 21) return baseRefreshInterval;     // US market hours (13:30–21:00 UTC)
+      return 120_000;                                               // Off-hours: 2 min
+    }
+
+    loadData(); // initial load
+
+    // Use setTimeout chain instead of setInterval so interval can adapt
+    function scheduleNext() {
+      intervalRef.current = setTimeout(() => {
+        loadData().then(scheduleNext);
+      }, getSmartInterval());
+    }
+    scheduleNext();
+
+    return () => { if (intervalRef.current) clearTimeout(intervalRef.current); };
+  }, [taxLoading, loadData, baseRefreshInterval]);
 
   // Load FRED macro context data for group banners (once, after initial load)
   useEffect(() => {
@@ -1552,6 +1637,32 @@ export default function GlobalMarketsTerminal() {
         {/* ── MAIN CONTENT ── */}
         {!loading && marketData && (
           <div className="fade-in">
+
+            {/* ── STALENESS BANNER — shown when data is stale or from snapshot ── */}
+            {dataSource === 'stale' && (
+              <div style={{
+                fontFamily: "'JetBrains Mono', monospace", fontSize: 11,
+                color: '#FFA726', letterSpacing: '0.5px', textAlign: 'center',
+                padding: '6px 12px', marginBottom: 12,
+                background: 'rgba(255, 167, 38, 0.08)',
+                border: '1px solid rgba(255, 167, 38, 0.15)', borderRadius: 6,
+              }}>
+                DELAYED — data may be a few minutes behind
+              </div>
+            )}
+            {dataSource === 'snapshot' && (
+              <div style={{
+                fontFamily: "'JetBrains Mono', monospace", fontSize: 11,
+                color: '#78909C', letterSpacing: '0.5px', textAlign: 'center',
+                padding: '6px 12px', marginBottom: 12,
+                background: 'rgba(120, 144, 156, 0.08)',
+                border: '1px solid rgba(120, 144, 156, 0.15)', borderRadius: 6,
+              }}>
+                {snapshotLabel
+                  ? `Showing cached prices — ${snapshotLabel}`
+                  : 'Showing cached prices — live feeds temporarily unavailable'}
+              </div>
+            )}
 
             {/* ── LIST VIEW — flat sortable table, mutually exclusive with card views ── */}
             {viewMode === "list" && (

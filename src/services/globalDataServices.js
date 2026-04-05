@@ -59,7 +59,13 @@ export {
   coingeckoTrending,
 } from '../dataServices.js';
 
-// ── Shared utilities ─��──────────────────────────────
+// ── Server-side cached quotes ──────────────────────────
+export {
+  fetchLiveQuotes,
+  fetchSnapshotFallback,
+} from '../dataServices.js';
+
+// ── Shared utilities ────────────────────────────────
 export {
   API_BASE,
   getSourceStatus,
