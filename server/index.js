@@ -16,6 +16,7 @@ import preferencesRoutes from './routes/preferences.js';
 import clubeRoutes       from './routes/clubes.js';
 import yahooRoutes       from './routes/yahoo.js';
 import snapshotRoutes    from './routes/snapshot.js';
+import brazilMacroRoutes from './routes/brazilMacro.js';
 
 const PORT = process.env.PORT || 4000;
 const app  = express();
@@ -68,6 +69,7 @@ app.use('/api/v1/snapshot', snapshotRoutes);
 app.get('/api/v1/health', (_req, res) => res.json({ status: 'ok', ts: Date.now() }));
 
 app.use('/api/v1/clubes', clubeRoutes);
+app.use('/api/v1/brazil', brazilMacroRoutes);
 
 // ── External API Proxies (production CORS bypass) ─────────────────────────────
 // Public pass-through proxies — no auth required. These forward requests to
