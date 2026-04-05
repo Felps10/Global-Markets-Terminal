@@ -2,7 +2,6 @@ import 'dotenv/config';
 import express from 'express';
 import cors    from 'cors';
 import { createProxyMiddleware } from 'http-proxy-middleware';
-import { authenticate } from './middleware/auth.js';
 import { supabase, initSchema, seedIfEmpty } from './db.js';
 import { seedClubeDemo } from './seed.js';
 import authRoutes     from './routes/auth.js';
@@ -71,20 +70,24 @@ app.get('/api/v1/health', (_req, res) => res.json({ status: 'ok', ts: Date.now()
 app.use('/api/v1/clubes', clubeRoutes);
 
 // ── External API Proxies (production CORS bypass) ─────────────────────────────
-// Yahoo Finance — crumb/cookie session logic lives in server/routes/yahoo.js
-app.use('/proxy/yahoo', authenticate, yahooRoutes);
+// Public pass-through proxies — no auth required. These forward requests to
+// external market data APIs. CORS policy restricts access to ALLOWED_ORIGINS.
+// The external APIs themselves require their own API keys (sent by the browser).
 
-// Simple pass-through proxies — all require authentication.
+// Yahoo Finance — crumb/cookie session logic lives in server/routes/yahoo.js
+app.use('/proxy/yahoo', yahooRoutes);
+
+// Simple pass-through proxies.
 // Express strips the mount prefix from req.url before passing to the middleware,
 // so no pathRewrite is needed.
-app.use('/proxy/finnhub',      authenticate, createProxyMiddleware({ target: 'https://finnhub.io/api/v1',                    changeOrigin: true }));
-app.use('/proxy/coingecko',    authenticate, createProxyMiddleware({ target: 'https://api.coingecko.com/api/v3',             changeOrigin: true }));
-app.use('/proxy/fmp',          authenticate, createProxyMiddleware({ target: 'https://financialmodelingprep.com/stable',     changeOrigin: true }));
-app.use('/proxy/brapi',        authenticate, createProxyMiddleware({ target: 'https://brapi.dev/api',                        changeOrigin: true }));
-app.use('/proxy/bcb',          authenticate, createProxyMiddleware({ target: 'https://api.bcb.gov.br',                       changeOrigin: true }));
-app.use('/proxy/awesomeapi',   authenticate, createProxyMiddleware({ target: 'https://economia.awesomeapi.com.br',           changeOrigin: true }));
-app.use('/proxy/alphavantage', authenticate, createProxyMiddleware({ target: 'https://www.alphavantage.co',                  changeOrigin: true }));
-app.use('/proxy/fred',         authenticate, createProxyMiddleware({ target: 'https://api.stlouisfed.org/fred',              changeOrigin: true }));
+app.use('/proxy/finnhub',      createProxyMiddleware({ target: 'https://finnhub.io/api/v1',                    changeOrigin: true }));
+app.use('/proxy/coingecko',    createProxyMiddleware({ target: 'https://api.coingecko.com/api/v3',             changeOrigin: true }));
+app.use('/proxy/fmp',          createProxyMiddleware({ target: 'https://financialmodelingprep.com/stable',     changeOrigin: true }));
+app.use('/proxy/brapi',        createProxyMiddleware({ target: 'https://brapi.dev/api',                        changeOrigin: true }));
+app.use('/proxy/bcb',          createProxyMiddleware({ target: 'https://api.bcb.gov.br',                       changeOrigin: true }));
+app.use('/proxy/awesomeapi',   createProxyMiddleware({ target: 'https://economia.awesomeapi.com.br',           changeOrigin: true }));
+app.use('/proxy/alphavantage', createProxyMiddleware({ target: 'https://www.alphavantage.co',                  changeOrigin: true }));
+app.use('/proxy/fred',         createProxyMiddleware({ target: 'https://api.stlouisfed.org/fred',              changeOrigin: true }));
 
 // ── 404 ───────────────────────────────────────────────────────────────────────
 app.use((_req, res) => res.status(404).json({ error: 'NOT_FOUND' }));
