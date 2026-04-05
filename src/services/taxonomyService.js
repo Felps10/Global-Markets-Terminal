@@ -172,8 +172,9 @@ export async function fetchL1() {
 
 // ── Taxonomy ──────────────────────────────────────────────────────────────────
 export async function fetchTaxonomy({ view } = {}) {
+  const headers = await authHeaders();
   const url = view ? `${BASE}/taxonomy?view=${view}` : `${BASE}/taxonomy`;
-  const res = await fetch(url);
+  const res = await fetch(url, { headers });
   return handleResponse(res);
 }
 

@@ -10,7 +10,7 @@ router.get('/', authenticate, async (req, res) => {
 
   let groupsQuery   = supabase.from('groups').select('*').order('sort_order');
   let subgroupsQuery = supabase.from('subgroups').select('*').order('sort_order');
-  let assetsQuery   = supabase.from('assets').select('*').order('symbol');
+  let assetsQuery   = supabase.from('assets').select('*').eq('active', true).order('symbol');
 
   if (view === 'global' || view === 'brazil') {
     groupsQuery = groupsQuery.eq('terminal_view', view);

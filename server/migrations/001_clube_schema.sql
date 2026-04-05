@@ -1,3 +1,7 @@
+-- ⚠ NOTE (added by migration 006): The DISABLE ROW LEVEL SECURITY statements
+-- at the bottom of this file have been superseded by 006_rls_hardening.sql.
+-- Do not use DISABLE ROW LEVEL SECURITY in future migrations. See RLS_POLICY_GUIDE.md.
+
 -- GMT Clube de Investimento — Schema Migration 001
 -- Run this manually in the Supabase SQL Editor BEFORE starting the server.
 -- Safe to re-run: all statements use IF NOT EXISTS.

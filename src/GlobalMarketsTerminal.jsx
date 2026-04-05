@@ -103,16 +103,25 @@ export const STATIC_CATEGORIES = Object.fromEntries(
   STATIC_SUBGROUPS_ARRAY.map(s => [s.id, { label: s.display_name, icon: s.icon, color: s.color }])
 );
 
-export const STATIC_ASSETS_MAP = Object.fromEntries(
-  STATIC_ASSETS_ARRAY.map(a => [a.symbol, {
-    name:     a.name,
-    cat:      a.subgroup_id,
-    sector:   a.sector || null,
-    exchange: a.exchange || 'NASDAQ',
-    type:     a.type,
-    ...(a.meta || {}),
-  }])
-);
+export const STATIC_ASSETS_MAP = (() => {
+  const map = {};
+  for (const a of STATIC_ASSETS_ARRAY) {
+    const entry = {
+      name:     a.name,
+      cat:      a.subgroup_id,
+      sector:   a.sector || null,
+      exchange: a.exchange || 'NASDAQ',
+      type:     a.type,
+      ...(a.meta || {}),
+    };
+    map[a.symbol] = entry;
+    // Register yahooSymbol alias so parseYahooResults can validate .SA responses
+    if (a.meta?.yahooSymbol && a.meta.yahooSymbol !== a.symbol) {
+      map[a.meta.yahooSymbol] = { ...entry, _displaySymbol: a.symbol };
+    }
+  }
+  return map;
+})();
 
 export const EXCHANGE_COLORS = {
   NASDAQ: "#00BCD4",
@@ -205,7 +214,7 @@ export function formatPrice(symbol, price) {
   if (price == null) return "—";
   const asset = STATIC_ASSETS_MAP[symbol];
   if (!asset) return String(price);
-  if (asset.isB3) return "R$ " + price.toFixed(2);
+  if (asset.isB3 || asset.currency === 'BRL') return "R$ " + price.toFixed(2);
   if (asset.cat === "fx") return price.toFixed(4);
   if (asset.cat === "crypto") {
     if (price >= 1000) return "$" + Math.round(price).toLocaleString();
@@ -231,9 +240,29 @@ function generateSparkline(basePrice, vol, points = 30) {
 }
 
 async function fetchMarketData(prevData, assetsMap = STATIC_ASSETS_MAP) {
-  // Exclude crypto (CoinGecko) and B3 (BRAPI) — they use dedicated sources
-  const yahooSymbols = Object.keys(assetsMap).filter(s => !assetsMap[s].isCrypto && !assetsMap[s].isB3);
-  return fetchYahooMarketData(yahooSymbols, prevData, { assets: assetsMap, volatility: VOLATILITY, isEquityCat });
+  // Build Yahoo fetch list: exclude alias entries (_displaySymbol), crypto, and B3.
+  // For assets with yahooSymbol (e.g. PETR4 → PETR4.SA), fetch the .SA form.
+  const yahooToDisplay = {};
+  const yahooSymbols = Object.keys(assetsMap)
+    .filter(s => !assetsMap[s].isCrypto && !assetsMap[s].isB3 && !assetsMap[s]._displaySymbol)
+    .map(s => {
+      const y = assetsMap[s].yahooSymbol || s;
+      if (y !== s) yahooToDisplay[y] = s;
+      return y;
+    });
+
+  const result = await fetchYahooMarketData(yahooSymbols, prevData, { assets: assetsMap, volatility: VOLATILITY, isEquityCat });
+
+  // Remap Yahoo response keys (PETR4.SA) back to display symbol keys (PETR4)
+  if (result.data && Object.keys(yahooToDisplay).length > 0) {
+    for (const [yahooSym, displaySym] of Object.entries(yahooToDisplay)) {
+      if (result.data[yahooSym]) {
+        result.data[displaySym] = result.data[yahooSym];
+        delete result.data[yahooSym];
+      }
+    }
+  }
+  return result;
 }
 
 // Fetch crypto data from CoinGecko and merge into the same data shape
@@ -1007,7 +1036,7 @@ export default function GlobalMarketsTerminal() {
       for (const group of globalTaxonomy) {
         for (const sg of (group.subgroups || [])) {
           for (const a of (sg.assets || [])) {
-            map[a.symbol] = {
+            const entry = {
               name:     a.name,
               cat:      a.subgroup_id,
               sector:   a.sector || null,
@@ -1015,6 +1044,11 @@ export default function GlobalMarketsTerminal() {
               type:     a.type,
               ...(a.meta ? (typeof a.meta === 'string' ? JSON.parse(a.meta) : a.meta) : {}),
             };
+            map[a.symbol] = entry;
+            // Register yahooSymbol alias so parseYahooResults can validate .SA responses
+            if (a.meta?.yahooSymbol && a.meta.yahooSymbol !== a.symbol) {
+              map[a.meta.yahooSymbol] = { ...entry, _displaySymbol: a.symbol };
+            }
           }
         }
       }
@@ -1029,6 +1063,7 @@ export default function GlobalMarketsTerminal() {
   const assetsInCategory = useCallback((catKey) => {
     return Object.keys(ASSETS).filter(s => {
       const a = ASSETS[s];
+      if (a._displaySymbol) return false;
       return a.cat === catKey || (a.alsoIn && a.alsoIn.includes(catKey));
     });
   }, [ASSETS]);
@@ -1124,7 +1159,7 @@ export default function GlobalMarketsTerminal() {
     }
     let cancelled = false;
     (async () => {
-      const equitySyms = Object.keys(ASSETS).filter(s => isEquityCat(ASSETS[s].cat));
+      const equitySyms = Object.keys(ASSETS).filter(s => !ASSETS[s]._displaySymbol && isEquityCat(ASSETS[s].cat));
       const profiles = await fmpBatchProfile(equitySyms);
       if (profiles && !cancelled) setBatchProfiles(profiles);
     })();
@@ -1156,7 +1191,7 @@ export default function GlobalMarketsTerminal() {
   // Combined filter predicate (handles cross-listing + dividends)
   const passes = useCallback((sym) => {
     const a = ASSETS[sym];
-    if (!a) return false;
+    if (!a || a._displaySymbol) return false;
     let catMatch;
     if (activeFilter === "all") {
       catMatch = true;
@@ -1603,6 +1638,7 @@ export default function GlobalMarketsTerminal() {
                     } else {
                       symbols = Object.keys(ASSETS).filter(s => {
                         const a = ASSETS[s];
+                        if (a._displaySymbol) return false;
                         const inCat = a.cat === catKey || (a.alsoIn && a.alsoIn.includes(catKey));
                         return inCat && marketData[s];
                       });
@@ -1729,6 +1765,7 @@ export default function GlobalMarketsTerminal() {
                   } else {
                     symbols = Object.keys(ASSETS).filter(s => {
                       const a = ASSETS[s];
+                      if (a._displaySymbol) return false;
                       const inCat = a.cat === catKey || (a.alsoIn && a.alsoIn.includes(catKey));
                       return inCat && marketData[s];
                     });
@@ -1794,6 +1831,7 @@ export default function GlobalMarketsTerminal() {
                   } else {
                     symbols = Object.keys(ASSETS).filter(s => {
                       const a = ASSETS[s];
+                      if (a._displaySymbol) return false;
                       const inCat = a.cat === catKey || (a.alsoIn && a.alsoIn.includes(catKey));
                       return inCat && marketData[s];
                     });
