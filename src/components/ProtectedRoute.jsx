@@ -45,7 +45,7 @@ function AccessDenied() {
         ACESSO RESTRITO
       </div>
       <div style={{
-        fontFamily: "'DM Sans', sans-serif",
+        fontFamily: "'IBM Plex Sans', sans-serif",
         fontSize:   22,
         fontWeight: 600,
         color:      '#e2e8f0',
@@ -54,7 +54,7 @@ function AccessDenied() {
         Você não tem acesso a esta área
       </div>
       <div style={{
-        fontFamily: "'DM Sans', sans-serif",
+        fontFamily: "'IBM Plex Sans', sans-serif",
         fontSize:   14,
         color:      '#64748b',
         textAlign:  'center',

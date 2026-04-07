@@ -51,35 +51,3 @@ export const CLUBE_NAV = {
   ],
 };
 
-// Authenticated nav by role
-export const CLUBE_MEMBER_NAV = {
-  pt: [
-    { label: 'Meu Clube',    path: 'dashboard'    },
-    { label: 'Performance',  path: 'performance'  },
-    { label: 'Relatórios',   path: 'report'       },
-    { label: 'Assembleias',  path: 'governanca'   },
-    { label: 'Legal',        path: 'tributacao'   },
-  ],
-  en: [
-    { label: 'My Club',      path: 'dashboard'    },
-    { label: 'Performance',  path: 'performance'  },
-    { label: 'Reports',      path: 'report'       },
-    { label: 'Assemblies',   path: 'governanca'   },
-    { label: 'Legal',        path: 'tributacao'   },
-  ],
-};
-
-export const CLUBE_MANAGER_EXTRA_NAV = {
-  pt: [
-    { label: 'Membros',      path: 'membros'         },
-    { label: 'NAV',          path: 'nav'             },
-    { label: 'Compliance',   path: 'reenquadramento' },
-    { label: 'Documentos',   path: 'documentos'      },
-  ],
-  en: [
-    { label: 'Members',      path: 'membros'         },
-    { label: 'NAV',          path: 'nav'             },
-    { label: 'Compliance',   path: 'reenquadramento' },
-    { label: 'Documents',    path: 'documentos'      },
-  ],
-};

@@ -42,9 +42,15 @@ const SECTOR_META = {
   "Outros":       { label: "Outros Setores",         icon: "📎"  },
 };
 
-// B3_ASSET_ENTRIES is computed lazily at call time to avoid circular-module init
+// Computed once — STATIC_ASSETS_MAP is immutable after module init.
+// Was previously a function called on every data refresh; memoized to avoid
+// repeated O(n) filter over the full asset map.
+let _b3AssetEntriesCache = null;
 function getB3AssetEntries() {
-  return Object.entries(STATIC_ASSETS_MAP).filter(([, a]) => a.isB3);
+  if (!_b3AssetEntriesCache) {
+    _b3AssetEntriesCache = Object.entries(STATIC_ASSETS_MAP).filter(([, a]) => a.isB3);
+  }
+  return _b3AssetEntriesCache;
 }
 
 // ─── SORT OPTIONS ─────────────────────────────────────────────────────────────
@@ -80,14 +86,14 @@ function IndicatorCard({ symbol, name, value, date, unit, source, category, chan
         <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700, color: "#F9C300", letterSpacing: "0.5px" }}>{symbol}</span>
         <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, fontWeight: 700, letterSpacing: "0.5px", color: sc.color, background: sc.bg, border: `1px solid ${sc.border}`, borderRadius: 3, padding: "1px 6px" }}>{source}</span>
       </div>
-      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: "var(--c-text-3)", marginBottom: 8, lineHeight: 1.3 }}>{name}</div>
+      <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 11, color: "var(--c-text-3)", marginBottom: 8, lineHeight: 1.3 }}>{name}</div>
       {hasValue ? (
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 20, fontWeight: 700, color: "#F9C300", marginBottom: 4 }}>{fmtValue}</div>
       ) : (
         <div style={{ width: 40, height: 20, borderRadius: 3, background: "rgba(249,195,0,0.15)", marginBottom: 4 }} className="gmt-blink" />
       )}
       {changePct != null && (
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, color: changePct >= 0 ? "#00E676" : "#FF5252", marginBottom: 4 }}>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, color: changePct >= 0 ? "#00E676" : "var(--c-error)", marginBottom: 4 }}>
           {changePct >= 0 ? "+" : ""}{changePct.toFixed(2)}%
         </div>
       )}
@@ -104,7 +110,7 @@ function UnavailableSection({ icon, title, description }) {
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, textAlign: "center" }}>
         <div style={{ fontSize: 36, opacity: 0.3 }}>{icon || "🔒"}</div>
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, fontWeight: 700, color: "rgba(249,195,0,0.5)", letterSpacing: "1px" }}>{title || "EM BREVE"}</div>
-        <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: "var(--c-text-3)", lineHeight: 1.6 }}>{description || "Em desenvolvimento"}</div>
+        <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 11, color: "var(--c-text-3)", lineHeight: 1.6 }}>{description || "Em desenvolvimento"}</div>
       </div>
     </div>
   );
@@ -116,10 +122,10 @@ function MacroStrip({ macro, extended }) {
     return (
       <div style={{
         display: "flex", alignItems: "center", gap: 8,
-        background: "rgba(249,195,0,0.06)", border: "1px solid rgba(249,195,0,0.2)",
-        borderRadius: 6, padding: "8px 14px", marginBottom: 16,
+        background: "rgba(21,101,192,0.08)", border: "1px solid rgba(21,101,192,0.2)",
+        borderRadius: 8, padding: "8px 14px", marginBottom: 16,
       }}>
-        <div style={{ width: 6, height: 6, borderRadius: "50%", background: GOLD, animation: "pulse 1.2s ease-in-out infinite" }} />
+        <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#F5C518", animation: "pulse 1.2s ease-in-out infinite" }} />
         <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)" }}>
           Loading macro data...
         </span>
@@ -141,17 +147,17 @@ function MacroStrip({ macro, extended }) {
   return (
     <div style={{
       display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16,
-      background: "rgba(249,195,0,0.06)", border: "1px solid rgba(249,195,0,0.2)",
-      borderRadius: 6, padding: "8px 16px", marginBottom: 12,
+      background: "rgba(21,101,192,0.08)", border: "1px solid rgba(21,101,192,0.2)",
+      borderRadius: 8, padding: "8px 16px", marginBottom: 12,
     }}>
       <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, fontWeight: 700, letterSpacing: "0.5px", color: "#003087", background: "rgba(0,48,135,0.18)", border: "1px solid rgba(0,48,135,0.28)", borderRadius: 3, padding: "1px 6px" }}>BCB</span>
       <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, fontWeight: 700, letterSpacing: "0.5px", color: "#FF6B00", background: "rgba(255,107,0,0.18)", border: "1px solid rgba(255,107,0,0.28)", borderRadius: 3, padding: "1px 6px" }}>AwesomeAPI</span>
       {items.map(it => (
         <span key={it.label} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)" }}>{it.label}:</span>
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700, color: it.value === "—" ? "var(--c-text-3)" : GOLD }}>{it.value}</span>
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 20, fontWeight: 600, color: it.value === "—" ? "var(--c-text-3)" : "#F5C518", fontVariantNumeric: "tabular-nums" }}>{it.value}</span>
           {it.pct != null && (
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: it.pct >= 0 ? "#00E676" : "#FF5252" }}>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: it.pct >= 0 ? "#00E676" : "var(--c-error)" }}>
               {it.pct >= 0 ? "+" : ""}{it.pct.toFixed(2)}%
             </span>
           )}
@@ -174,7 +180,7 @@ function PlaceholderSection({ section, accentColor }) {
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, fontWeight: 700, color: "var(--c-text-2)", letterSpacing: "1px" }}>
           {section?.label?.toUpperCase() || "SEÇÃO"}
         </div>
-        <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "var(--c-text-3)", lineHeight: 1.6 }}>
+        <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: "var(--c-text-3)", lineHeight: 1.6 }}>
           Dados em desenvolvimento · Em breve nesta seção
         </div>
       </div>
@@ -294,7 +300,7 @@ function FilterBar({ section, accentColor, getFilter, setFilter, clearFilters, a
             onClick={() => { clearFilters(sectionId); setActiveSector("all"); }}
             style={{
               fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700,
-              letterSpacing: "0.5px", color: "#FF5252", background: "transparent",
+              letterSpacing: "0.5px", color: "var(--c-error)", background: "transparent",
               border: "none", cursor: "pointer", padding: "3px 0", textDecoration: "underline",
               transition: "opacity 0.15s",
             }}
@@ -315,7 +321,7 @@ function BrazilDetailPanel({ symbol, data, onClose }) {
   }, [onClose]);
   if (!asset || !data) return null;
   const positive    = (data.changePct ?? 0) >= 0;
-  const color       = positive ? "#00E676" : "#FF5252";
+  const color       = positive ? "#00E676" : "var(--c-error)";
   const sign        = positive ? "+" : "";
   const weekHighPct = data.fiftyTwoWeekHigh && data.price
     ? ((data.price - data.fiftyTwoWeekLow) / (data.fiftyTwoWeekHigh - (data.fiftyTwoWeekLow || 0))) * 100
@@ -337,7 +343,7 @@ function BrazilDetailPanel({ symbol, data, onClose }) {
                 <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 22, fontWeight: 700, color: "var(--c-text)", letterSpacing: "0.5px" }}>{symbol}</span>
                 <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, fontWeight: 700, letterSpacing: "0.8px", color: "#080f1a", background: GOLD, borderRadius: 3, padding: "2px 6px" }}>B3</span>
               </div>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "var(--c-text-2)" }}>{asset.name}</div>
+              <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, color: "var(--c-text-2)" }}>{asset.name}</div>
             </div>
             <button
               onClick={onClose}
@@ -384,12 +390,12 @@ function BrazilDetailPanel({ symbol, data, onClose }) {
             <div style={{ marginBottom: 20, background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 6, padding: 12 }}>
               <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "var(--c-text-3)", letterSpacing: "1px", marginBottom: 8 }}>52-WEEK RANGE</div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#FF5252" }}>{formatPrice(symbol, data.fiftyTwoWeekLow)}</span>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--c-error)" }}>{formatPrice(symbol, data.fiftyTwoWeekLow)}</span>
                 <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--c-text-2)" }}>{formatPrice(symbol, data.price)}</span>
                 <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#00E676" }}>{formatPrice(symbol, data.fiftyTwoWeekHigh)}</span>
               </div>
               <div style={{ height: 4, background: "var(--c-border)", borderRadius: 2, overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, weekHighPct ?? 50))}%`, background: `linear-gradient(90deg,#FF5252,${GOLD},#00E676)`, borderRadius: 2 }} />
+                <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, weekHighPct ?? 50))}%`, background: `linear-gradient(90deg,var(--c-error),${GOLD},#00E676)`, borderRadius: 2 }} />
               </div>
             </div>
           )}
@@ -662,7 +668,7 @@ export default function BrazilTerminal() {
   // MAIN RENDER
   // ─────────────────────────────────────────────────────────────────────────────
   return (
-    <div className="fade-in" style={{ paddingTop: 16 }}>
+    <div className="fade-in" data-context="brazil" style={{ paddingTop: 16 }}>
 
       {/* Detail panel */}
       {selectedAsset && b3Data?.[selectedAsset] && (
@@ -717,7 +723,7 @@ export default function BrazilTerminal() {
               onClick={() => setActiveSection(section.sectionId)}
               style={{
                 position: "relative",
-                fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600,
+                fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, fontWeight: 600,
                 padding: "5px 14px", borderRadius: 6, cursor: "pointer",
                 transition: "all 0.15s ease",
                 background: isActive ? accentColor + "1F" : "var(--c-surface)",
@@ -953,7 +959,7 @@ export default function BrazilTerminal() {
             const stats    = getSectorStats(sg);
             if (stats.count === 0) return null;
             const isOpen   = expandedCards.has(sg.id);
-            const pctColor = stats.avgPct > 0 ? "#00E676" : stats.avgPct < 0 ? "#FF5252" : "var(--c-text-3)";
+            const pctColor = stats.avgPct > 0 ? "#00E676" : stats.avgPct < 0 ? "var(--c-error)" : "var(--c-text-3)";
             const pctSign  = stats.avgPct > 0 ? "+" : stats.avgPct < 0 ? "−" : "";
             const pctArrow = stats.avgPct > 0 ? "↑" : stats.avgPct < 0 ? "↓" : "";
             const syms     = isOpen ? sortedSymbols(sg.tickers.filter(s => b3Data[s])) : null;
@@ -964,13 +970,13 @@ export default function BrazilTerminal() {
                   style={{
                     display: "flex", alignItems: "center",
                     height: 40, padding: "0 16px",
-                    borderLeft: `3px solid ${isOpen ? accentColor : (stats.avgPct >= 0 ? "#00E676" : "#FF5252")}`,
+                    borderLeft: `3px solid ${isOpen ? accentColor : (stats.avgPct >= 0 ? "#00E676" : "var(--c-error)")}`,
                     cursor: "pointer", transition: "background 0.15s ease", userSelect: "none",
                   }}
                   onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
                   onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                 >
-                  <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 600, color: "var(--c-text)", flex: 1 }}>
+                  <span style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 14, fontWeight: 600, color: "var(--c-text)", flex: 1 }}>
                     {sg.icon} {sg.label}
                   </span>
                   <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", marginRight: 12 }}>
@@ -1112,7 +1118,7 @@ export default function BrazilTerminal() {
             if (syms.length === 0) return null;
             const pcts       = syms.map(s => b3Data[s]?.changePct ?? 0);
             const avgPct     = pcts.reduce((a, b) => a + b, 0) / pcts.length;
-            const avgClr     = avgPct >= 0 ? "#00E676" : "#FF5252";
+            const avgClr     = avgPct >= 0 ? "#00E676" : "var(--c-error)";
             const isCollapsed = collapsedGroups[sg.id];
             return (
               <div key={sg.id} className="section-animate" style={{ marginBottom: isCollapsed ? 8 : 24, animationDelay: `${idx * 0.08}s` }}>

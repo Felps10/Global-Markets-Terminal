@@ -20,7 +20,7 @@ const Modal = styled.div`
 `;
 
 const ModalTitle = styled.h2`
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'IBM Plex Sans', sans-serif;
   font-size: 16px;
   font-weight: 700;
   color: #E8EAF0;
@@ -44,7 +44,7 @@ const Label = styled.label`
 const Input = styled.input`
   width: 100%;
   background: #080C18;
-  border: 1px solid ${(p) => (p.$error ? '#FF5252' : '#1E2740')};
+  border: 1px solid ${(p) => (p.$error ? 'var(--c-error)' : '#1E2740')};
   border-radius: 4px;
   color: #E8EAF0;
   font-family: 'Space Mono', monospace;
@@ -52,7 +52,7 @@ const Input = styled.input`
   padding: 9px 12px;
   outline: none;
   box-sizing: border-box;
-  &:focus { border-color: ${(p) => (p.$error ? '#FF5252' : 'var(--c-accent)')}; }
+  &:focus { border-color: ${(p) => (p.$error ? 'var(--c-error)' : 'var(--c-accent)')}; }
 `;
 
 const Textarea = styled.textarea`
@@ -80,7 +80,7 @@ const SlugPreview = styled.div`
 
 const FieldError = styled.div`
   font-size: 11px;
-  color: #FF5252;
+  color: var(--c-error);
   margin-top: 4px;
 `;
 
@@ -88,7 +88,7 @@ const ErrorMsg = styled.div`
   background: rgba(255,82,82,0.08);
   border: 1px solid rgba(255,82,82,0.3);
   border-radius: 4px;
-  color: #FF5252;
+  color: var(--c-error);
   font-size: 12px;
   padding: 10px 12px;
   margin-bottom: 18px;

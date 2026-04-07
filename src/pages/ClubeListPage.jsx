@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
+import { hasRole } from '../lib/roles.js';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -17,12 +18,20 @@ const GREEN    = '#00E676';
 const AMBER    = '#fbbf24';
 const MONO     = "'JetBrains Mono', monospace";
 
+const GOLD = '#F5C518';
+const SANS = "'IBM Plex Sans', sans-serif";
+
 export default function ClubeListPage() {
   const navigate       = useNavigate();
-  const { getToken }   = useAuth();
+  const { getToken, user } = useAuth();
+  const isManager = hasRole(user?.role, 'club_manager');
 
   const [clubes,  setClubes]  = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showSetup, setShowSetup] = useState(false);
+  const [setupForm, setSetupForm] = useState({ nome: '', data_constituicao: '', benchmark_ibov: true, benchmark_cdi: true });
+  const [setupSaving, setSetupSaving] = useState(false);
+  const [setupError, setSetupError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -69,15 +78,244 @@ export default function ClubeListPage() {
             </div>
           )}
 
-          {!loading && clubes.length === 0 && (
+          {!loading && clubes.length === 0 && !showSetup && (
             <div style={{
               padding: 48, textAlign: 'center',
               background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 6,
             }}>
               <div style={{ fontSize: 32, color: TXT_3, marginBottom: 16 }}>💼</div>
-              <div style={{ fontSize: 12, color: TXT_2, lineHeight: 1.8 }}>
+              <div style={{ fontSize: 12, color: TXT_2, lineHeight: 1.8, marginBottom: isManager ? 24 : 0 }}>
                 Nenhum clube registrado.<br /><br />
                 Clubes de investimento são geridos conforme a CVM Resolução 11.
+              </div>
+              {isManager && (
+                <button
+                  onClick={() => setShowSetup(true)}
+                  style={{
+                    background: GOLD,
+                    color: '#0C0A00',
+                    border: 'none',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '10px 28px',
+                    fontFamily: SANS,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    letterSpacing: '0.06em',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Criar Clube
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Club profile setup form */}
+          {!loading && showSetup && (
+            <div style={{
+              maxWidth: 460,
+              margin: '0 auto',
+              background: BG_CARD,
+              border: `1px solid ${BORDER}`,
+              borderRadius: 6,
+              padding: '32px 28px',
+            }}>
+              <div style={{
+                fontFamily: MONO,
+                fontSize: 10,
+                letterSpacing: '0.15em',
+                color: GOLD,
+                marginBottom: 24,
+                textTransform: 'uppercase',
+              }}>
+                CONFIGURAR CLUBE
+              </div>
+
+              {setupError && (
+                <div style={{
+                  background: 'var(--c-error-dim)',
+                  border: '1px solid rgba(255,82,82,0.25)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '8px 12px',
+                  marginBottom: 16,
+                  fontFamily: SANS,
+                  fontSize: 12,
+                  color: 'var(--c-error)',
+                }}>
+                  {setupError}
+                </div>
+              )}
+
+              {/* Nome */}
+              <div style={{ marginBottom: 20 }}>
+                <label style={{
+                  display: 'block',
+                  fontFamily: SANS,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  letterSpacing: '0.12em',
+                  color: TXT_3,
+                  textTransform: 'uppercase',
+                  marginBottom: 8,
+                }}>
+                  NOME DO CLUBE
+                </label>
+                <input
+                  type="text"
+                  value={setupForm.nome}
+                  onChange={e => setSetupForm(p => ({ ...p, nome: e.target.value }))}
+                  placeholder="Ex: Clube Alpha Invest"
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: 'var(--radius-input)',
+                    color: TXT_1,
+                    fontFamily: MONO,
+                    fontSize: 13,
+                    padding: '10px 14px',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {/* Data de constituição */}
+              <div style={{ marginBottom: 20 }}>
+                <label style={{
+                  display: 'block',
+                  fontFamily: SANS,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  letterSpacing: '0.12em',
+                  color: TXT_3,
+                  textTransform: 'uppercase',
+                  marginBottom: 8,
+                }}>
+                  DATA DE CONSTITUIÇÃO
+                </label>
+                <input
+                  type="date"
+                  value={setupForm.data_constituicao}
+                  onChange={e => setSetupForm(p => ({ ...p, data_constituicao: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: 'var(--radius-input)',
+                    color: TXT_1,
+                    fontFamily: MONO,
+                    fontSize: 13,
+                    padding: '10px 14px',
+                    outline: 'none',
+                    colorScheme: 'dark',
+                  }}
+                />
+              </div>
+
+              {/* Benchmark */}
+              <div style={{ marginBottom: 28 }}>
+                <label style={{
+                  display: 'block',
+                  fontFamily: SANS,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  letterSpacing: '0.12em',
+                  color: TXT_3,
+                  textTransform: 'uppercase',
+                  marginBottom: 10,
+                }}>
+                  BENCHMARK
+                </label>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  {[
+                    { key: 'benchmark_ibov', label: 'IBOVESPA' },
+                    { key: 'benchmark_cdi', label: 'CDI' },
+                  ].map(b => (
+                    <button
+                      key={b.key}
+                      onClick={() => setSetupForm(p => ({ ...p, [b.key]: !p[b.key] }))}
+                      style={{
+                        background: setupForm[b.key] ? GOLD : 'rgba(255,255,255,0.04)',
+                        color: setupForm[b.key] ? '#0C0A00' : TXT_2,
+                        border: setupForm[b.key] ? 'none' : '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: 'var(--radius-sm)',
+                        padding: '8px 20px',
+                        fontFamily: MONO,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        letterSpacing: '0.06em',
+                      }}
+                    >
+                      {b.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button
+                  disabled={setupSaving || !setupForm.nome.trim()}
+                  onClick={async () => {
+                    setSetupSaving(true);
+                    setSetupError('');
+                    try {
+                      const token = await getToken();
+                      const res = await fetch(`${API_BASE}/api/v1/clubes`, {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          Authorization: `Bearer ${token}`,
+                        },
+                        body: JSON.stringify(setupForm),
+                      });
+                      if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.message || 'Falha ao criar clube');
+                      }
+                      const created = await res.json();
+                      navigate(`/clube/${created.id}`);
+                    } catch (err) {
+                      setSetupError(err.message);
+                    } finally {
+                      setSetupSaving(false);
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    background: !setupForm.nome.trim() ? 'rgba(255,255,255,0.05)' : GOLD,
+                    color: !setupForm.nome.trim() ? TXT_3 : '#0C0A00',
+                    border: 'none',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '10px 0',
+                    fontFamily: SANS,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: !setupForm.nome.trim() || setupSaving ? 'not-allowed' : 'pointer',
+                    letterSpacing: '0.06em',
+                    opacity: setupSaving ? 0.6 : 1,
+                  }}
+                >
+                  {setupSaving ? 'Criando...' : 'Criar Clube'}
+                </button>
+                <button
+                  onClick={() => setShowSetup(false)}
+                  style={{
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: 'var(--radius-sm)',
+                    color: TXT_2,
+                    padding: '10px 20px',
+                    fontFamily: SANS,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancelar
+                </button>
               </div>
             </div>
           )}

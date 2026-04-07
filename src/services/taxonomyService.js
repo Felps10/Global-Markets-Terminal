@@ -52,7 +52,7 @@ export async function getMe(token) {
 
 // ── Groups ────────────────────────────────────────────────────────────────────
 export async function fetchGroups() {
-  const res = await fetch(`${BASE}/groups`);
+  const res = await fetch(`${BASE}/groups`, { headers: await authHeaders() });
   return handleResponse(res);
 }
 
@@ -86,7 +86,7 @@ export async function deleteGroup(id) {
 // ── Subgroups ─────────────────────────────────────────────────────────────────
 export async function fetchSubgroups(groupId) {
   const url = groupId ? `${BASE}/subgroups?groupId=${groupId}` : `${BASE}/subgroups`;
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: await authHeaders() });
   return handleResponse(res);
 }
 
@@ -124,7 +124,7 @@ export async function fetchAssets({ subgroupId, groupId, terminal_view } = {}) {
   if (groupId)       params.set('groupId',       groupId);
   if (terminal_view) params.set('terminal_view', terminal_view);
   const qs = params.toString();
-  const res = await fetch(qs ? `${BASE}/assets?${qs}` : `${BASE}/assets`);
+  const res = await fetch(qs ? `${BASE}/assets?${qs}` : `${BASE}/assets`, { headers: await authHeaders() });
   return handleResponse(res);
 }
 

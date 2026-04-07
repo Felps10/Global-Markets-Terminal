@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
+import { hasRole } from '../lib/roles.js';
 import ClubeShell from '../components/clube/ClubeShell.jsx';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -15,7 +16,7 @@ const TXT_2    = '#94a3b8';
 const TXT_3    = '#475569';
 const ACCENT   = 'var(--c-accent)';
 const GREEN    = '#00E676';
-const RED      = '#FF5252';
+const RED      = 'var(--c-error)';
 const AMBER    = '#fbbf24';
 const MONO     = "'JetBrains Mono', monospace";
 
@@ -159,7 +160,7 @@ export default function ClubeGovernancaPage() {
         </span>
       }
       headerRight={
-        user?.role === 'admin' ? (
+        hasRole(user?.role, 'club_manager') ? (
           <button
             onClick={() => setShowForm(true)}
             style={{
@@ -193,7 +194,7 @@ export default function ClubeGovernancaPage() {
                 A AGO deve ser realizada em até 120 dias após
                 o encerramento do exercício social.
               </div>
-              {user?.role === 'admin' && (
+              {hasRole(user?.role, 'club_manager') && (
                 <button
                   onClick={() => setShowForm(true)}
                   style={{

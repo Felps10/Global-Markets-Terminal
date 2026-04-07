@@ -18,7 +18,7 @@ const Modal = styled.div`
   font-family: 'Space Mono', monospace;
 `;
 const ModalTitle = styled.h2`
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'IBM Plex Sans', sans-serif;
   font-size: 16px; font-weight: 700;
   color: #E8EAF0; margin: 0 0 24px;
 `;
@@ -30,11 +30,11 @@ const Label    = styled.label`
 `;
 const Input    = styled.input`
   width: 100%; background: #080C18;
-  border: 1px solid ${(p) => (p.$error ? '#FF5252' : '#1E2740')};
+  border: 1px solid ${(p) => (p.$error ? 'var(--c-error)' : '#1E2740')};
   border-radius: 4px; color: #E8EAF0;
   font-family: 'Space Mono', monospace; font-size: 13px;
   padding: 9px 12px; outline: none; box-sizing: border-box;
-  &:focus { border-color: ${(p) => (p.$error ? '#FF5252' : 'var(--c-accent)')}; }
+  &:focus { border-color: ${(p) => (p.$error ? 'var(--c-error)' : 'var(--c-accent)')}; }
 `;
 const Select   = styled.select`
   width: 100%; background: #080C18;
@@ -56,11 +56,11 @@ const SlugPreview = styled.div`
   font-size: 11px; color: #4A5568; margin-top: 4px;
   span { color: var(--c-accent); }
 `;
-const FieldError  = styled.div`font-size: 11px; color: #FF5252; margin-top: 4px;`;
+const FieldError  = styled.div`font-size: 11px; color: var(--c-error); margin-top: 4px;`;
 const ErrorMsg    = styled.div`
   background: rgba(255,82,82,0.08);
   border: 1px solid rgba(255,82,82,0.3);
-  border-radius: 4px; color: #FF5252;
+  border-radius: 4px; color: var(--c-error);
   font-size: 12px; padding: 10px 12px; margin-bottom: 18px;
 `;
 const Actions  = styled.div`display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px;`;

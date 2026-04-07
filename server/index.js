@@ -18,6 +18,7 @@ import yahooRoutes       from './routes/yahoo.js';
 import snapshotRoutes    from './routes/snapshot.js';
 import quotesRoutes      from './routes/quotes.js';
 import brazilMacroRoutes from './routes/brazilMacro.js';
+import alertsRoutes      from './routes/alerts.js';
 import { start as startQuoteFetcher, stop as stopQuoteFetcher } from './services/quoteFetchManager.js';
 
 const PORT = process.env.PORT || 4000;
@@ -77,6 +78,7 @@ app.get('/api/v1/health', (_req, res) => res.json({ status: 'ok', ts: Date.now()
 
 app.use('/api/v1/clubes', clubeRoutes);
 app.use('/api/v1/brazil', brazilMacroRoutes);
+app.use('/api/v1/alerts', alertsRoutes);
 
 // ── External API Proxies (production CORS bypass) ─────────────────────────────
 // Public pass-through proxies — no auth required. These forward requests to

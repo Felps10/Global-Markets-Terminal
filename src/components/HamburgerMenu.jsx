@@ -38,7 +38,7 @@ export default function HamburgerMenu({
         onClick={() => onNavigate(path)}
         style={{
           display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
-          fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: active ? 700 : 400,
+          fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, fontWeight: active ? 700 : 400,
           color: active ? color : "var(--c-text-2)",
           background: active ? (color + "0F") : "transparent",
           border: "none", borderLeft: `2px solid ${active ? color : "transparent"}`,
@@ -78,7 +78,7 @@ export default function HamburgerMenu({
             Switch to {isBrasil ? "Brasil" : "Global"} Terminal?
           </div>
           <div style={{
-            fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "var(--c-text-2)",
+            fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: "var(--c-text-2)",
             lineHeight: 1.6, marginBottom: 20,
           }}>
             This will navigate to the {isBrasil ? "Brazilian" : "global"} market view.
@@ -146,7 +146,7 @@ export default function HamburgerMenu({
                 onClick={() => { if (!active) setConfirmTarget(mode.key); }}
                 style={{
                   display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
-                  height: 40, fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 700,
+                  height: 40, fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, fontWeight: 700,
                   color: active ? "#080f1a" : "var(--c-text-2)",
                   background: active ? mode.accent : "transparent",
                   border: active ? "none" : "1px solid var(--c-border)",
@@ -211,7 +211,7 @@ export default function HamburgerMenu({
         <div style={{ padding: "16px 18px" }}>
           <SectionLabel>APPEARANCE</SectionLabel>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "var(--c-text-2)" }}>
+            <span style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, color: "var(--c-text-2)" }}>
               {theme === "dark" ? "🌙 Dark mode" : "☀️ Light mode"}
             </span>
             <button onClick={onThemeToggle}
@@ -237,7 +237,7 @@ export default function HamburgerMenu({
         <div style={{ padding: "16px 18px 24px", marginTop: "auto" }}>
           {user && (
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, color: "var(--c-text)" }}>
+              <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, fontWeight: 600, color: "var(--c-text)" }}>
                 {user.name || user.email}
               </div>
               <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", marginTop: 2 }}>
@@ -249,7 +249,7 @@ export default function HamburgerMenu({
             onClick={() => onNavigate("/app/settings")}
             style={{
               display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
-              fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "var(--c-text-2)",
+              fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, color: "var(--c-text-2)",
               background: "transparent", border: "none", padding: "8px 0", cursor: "pointer",
             }}
           >
@@ -259,7 +259,7 @@ export default function HamburgerMenu({
             onClick={onLogout}
             style={{
               display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
-              fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#FF5252",
+              fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, color: "var(--c-error)",
               background: "transparent", border: "none", padding: "8px 0", cursor: "pointer",
             }}
           >

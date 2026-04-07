@@ -21,6 +21,7 @@ import {
   hasFmpKey, hasFinnhubKey,
 } from '../dataServices.js';
 import { useAuth } from '../hooks/useAuth.js';
+import { useAlerts } from '../context/AlertsContext.jsx';
 
 // ─── Color tokens ─────────────────────────────────────────────────────────────
 const BG_DRAWER = '#0a1628';
@@ -31,7 +32,7 @@ const TXT_2     = '#94a3b8';
 const TXT_3     = '#475569';
 const ACCENT    = 'var(--c-accent)';
 const GREEN     = '#00E676';
-const RED       = '#FF5252';
+const RED       = 'var(--c-error)';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TIMEFRAMES   = ['1D', '5D', '1W', '1M', '3M', 'YTD', '1Y', '5Y', 'MAX'];
@@ -328,6 +329,14 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
   const navigate   = useNavigate();
   const { assets } = useTaxonomy();
   const { isAuthenticated, openAuthPanel } = useAuth();
+  const { createAlert } = useAlerts();
+
+  // ── Alert form state ─────────────────────────────────────────────────────
+  const [alertOpen,      setAlertOpen]      = useState(false);
+  const [alertCondition, setAlertCondition] = useState('above');
+  const [alertThreshold, setAlertThreshold] = useState('');
+  const [alertSaving,    setAlertSaving]    = useState(false);
+  const [alertSuccess,   setAlertSuccess]   = useState(false);
 
   // ── Navigation stack ──────────────────────────────────────────────────────
   const [stack, setStack] = useState([]);
@@ -1435,6 +1444,142 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
           {/* Price header — always visible */}
           <div style={{ flexShrink: 0, padding: '16px 16px 8px' }}>
             {priceHeaderSection}
+
+            {/* Alert button + inline form */}
+            {isAuthenticated && currentSymbol && !alertSuccess && (
+              <div style={{ marginBottom: 8 }}>
+                {!alertOpen ? (
+                  <button
+                    onClick={() => {
+                      setAlertOpen(true);
+                      setAlertThreshold(quoteData?.price ? String(quoteData.price) : '');
+                    }}
+                    style={{
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: 4,
+                      color: ACCENT,
+                      cursor: 'pointer',
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: 10,
+                      letterSpacing: '0.08em',
+                      padding: '5px 12px',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(59,130,246,0.4)'}
+                    onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'}
+                  >
+                    SET ALERT
+                  </button>
+                ) : (
+                  <div style={{
+                    background: 'rgba(255,255,255,0.02)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: 4,
+                    padding: '10px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    flexWrap: 'wrap',
+                  }}>
+                    {/* Condition toggle */}
+                    {['above', 'below'].map(c => (
+                      <button
+                        key={c}
+                        onClick={() => setAlertCondition(c)}
+                        style={{
+                          background: alertCondition === c ? ACCENT : 'rgba(255,255,255,0.04)',
+                          color: alertCondition === c ? '#080f1a' : TXT_2,
+                          border: 'none',
+                          borderRadius: 3,
+                          padding: '4px 10px',
+                          fontFamily: "'JetBrains Mono', monospace",
+                          fontSize: 10,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.06em',
+                        }}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                    {/* Threshold input */}
+                    <input
+                      type="number"
+                      value={alertThreshold}
+                      onChange={e => setAlertThreshold(e.target.value)}
+                      step="0.01"
+                      style={{
+                        width: 90,
+                        background: 'rgba(255,255,255,0.04)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: 'var(--radius-input)',
+                        color: TXT_1,
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontSize: 12,
+                        fontVariantNumeric: 'tabular-nums',
+                        padding: '4px 8px',
+                        outline: 'none',
+                      }}
+                    />
+                    {/* Create button */}
+                    <button
+                      disabled={alertSaving || !alertThreshold || Number(alertThreshold) <= 0}
+                      onClick={async () => {
+                        setAlertSaving(true);
+                        try {
+                          await createAlert(currentSymbol, alertCondition, Number(alertThreshold));
+                          setAlertSuccess(true);
+                          setAlertOpen(false);
+                          setTimeout(() => setAlertSuccess(false), 2000);
+                        } catch (_) { /* ignore */ }
+                        setAlertSaving(false);
+                      }}
+                      style={{
+                        background: ACCENT,
+                        color: '#080f1a',
+                        border: 'none',
+                        borderRadius: 3,
+                        padding: '4px 12px',
+                        fontFamily: "'IBM Plex Sans', sans-serif",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: alertSaving ? 'not-allowed' : 'pointer',
+                        opacity: alertSaving ? 0.5 : 1,
+                      }}
+                    >
+                      {alertSaving ? '...' : 'Create'}
+                    </button>
+                    {/* Cancel */}
+                    <button
+                      onClick={() => setAlertOpen(false)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: TXT_3,
+                        cursor: 'pointer',
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontSize: 10,
+                        padding: '4px 6px',
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+            {alertSuccess && (
+              <div style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: 10,
+                color: GREEN,
+                marginBottom: 8,
+                letterSpacing: '0.06em',
+              }}>
+                ✓ ALERT CREATED
+              </div>
+            )}
           </div>
 
           {/* ── TAB BAR — always visible, right below price ──────── */}

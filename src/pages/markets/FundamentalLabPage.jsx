@@ -18,12 +18,12 @@ const TXT_2   = '#94a3b8';
 const TXT_3   = '#475569';
 const ACCENT  = 'var(--c-accent)';
 const GREEN   = '#00E676';
-const RED     = '#FF5252';
+const RED     = 'var(--c-error)';
 const ORANGE  = '#f59e0b';
 const AMBER   = '#fbbf24';
 
 // ─── Position colors — chip = bar = table header (consistent) ─────────────────
-const POS_COLORS = ['var(--c-accent)', '#f59e0b', '#00E676', '#a855f7', '#FF5252'];
+const POS_COLORS = ['var(--c-accent)', '#f59e0b', '#00E676', '#a855f7', 'var(--c-error)'];
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 function fmtNum(v, d = 2) {

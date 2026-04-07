@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -12,7 +12,7 @@ const TXT_2    = '#94a3b8';
 const TXT_3    = '#475569';
 const ACCENT   = 'var(--c-accent)';
 const GREEN    = '#00E676';
-const RED      = '#FF5252';
+const RED      = 'var(--c-error)';
 const AMBER    = '#fbbf24';
 const MONO     = "'JetBrains Mono', monospace";
 
@@ -68,6 +68,16 @@ export default function CotistaFormModal({ clubeId, navLatest, cotistas, onClose
   // Step 2 fields
   const [answers, setAnswers] = useState([null, null, null, null]);
 
+  const [cpfCnpj, setCpfCnpj] = useState('');
+  const [email, setEmail]     = useState('');
+
+  // User link state
+  const [linkedUserId, setLinkedUserId] = useState(null);
+  const [linkedUserSearch, setLinkedUserSearch] = useState('');
+  const [linkedUserResults, setLinkedUserResults] = useState([]);
+  const [linkedUserLoading, setLinkedUserLoading] = useState(false);
+  const [linkedUser, setLinkedUser] = useState(null);
+
   // Submit state
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
@@ -107,6 +117,47 @@ export default function CotistaFormModal({ clubeId, navLatest, cotistas, onClose
     });
   };
 
+  function maskCpfCnpj(value) {
+    const digits = value.replace(/\D/g, '');
+    if (digits.length <= 11) {
+      return digits
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    } else {
+      return digits
+        .slice(0, 14)
+        .replace(/(\d{2})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1/$2')
+        .replace(/(\d{4})(\d{1,2})$/, '$1-$2');
+    }
+  }
+
+  // Debounced user search for USUÁRIO GMT field
+  useEffect(() => {
+    if (linkedUserSearch.trim().length < 3) {
+      setLinkedUserResults([]);
+      return;
+    }
+    setLinkedUserLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const token = await getToken();
+        const res = await fetch(
+          `${API_BASE}/api/v1/clubes/${clubeId}/access/search?q=${encodeURIComponent(linkedUserSearch.trim())}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setLinkedUserResults(data.users ?? []);
+        }
+      } catch { /* silent */ }
+      finally { setLinkedUserLoading(false); }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [linkedUserSearch, getToken, clubeId]);
+
   const handleSubmit = async () => {
     setSubmitting(true);
     setSubmitError(null);
@@ -116,6 +167,9 @@ export default function CotistaFormModal({ clubeId, navLatest, cotistas, onClose
         nome: nome.trim(),
         cotas_detidas: Number(cotasIniciais),
         data_entrada: dataEntrada,
+        cpf_cnpj: cpfCnpj.trim() || null,
+        email: email.trim().toLowerCase() || null,
+        auth_user_id: linkedUserId || null,
         perfil_suitability: profile,
         suitability_data: new Date().toISOString().split('T')[0],
         suitability_alerta: profile === 'conservador',
@@ -201,6 +255,75 @@ export default function CotistaFormModal({ clubeId, navLatest, cotistas, onClose
                     <div>Equivale a {Number(valorEquiv).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
                   )}
                   <div>Participação estimada: {equityPct.toFixed(2)}%</div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 10, fontFamily: MONO, color: TXT_2, letterSpacing: '0.06em', marginBottom: 4 }}>
+                CPF / CNPJ
+                <span style={{ color: 'rgba(255,255,255,0.3)', marginLeft: 6 }}>(opcional)</span>
+              </div>
+              <input
+                style={INPUT}
+                value={cpfCnpj}
+                onChange={e => setCpfCnpj(maskCpfCnpj(e.target.value))}
+                placeholder="000.000.000-00"
+                maxLength={18}
+              />
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 10, fontFamily: MONO, color: TXT_2, letterSpacing: '0.06em', marginBottom: 4 }}>
+                EMAIL
+                <span style={{ color: 'rgba(255,255,255,0.3)', marginLeft: 6 }}>(opcional)</span>
+              </div>
+              <input
+                style={INPUT}
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="email@exemplo.com"
+              />
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 10, fontFamily: MONO, color: TXT_2, letterSpacing: '0.06em', marginBottom: 4 }}>
+                USUÁRIO GMT
+                <span style={{ color: 'rgba(255,255,255,0.3)', marginLeft: 6 }}>(opcional)</span>
+              </div>
+              {linkedUser ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'rgba(0,230,118,0.08)', border: '1px solid rgba(0,230,118,0.2)', borderRadius: 3 }}>
+                  <span style={{ flex: 1, fontSize: 12, color: '#00E676' }}>{linkedUser.name || linkedUser.email}</span>
+                  <button type="button"
+                    onClick={() => { setLinkedUser(null); setLinkedUserId(null); setLinkedUserSearch(''); }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: TXT_3, fontSize: 14, padding: '0 2px' }}>×</button>
+                </div>
+              ) : (
+                <div style={{ position: 'relative' }}>
+                  <input
+                    style={INPUT}
+                    value={linkedUserSearch}
+                    onChange={e => setLinkedUserSearch(e.target.value)}
+                    placeholder="Buscar por nome ou email..."
+                  />
+                  {linkedUserLoading && (
+                    <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 10, color: TXT_3, fontFamily: MONO }}>...</span>
+                  )}
+                  {linkedUserResults.length > 0 && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: BG_CARD2, border: `1px solid ${BORDER2}`, borderRadius: 3, zIndex: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
+                      {linkedUserResults.map(u => (
+                        <div key={u.id}
+                          onClick={() => { setLinkedUser(u); setLinkedUserId(u.id); setLinkedUserSearch(''); setLinkedUserResults([]); }}
+                          style={{ padding: '8px 10px', fontSize: 12, cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                          <div style={{ color: TXT_1 }}>{u.name}</div>
+                          <div style={{ fontSize: 10, fontFamily: MONO, color: TXT_3 }}>{u.email}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

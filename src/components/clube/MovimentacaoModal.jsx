@@ -13,7 +13,7 @@ const TXT_2    = '#94a3b8';
 const TXT_3    = '#475569';
 const ACCENT   = 'var(--c-accent)';
 const GREEN    = '#00E676';
-const RED      = '#FF5252';
+const RED      = 'var(--c-error)';
 const AMBER    = '#fbbf24';
 const MONO     = "'JetBrains Mono', monospace";
 

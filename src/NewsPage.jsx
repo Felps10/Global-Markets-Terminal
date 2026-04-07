@@ -4,7 +4,7 @@ import { hasFinnhubKey, finnhubNews } from "./dataServices.js";
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
 const mono = "'JetBrains Mono', monospace";
-const sans = "'DM Sans', sans-serif";
+const sans = "'IBM Plex Sans', sans-serif";
 
 // All assets from GlobalMarketsTerminal (kept in sync)
 const ASSETS = {

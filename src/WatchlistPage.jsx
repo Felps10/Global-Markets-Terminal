@@ -18,7 +18,7 @@ function AssetWatchRow({ symbol, marketData, assets, onUnpin }) {
   const asset   = assets?.[symbol];
   const live    = marketData?.[symbol];
   const pct     = live?.changePct;
-  const pctColor = pct == null ? "#475569" : pct >= 0 ? "#00E676" : "#FF5252";
+  const pctColor = pct == null ? "#475569" : pct >= 0 ? "#00E676" : "var(--c-error)";
   const arrow   = pct == null ? "" : pct >= 0 ? "▲ " : "▼ ";
 
   return (

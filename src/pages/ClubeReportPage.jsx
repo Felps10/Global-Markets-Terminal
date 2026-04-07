@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
+import { hasRole } from '../lib/roles.js';
 import {
   calculateNAVFromHistory,
   calculateDrawdown,
@@ -23,7 +24,7 @@ const TXT_3    = '#475569';
 const TXT_4    = '#334155';
 const ACCENT   = 'var(--c-accent)';
 const GREEN    = '#00E676';
-const RED      = '#FF5252';
+const RED      = 'var(--c-error)';
 const AMBER    = '#fbbf24';
 const GOLD     = '#FFD700';
 
@@ -703,7 +704,7 @@ Instruções:
               onChange={e => setDocFilter(f => ({ ...f, search: e.target.value }))}
               style={{ flex: 1, minWidth: 180, background: BG_CARD, border: `1px solid ${BORDER2}`, color: TXT_1, fontFamily: MONO, fontSize: 10, padding: '4px 10px', borderRadius: 3, outline: 'none' }}
             />
-            {user?.role === 'admin' && (
+            {hasRole(user?.role, 'club_manager') && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                 <select value={irYear} onChange={e => setIrYear(Number(e.target.value))}
                   style={{ background: BG_CARD, border: `1px solid ${BORDER2}`, color: TXT_2, fontFamily: MONO, fontSize: 10, padding: '4px 8px', borderRadius: 3, outline: 'none' }}>

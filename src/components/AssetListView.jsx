@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useAuth } from '../hooks/useAuth.js';
 import { useWatchlist } from '../context/WatchlistContext.jsx';
 
@@ -26,8 +27,8 @@ const C = {
   textBold:  '#e2e8f0',
   green:     '#00d4aa',
   red:       '#ff6b6b',
-  amber:     '#FFB300',
-  starDim:   '#2a4a6a',
+  amber:     '#F5C518',
+  starDim:   'rgba(255,255,255,0.2)',
 };
 
 // ── CHG% filter options ───────────────────────────────────────────────────────
@@ -474,6 +475,15 @@ export default function AssetListView({
     filterGroups, filterExchanges, isPinned,
   ]);
 
+  // ── Virtualization ──────────────────────────────────────────────────────────
+  const scrollRef = useRef(null);
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 36,   // matches height: 36 on each <tr>
+    overscan: 8,              // render 8 extra rows above/below viewport
+  });
+
   // Shared input style (used in filter row)
   const inputStyle = {
     width: '100%',
@@ -574,8 +584,9 @@ export default function AssetListView({
         </div>
       )}
 
-      {/* ── Scroll container ──────────────────────────────────────────────── */}
+      {/* ── Scroll container (virtualizer scroll element) ────────────────── */}
       <div
+        ref={scrollRef}
         className="alv-scroll"
         style={{ height: 'calc(100vh - 200px)', overflowY: 'auto' }}
       >
@@ -736,36 +747,55 @@ export default function AssetListView({
             </tr>
           </thead>
 
-          {/* Body */}
+          {/* Body — virtualized: only visible rows + overscan are in the DOM */}
           <tbody>
-            {rows.map((sym, idx) => {
-              const d   = marketData[sym];
-              const a   = assets[sym];
-              if (!d || !a) return null;
+            {rows.length > 0 && (
+              <>
+                {/* Top spacer — keeps scroll position accurate */}
+                {rowVirtualizer.getVirtualItems()[0]?.start > 0 && (
+                  <tr><td colSpan={COLS.length} style={{ height: rowVirtualizer.getVirtualItems()[0].start, padding: 0, border: 'none' }} /></tr>
+                )}
 
-              const sg       = subgroupMap.get(a.cat);
-              const groupId  = sg?.group_id || 'equities';
-              const badge    = GROUP_BADGE[groupId] || DEFAULT_BADGE;
-              const isLast   = idx === rows.length - 1;
-              const pinned   = isPinned('asset', sym);
-              const chg      = d.changeAbs ?? d.change ?? null;
-              const chgPct   = d.changePct ?? null;
-              const displaySym = a.display || sym;
+                {rowVirtualizer.getVirtualItems().map(virtualRow => {
+                  const idx = virtualRow.index;
+                  const sym = rows[idx];
+                  const d   = marketData[sym];
+                  const a   = assets[sym];
+                  if (!d || !a) return null;
 
-              return (
-                <AssetRow
-                  key={sym}
-                  sym={sym}
-                  displaySym={displaySym}
-                  d={d} a={a} sg={sg} badge={badge}
-                  chg={chg} chgPct={chgPct}
-                  pinned={pinned} isLast={isLast}
-                  isAuthenticated={isAuthenticated}
-                  onPin={() => pinned ? unpin('asset', sym) : pin('asset', sym)}
-                  onClick={() => onAssetClick(sym)}
-                />
-              );
-            })}
+                  const sg       = subgroupMap.get(a.cat);
+                  const groupId  = sg?.group_id || 'equities';
+                  const badge    = GROUP_BADGE[groupId] || DEFAULT_BADGE;
+                  const isLast   = idx === rows.length - 1;
+                  const pinned   = isPinned('asset', sym);
+                  const chg      = d.changeAbs ?? d.change ?? null;
+                  const chgPct   = d.changePct ?? null;
+                  const displaySym = a.display || sym;
+
+                  return (
+                    <AssetRow
+                      key={sym}
+                      sym={sym}
+                      displaySym={displaySym}
+                      d={d} a={a} sg={sg} badge={badge}
+                      chg={chg} chgPct={chgPct}
+                      pinned={pinned} isLast={isLast}
+                      isAuthenticated={isAuthenticated}
+                      onPin={() => pinned ? unpin('asset', sym) : pin('asset', sym)}
+                      onClick={() => onAssetClick(sym)}
+                    />
+                  );
+                })}
+
+                {/* Bottom spacer — total height minus last virtual item end */}
+                {(() => {
+                  const items = rowVirtualizer.getVirtualItems();
+                  const lastItem = items[items.length - 1];
+                  const bottomPad = lastItem ? rowVirtualizer.getTotalSize() - lastItem.end : 0;
+                  return bottomPad > 0 ? <tr><td colSpan={COLS.length} style={{ height: bottomPad, padding: 0, border: 'none' }} /></tr> : null;
+                })()}
+              </>
+            )}
 
             {rows.length === 0 && (
               <tr>

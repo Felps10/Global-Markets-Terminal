@@ -57,6 +57,7 @@ export default function TerminalLayout() {
             catalog:   '/app/catalog',
             news:      '/app/news',
             watchlist: '/app/watchlist',
+            alerts:    '/app/alerts',
           };
           navigate(pathMap[key] || `/app/${terminalMode}`);
         }}

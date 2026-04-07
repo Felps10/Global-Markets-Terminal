@@ -2,6 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 import { useSnapshot } from '../hooks/useSnapshot.js';
+import { hasRole } from '../lib/roles.js';
+
+function getRedirectForRole(role) {
+  if (role === 'admin') return '/admin';
+  if (hasRole(role, 'club_member')) return '/clubes';
+  return '/app/global';
+}
 
 const DISPLAY_NAMES = {
   '^GSPC': 'S&P 500', '^DJI': 'Dow Jones', '^IXIC': 'NASDAQ',
@@ -102,7 +109,7 @@ const DATA_SOURCES = [
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { assets: tickerAssets, snapshotLabel } = useSnapshot();
   const TICKER_ITEMS = buildTickerItems(tickerAssets);
   const [hoveredCard, setHoveredCard] = useState(null);
@@ -115,8 +122,8 @@ export default function LandingPage() {
   const [featuresLinkHover, setFeaturesLinkHover] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated) navigate('/app', { replace: true });
-  }, [isAuthenticated, navigate]);
+    if (isAuthenticated) navigate(getRedirectForRole(user?.role), { replace: true });
+  }, [isAuthenticated, user, navigate]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -136,7 +143,6 @@ export default function LandingPage() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
         @keyframes fadeInUp {
           from { opacity: 0; transform: translateY(20px); }
           to   { opacity: 1; transform: translateY(0); }
@@ -164,6 +170,12 @@ export default function LandingPage() {
         .gmt-section-reveal.visible {
           opacity: 1;
           transform: translateY(0);
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .hero-text, .hero-sub, .hero-cta { animation: none !important; opacity: 1 !important; }
+          .gmt-node  { animation: none !important; opacity: 0.6 !important; }
+          .gmt-blink { animation: none !important; opacity: 1 !important; }
+          .gmt-section-reveal { transition: none !important; opacity: 1 !important; transform: none !important; }
         }
       `}</style>
       <div style={{
@@ -328,6 +340,57 @@ export default function LandingPage() {
             }}>
               269 assets · 9 groups · 36 subgroups
             </div>
+
+            {/* Live hero prices */}
+            {(() => {
+              const heroSymbols = ['^GSPC', '^DJI', '^IXIC', 'BTC', 'EURUSD=X'];
+              const heroItems = heroSymbols
+                .filter(sym => tickerAssets[sym])
+                .map(sym => {
+                  const a = tickerAssets[sym];
+                  return {
+                    sym: DISPLAY_NAMES[sym] || sym,
+                    price: fmtPrice(a.price),
+                    chg: `${a.changePct >= 0 ? '+' : ''}${a.changePct.toFixed(2)}%`,
+                    pos: a.changePct >= 0,
+                  };
+                });
+              if (!heroItems.length) return null;
+              return (
+                <div style={{
+                  display: 'flex',
+                  gap: 20,
+                  marginTop: 20,
+                  flexWrap: 'wrap',
+                }}>
+                  {heroItems.map((item, i) => (
+                    <div key={i} style={{
+                      display: 'flex',
+                      alignItems: 'baseline',
+                      gap: 6,
+                    }}>
+                      <span style={{
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontSize: 10,
+                        color: 'rgba(255,255,255,0.35)',
+                        letterSpacing: '0.05em',
+                      }}>{item.sym}</span>
+                      <span style={{
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontSize: 12,
+                        fontWeight: 500,
+                        color: 'var(--c-accent-data)',
+                      }}>{item.price}</span>
+                      <span style={{
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontSize: 10,
+                        color: item.pos ? '#00E676' : 'var(--c-error)',
+                      }}>{item.chg}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         </section>
 

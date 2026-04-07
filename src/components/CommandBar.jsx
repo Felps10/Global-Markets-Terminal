@@ -416,8 +416,10 @@ export default function CommandBar({
   const filterPreview =
     activeFilter === 'all'
       ? 'ALL'
-      : (subgroups || []).find(s => s.id === activeFilter)?.display_name?.toUpperCase()
-        || activeFilter.toUpperCase();
+      : activeFilter === 'watchlist'
+        ? '★ WATCHLIST'
+        : (subgroups || []).find(s => s.id === activeFilter)?.display_name?.toUpperCase()
+          || activeFilter.toUpperCase();
 
   const sortLabel   = sortMode === 'alpha' ? 'A-Z' : 'RETURN';
   const sortPreview = `${sortLabel} ${sortDir === 'asc' ? '↑' : '↓'}`;
@@ -589,6 +591,10 @@ export default function CommandBar({
                 </LabeledRow>
 
                 <LabeledRow label="SECTOR">
+                  <Chip active={activeFilter === 'watchlist'} onClick={() => onFilterChange('watchlist')}>
+                    <span style={{ color: activeFilter === 'watchlist' ? '#F5C518' : undefined }}>★</span> WATCHLIST
+                  </Chip>
+                  <span style={{ display: 'inline-block', width: 1, height: 16, background: C.border, margin: '0 2px', flexShrink: 0 }} />
                   <Chip active={activeFilter === 'all'} onClick={() => onFilterChange('all')}>
                     ALL
                   </Chip>

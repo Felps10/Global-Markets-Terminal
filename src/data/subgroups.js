@@ -54,7 +54,7 @@ export const SUBGROUPS = [
   { id: "br-titulos", display_name: "Títulos Públicos",description: "Tesouro Direto e títulos públicos federais",             slug: "br-titulos", group_id: "br-renda-fixa", icon: "🧾", color: "#78909C", section_id: "titulos",         data_source: "bcb",    sort_order: 2 },
 
   // ── Brazil — Macro sections ───────────────────────────────────────────────
-  { id: "br-macro-indicadores", display_name: "Macro Brasil",       description: "Indicadores macroeconômicos do Brasil",           slug: "br-macro-indicadores", group_id: "br-macro", icon: "📊", color: "#FF5252", section_id: "macro-brasil",     data_source: "bcb",        sort_order: 0 },
+  { id: "br-macro-indicadores", display_name: "Macro Brasil",       description: "Indicadores macroeconômicos do Brasil",           slug: "br-macro-indicadores", group_id: "br-macro", icon: "📊", color: "var(--c-error)", section_id: "macro-brasil",     data_source: "bcb",        sort_order: 0 },
   { id: "br-cambio",            display_name: "Câmbio & Liquidez",  description: "Taxas de câmbio e liquidez do mercado brasileiro", slug: "br-cambio",            group_id: "br-macro", icon: "💵", color: "#FFD740", section_id: "cambio",          data_source: "awesomeapi", sort_order: 1 },
 
   // ── Equities — Brazil Highlights (Global Terminal via Yahoo .SA) ──────────

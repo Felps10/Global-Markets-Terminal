@@ -107,6 +107,10 @@ export default function PricingPage() {
           opacity: 1;
           transform: translateY(0);
         }
+        @media (prefers-reduced-motion: reduce) {
+          .gmt-page-enter  { animation: none !important; opacity: 1 !important; }
+          .gmt-section-reveal { transition: none !important; opacity: 1 !important; transform: none !important; }
+        }
       `}</style>
       <div className="gmt-page-enter" style={{
         fontFamily: "'IBM Plex Sans', sans-serif",
@@ -169,7 +173,12 @@ export default function PricingPage() {
               }}>Monthly</span>
 
               <div
+                role="switch"
+                aria-checked={isAnnual}
+                aria-label="Billing period"
+                tabIndex={0}
                 onClick={() => setIsAnnual(a => !a)}
+                onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setIsAnnual(a => !a)}
                 style={{
                   width: 44, height: 24, borderRadius: 12,
                   background: isAnnual ? 'var(--c-accent)' : 'rgba(255,255,255,0.1)',
@@ -472,6 +481,7 @@ export default function PricingPage() {
                 }}>
                   <button
                     onClick={() => setOpenFaq(isOpen ? null : i)}
+                    aria-expanded={isOpen}
                     style={{
                       width: '100%', display: 'flex', justifyContent: 'space-between',
                       alignItems: 'center', padding: '20px 0',

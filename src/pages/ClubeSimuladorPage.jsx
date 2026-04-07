@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
+import { hasRole } from '../lib/roles.js';
 import { ASSETS as STATIC_ASSETS_MAP } from '../data/assets.js';
 import {
   simulateRebalance,
   simulateMovimentacao,
   simulatePreTrade,
-  computePeriodicTaxPreview,
 } from '../services/simulatorEngine.js';
 import ClubeShell from '../components/clube/ClubeShell.jsx';
 
@@ -23,7 +23,7 @@ const TXT_2    = '#94a3b8';
 const TXT_3    = '#475569';
 const ACCENT   = 'var(--c-accent)';
 const GREEN    = '#00E676';
-const RED      = '#FF5252';
+const RED      = 'var(--c-error)';
 const AMBER    = '#fbbf24';
 const GOLD     = '#FFD700';
 const MONO     = "'JetBrains Mono', monospace";
@@ -54,55 +54,40 @@ const MODES = [
   { id: 'rebalance',    label: 'REBALANCEAR' },
   { id: 'movimentacao', label: 'SIMULAR MOVIMENTAÇÃO' },
   { id: 'pretrade',     label: 'PRÉ-TRADE COMPLIANCE' },
-  { id: 'tributacao',   label: 'TRIBUTAÇÃO PERIÓDICA' },
+  { id: 'tributacao',   label: 'TRIBUTAÇÃO' },
 ];
 
-// ── TributacaoPreviewPanel (module-level) ────────────────────────────────────
-function TributacaoPreviewPanel({ cotistas, navLatest, estatuto, navigate }) {
-  const preview = useMemo(() => {
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      return computePeriodicTaxPreview(cotistas, [], navLatest.valor_cota, estatuto, today);
-    } catch { return null; }
-  }, [cotistas, navLatest, estatuto]);
+const TRIB_STAGES = [
+  { id: 'simular',   label: 'SIMULAR' },
+  { id: 'executar',  label: 'EXECUTAR' },
+  { id: 'historico', label: 'HISTÓRICO' },
+];
 
-  if (!preview) return null;
+const LAYOUT_ICONS = {
+  stack: (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <line x1="2" y1="3" x2="12" y2="3"/><line x1="2" y1="7" x2="12" y2="7"/><line x1="2" y1="11" x2="12" y2="11"/>
+    </svg>
+  ),
+  split: (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="1" y="2" width="5" height="10" rx="1"/><rect x="8" y="2" width="5" height="10" rx="1"/>
+    </svg>
+  ),
+  focus: (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="3" y="2" width="8" height="10" rx="1"/>
+    </svg>
+  ),
+};
 
-  return (
-    <div style={{
-      maxWidth: 580, width: '100%',
-      background: BG_CARD, border: `1px solid ${BORDER}`,
-      borderRadius: 6, padding: 24,
-    }}>
-      <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_3, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 16 }}>
-        ESTIMATIVA TRIBUTÁRIA
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-        {[
-          ['IRRF ESTIMADO', `R$ ${preview.totalTaxBrl.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
-          ['COTISTAS COM GANHO', `${preview.membersWithGain} de ${preview.totalMembers}`],
-          ['REGIME', preview.regime.toUpperCase()],
-          ['ALÍQUOTA', `${(preview.irrfRate * 100).toFixed(2)}%`],
-        ].map(([label, value]) => (
-          <div key={label} style={{ background: BG_CARD2, borderRadius: 4, padding: '10px 12px' }}>
-            <div style={{ fontFamily: MONO, fontSize: 9, color: TXT_3, letterSpacing: '0.1em', marginBottom: 4 }}>{label}</div>
-            <div style={{ fontFamily: MONO, fontSize: 14, fontWeight: 600, color: TXT_1 }}>{value}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_3, padding: '10px 12px', background: BG_CARD2, borderRadius: 4, marginBottom: 16, lineHeight: 1.6 }}>
-        ⚠ Estimativa sem base de custo FIFO. Para cálculo preciso com histórico de aquisição, use a página de Tributação.
-      </div>
-      <button
-        onClick={() => navigate('/clube/tributacao')}
-        style={{
-          width: '100%', padding: '10px 0', fontFamily: MONO, fontSize: 11, letterSpacing: '0.1em',
-          background: 'rgba(255,82,82,0.10)', border: '1px solid rgba(255,82,82,0.4)',
-          color: RED, borderRadius: 4, cursor: 'pointer',
-        }}
-      >IR PARA TRIBUTAÇÃO → EXECUTAR</button>
-    </div>
-  );
+function defaultDataRef() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const may = new Date(year, 4, 31);
+  const nov = new Date(year, 10, 30);
+  const next = now <= may ? may : now <= nov ? nov : new Date(year + 1, 4, 31);
+  return next.toISOString().split('T')[0];
 }
 
 export default function ClubeSimuladorPage() {
@@ -140,6 +125,22 @@ export default function ClubeSimuladorPage() {
   const [tradeDirection, setTradeDirection]  = useState('buy');
   const [tradeValor,     setTradeValor]     = useState('');
   const [tradeResult,    setTradeResult]    = useState(null);
+
+  // Mode E — Tributação
+  const [tribStage,       setTribStage]       = useState('simular');
+  const [tribLayout,      setTribLayout]      = useState(() => localStorage.getItem('clube-tributacao-layout') || 'split');
+  const [dataRef,         setDataRef]         = useState(defaultDataRef);
+  const [tribSimLoading,  setTribSimLoading]  = useState(false);
+  const [tribSimResult,   setTribSimResult]   = useState(null);
+  const [tribSimError,    setTribSimError]    = useState(null);
+  const [tribExecuting,   setTribExecuting]   = useState(false);
+  const [tribExecResult,  setTribExecResult]  = useState(null);
+  const [tribExecError,   setTribExecError]   = useState(null);
+  const [tribConfirmPhrase, setTribConfirmPhrase] = useState('');
+  const [historico,          setHistorico]          = useState([]);
+  const [historicoLoading,   setHistoricoLoading]   = useState(false);
+  const [historicoError,     setHistoricoError]     = useState(null);
+  const historicoFetched = useRef(false);
 
   const totalCotas = useMemo(
     () => cotistas.reduce((s, c) => s + parseFloat(c.cotas_detidas ?? 0), 0),
@@ -319,6 +320,88 @@ export default function ClubeSimuladorPage() {
     ));
   };
 
+  // ── Mode E — Tributação ──────────────────────────────────────────────────
+  useEffect(() => {
+    localStorage.setItem('clube-tributacao-layout', tribLayout);
+  }, [tribLayout]);
+
+  const handleTribSimular = useCallback(async () => {
+    if (!clube?.id) return;
+    setTribSimLoading(true); setTribSimError(null); setTribSimResult(null); setTribExecResult(null);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE}/api/v1/clubes/${clube.id}/tributacao/simular`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ data_referencia: dataRef }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message ?? `Erro ${res.status}`);
+      }
+      const data = await res.json();
+      setTribSimResult(data);
+      setTribStage('executar');
+    } catch (e) {
+      setTribSimError(e.message);
+    } finally {
+      setTribSimLoading(false);
+    }
+  }, [clube?.id, getToken, dataRef]);
+
+  const fetchHistorico = useCallback(async () => {
+    if (!clube?.id) return;
+    setHistoricoLoading(true); setHistoricoError(null);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE}/api/v1/clubes/${clube.id}/tributacao/historico`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setHistorico(await res.json());
+    } catch (e) {
+      setHistoricoError(e.message);
+    } finally {
+      setHistoricoLoading(false);
+    }
+  }, [clube?.id, getToken]);
+
+  const handleTribExecutar = useCallback(async () => {
+    if (!clube?.id) return;
+    setTribExecuting(true); setTribExecError(null);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE}/api/v1/clubes/${clube.id}/tributacao/executar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ data_referencia: dataRef }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message ?? `Erro ${res.status}`);
+      }
+      const result = await res.json();
+      setTribExecResult(result);
+      setTribConfirmPhrase('');
+      setTribSimResult(null);
+      historicoFetched.current = false;
+      setTribStage('historico');
+    } catch (e) {
+      setTribExecError(e.message);
+    } finally {
+      setTribExecuting(false);
+    }
+  }, [clube?.id, getToken, dataRef]);
+
+  useEffect(() => {
+    if (activeMode === 'tributacao' && tribStage === 'historico' && !historicoFetched.current) {
+      historicoFetched.current = true;
+      fetchHistorico();
+    }
+  }, [activeMode, tribStage, fetchHistorico]);
+
+  const tribRegime = estatuto?.regime_tributario ?? 'fia';
+  const tribCanConfirm = tribConfirmPhrase === 'CONFIRMAR TRIBUTAÇÃO';
+
   // ── Loading / empty ─────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -351,7 +434,7 @@ export default function ClubeSimuladorPage() {
       headerLeft={
         <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '0.14em', color: TXT_2 }}>
           <span style={{ color: ACCENT }}>SIMULADOR</span>
-          <span style={{ color: TXT_3 }}> · {activeMode === 'rebalance' ? 'Rebalancear' : activeMode === 'movimentacao' ? 'Movimentação' : 'Pré-Trade'}</span>
+          <span style={{ color: TXT_3 }}> · {activeMode === 'rebalance' ? 'Rebalancear' : activeMode === 'movimentacao' ? 'Movimentação' : activeMode === 'tributacao' ? 'Tributação' : 'Pré-Trade'}</span>
         </span>
       }
       headerRight={null}
@@ -523,7 +606,7 @@ export default function ClubeSimuladorPage() {
                     </div>
 
                     {/* Save button */}
-                    {user?.role === 'admin' && rebalanceResult.cvmStatus !== 'breach' && (
+                    {hasRole(user?.role, 'club_manager') && rebalanceResult.cvmStatus !== 'breach' && (
                       <button
                         onClick={() => { setShowSaveConfirm(true); setSaveError(null); }}
                         style={{
@@ -857,27 +940,327 @@ export default function ClubeSimuladorPage() {
             </div>
           )}
 
-          {/* ════════════ MODE F — TRIBUTAÇÃO PERIÓDICA ════════════ */}
-          {activeMode === 'tributacao' && (
-            <div style={{
-              flex: 1, display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center',
-              gap: 16, padding: 40,
-            }}>
-              {navLatest && cotistas.length > 0 && estatuto ? (
-                <TributacaoPreviewPanel
-                  cotistas={cotistas}
-                  navLatest={navLatest}
-                  estatuto={estatuto}
-                  navigate={navigate}
-                />
-              ) : (
-                <div style={{ fontFamily: MONO, fontSize: 12, color: TXT_3, textAlign: 'center', lineHeight: 1.8 }}>
-                  Carregando dados para simulação tributária...
+          {/* ════════════ MODE E — TRIBUTAÇÃO ════════════ */}
+          {activeMode === 'tributacao' && (() => {
+            // ── Shared section builders ──────────────────────────────────
+            const regimeBanner = (
+              <div style={{
+                padding: '8px 12px', borderRadius: 4,
+                background: tribRegime === 'fia' ? 'rgba(0,230,118,0.06)' : 'rgba(251,191,36,0.06)',
+                border: `1px solid ${tribRegime === 'fia' ? 'rgba(0,230,118,0.25)' : 'rgba(251,191,36,0.25)'}`,
+                fontFamily: MONO, fontSize: 10,
+                color: tribRegime === 'fia' ? GREEN : AMBER,
+              }}>
+                {tribRegime === 'fia' ? 'Regime FIA — Alíquota flat 15%' : 'Regime Geral — Alíquota regressiva 15–22.5%'}
+              </div>
+            );
+
+            const dateControl = (
+              <div>
+                <div style={{ ...LABEL }}>DATA DE REFERÊNCIA</div>
+                <input type="date" value={dataRef} onChange={e => setDataRef(e.target.value)} style={{ ...INPUT }} />
+                <div style={{ fontFamily: MONO, fontSize: 9, color: TXT_3, marginTop: 4 }}>
+                  IRRF periódico: último dia útil de maio e novembro
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            );
+
+            const simularBtn = (
+              <button
+                onClick={handleTribSimular}
+                disabled={tribSimLoading}
+                style={{
+                  width: '100%', padding: '10px 0', fontFamily: MONO, fontSize: 11,
+                  letterSpacing: '0.1em', borderRadius: 3,
+                  background: tribSimLoading ? TXT_3 : ACCENT, border: 'none', color: '#fff',
+                  cursor: tribSimLoading ? 'not-allowed' : 'pointer',
+                }}
+              >{tribSimLoading ? 'CALCULANDO...' : 'SIMULAR'}</button>
+            );
+
+            const perCotistaTable = tribSimResult && (
+              <div>
+                <div style={{ fontSize: 10, color: TXT_3, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>
+                  IMPACTO POR COTISTA
+                </div>
+                <div style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 6, overflow: 'hidden' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 90px 80px 60px 80px 80px', gap: 6, padding: '8px 14px', borderBottom: `1px solid ${BORDER}` }}>
+                    {['COTISTA', 'COTAS', 'CUSTO', 'GANHO', 'ALÍQ.', 'IRRF', 'APÓS'].map(h => (
+                      <div key={h} style={{ fontFamily: MONO, fontSize: 9, color: TXT_3, letterSpacing: '0.06em' }}>{h}</div>
+                    ))}
+                  </div>
+                  {tribSimResult.perMember.map(m => (
+                    <div key={m.cotista_id} style={{
+                      display: 'grid', gridTemplateColumns: '1fr 80px 90px 80px 60px 80px 80px',
+                      gap: 6, padding: '8px 14px', borderBottom: `1px solid ${BORDER2}`,
+                      opacity: m.hasGain ? 1 : 0.5,
+                    }}>
+                      <div style={{ fontFamily: MONO, fontSize: 11, color: TXT_1 }}>{m.cotista_nome}</div>
+                      <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_2 }}>{m.cotas_detidas.toFixed(2)}</div>
+                      <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_2 }}>{formatBRL(m.costBasis)}</div>
+                      <div style={{ fontFamily: MONO, fontSize: 10, color: m.hasGain ? GREEN : TXT_3 }}>{m.hasGain ? formatBRL(m.gain) : 'Sem ganho'}</div>
+                      <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_2 }}>{(m.irrfRate * 100).toFixed(1)}%</div>
+                      <div style={{ fontFamily: MONO, fontSize: 10, color: m.hasGain ? RED : TXT_3 }}>{m.hasGain ? formatBRL(m.taxBrl) : '—'}</div>
+                      <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_2 }}>{m.newCotas.toFixed(2)}</div>
+                    </div>
+                  ))}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 90px 80px 60px 80px 80px', gap: 6, padding: '10px 14px', borderTop: `1px solid ${BORDER}` }}>
+                    <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_3 }}>TOTAL</div>
+                    <div /><div /><div /><div />
+                    <div style={{ fontFamily: MONO, fontSize: 10, color: RED, fontWeight: 600 }}>{formatBRL(tribSimResult.totalTaxBrl)}</div>
+                    <div style={{ fontFamily: MONO, fontSize: 10, color: RED }}>{tribSimResult.totalCotasACancelar.toFixed(6)}</div>
+                  </div>
+                </div>
+              </div>
+            );
+
+            // ── SIMULAR stage content ────────────────────────────────────
+            const simularContent = () => {
+              const controls = (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {regimeBanner}
+                  {dateControl}
+                  {simularBtn}
+                  {tribSimLoading && (
+                    <div style={{ padding: '40px 0', textAlign: 'center', fontFamily: MONO, fontSize: 11, color: TXT_3, letterSpacing: '0.1em' }}>
+                      CALCULANDO TRIBUTAÇÃO...
+                    </div>
+                  )}
+                  {tribSimError && (
+                    <div style={{ padding: '12px 16px', borderRadius: 4, background: 'rgba(255,82,82,0.08)', border: '1px solid rgba(255,82,82,0.3)', fontFamily: MONO, fontSize: 11, color: RED }}>
+                      {tribSimError}
+                    </div>
+                  )}
+                </div>
+              );
+              const detail = tribSimResult ? perCotistaTable : (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 40 }}>
+                  <div style={{ fontSize: 32, color: TXT_3 }}>⊘</div>
+                  <div style={{ fontFamily: MONO, fontSize: 12, color: TXT_3, textAlign: 'center', lineHeight: 1.8 }}>
+                    Configure a data de referência e clique em SIMULAR<br />
+                    para calcular o impacto tributário antes de executar.
+                  </div>
+                </div>
+              );
+
+              if (tribLayout === 'split') {
+                return (
+                  <div style={{ display: 'flex', gap: 0, flex: 1, overflow: 'hidden' }}>
+                    <div style={{ width: 360, flexShrink: 0, borderRight: `1px solid ${BORDER}`, overflowY: 'auto', padding: 20 }}>{controls}</div>
+                    <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>{detail}</div>
+                  </div>
+                );
+              }
+              if (tribLayout === 'focus') {
+                return <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 24 }}>{controls}{detail}</div>;
+              }
+              return <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>{controls}{detail}</div>;
+            };
+
+            // ── EXECUTAR stage content ───────────────────────────────────
+            const executarContent = () => {
+              const summaryCard = tribSimResult && (
+                <div style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 6, padding: '14px 18px', display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_3, letterSpacing: '0.1em' }}>
+                    TRIBUTAÇÃO SIMULADA — {formatDateBR(tribSimResult.dataReferencia)}
+                  </div>
+                  <span style={{ fontFamily: MONO, fontSize: 9, padding: '2px 8px', borderRadius: 3, background: tribRegime === 'fia' ? 'rgba(0,230,118,0.1)' : 'rgba(251,191,36,0.1)', color: tribRegime === 'fia' ? GREEN : AMBER, border: `1px solid ${tribRegime === 'fia' ? GREEN + '40' : AMBER + '40'}` }}>
+                    {tribSimResult.regime.toUpperCase()}
+                  </span>
+                  <div style={{ flex: 1 }} />
+                  <span style={{ fontFamily: MONO, fontSize: 11, color: RED }}>Total IRRF: {formatBRL(tribSimResult.totalTaxBrl)}</span>
+                  <span style={{ fontFamily: MONO, fontSize: 10, color: TXT_2 }}>Cotas a cancelar: {tribSimResult.totalCotasACancelar.toFixed(6)}</span>
+                  <span style={{ fontFamily: MONO, fontSize: 10, color: TXT_3 }}>{tribSimResult.membersWithGain} de {tribSimResult.totalMembers} cotistas</span>
+                </div>
+              );
+
+              const warning = (
+                <div style={{
+                  padding: 16, borderRadius: 4,
+                  background: 'rgba(255,82,82,0.06)',
+                  border: '1px solid rgba(255,82,82,0.25)',
+                }}>
+                  <div style={{ fontFamily: MONO, fontSize: 11, color: RED, fontWeight: 600, marginBottom: 8 }}>⚠ OPERAÇÃO IRREVERSÍVEL</div>
+                  <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_2, lineHeight: 1.6 }}>
+                    A execução debitará IRRF de cada cotista, cancelará cotas e gerará os DARFs correspondentes. Esta operação não pode ser desfeita após confirmação. Verifique os valores acima antes de prosseguir.
+                  </div>
+                </div>
+              );
+
+              const confirmBlock = hasRole(user?.role, 'club_manager') && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ fontFamily: MONO, fontSize: 12, color: TXT_2 }}>
+                    Para confirmar, digite: <span style={{ color: TXT_1, fontWeight: 600 }}>CONFIRMAR TRIBUTAÇÃO</span>
+                  </div>
+                  <input
+                    value={tribConfirmPhrase}
+                    onChange={e => setTribConfirmPhrase(e.target.value)}
+                    placeholder="CONFIRMAR TRIBUTAÇÃO"
+                    style={{ ...INPUT, border: `1px solid ${tribCanConfirm ? GREEN + '60' : BORDER2}` }}
+                  />
+                  {tribExecError && (
+                    <div style={{ padding: '8px 12px', borderRadius: 4, background: 'rgba(255,82,82,0.08)', border: '1px solid rgba(255,82,82,0.3)', fontSize: 10, color: RED }}>
+                      {tribExecError}
+                    </div>
+                  )}
+                  <button
+                    onClick={handleTribExecutar}
+                    disabled={!tribCanConfirm || tribExecuting}
+                    style={{
+                      padding: '10px 24px', fontFamily: MONO, fontSize: 11,
+                      letterSpacing: '0.1em', borderRadius: 3,
+                      background: tribCanConfirm && !tribExecuting ? RED : TXT_3,
+                      border: 'none', color: '#fff',
+                      cursor: tribCanConfirm && !tribExecuting ? 'pointer' : 'not-allowed',
+                    }}
+                  >{tribExecuting ? 'EXECUTANDO...' : 'EXECUTAR TRIBUTAÇÃO'}</button>
+                </div>
+              );
+
+              const successBlock = tribExecResult && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 40 }}>
+                  <div style={{ fontSize: 48, color: GREEN }}>✓</div>
+                  <div style={{ fontFamily: MONO, fontSize: 16, color: TXT_1, fontWeight: 600 }}>Tributação Executada</div>
+                  <div style={{ fontFamily: MONO, fontSize: 12, color: TXT_2 }}>
+                    {formatBRL(tribExecResult.totalTaxBrl)} debitados · {tribExecResult.darfsGerados} DARFs gerados
+                  </div>
+                </div>
+              );
+
+              const body = (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  {successBlock || (<>{summaryCard}{warning}{confirmBlock}</>)}
+                </div>
+              );
+
+              if (tribLayout === 'split') {
+                return (
+                  <div style={{ display: 'flex', gap: 0, flex: 1, overflow: 'hidden' }}>
+                    <div style={{ width: 360, flexShrink: 0, borderRight: `1px solid ${BORDER}`, overflowY: 'auto', padding: 20 }}>
+                      {regimeBanner}
+                      <div style={{ marginTop: 16 }}>{dateControl}</div>
+                    </div>
+                    <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>{body}</div>
+                  </div>
+                );
+              }
+              if (tribLayout === 'focus') {
+                return <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 24 }}>{body}</div>;
+              }
+              return <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>{body}</div>;
+            };
+
+            // ── HISTÓRICO stage content ──────────────────────────────────
+            const historicoContent = () => {
+              const body = (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ fontSize: 10, color: TXT_3, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 4 }}>
+                    HISTÓRICO DE TRIBUTAÇÕES
+                  </div>
+                  {historicoLoading && (
+                    <div style={{ padding: '40px 0', textAlign: 'center', fontFamily: MONO, fontSize: 11, color: TXT_3, letterSpacing: '0.1em' }}>
+                      CARREGANDO HISTÓRICO...
+                    </div>
+                  )}
+                  {historicoError && (
+                    <div style={{ padding: '12px 16px', borderRadius: 4, background: 'rgba(255,82,82,0.08)', border: '1px solid rgba(255,82,82,0.3)', fontFamily: MONO, fontSize: 11, color: RED }}>
+                      {historicoError}
+                    </div>
+                  )}
+                  {!historicoLoading && !historicoError && historico.length === 0 && (
+                    <div style={{ fontFamily: MONO, fontSize: 11, color: TXT_3, padding: '24px 0', textAlign: 'center' }}>
+                      Nenhum evento de tributação registrado.
+                    </div>
+                  )}
+                  {!historicoLoading && historico.length > 0 && (
+                    <div style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 6, overflow: 'hidden' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '100px 100px 100px 1fr', gap: 8, padding: '8px 14px', borderBottom: `1px solid ${BORDER}` }}>
+                        {['DATA', 'IRRF TOTAL', 'COTISTAS', 'EXECUTADO EM'].map(h => (
+                          <div key={h} style={{ fontFamily: MONO, fontSize: 9, color: TXT_3, letterSpacing: '0.06em' }}>{h}</div>
+                        ))}
+                      </div>
+                      {historico.map((h, i) => {
+                        const state = h.after_state ?? {};
+                        // TODO: expand to show per-cotista breakdown if available in response
+                        return (
+                          <div key={h.id ?? i} style={{
+                            display: 'grid', gridTemplateColumns: '100px 100px 100px 1fr',
+                            gap: 8, padding: '8px 14px', borderBottom: `1px solid ${BORDER2}`,
+                          }}>
+                            <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_1 }}>{formatDateBR(state.dataRef ?? h.created_at?.split('T')[0])}</div>
+                            <div style={{ fontFamily: MONO, fontSize: 10, color: RED }}>{formatBRL(state.totalTaxBrl)}</div>
+                            <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_2 }}>{state.membersAffected ?? '—'}</div>
+                            <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_3 }}>{h.created_at ? formatDateBR(h.created_at.split('T')[0]) : '—'}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+
+              if (tribLayout === 'focus') {
+                return <div style={{ maxWidth: 720, margin: '0 auto' }}>{body}</div>;
+              }
+              return body;
+            };
+
+            // ── Stage toggle + layout toggle + content ───────────────────
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 0, flex: 1 }}>
+                {/* Top bar: stage toggle + layout toggle */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                  {/* Stage toggle */}
+                  <div style={{ display: 'inline-flex', border: `1px solid ${BORDER2}`, borderRadius: 4, overflow: 'hidden' }}>
+                    {TRIB_STAGES.map(({ id, label }) => {
+                      const isActive = tribStage === id;
+                      const isDisabled = id === 'executar' && !tribSimResult;
+                      return (
+                        <button
+                          key={id}
+                          onClick={() => { if (!isDisabled) setTribStage(id); }}
+                          disabled={isDisabled}
+                          style={{
+                            padding: '6px 16px', fontFamily: MONO, fontSize: 10,
+                            letterSpacing: '0.08em', border: 'none',
+                            background: isActive ? ACCENT : 'transparent',
+                            color: isActive ? '#fff' : isDisabled ? TXT_3 + '60' : TXT_2,
+                            cursor: isDisabled ? 'not-allowed' : 'pointer',
+                            borderRight: `1px solid ${BORDER2}`,
+                            opacity: isDisabled ? 0.4 : 1,
+                          }}
+                        >{label}</button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Layout toggle */}
+                  <div style={{ display: 'inline-flex', gap: 2 }}>
+                    {['stack', 'split', 'focus'].map(layoutId => (
+                      <button
+                        key={layoutId}
+                        onClick={() => setTribLayout(layoutId)}
+                        title={layoutId}
+                        style={{
+                          width: 28, height: 28,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: tribLayout === layoutId ? 'rgba(59,130,246,0.15)' : 'transparent',
+                          border: `1px solid ${tribLayout === layoutId ? ACCENT : BORDER2}`,
+                          borderRadius: 3, cursor: 'pointer',
+                          color: tribLayout === layoutId ? ACCENT : TXT_3,
+                        }}
+                      >{LAYOUT_ICONS[layoutId]}</button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Content */}
+                {tribStage === 'simular' && simularContent()}
+                {tribStage === 'executar' && executarContent()}
+                {tribStage === 'historico' && historicoContent()}
+              </div>
+            );
+          })()}
 
         </div>
       </div>

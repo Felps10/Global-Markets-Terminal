@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
+import { hasRole } from '../lib/roles.js';
+
+function getRedirectForRole(role) {
+  if (role === 'admin') return '/admin';
+  if (hasRole(role, 'club_member')) return '/clubes';
+  return '/app/global';
+}
 
 // ── Password strength ───────────────────────────────────────────────────────
 const SPECIAL_RE = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/;
@@ -13,7 +20,7 @@ function getStrength(pw) {
   return 1;
 }
 
-const STRENGTH_COLORS = ['', '#f87171', '#fb923c', 'var(--c-accent)', '#00E676'];
+const STRENGTH_COLORS = ['', 'var(--c-error)', '#fb923c', 'var(--c-accent)', '#00E676'];
 const STRENGTH_LABELS = ['', 'WEAK', 'FAIR', 'GOOD', 'STRONG'];
 
 // ── Small decorative globe ──────────────────────────────────────────────────
@@ -49,7 +56,7 @@ const PW_REQS = [
 ];
 
 export default function RegisterPage() {
-  const { register, isAuthenticated } = useAuth();
+  const { register, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -67,7 +74,7 @@ export default function RegisterPage() {
   const [submitHover, setSubmitHover] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated) navigate('/app', { replace: true });
+    if (isAuthenticated) navigate(getRedirectForRole(user?.role), { replace: true });
   }, [isAuthenticated, navigate]);
 
   const strength = getStrength(password);
@@ -95,7 +102,7 @@ export default function RegisterPage() {
     try {
       const result = await register(name, email, password, confirmPassword);
       if (result.success) {
-        navigate('/app', { replace: true });
+        navigate('/app/global', { replace: true });
       } else {
         const err = result.error;
         if (err?.error === 'EMAIL_TAKEN') {
@@ -138,12 +145,12 @@ export default function RegisterPage() {
   const fieldErrorStyle = {
     fontFamily: "'IBM Plex Sans', sans-serif",
     fontSize: 10,
-    color: '#f87171',
+    color: 'var(--c-error)',
     marginTop: 6,
   };
 
   function getBorder(fieldError, focused) {
-    if (fieldError) return '1px solid rgba(248,113,113,0.5)';
+    if (fieldError) return '1px solid rgba(255,82,82,0.5)';
     if (focused) return '1px solid rgba(59,130,246,0.5)';
     return '1px solid rgba(255,255,255,0.08)';
   }
@@ -158,7 +165,8 @@ export default function RegisterPage() {
     cursor: 'pointer',
     padding: 4,
     color: 'rgba(255,255,255,0.25)',
-    fontSize: 14,
+    display: 'flex',
+    alignItems: 'center',
   };
 
   return (
@@ -275,14 +283,14 @@ export default function RegisterPage() {
 
             {error && (
               <div style={{
-                background: 'rgba(248,113,113,0.08)',
-                border: '1px solid rgba(248,113,113,0.25)',
+                background: 'var(--c-error-dim)',
+                border: '1px solid rgba(255,82,82,0.25)',
                 borderRadius: 4,
                 padding: '10px 14px',
                 marginBottom: 20,
                 fontFamily: "'IBM Plex Sans', sans-serif",
                 fontSize: 13,
-                color: '#f87171',
+                color: 'var(--c-error)',
               }}>
                 {error}
               </div>
@@ -299,6 +307,7 @@ export default function RegisterPage() {
                   onFocus={() => setNameFocused(true)}
                   onBlur={() => setNameFocused(false)}
                   autoFocus
+                  autoComplete="name"
                   style={{ ...inputBase, border: getBorder(fieldErrors.name, nameFocused) }}
                 />
                 {fieldErrors.name && <div style={fieldErrorStyle}>{fieldErrors.name}</div>}
@@ -313,6 +322,7 @@ export default function RegisterPage() {
                   onChange={e => { setEmail(e.target.value); setFieldErrors(p => ({ ...p, email: '' })); }}
                   onFocus={() => setEmailFocused(true)}
                   onBlur={() => setEmailFocused(false)}
+                  autoComplete="email"
                   style={{ ...inputBase, border: getBorder(fieldErrors.email, emailFocused) }}
                 />
                 {fieldErrors.email && <div style={fieldErrorStyle}>{fieldErrors.email}</div>}
@@ -328,16 +338,21 @@ export default function RegisterPage() {
                     onChange={e => { setPassword(e.target.value); setFieldErrors(p => ({ ...p, password: '' })); }}
                     onFocus={() => setPasswordFocused(true)}
                     onBlur={() => setPasswordFocused(false)}
+                    autoComplete="new-password"
                     style={{ ...inputBase, paddingRight: 44, border: getBorder(fieldErrors.password, passwordFocused) }}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(v => !v)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                     style={eyeBtn}
                     onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.6)'}
                     onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.25)'}
                   >
-                    {showPassword ? '●' : '○'}
+                    {showPassword
+                      ? <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                      : <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    }
                   </button>
                 </div>
 
@@ -412,16 +427,21 @@ export default function RegisterPage() {
                     onChange={e => { setConfirmPassword(e.target.value); setFieldErrors(p => ({ ...p, confirmPassword: '' })); }}
                     onFocus={() => setConfirmFocused(true)}
                     onBlur={() => setConfirmFocused(false)}
+                    autoComplete="new-password"
                     style={{ ...inputBase, paddingRight: 44, border: getBorder(fieldErrors.confirmPassword, confirmFocused) }}
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirm(v => !v)}
+                    aria-label={showConfirm ? 'Hide password' : 'Show password'}
                     style={eyeBtn}
                     onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.6)'}
                     onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.25)'}
                   >
-                    {showConfirm ? '●' : '○'}
+                    {showConfirm
+                      ? <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                      : <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    }
                   </button>
                 </div>
                 {fieldErrors.confirmPassword && <div style={fieldErrorStyle}>{fieldErrors.confirmPassword}</div>}

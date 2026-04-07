@@ -32,6 +32,8 @@ const HEALTH_THRESHOLDS = {
 };
 
 // ─── localStorage Helpers (per-day persistence) ───────────────────────────────
+// Day counters are buffered in-memory and flushed to localStorage at most once
+// every 2 seconds. This eliminates synchronous setItem calls on every API tick.
 
 /** @returns {string} Today's date in YYYY-MM-DD format (UTC) */
 function getTodayKey() {
@@ -43,10 +45,35 @@ function getDayStorageKey(apiId) {
   return `quota:daily:${getTodayKey()}:${apiId}`;
 }
 
+/** @type {Record<string, number>} In-memory day counter mirror, keyed by apiId */
+const dayCounterBuffer = {};
+
+/** @type {ReturnType<typeof setTimeout>|null} */
+let dayFlushTimer = null;
+
+/** Flush all buffered day counters to localStorage in one batch */
+function flushDayCounters() {
+  dayFlushTimer = null;
+  for (const apiId of Object.keys(dayCounterBuffer)) {
+    try {
+      localStorage.setItem(getDayStorageKey(apiId), String(dayCounterBuffer[apiId]));
+    } catch { /* localStorage unavailable — skip */ }
+  }
+}
+
+/** Schedule a debounced flush (at most once every 2 seconds) */
+function scheduleDayFlush() {
+  if (dayFlushTimer !== null) return;
+  dayFlushTimer = setTimeout(flushDayCounters, 2000);
+}
+
 /** @param {string} apiId @returns {number} */
 function getDayUsed(apiId) {
+  if (apiId in dayCounterBuffer) return dayCounterBuffer[apiId];
   try {
-    return parseInt(localStorage.getItem(getDayStorageKey(apiId)) || "0", 10);
+    const val = parseInt(localStorage.getItem(getDayStorageKey(apiId)) || "0", 10);
+    dayCounterBuffer[apiId] = val;
+    return val;
   } catch {
     return 0; // localStorage unavailable — degrade gracefully
   }
@@ -54,15 +81,19 @@ function getDayUsed(apiId) {
 
 /** @param {string} apiId @param {number} count */
 function incrementDayUsed(apiId, count) {
-  try {
-    const key = getDayStorageKey(apiId);
-    const current = parseInt(localStorage.getItem(key) || "0", 10);
-    localStorage.setItem(key, String(current + count));
-  } catch { /* localStorage unavailable — skip persistence, tracker still works in-memory */ }
+  dayCounterBuffer[apiId] = getDayUsed(apiId) + count;
+  scheduleDayFlush();
+}
+
+/** @param {string} apiId @param {number} value — direct override for markExhausted / tests */
+function setDayUsed(apiId, value) {
+  dayCounterBuffer[apiId] = value;
+  scheduleDayFlush();
 }
 
 /** @param {string} apiId */
 function clearDayUsed(apiId) {
+  delete dayCounterBuffer[apiId];
   try {
     localStorage.removeItem(getDayStorageKey(apiId));
   } catch { /* ignore */ }
@@ -427,13 +458,11 @@ const quotaTracker = {
     const api = getApiDef(apiId);
     const duration = overrideDurationMs ?? (api ? computeExhaustedDuration(api) : 60_000);
     exhaustedUntil[apiId] = Date.now() + duration;
-    // For per-day APIs, persist exhaustion to localStorage so it survives page reload.
+    // For per-day APIs, persist exhaustion so it survives page reload.
     // Setting the day counter to the limit causes getQuotaHealth() to return 'exhausted'
     // on subsequent loads until the UTC date key rolls over at midnight.
     if (api?.limits.perDay != null) {
-      try {
-        localStorage.setItem(getDayStorageKey(apiId), String(api.limits.perDay));
-      } catch { /* localStorage unavailable — in-memory exhaustion still applies this session */ }
+      setDayUsed(apiId, api.limits.perDay);
     }
     console.warn(
       `[QuotaTracker] "${apiId}" marked EXHAUSTED. ` +
@@ -570,8 +599,9 @@ const quotaTracker = {
       dayAfter === dayBefore + 10,
       `recordCall(fmp, batchProfile, 10) increments per-day counter by 10 (${dayBefore} → ${dayAfter})`
     );
-    // Clean up test 4
-    try { localStorage.setItem(getDayStorageKey("fmp"), String(dayBefore)); } catch {}
+    // Clean up test 4 — restore buffer and storage
+    setDayUsed("fmp", dayBefore);
+    flushDayCounters();
     clearMinuteWindow("fmp");
 
     // ── Test 5: canCall returns false when exhausted ───────────────────────
@@ -593,21 +623,20 @@ const quotaTracker = {
     // ── Test 8: getQuotaHealth threshold transitions ───────────────────────
     // Simulate FMP at 80% used (200/250) → should be "exhausted" (<5% left)
     const fmpLimit = API_REGISTRY.fmp.limits.perDay; // 250
-    const dayKeyFmp = getDayStorageKey("fmp");
-    const savedFmp = localStorage.getItem(dayKeyFmp);
+    const savedFmpDay = getDayUsed("fmp");
     try {
-      localStorage.setItem(dayKeyFmp, String(Math.floor(fmpLimit * 0.97))); // 3% remaining
+      setDayUsed("fmp", Math.floor(fmpLimit * 0.97)); // 3% remaining
       assert(quotaTracker.getQuotaHealth("fmp") === "exhausted", "Health at 3% remaining → 'exhausted'");
-      localStorage.setItem(dayKeyFmp, String(Math.floor(fmpLimit * 0.85))); // 15% remaining
+      setDayUsed("fmp", Math.floor(fmpLimit * 0.85)); // 15% remaining
       assert(quotaTracker.getQuotaHealth("fmp") === "critical", "Health at 15% remaining → 'critical'");
-      localStorage.setItem(dayKeyFmp, String(Math.floor(fmpLimit * 0.70))); // 30% remaining
+      setDayUsed("fmp", Math.floor(fmpLimit * 0.70)); // 30% remaining
       assert(quotaTracker.getQuotaHealth("fmp") === "warning", "Health at 30% remaining → 'warning'");
-      localStorage.setItem(dayKeyFmp, String(Math.floor(fmpLimit * 0.40))); // 60% remaining
+      setDayUsed("fmp", Math.floor(fmpLimit * 0.40)); // 60% remaining
       assert(quotaTracker.getQuotaHealth("fmp") === "healthy", "Health at 60% remaining → 'healthy'");
     } finally {
       // Restore original FMP day counter
-      if (savedFmp !== null) localStorage.setItem(dayKeyFmp, savedFmp);
-      else localStorage.removeItem(dayKeyFmp);
+      setDayUsed("fmp", savedFmpDay);
+      flushDayCounters();
     }
 
     // ── Test 9: getRemainingQuota structure ────────────────────────────────
@@ -629,16 +658,17 @@ const quotaTracker = {
     assert(quotaTracker.getSessionLog("brapi")._total === 0, "resetCounters(brapi) clears session log");
 
     // ── Test 11: Per-day counter survives page-refresh simulation ─────────
-    const dayKeyBcb = getDayStorageKey("bcb");
-    const savedBcb = localStorage.getItem(dayKeyBcb);
+    const savedBcbDay = getDayUsed("bcb");
     try {
-      localStorage.setItem(dayKeyBcb, "5");
-      // Simulate what happens after a page refresh — getDayUsed reads from localStorage
-      const refreshedCount = getDayUsed("bcb");
+      // Simulate a page refresh: flush to storage, clear buffer, then read back
+      setDayUsed("bcb", 5);
+      flushDayCounters();
+      delete dayCounterBuffer["bcb"]; // Simulate memory loss from refresh
+      const refreshedCount = getDayUsed("bcb"); // Should read from localStorage
       assert(refreshedCount === 5, `Per-day counter survives page refresh simulation: getDayUsed("bcb") === 5`);
     } finally {
-      if (savedBcb !== null) localStorage.setItem(dayKeyBcb, savedBcb);
-      else localStorage.removeItem(dayKeyBcb);
+      setDayUsed("bcb", savedBcbDay);
+      flushDayCounters();
     }
 
     // ── Test 12: canCall for variable-cost endpoint without callCount returns false

@@ -23,7 +23,7 @@ const Modal = styled.div`
   &::-webkit-scrollbar-thumb { background: #1E2740; border-radius: 2px; }
 `;
 const ModalTitle = styled.h2`
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'IBM Plex Sans', sans-serif;
   font-size: 16px; font-weight: 700;
   color: #E8EAF0; margin: 0 0 24px;
 `;
@@ -35,43 +35,43 @@ const Label    = styled.label`
 `;
 const Input    = styled.input`
   width: 100%; background: #080C18;
-  border: 1px solid ${(p) => (p.$error ? '#FF5252' : '#1E2740')};
+  border: 1px solid ${(p) => (p.$error ? 'var(--c-error)' : '#1E2740')};
   border-radius: 4px; color: #E8EAF0;
   font-family: 'Space Mono', monospace; font-size: 13px;
   padding: 9px 12px; outline: none; box-sizing: border-box;
-  &:focus { border-color: ${(p) => (p.$error ? '#FF5252' : 'var(--c-accent)')}; }
+  &:focus { border-color: ${(p) => (p.$error ? 'var(--c-error)' : 'var(--c-accent)')}; }
 `;
 const Select   = styled.select`
   width: 100%; background: #080C18;
-  border: 1px solid ${(p) => (p.$error ? '#FF5252' : '#1E2740')};
+  border: 1px solid ${(p) => (p.$error ? 'var(--c-error)' : '#1E2740')};
   border-radius: 4px; color: #E8EAF0;
   font-family: 'Space Mono', monospace; font-size: 13px;
   padding: 9px 12px; outline: none; box-sizing: border-box;
   cursor: pointer;
-  &:focus { border-color: ${(p) => (p.$error ? '#FF5252' : 'var(--c-accent)')}; }
+  &:focus { border-color: ${(p) => (p.$error ? 'var(--c-error)' : 'var(--c-accent)')}; }
 `;
 const Textarea = styled.textarea`
   width: 100%; background: #080C18;
-  border: 1px solid ${(p) => (p.$error ? '#FF5252' : '#1E2740')};
+  border: 1px solid ${(p) => (p.$error ? 'var(--c-error)' : '#1E2740')};
   border-radius: 4px; color: #E8EAF0;
   font-family: 'Space Mono', monospace; font-size: 12px;
   padding: 9px 12px; outline: none; resize: vertical;
   min-height: 80px; box-sizing: border-box;
-  &:focus { border-color: ${(p) => (p.$error ? '#FF5252' : 'var(--c-accent)')}; }
+  &:focus { border-color: ${(p) => (p.$error ? 'var(--c-error)' : 'var(--c-accent)')}; }
 `;
-const FieldError = styled.div`font-size: 11px; color: #FF5252; margin-top: 4px;`;
+const FieldError = styled.div`font-size: 11px; color: var(--c-error); margin-top: 4px;`;
 const Row2 = styled.div`
   display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
 `;
 const ErrorMsg = styled.div`
   background: rgba(255,82,82,0.08);
   border: 1px solid rgba(255,82,82,0.3);
-  border-radius: 4px; color: #FF5252;
+  border-radius: 4px; color: var(--c-error);
   font-size: 12px; padding: 10px 12px; margin-bottom: 18px;
 `;
 const ConfirmText = styled.p`
   color: #8892A4; font-size: 13px; line-height: 1.6; margin-bottom: 24px;
-  span { color: #FF5252; font-weight: 700; }
+  span { color: var(--c-error); font-weight: 700; }
 `;
 const Actions = styled.div`
   display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px;
@@ -99,11 +99,11 @@ const SaveBtn = styled(Btn)`
 const DeleteBtn = styled(Btn)`
   background: transparent;
   border: 1px solid rgba(255,82,82,0.35);
-  color: #FF5252;
-  &:hover { background: rgba(255,82,82,0.12); border-color: #FF5252; }
+  color: var(--c-error);
+  &:hover { background: rgba(255,82,82,0.12); border-color: var(--c-error); }
 `;
 const DeleteConfirmBtn = styled(Btn)`
-  background: ${(p) => (p.disabled ? '#1E2740' : '#FF5252')};
+  background: ${(p) => (p.disabled ? '#1E2740' : 'var(--c-error)')};
   border: none;
   color: ${(p) => (p.disabled ? '#4A5568' : '#fff')};
   cursor: ${(p) => (p.disabled ? 'not-allowed' : 'pointer')};

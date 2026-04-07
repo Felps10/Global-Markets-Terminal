@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import styled, { keyframes } from 'styled-components';
-import { getUsers, deleteUser, patchUserRole } from '../../services/userService.js';
+import { getUsers, deleteUser, patchUserRole, promoteToManager } from '../../services/userService.js';
 import { ROLE_LABEL, ADMIN_ASSIGNABLE_ROLES } from '../../lib/roles.js';
 import { useAuth } from '../../hooks/useAuth.js';
 
@@ -35,12 +35,13 @@ const SectionTitle = styled.div`
   color: #4A5568;
   text-transform: uppercase;
   margin-bottom: 16px;
+  font-family: 'IBM Plex Sans', sans-serif;
 `;
 
 const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
-  font-family: 'Space Mono', monospace;
+  font-family: 'JetBrains Mono', monospace;
 `;
 
 const Th = styled.th`
@@ -52,6 +53,7 @@ const Th = styled.th`
   text-align: left;
   padding: 8px 14px;
   border-bottom: 1px solid #1E2740;
+  font-family: 'IBM Plex Sans', sans-serif;
 `;
 
 const Tr = styled.tr`
@@ -67,25 +69,32 @@ const Td = styled.td`
   vertical-align: middle;
 `;
 
-const ROLE_COLORS = {
-  admin:        { bg: 'var(--c-accent-dim)',   border: 'rgba(59,130,246,0.3)',   color: 'var(--c-accent)' },
-  club_manager: { bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.3)',  color: '#fbbf24' },
-  club_member:  { bg: 'rgba(0,230,118,0.12)',   border: 'rgba(0,230,118,0.3)',   color: '#00E676' },
-  user:         { bg: 'rgba(107,127,163,0.12)', border: 'rgba(107,127,163,0.2)', color: '#6B7FA3' },
+const ROLE_BADGE_STYLES = {
+  admin:        { background: 'var(--c-accent)', color: '#fff' },
+  club_manager: { background: '#C5A059',         color: '#1a1a1a' },
+  club_member:  { background: 'rgba(197,160,89,0.3)', color: '#C5A059' },
+  user:         { background: 'rgba(255,255,255,0.06)', color: 'var(--c-text-2)' },
 };
 
-const RoleBadge = styled.span`
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 3px;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  background: ${(p) => (ROLE_COLORS[p.$role] || ROLE_COLORS.user).bg};
-  border: 1px solid ${(p) => (ROLE_COLORS[p.$role] || ROLE_COLORS.user).border};
-  color: ${(p) => (ROLE_COLORS[p.$role] || ROLE_COLORS.user).color};
-`;
+const BADGE_BASE = {
+  display:       'inline-block',
+  padding:       '2px 8px',
+  borderRadius:  3,
+  fontSize:      11,
+  fontFamily:    "'JetBrains Mono', monospace",
+  fontWeight:    700,
+  letterSpacing: '0.06em',
+  lineHeight:    '18px',
+};
+
+function RoleBadgeInline({ role, children }) {
+  const colors = ROLE_BADGE_STYLES[role] || ROLE_BADGE_STYLES.user;
+  return (
+    <span style={{ ...BADGE_BASE, ...colors }}>
+      {children}
+    </span>
+  );
+}
 
 const DeleteBtn = styled.button`
   background: transparent;
@@ -93,7 +102,7 @@ const DeleteBtn = styled.button`
   border-radius: 3px;
   color: #4A5568;
   cursor: pointer;
-  font-family: 'Space Mono', monospace;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
   letter-spacing: 0.06em;
   padding: 4px 10px;
@@ -101,8 +110,8 @@ const DeleteBtn = styled.button`
 
   &:hover:not(:disabled) {
     background: rgba(255,82,82,0.1);
-    border-color: #FF5252;
-    color: #FF5252;
+    border-color: var(--c-error);
+    color: var(--c-error);
   }
   &:disabled {
     opacity: 0.3;
@@ -115,7 +124,7 @@ const StatusRow = styled.div`
   align-items: center;
   justify-content: center;
   padding: 60px 0;
-  font-family: 'Space Mono', monospace;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   color: #2D3748;
 `;
@@ -123,7 +132,7 @@ const StatusRow = styled.div`
 const EmptyState = styled.div`
   padding: 60px 0;
   text-align: center;
-  font-family: 'Space Mono', monospace;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   color: #2D3748;
   line-height: 1.8;
@@ -151,7 +160,7 @@ const ModalBox = styled.div`
 `;
 
 const ModalTitle = styled.div`
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'IBM Plex Sans', sans-serif;
   font-size: 15px;
   font-weight: 700;
   color: #E8EAF0;
@@ -159,7 +168,7 @@ const ModalTitle = styled.div`
 `;
 
 const ModalBody = styled.div`
-  font-family: 'Space Mono', monospace;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   color: #8892A4;
   line-height: 1.6;
@@ -179,7 +188,7 @@ const ModalCancelBtn = styled.button`
   border-radius: 4px;
   color: #4A5568;
   cursor: pointer;
-  font-family: 'Space Mono', monospace;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
   letter-spacing: 0.06em;
   padding: 8px 18px;
@@ -191,23 +200,23 @@ const ModalConfirmBtn = styled.button`
   background: rgba(255,82,82,0.12);
   border: 1px solid rgba(255,82,82,0.4);
   border-radius: 4px;
-  color: #FF5252;
+  color: var(--c-error);
   cursor: pointer;
-  font-family: 'Space Mono', monospace;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
   padding: 8px 18px;
   transition: all 0.15s;
-  &:hover:not(:disabled) { background: rgba(255,82,82,0.2); border-color: #FF5252; }
+  &:hover:not(:disabled) { background: rgba(255,82,82,0.2); border-color: var(--c-error); }
   &:disabled { opacity: 0.5; cursor: not-allowed; }
 `;
 
 const ModalError = styled.div`
   margin-top: 12px;
-  font-family: 'Space Mono', monospace;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
-  color: #FF5252;
+  color: var(--c-error);
 `;
 
 // ── Toast ──────────────────────────────────────────────────────────────────────
@@ -223,10 +232,10 @@ const ToastWrap = styled.div`
 
 const ToastItem = styled.div`
   background: ${(p) => (p.$type === 'error' ? '#2D0A0A' : '#0A1F1A')};
-  border: 1px solid ${(p) => (p.$type === 'error' ? '#FF5252' : '#00E676')};
+  border: 1px solid ${(p) => (p.$type === 'error' ? 'var(--c-error)' : '#00E676')};
   border-radius: 6px;
-  color: ${(p) => (p.$type === 'error' ? '#FF5252' : '#00E676')};
-  font-family: 'Space Mono', monospace;
+  color: ${(p) => (p.$type === 'error' ? 'var(--c-error)' : '#00E676')};
+  font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   padding: 12px 18px;
   min-width: 280px;
@@ -254,7 +263,7 @@ function fmtDate(iso) {
 function RoleSelector({ user, currentUserId, onSelect }) {
   const isLocked = user.id === currentUserId || user.role === 'admin';
   if (isLocked) {
-    return <RoleBadge $role={user.role}>{ROLE_LABEL[user.role]}</RoleBadge>;
+    return <RoleBadgeInline role={user.role}>{ROLE_LABEL[user.role]}</RoleBadgeInline>;
   }
   return (
     <select
@@ -265,7 +274,7 @@ function RoleSelector({ user, currentUserId, onSelect }) {
         border:      '1px solid #1E2740',
         borderRadius: 3,
         color:       '#8892A4',
-        fontFamily:  "'Space Mono', monospace",
+        fontFamily:  "'JetBrains Mono', monospace",
         fontSize:    10,
         letterSpacing: '0.08em',
         padding:     '3px 6px',
@@ -273,7 +282,7 @@ function RoleSelector({ user, currentUserId, onSelect }) {
         textTransform: 'uppercase',
       }}
     >
-      {ADMIN_ASSIGNABLE_ROLES.filter((r) => r !== 'admin').map((r) => (
+      {ADMIN_ASSIGNABLE_ROLES.filter((r) => r !== 'admin' && r !== 'club_manager').map((r) => (
         <option key={r} value={r}>{ROLE_LABEL[r]}</option>
       ))}
     </select>
@@ -294,10 +303,14 @@ export default function UserManager() {
   const [deleteError,   setDeleteError]   = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // Promote modal state
+  // Promote modal state (generic role change)
   const [promotingUser,  setPromotingUser]  = useState(null); // { id, email, name, currentRole, targetRole }
   const [promoteLoading, setPromoteLoading] = useState(false);
   const [promoteError,   setPromoteError]   = useState(null);
+
+  // Promote-to-manager inline confirmation state
+  const [managerConfirmId,     setManagerConfirmId]     = useState(null); // user id showing confirmation
+  const [managerPromoteLoading, setManagerPromoteLoading] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -349,6 +362,27 @@ export default function UserManager() {
     }
   }
 
+  async function handlePromoteManager(userId) {
+    setManagerPromoteLoading(true);
+    try {
+      const updated = await promoteToManager(userId);
+      setUsers((prev) =>
+        prev.map((u) => (u.id === updated.id ? { ...u, role: updated.role } : u))
+      );
+      push(`${updated.name || updated.email} promoted to Club Manager`);
+      setManagerConfirmId(null);
+    } catch (err) {
+      if (err.message === 'CONFLICT' || err.message.includes('already exists')) {
+        push('A club manager already exists. Demote the current one first.', 'error');
+      } else {
+        push(err.message || 'Failed to promote user', 'error');
+      }
+      setManagerConfirmId(null);
+    } finally {
+      setManagerPromoteLoading(false);
+    }
+  }
+
   const nonAdminUsers = users.filter((u) => u.role !== 'admin');
 
   return (
@@ -359,7 +393,7 @@ export default function UserManager() {
         {loading && <StatusRow>Loading users…</StatusRow>}
 
         {!loading && error && (
-          <StatusRow style={{ color: '#FF5252' }}>⚠ {error}</StatusRow>
+          <StatusRow style={{ color: 'var(--c-error)' }}>⚠ {error}</StatusRow>
         )}
 
         {!loading && !error && users.length === 0 && (
@@ -383,7 +417,7 @@ export default function UserManager() {
                 const isSelf = u.id === currentUser?.id;
                 return (
                   <Tr key={u.id}>
-                    <Td style={{ color: '#2D3748', fontFamily: "'Space Mono', monospace" }}>
+                    <Td style={{ color: '#2D3748', fontFamily: "'JetBrains Mono', monospace" }}>
                       {u.id}
                     </Td>
                     <Td style={{ color: '#E8EAF0' }}>{u.email}</Td>
@@ -405,7 +439,73 @@ export default function UserManager() {
                       />
                     </Td>
                     <Td>{fmtDate(u.created_at)}</Td>
-                    <Td>
+                    <Td style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {u.role !== 'club_manager' && u.role !== 'admin' && !isSelf && (
+                        managerConfirmId === u.id ? (
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 6,
+                            fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 11, color: '#8892A4',
+                          }}>
+                            <span>Set as sole club manager?</span>
+                            <button
+                              disabled={managerPromoteLoading}
+                              onClick={() => handlePromoteManager(u.id)}
+                              style={{
+                                background: 'rgba(59,130,246,0.12)',
+                                border: '1px solid var(--c-accent)',
+                                borderRadius: 3,
+                                color: 'var(--c-accent)',
+                                cursor: managerPromoteLoading ? 'not-allowed' : 'pointer',
+                                fontFamily: "'JetBrains Mono', monospace",
+                                fontSize: 10,
+                                fontWeight: 700,
+                                letterSpacing: '0.06em',
+                                padding: '3px 8px',
+                                opacity: managerPromoteLoading ? 0.5 : 1,
+                              }}
+                            >
+                              {managerPromoteLoading ? 'Saving...' : 'Confirm'}
+                            </button>
+                            <button
+                              disabled={managerPromoteLoading}
+                              onClick={() => setManagerConfirmId(null)}
+                              style={{
+                                background: 'transparent',
+                                border: '1px solid #1E2740',
+                                borderRadius: 3,
+                                color: '#4A5568',
+                                cursor: 'pointer',
+                                fontFamily: "'JetBrains Mono', monospace",
+                                fontSize: 10,
+                                letterSpacing: '0.06em',
+                                padding: '3px 8px',
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => setManagerConfirmId(u.id)}
+                            title={`Promote ${u.email} to Club Manager`}
+                            style={{
+                              background: 'transparent',
+                              border: '1px solid #1E2740',
+                              borderRadius: 3,
+                              color: 'var(--c-accent)',
+                              cursor: 'pointer',
+                              fontFamily: "'JetBrains Mono', monospace",
+                              fontSize: 10,
+                              letterSpacing: '0.06em',
+                              padding: '4px 10px',
+                              transition: 'all 0.15s',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            Promote to Manager
+                          </button>
+                        )
+                      )}
                       <DeleteBtn
                         disabled={isSelf}
                         title={isSelf ? 'Cannot delete your own account' : `Delete ${u.email}`}

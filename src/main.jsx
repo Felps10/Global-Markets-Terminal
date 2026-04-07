@@ -7,6 +7,7 @@ import { AuthProvider } from './context/AuthContext.jsx'
 import { TaxonomyProvider } from './context/TaxonomyContext.jsx'
 import { PreferencesProvider } from './context/PreferencesContext.jsx'
 import { WatchlistProvider } from './context/WatchlistContext.jsx'
+import { AlertsProvider } from './context/AlertsContext.jsx'
 import './index.css'
 import { initAnalytics } from './services/analytics.js'
 
@@ -30,7 +31,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <TaxonomyProvider>
         <PreferencesProvider>
           <WatchlistProvider>
-            <App />
+            <AlertsProvider>
+              <App />
+            </AlertsProvider>
           </WatchlistProvider>
         </PreferencesProvider>
       </TaxonomyProvider>

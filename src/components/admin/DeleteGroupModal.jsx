@@ -17,7 +17,7 @@ const Modal = styled.div`
   padding: 28px;
 `;
 const Title = styled.h2`
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'IBM Plex Sans', sans-serif;
   font-size: 16px; font-weight: 700;
   color: #E8EAF0; margin: 0 0 12px;
 `;
@@ -30,7 +30,7 @@ const BlockedBox = styled.div`
   background: rgba(255,82,82,0.06);
   border: 1px solid rgba(255,82,82,0.25);
   border-radius: 4px;
-  color: #FF5252;
+  color: var(--c-error);
   font-family: 'Space Mono', monospace;
   font-size: 12px;
   padding: 12px 14px;
@@ -40,7 +40,7 @@ const ErrorMsg = styled.div`
   background: rgba(255,82,82,0.08);
   border: 1px solid rgba(255,82,82,0.3);
   border-radius: 4px;
-  color: #FF5252;
+  color: var(--c-error);
   font-size: 12px;
   padding: 10px 12px;
   margin-bottom: 16px;
@@ -61,7 +61,7 @@ const CancelBtn = styled(Btn)`
   &:hover { border-color: #4A5568; color: #E8EAF0; }
 `;
 const DeleteBtn = styled(Btn)`
-  background: ${(p) => (p.disabled ? '#1E2740' : '#FF5252')};
+  background: ${(p) => (p.disabled ? '#1E2740' : 'var(--c-error)')};
   border: none;
   color: ${(p) => (p.disabled ? '#4A5568' : '#fff')};
   cursor: ${(p) => (p.disabled ? 'not-allowed' : 'pointer')};

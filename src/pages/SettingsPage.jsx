@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth.js';
 import { usePreferences } from '../context/PreferencesContext.jsx';
 
 const mono = "'JetBrains Mono', monospace";
-const sans = "'DM Sans', sans-serif";
+const sans = "'IBM Plex Sans', sans-serif";
 
 function SectionLabel({ children }) {
   return (

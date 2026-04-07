@@ -24,6 +24,7 @@ import { useTicker } from './context/TickerContext.jsx';
 import { useSelectedAsset } from './context/SelectedAssetContext.jsx';
 import { usePreferences } from './context/PreferencesContext.jsx';
 import { useWatchlist }   from './context/WatchlistContext.jsx';
+import { useAlerts }     from './context/AlertsContext.jsx';
 import { isExhausted } from './services/quotaTracker.js';
 import { trackEvent } from './services/analytics.js';
 
@@ -132,7 +133,7 @@ export const EXCHANGE_COLORS = {
   LSE:    "#FF9100",
   XETRA:  "#FFD740",
   TSE:    "#E91E63",
-  HKEX:   "#FF5252",
+  HKEX:   "var(--c-error)",
   B3:     "#00E676",
   INDEX:  "#78909C",
   FOREX:  "#9E9E9E",
@@ -320,7 +321,7 @@ export function Sparkline({ data, positive, width = 80, height = 28 }) {
     const y = pad + ((max - v) / range) * (height - pad * 2);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   });
-  const color  = positive ? "#00E676" : "#FF5252";
+  const color  = positive ? "#00E676" : "var(--c-error)";
   const gradId = `sg${Math.random().toString(36).slice(2, 8)}`;
   return (
     <svg width={width} height={height} style={{ display: "block", flexShrink: 0 }}>
@@ -350,7 +351,7 @@ function HistoryChart({ points, positive, xFmt }) {
   const toX    = (i) => (i / (points.length - 1)) * W;
   const toY    = (v) => pad + ((max - v) / rng) * (H - pad * 2);
   const pts    = points.map((p, i) => `${toX(i).toFixed(1)},${toY(p.v).toFixed(1)}`).join(" ");
-  const color  = positive ? "#00E676" : "#FF5252";
+  const color  = positive ? "#00E676" : "var(--c-error)";
   const gradId = `hc${Math.random().toString(36).slice(2, 8)}`;
 
   const formatLabel = (ts) => {
@@ -508,7 +509,7 @@ export function AssetCard({ symbol, data, onClick, groupLabel, density = "compac
 
   const dc = DENSITY_CONFIG[density] || DENSITY_CONFIG.compact;
   const positive     = (data.changePct ?? 0) >= 0;
-  const color        = positive ? "#00E676" : "#FF5252";
+  const color        = positive ? "#00E676" : "var(--c-error)";
   const arrow        = positive ? "▲" : "▼";
   const sign         = positive ? "+" : "";
   const displayTicker = asset.display || symbol;
@@ -536,7 +537,7 @@ export function AssetCard({ symbol, data, onClick, groupLabel, density = "compac
           <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: dc.assetTickerSize, fontWeight: 700, color: "var(--c-text)", letterSpacing: "0.5px" }}>
             {displayTicker}
           </div>
-          <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: dc.assetNameSize, color: "var(--c-text-2)", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: dc.assetNameSize, color: "var(--c-text-2)", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {asset.name}
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 5 }}>
@@ -629,7 +630,7 @@ export function AssetRow({ symbol, data, rank, onClick }) {
   if (!asset || !data) return null;
 
   const positive     = (data.changePct ?? 0) >= 0;
-  const color        = positive ? "#00E676" : "#FF5252";
+  const color        = positive ? "#00E676" : "var(--c-error)";
   const sign         = positive ? "+" : "";
   const displayTicker = asset.display || symbol;
   const catInfo      = STATIC_CATEGORIES[asset.cat];
@@ -766,7 +767,7 @@ function DetailPanel({ symbol, data, onClose }) {
   const displayPct   = chartOk ? chartState.data.changePct   : data.changePct;
   const displayDelta = chartOk ? chartState.data.change       : data.change;
   const positive     = (displayPct ?? 0) >= 0;
-  const color        = positive ? "#00E676" : "#FF5252";
+  const color        = positive ? "#00E676" : "var(--c-error)";
   const sign         = positive ? "+" : "";
   const periodLabel  = activeRange === "1D" ? "today" : `past ${activeRange.toLowerCase()}`;
   const activeTf     = TIMEFRAMES.find((t) => t.key === activeRange);
@@ -803,7 +804,7 @@ function DetailPanel({ symbol, data, onClose }) {
               </div>
               <ExchangeBadge exchange={asset.exchange} style={{ fontSize: 9, padding: "2px 7px" }} />
             </div>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "var(--c-text-2)" }}>{asset.name}</div>
+            <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, color: "var(--c-text-2)" }}>{asset.name}</div>
             <div style={{ marginTop: 6 }}>
               <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 600, color: catInfo.color, background: catInfo.color + "14", border: `1px solid ${catInfo.color}28`, borderRadius: 10, padding: "2px 8px" }}>
                 {catInfo.icon} {catInfo.label}
@@ -812,7 +813,7 @@ function DetailPanel({ symbol, data, onClose }) {
           </div>
           <button onClick={onClose}
             style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 6, cursor: "pointer", color: "var(--c-text-2)", fontSize: 16, padding: "6px 10px", transition: "all 0.15s ease" }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#FF5252"; e.currentTarget.style.color = "#FF5252"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--c-error)"; e.currentTarget.style.color = "var(--c-error)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--c-border)"; e.currentTarget.style.color = "var(--c-text-2)"; }}>
             ✕
           </button>
@@ -866,7 +867,7 @@ function DetailPanel({ symbol, data, onClose }) {
               )}
               {chartState.status === "error" && (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 120 }}>
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "#FF5252" }}>⚠ {chartState.error}</span>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-error)" }}>⚠ {chartState.error}</span>
                 </div>
               )}
               {chartState.status === "ok" && chartState.data && activeTf && (
@@ -880,15 +881,15 @@ function DetailPanel({ symbol, data, onClose }) {
             <MetricBox label="PREV CLOSE" value={formatPrice(symbol, data.prevClose)} />
             {showVolume && <MetricBox label="VOLUME" value={formatVolume(data.volume)} />}
             <MetricBox label="DAY HIGH" value={formatPrice(symbol, data.high)} valueColor="#00E676" />
-            <MetricBox label="DAY LOW"  value={formatPrice(symbol, data.low)}  valueColor="#FF5252" />
+            <MetricBox label="DAY LOW"  value={formatPrice(symbol, data.low)}  valueColor="var(--c-error)" />
             {data.marketCap        && <MetricBox label="MARKET CAP" value={formatMarketCap(data.marketCap)} />}
             {data.fiftyTwoWeekHigh && <MetricBox label="52W HIGH" value={formatPrice(symbol, data.fiftyTwoWeekHigh)} valueColor="#00E676" />}
-            {data.fiftyTwoWeekLow  && <MetricBox label="52W LOW"  value={formatPrice(symbol, data.fiftyTwoWeekLow)}  valueColor="#FF5252" />}
+            {data.fiftyTwoWeekLow  && <MetricBox label="52W LOW"  value={formatPrice(symbol, data.fiftyTwoWeekLow)}  valueColor="var(--c-error)" />}
           </div>
 
           {/* Exchange info row */}
           <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 6, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "var(--c-text-2)" }}>Listed on</span>
+            <span style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: "var(--c-text-2)" }}>Listed on</span>
             <ExchangeBadge exchange={asset.exchange} style={{ fontSize: 10, padding: "3px 8px" }} />
           </div>
 
@@ -921,7 +922,7 @@ function DetailPanel({ symbol, data, onClose }) {
                 <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>
                   <span style={{ color: "#00E676" }}>Buy {enrichment.recommendation.buy || 0}</span>
                   <span style={{ color: "#FFD740" }}>Hold {enrichment.recommendation.hold || 0}</span>
-                  <span style={{ color: "#FF5252" }}>Sell {enrichment.recommendation.sell || 0}</span>
+                  <span style={{ color: "var(--c-error)" }}>Sell {enrichment.recommendation.sell || 0}</span>
                 </div>
                 <div style={{ display: "flex", gap: 2, marginTop: 6, height: 4, borderRadius: 2, overflow: "hidden" }}>
                   {(() => {
@@ -933,7 +934,7 @@ function DetailPanel({ symbol, data, onClose }) {
                     return (<>
                       <div style={{ width: `${buyPct}%`, background: "#00E676", borderRadius: "2px 0 0 2px" }} />
                       <div style={{ width: `${holdPct}%`, background: "#FFD740" }} />
-                      <div style={{ width: `${sellPct}%`, background: "#FF5252", borderRadius: "0 2px 2px 0" }} />
+                      <div style={{ width: `${sellPct}%`, background: "var(--c-error)", borderRadius: "0 2px 2px 0" }} />
                     </>);
                   })()}
                 </div>
@@ -950,7 +951,7 @@ function DetailPanel({ symbol, data, onClose }) {
               </div>
               {enrichment.news.map((n, i) => (
                 <div key={i} style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 6, padding: "8px 12px", marginBottom: 4 }}>
-                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "var(--c-text)", lineHeight: 1.4 }}>{n.headline}</div>
+                  <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: "var(--c-text)", lineHeight: 1.4 }}>{n.headline}</div>
                   <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "var(--c-text-3)", marginTop: 4 }}>
                     {n.source} · {new Date(n.datetime * 1000).toLocaleDateString()}
                   </div>
@@ -970,6 +971,7 @@ export default function GlobalMarketsTerminal() {
   const { user, logout }                  = useAuth();
   const { prefs }                         = usePreferences();
   const { items: watchlistItems, loading: watchlistLoading, unpin, isPinned } = useWatchlist();
+  const { checkAlerts }                   = useAlerts();
   const { setTickerItems }                = useTicker();
   const { selectedAsset, setSelectedAsset: rawSetSelectedAsset } = useSelectedAsset();
   const handleSelectAsset = useCallback((sym) => {
@@ -1170,6 +1172,7 @@ export default function GlobalMarketsTerminal() {
         prevDataRef.current = merged;
         setMarketData(merged);
         setDataSource(source);
+        checkAlerts(merged);
         if (source === 'snapshot') {
           // Keep snapshot label from above
         } else {
@@ -1280,13 +1283,15 @@ export default function GlobalMarketsTerminal() {
     let catMatch;
     if (activeFilter === "all") {
       catMatch = true;
+    } else if (activeFilter === "watchlist") {
+      catMatch = isPinned('asset', sym);
     } else if (activeFilter === "dividends") {
       catMatch = dividendSymbols.includes(sym);
     } else {
       catMatch = a.cat === activeFilter || (a.alsoIn && a.alsoIn.includes(activeFilter));
     }
     return catMatch && (activeExchanges.size === 0 || activeExchanges.has(a.exchange));
-  }, [activeFilter, activeExchanges, dividendSymbols]);
+  }, [activeFilter, activeExchanges, dividendSymbols, isPinned]);
 
   // Sentiment over currently visible set
   const allPcts = marketData
@@ -1299,7 +1304,7 @@ export default function GlobalMarketsTerminal() {
   const rising        = allPcts.filter(p => p > 0).length;
   const falling       = allPcts.filter(p => p < 0).length;
   const sentiment     = avgPct > 0.3 ? "BULLISH" : avgPct < -0.3 ? "BEARISH" : "MIXED";
-  const sentimentColor = sentiment === "BULLISH" ? "#00E676" : sentiment === "BEARISH" ? "#FF5252" : "#FFD740";
+  const sentimentColor = sentiment === "BULLISH" ? "#00E676" : sentiment === "BEARISH" ? "var(--c-error)" : "#FFD740";
 
   // Top movers from visible set
   const topMovers = marketData
@@ -1314,6 +1319,11 @@ export default function GlobalMarketsTerminal() {
         .sort((a, b) => sortMode === "gainers"
           ? (marketData[b].changePct ?? 0) - (marketData[a].changePct ?? 0)
           : (marketData[a].changePct ?? 0) - (marketData[b].changePct ?? 0))
+    : null;
+
+  // Watchlist flat symbols — used for card view when activeFilter === "watchlist"
+  const watchlistFlatSymbols = activeFilter === "watchlist" && marketData
+    ? Object.keys(ASSETS).filter(s => passes(s) && marketData[s])
     : null;
 
   // Category sections (filtered, hiding empty cats)
@@ -1548,7 +1558,7 @@ export default function GlobalMarketsTerminal() {
 
   return (
     <div
-      style={{ fontFamily: "'DM Sans', sans-serif", position: "relative", overflow: "hidden" }}
+      style={{ fontFamily: "'IBM Plex Sans', sans-serif", position: "relative", overflow: "hidden" }}
     >
       <style>{`
 
@@ -1676,8 +1686,29 @@ export default function GlobalMarketsTerminal() {
               />
             )}
 
-            {/* ── CARD VIEWS (flatSymbols / flatExpand / collapsed / normal expanded) ── */}
-            {viewMode !== "list" && (flatSymbols ? (
+            {/* ── CARD VIEWS (watchlist / flatSymbols / flatExpand / collapsed / normal expanded) ── */}
+            {viewMode !== "list" && (watchlistFlatSymbols ? (
+              <div style={{ marginTop: 16 }}>
+                {watchlistFlatSymbols.length === 0 ? (
+                  <div style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center',
+                    justifyContent: 'center', padding: '80px 0', gap: 12, textAlign: 'center',
+                  }}>
+                    <span style={{ fontSize: 32, opacity: 0.25 }}>★</span>
+                    <span style={{
+                      fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
+                      color: 'var(--c-text-3)', letterSpacing: '0.08em',
+                    }}>
+                      No assets pinned yet — click ★ on any asset
+                    </span>
+                  </div>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${(DENSITY_CONFIG[cardDensity] || DENSITY_CONFIG.compact).assetGridMin}px, 1fr))`, gap: (DENSITY_CONFIG[cardDensity] || DENSITY_CONFIG.compact).assetGap, transition: "all 0.2s ease" }}>
+                    {watchlistFlatSymbols.map(sym => <AssetCard key={sym} symbol={sym} data={marketData[sym]} onClick={() => handleSelectAsset(sym)} groupLabel={CATEGORIES[ASSETS[sym]?.cat]?.label} density={cardDensity} />)}
+                  </div>
+                )}
+              </div>
+            ) : flatSymbols ? (
               <div style={{ marginTop: 16 }}>
                 {viewMode === "list" && <ListColumnHeader />}
                 {viewMode === "cards" ? (
@@ -1736,10 +1767,10 @@ export default function GlobalMarketsTerminal() {
                   const stats = getGroupStats(catKey);
                   if (stats.count === 0) return null;
                   const isOpen = expandedCards.has(catKey);
-                  const pctColor = stats.avgPct > 0 ? "#00E676" : stats.avgPct < 0 ? "#FF5252" : "var(--c-text-3)";
+                  const pctColor = stats.avgPct > 0 ? "#00E676" : stats.avgPct < 0 ? "var(--c-error)" : "var(--c-text-3)";
                   const pctSign = stats.avgPct > 0 ? "+" : stats.avgPct < 0 ? "−" : "";
                   const pctArrow = stats.avgPct > 0 ? "↑" : stats.avgPct < 0 ? "↓" : "";
-                  const borderAccent = stats.avgPct >= 0 ? "#00E676" : "#FF5252";
+                  const borderAccent = stats.avgPct >= 0 ? "#00E676" : "var(--c-error)";
 
                   // Gather symbols for the expanded inline view (same logic as collapsed card mode)
                   let symbols = null;
@@ -1800,7 +1831,7 @@ export default function GlobalMarketsTerminal() {
                         onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
                         onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                       >
-                        <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 600, color: "var(--c-text)", flex: 1 }}>
+                        <span style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 14, fontWeight: 600, color: "var(--c-text)", flex: 1 }}>
                           {cat.icon} {cat.label}
                         </span>
                         <span style={{
@@ -1978,7 +2009,7 @@ export default function GlobalMarketsTerminal() {
                   }
                   const catPcts = symbols.map(s => marketData[s]?.changePct ?? 0);
                   const catAvg  = catPcts.length ? catPcts.reduce((a, b) => a + b, 0) / catPcts.length : 0;
-                  const catColor = catAvg >= 0 ? "#00E676" : "#FF5252";
+                  const catColor = catAvg >= 0 ? "#00E676" : "var(--c-error)";
 
                   if (symbols.length === 0) return null;
 

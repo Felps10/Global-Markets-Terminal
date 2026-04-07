@@ -18,7 +18,7 @@ const TXT_4 = '#334155';
 const MONO = "'JetBrains Mono', monospace";
 const GOLD = '#F9C300';
 const GREEN = '#00E676';
-const RED = '#FF5252';
+const RED = 'var(--c-error)';
 
 const STATUS_STYLES = {
   pendente:       { color: GOLD,  bg: 'rgba(249,195,0,0.08)',  border: 'rgba(249,195,0,0.25)' },

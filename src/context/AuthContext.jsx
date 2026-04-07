@@ -6,10 +6,11 @@ export const AuthContext = createContext(null);
 
 function mapUser(supabaseUser) {
   return {
-    id:    supabaseUser.id,
-    email: supabaseUser.email,
-    name:  supabaseUser.user_metadata?.name || '',
-    role:  supabaseUser.user_metadata?.role || 'user',
+    id:                   supabaseUser.id,
+    email:                supabaseUser.email,
+    name:                 supabaseUser.user_metadata?.name || '',
+    role:                 supabaseUser.user_metadata?.role || 'user',
+    notification_pending: !!supabaseUser.user_metadata?.notification_pending,
   };
 }
 
@@ -19,6 +20,9 @@ export function AuthProvider({ children }) {
   const [user,    setUser]    = useState(null);
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Role promotion notification — shown once after admin changes a user's role
+  const [roleNotification, setRoleNotification] = useState(null);
 
   // AuthPanel state — openable from anywhere via useAuth()
   const [authPanelOpen, setAuthPanelOpen] = useState(false);
@@ -38,12 +42,23 @@ export function AuthProvider({ children }) {
     setAuthPanelOpen(false);
   }, []);
 
+  const dismissRoleNotification = useCallback(async () => {
+    setRoleNotification(null);
+    await supabase.auth.updateUser({
+      data: { notification_pending: false },
+    });
+  }, []);
+
   useEffect(() => {
     // One-time purge of stale localStorage tokens (remove after ~1h post-deploy)
     supabase.auth.signOut().then(() => {
       supabase.auth.getSession().then(({ data: { session } }) => {
         setSession(session);
-        setUser(session ? mapUser(session.user) : null);
+        const mapped = session ? mapUser(session.user) : null;
+        setUser(mapped);
+        if (mapped?.notification_pending) {
+          setRoleNotification(mapped.role);
+        }
         setLoading(false);
       });
     });
@@ -117,6 +132,8 @@ export function AuthProvider({ children }) {
     authPanelFeature,
     openAuthPanel,
     closeAuthPanel,
+    roleNotification,
+    dismissRoleNotification,
   };
 
   return (

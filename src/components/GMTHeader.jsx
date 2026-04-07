@@ -60,6 +60,7 @@ function injectStyles() {
       border-radius: 2px 2px 0 0;
     }
     .gmt-nav-item:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
+    .gmt-nav-item.active.gmt-nav-brazil::after { background: var(--c-accent-br); }
     .gmt-user-btn {
       display: inline-flex;
       align-items: center;
@@ -436,6 +437,7 @@ export default function GMTHeader({
     if (pathname.startsWith('/app/catalog')) return 'catalog';
     if (pathname.startsWith('/app/news')) return 'news';
     if (pathname.startsWith('/app/watchlist')) return 'watchlist';
+    if (pathname.startsWith('/app/alerts')) return 'alerts';
     if (pathname.startsWith('/clube') || pathname.startsWith('/clubes')) return 'clube';
     return activePage;
   }, [pathname, activePage]);
@@ -494,7 +496,7 @@ export default function GMTHeader({
     }}>
       {/* Terminal */}
       <button
-        className={`gmt-nav-item${derivedActivePage === 'terminal' ? ' active' : ''}`}
+        className={`gmt-nav-item${derivedActivePage === 'terminal' ? ' active' : ''}${isBrasilMode ? ' gmt-nav-brazil' : ''}`}
         onClick={() => onNav && onNav('dashboard')}
       >
         Terminal
@@ -508,6 +510,7 @@ export default function GMTHeader({
         { id: 'catalog',   label: 'Catalog'  },
         { id: 'news',      label: 'News'     },
         ...(watchlistEnabled ? [{ id: 'watchlist', label: 'Watchlist' }] : []),
+        ...(watchlistEnabled ? [{ id: 'alerts',    label: 'Alerts'    }] : []),
       ].map(item => (
         <button
           key={item.id}

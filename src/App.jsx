@@ -1,48 +1,73 @@
+import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import GlobalMarketsTerminal from './GlobalMarketsTerminal';
-import BrazilTerminal from './BrazilTerminal';
-import CatalogPage from './CatalogPage';
-import NewsPage from './NewsPage';
-import MarketHeatmapPage from './MarketHeatmapPage';
-import WatchlistPage from './WatchlistPage';
-import LoginPage from './pages/LoginPage.jsx';
-import LandingPage from './pages/LandingPage.jsx';
-import RegisterPage from './pages/RegisterPage.jsx';
-import AdminPanel from './pages/AdminPanel.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import TerminalLayout from './components/TerminalLayout.jsx';
 import { TickerProvider } from './context/TickerContext.jsx';
 import { SelectedAssetProvider } from './context/SelectedAssetContext.jsx';
-import FundamentalLabPage from './pages/markets/FundamentalLabPage.jsx';
-import MacroHubPage from './pages/markets/MacroHubPage.jsx';
-import SignalEnginePage from './pages/markets/SignalEnginePage.jsx';
-import ClubePage from './pages/ClubePage.jsx';
-import ClubeReportPage from './pages/ClubeReportPage.jsx';
-import ClubeMembroPage from './pages/ClubeMembroPage.jsx';
-import ClubeSimuladorPage from './pages/ClubeSimuladorPage.jsx';
-import ClubeGovernancaPage from './pages/ClubeGovernancaPage.jsx';
-import ClubeGovernancaDetailPage from './pages/ClubeGovernancaDetailPage.jsx';
-import ClubeReenquadramentoDetailPage from './pages/ClubeReenquadramentoDetailPage.jsx';
-import ClubeReenquadramentoPage from './pages/ClubeReenquadramentoPage.jsx';
-import ClubeTributacaoPage from './pages/ClubeTributacaoPage.jsx';
-import ClubeListPage from './pages/ClubeListPage.jsx';
-import SettingsPage from './pages/SettingsPage.jsx';
-import ChartResearchPage from './pages/markets/ChartResearchPage.jsx';
-import TerminalProLandingPage from './pages/TerminalProLandingPage.jsx';
-import TerminalMiniPage from './pages/TerminalMiniPage.jsx';
-import ClubeLandingPage    from './clube/pages/ClubeLandingPage.jsx';
-import ComoFuncionaPage    from './clube/pages/ComoFuncionaPage.jsx';
-import ParaGestoresPage    from './clube/pages/ParaGestoresPage.jsx';
-import ParaMembrosPage     from './clube/pages/ParaMembrosPage.jsx';
-import ContatoPage         from './clube/pages/ContatoPage.jsx';
 import { useAuth } from './hooks/useAuth.js';
+import { useAlerts } from './context/AlertsContext.jsx';
 import AuthPanel from './components/AuthPanel.jsx';
+import RolePromotionModal from './components/RolePromotionModal.jsx';
+import AlertToast from './components/AlertToast.jsx';
 import PublicLayout from './components/PublicLayout.jsx';
-import FeaturesPage from './pages/FeaturesPage.jsx';
-import CoveragePage from './pages/CoveragePage.jsx';
-import PricingPage from './pages/PricingPage.jsx';
-import AboutPage from './pages/AboutPage.jsx';
-import CommunityPage from './pages/CommunityPage.jsx';
+
+// ─── Lazy-loaded page components ───────────────────────────────────────────
+// Each becomes its own chunk at build time. Only the route the user visits
+// is downloaded on first navigation. Subsequent visits use the cache.
+const GlobalMarketsTerminal = React.lazy(() => import('./GlobalMarketsTerminal'));
+const BrazilTerminal        = React.lazy(() => import('./BrazilTerminal'));
+const CatalogPage           = React.lazy(() => import('./CatalogPage'));
+const NewsPage              = React.lazy(() => import('./NewsPage'));
+const MarketHeatmapPage     = React.lazy(() => import('./MarketHeatmapPage'));
+const WatchlistPage         = React.lazy(() => import('./WatchlistPage'));
+const LoginPage             = React.lazy(() => import('./pages/LoginPage.jsx'));
+const LandingPage           = React.lazy(() => import('./pages/LandingPage.jsx'));
+const RegisterPage          = React.lazy(() => import('./pages/RegisterPage.jsx'));
+const AdminPanel            = React.lazy(() => import('./pages/AdminPanel.jsx'));
+const FundamentalLabPage    = React.lazy(() => import('./pages/markets/FundamentalLabPage.jsx'));
+const MacroHubPage          = React.lazy(() => import('./pages/markets/MacroHubPage.jsx'));
+const SignalEnginePage      = React.lazy(() => import('./pages/markets/SignalEnginePage.jsx'));
+const ChartResearchPage     = React.lazy(() => import('./pages/markets/ChartResearchPage.jsx'));
+const ClubePage             = React.lazy(() => import('./pages/ClubePage.jsx'));
+const ClubeReportPage       = React.lazy(() => import('./pages/ClubeReportPage.jsx'));
+const ClubeMembroPage       = React.lazy(() => import('./pages/ClubeMembroPage.jsx'));
+const ClubeSimuladorPage    = React.lazy(() => import('./pages/ClubeSimuladorPage.jsx'));
+const ClubeGovernancaPage   = React.lazy(() => import('./pages/ClubeGovernancaPage.jsx'));
+const ClubeGovernancaDetailPage     = React.lazy(() => import('./pages/ClubeGovernancaDetailPage.jsx'));
+const ClubeReenquadramentoPage      = React.lazy(() => import('./pages/ClubeReenquadramentoPage.jsx'));
+const ClubeReenquadramentoDetailPage = React.lazy(() => import('./pages/ClubeReenquadramentoDetailPage.jsx'));
+const ClubeCalendarioPage   = React.lazy(() => import('./pages/ClubeCalendarioPage.jsx'));
+const ClubeNavPage          = React.lazy(() => import('./pages/ClubeNavPage.jsx'));
+
+const ClubeListPage         = React.lazy(() => import('./pages/ClubeListPage.jsx'));
+const SettingsPage          = React.lazy(() => import('./pages/SettingsPage.jsx'));
+const TerminalProLandingPage = React.lazy(() => import('./pages/TerminalProLandingPage.jsx'));
+const TerminalMiniPage      = React.lazy(() => import('./pages/TerminalMiniPage.jsx'));
+const ClubeLandingPage      = React.lazy(() => import('./clube/pages/ClubeLandingPage.jsx'));
+const ComoFuncionaPage      = React.lazy(() => import('./clube/pages/ComoFuncionaPage.jsx'));
+const ParaGestoresPage      = React.lazy(() => import('./clube/pages/ParaGestoresPage.jsx'));
+const ParaMembrosPage       = React.lazy(() => import('./clube/pages/ParaMembrosPage.jsx'));
+const ContatoPage           = React.lazy(() => import('./clube/pages/ContatoPage.jsx'));
+const FeaturesPage          = React.lazy(() => import('./pages/FeaturesPage.jsx'));
+const CoveragePage          = React.lazy(() => import('./pages/CoveragePage.jsx'));
+const PricingPage           = React.lazy(() => import('./pages/PricingPage.jsx'));
+const AboutPage             = React.lazy(() => import('./pages/AboutPage.jsx'));
+const CommunityPage         = React.lazy(() => import('./pages/CommunityPage.jsx'));
+const AlertsPage            = React.lazy(() => import('./pages/AlertsPage.jsx'));
+
+// Minimal loading fallback — matches the dark theme background.
+function RouteFallback() {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      height: '100vh', background: '#0a0a0f',
+      color: 'rgba(255,255,255,0.35)', fontFamily: "'IBM Plex Sans', sans-serif",
+      fontSize: 14,
+    }}>
+      Loading…
+    </div>
+  );
+}
 
 /**
  * ─── ROUTE SECURITY MODEL ─────────────────────────────────────────────────
@@ -106,7 +131,8 @@ import CommunityPage from './pages/CommunityPage.jsx';
  */
 
 function AppWithPanel() {
-  const { authPanelOpen, authPanelFeature, closeAuthPanel } = useAuth();
+  const { authPanelOpen, authPanelFeature, closeAuthPanel, roleNotification, dismissRoleNotification } = useAuth();
+  const { triggeredQueue, clearTriggered } = useAlerts();
 
   function handleAuthSuccess() {
     closeAuthPanel();
@@ -114,96 +140,108 @@ function AppWithPanel() {
 
   return (
     <>
-      <Routes>
-        {/* Public */}
-        <Route path="/"          element={<PublicLayout><LandingPage /></PublicLayout>} />
-        <Route path="/terminal"  element={<TerminalProLandingPage />} />
-        <Route path="/mini"      element={<TerminalMiniPage />} />
-        <Route path="/login"     element={<PublicLayout><LoginPage /></PublicLayout>} />
-        <Route path="/register"  element={<PublicLayout><RegisterPage /></PublicLayout>} />
-        <Route path="/features"  element={<PublicLayout><FeaturesPage /></PublicLayout>} />
-        <Route path="/coverage"  element={<PublicLayout><CoveragePage /></PublicLayout>} />
-        <Route path="/pricing"   element={<PublicLayout><PricingPage /></PublicLayout>} />
-        <Route path="/about"     element={<PublicLayout><AboutPage /></PublicLayout>} />
-        <Route path="/community" element={<PublicLayout><CommunityPage /></PublicLayout>} />
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          {/* Public */}
+          <Route path="/"          element={<PublicLayout><LandingPage /></PublicLayout>} />
+          <Route path="/terminal"  element={<TerminalProLandingPage />} />
+          <Route path="/mini"      element={<TerminalMiniPage />} />
+          <Route path="/login"     element={<PublicLayout><LoginPage /></PublicLayout>} />
+          <Route path="/register"  element={<PublicLayout><RegisterPage /></PublicLayout>} />
+          <Route path="/features"  element={<PublicLayout><FeaturesPage /></PublicLayout>} />
+          <Route path="/coverage"  element={<PublicLayout><CoveragePage /></PublicLayout>} />
+          <Route path="/pricing"   element={<PublicLayout><PricingPage /></PublicLayout>} />
+          <Route path="/about"     element={<PublicLayout><AboutPage /></PublicLayout>} />
+          <Route path="/community" element={<PublicLayout><CommunityPage /></PublicLayout>} />
 
-        {/* Terminal — any authenticated user */}
-        <Route
-          path="/app"
-          element={
-            <ProtectedRoute requiredRole={null}>
-              <SelectedAssetProvider>
-                <TickerProvider>
-                  <TerminalLayout />
-                </TickerProvider>
-              </SelectedAssetProvider>
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Navigate to="global" replace />} />
-          <Route path="global"    element={<GlobalMarketsTerminal />} />
-          <Route path="brasil"    element={<BrazilTerminal />} />
-          <Route path="catalog"   element={<CatalogPage />} />
-          <Route path="news"      element={<NewsPage />} />
-          <Route path="watchlist" element={<WatchlistPage />} />
-          <Route path="settings"  element={<SettingsPage />} />
-        </Route>
+          {/* Terminal — any authenticated user */}
+          <Route
+            path="/app"
+            element={
+              <ProtectedRoute requiredRole={null}>
+                <SelectedAssetProvider>
+                  <TickerProvider>
+                    <TerminalLayout />
+                  </TickerProvider>
+                </SelectedAssetProvider>
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Navigate to="global" replace />} />
+            <Route path="global"    element={<GlobalMarketsTerminal />} />
+            <Route path="brasil"    element={<BrazilTerminal />} />
+            <Route path="catalog"   element={<CatalogPage />} />
+            <Route path="news"      element={<NewsPage />} />
+            <Route path="watchlist" element={<WatchlistPage />} />
+            <Route path="alerts"    element={<AlertsPage />} />
+            <Route path="settings"  element={<SettingsPage />} />
+          </Route>
 
-        {/* Admin */}
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <AdminPanel />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/taxonomy"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <Navigate to="/admin" replace />
-            </ProtectedRoute>
-          }
-        />
+          {/* Admin */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminPanel />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/taxonomy"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <Navigate to="/admin" replace />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Markets modules — any authenticated user */}
-        <Route path="/markets/heatmap"      element={<ProtectedRoute requiredRole={null}><MarketHeatmapPage /></ProtectedRoute>} />
-        <Route path="/markets/research"     element={<ProtectedRoute requiredRole={null}><ChartResearchPage /></ProtectedRoute>} />
-        <Route path="/markets/chart"        element={<ProtectedRoute requiredRole={null}><ChartResearchPage /></ProtectedRoute>} />
-        <Route path="/markets/fundamentals" element={<ProtectedRoute requiredRole={null}><FundamentalLabPage /></ProtectedRoute>} />
-        <Route path="/markets/macro"        element={<ProtectedRoute requiredRole={null}><MacroHubPage /></ProtectedRoute>} />
-        <Route path="/markets/signals"      element={<ProtectedRoute requiredRole={null}><SignalEnginePage /></ProtectedRoute>} />
+          {/* Markets modules — any authenticated user */}
+          <Route path="/markets/heatmap"      element={<ProtectedRoute requiredRole={null}><MarketHeatmapPage /></ProtectedRoute>} />
+          <Route path="/markets/research"     element={<ProtectedRoute requiredRole={null}><ChartResearchPage /></ProtectedRoute>} />
+          <Route path="/markets/chart"        element={<ProtectedRoute requiredRole={null}><ChartResearchPage /></ProtectedRoute>} />
+          <Route path="/markets/fundamentals" element={<ProtectedRoute requiredRole={null}><FundamentalLabPage /></ProtectedRoute>} />
+          <Route path="/markets/macro"        element={<ProtectedRoute requiredRole={null}><MacroHubPage /></ProtectedRoute>} />
+          <Route path="/markets/signals"      element={<ProtectedRoute requiredRole={null}><SignalEnginePage /></ProtectedRoute>} />
 
-        {/* Clube de Investimento */}
-        <Route path="/clubes" element={<ProtectedRoute requiredRole={null}><ClubeListPage /></ProtectedRoute>} />
+          {/* Clube de Investimento */}
+          <Route path="/clubes" element={<ProtectedRoute requiredRole={null}><ClubeListPage /></ProtectedRoute>} />
 
-        {/* Clube GMT — public marketing pages */}
-        <Route path="/clube"               element={<ClubeLandingPage />}  />
-        <Route path="/clube/como-funciona" element={<ComoFuncionaPage />}  />
-        <Route path="/clube/para-gestores" element={<ParaGestoresPage />}  />
-        <Route path="/clube/para-membros"  element={<ParaMembrosPage />}   />
-        <Route path="/clube/contato"       element={<ContatoPage />}       />
+          {/* Clube GMT — public marketing pages */}
+          <Route path="/clube"               element={<ClubeLandingPage />}  />
+          <Route path="/clube/como-funciona" element={<ComoFuncionaPage />}  />
+          <Route path="/clube/para-gestores" element={<ParaGestoresPage />}  />
+          <Route path="/clube/para-membros"  element={<ParaMembrosPage />}   />
+          <Route path="/clube/contato"       element={<ContatoPage />}       />
 
-        {/* Parameterized clube module routes */}
-        <Route path="/clube/:id" element={<ProtectedRoute requiredRole="club_member" showDenied={true}><ClubePage /></ProtectedRoute>} />
-        <Route path="/clube/:id/membros" element={<ProtectedRoute requiredRole={null}><ClubeMembroPage /></ProtectedRoute>} />
-        <Route path="/clube/:id/simulador" element={<ProtectedRoute requiredRole={null}><ClubeSimuladorPage /></ProtectedRoute>} />
-        <Route path="/clube/:id/report" element={<ProtectedRoute requiredRole="club_member" showDenied={true}><ClubeReportPage /></ProtectedRoute>} />
-        <Route path="/clube/:id/governanca" element={<ProtectedRoute requiredRole={null}><ClubeGovernancaPage /></ProtectedRoute>} />
-        <Route path="/clube/:id/governanca/:aid" element={<ProtectedRoute requiredRole={null}><ClubeGovernancaDetailPage /></ProtectedRoute>} />
-        <Route path="/clube/:id/reenquadramento" element={<ProtectedRoute requiredRole={null}><ClubeReenquadramentoPage /></ProtectedRoute>} />
-        <Route path="/clube/:id/reenquadramento/:rid" element={<ProtectedRoute requiredRole={null}><ClubeReenquadramentoDetailPage /></ProtectedRoute>} />
-        <Route path="/clube/:id/tributacao" element={<ProtectedRoute requiredRole={null}><ClubeTributacaoPage /></ProtectedRoute>} />
+          {/* Parameterized clube module routes */}
+          <Route path="/clube/:id" element={<ProtectedRoute requiredRole="club_member" showDenied={true}><ClubePage /></ProtectedRoute>} />
+          <Route path="/clube/:id/membros" element={<ProtectedRoute requiredRole={null}><ClubeMembroPage /></ProtectedRoute>} />
+          <Route path="/clube/:id/simulador" element={<ProtectedRoute requiredRole={null}><ClubeSimuladorPage /></ProtectedRoute>} />
+          <Route path="/clube/:id/report" element={<ProtectedRoute requiredRole="club_member" showDenied={true}><ClubeReportPage /></ProtectedRoute>} />
+          <Route path="/clube/:id/governanca" element={<ProtectedRoute requiredRole={null}><ClubeGovernancaPage /></ProtectedRoute>} />
+          <Route path="/clube/:id/governanca/:aid" element={<ProtectedRoute requiredRole={null}><ClubeGovernancaDetailPage /></ProtectedRoute>} />
+          <Route path="/clube/:id/reenquadramento" element={<ProtectedRoute requiredRole={null}><ClubeReenquadramentoPage /></ProtectedRoute>} />
+          <Route path="/clube/:id/reenquadramento/:rid" element={<ProtectedRoute requiredRole={null}><ClubeReenquadramentoDetailPage /></ProtectedRoute>} />
+          <Route path="/clube/:id/calendario" element={<ProtectedRoute requiredRole="club_manager" showDenied={true}><ClubeCalendarioPage /></ProtectedRoute>} />
+          <Route path="/clube/:id/nav" element={<ProtectedRoute requiredRole="club_manager" showDenied={true}><ClubeNavPage /></ProtectedRoute>} />
+          <Route path="/clube/:id/tributacao" element={<Navigate to="../simulador" replace />} />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
       <AuthPanel
         isOpen={authPanelOpen}
         onClose={closeAuthPanel}
         featureName={authPanelFeature}
         onSuccess={handleAuthSuccess}
       />
+      {roleNotification && (
+        <RolePromotionModal
+          role={roleNotification}
+          onDismiss={dismissRoleNotification}
+        />
+      )}
+      <AlertToast alerts={triggeredQueue} onDismiss={clearTriggered} />
     </>
   );
 }

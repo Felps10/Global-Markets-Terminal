@@ -44,3 +44,7 @@ export async function patchUserRole(userId, role) {
     body:   JSON.stringify({ role }),
   });
 }
+
+export async function promoteToManager(userId) {
+  return req(`/${userId}/promote-manager`, { method: 'POST' });
+}

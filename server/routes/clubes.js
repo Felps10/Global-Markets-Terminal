@@ -272,7 +272,7 @@ router.get('/:id/cotistas', authenticate, requireRole('club_member'), async (req
 // POST /api/v1/clubes/:id/cotistas
 router.post('/:id/cotistas', authenticate, requireRole('club_manager'), async (req, res) => {
   const { id } = req.params;
-  const { nome, cotas_detidas, data_entrada } = req.body;
+  const { nome, cotas_detidas, data_entrada, cpf_cnpj, email, auth_user_id } = req.body;
 
   if (!nome) {
     return res.status(400).json({ error: 'VALIDATION_ERROR', message: 'nome is required' });
@@ -286,17 +286,127 @@ router.post('/:id/cotistas', authenticate, requireRole('club_manager'), async (r
 
   const { data, error } = await supabase
     .from('cotistas')
-    .insert({ clube_id: Number(id), nome, cotas_detidas, data_entrada, ativo: true })
+    .insert({ clube_id: Number(id), nome, cotas_detidas, data_entrada, ativo: true, cpf_cnpj: cpf_cnpj || null, email: email || null, auth_user_id: auth_user_id || null })
     .select()
     .single();
   if (error) return res.status(500).json({ error: 'DB_ERROR', message: error.message });
+
+  // Auto-create initial aporte movimentacao
+  try {
+    const { data: navAtEntry } = await supabase
+      .from('nav_historico')
+      .select('valor_cota')
+      .eq('clube_id', Number(id))
+      .lte('data', data_entrada)
+      .order('data', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    let valorCota = navAtEntry?.valor_cota ?? null;
+    if (!valorCota) {
+      const { data: clubeRow } = await supabase
+        .from('clubes')
+        .select('valor_cota_inicial')
+        .eq('id', Number(id))
+        .single();
+      valorCota = clubeRow?.valor_cota_inicial ?? 1000;
+    }
+
+    const valorBrl = parseFloat(cotas_detidas) * parseFloat(valorCota);
+    const cotasDelta = parseFloat(cotas_detidas);
+
+    const { error: movError } = await supabase
+      .from('movimentacoes')
+      .insert({
+        clube_id:         Number(id),
+        cotista_id:       data.id,
+        tipo:             'aporte',
+        status:           'convertido',
+        valor_brl:        valorBrl,
+        valor_cota:       parseFloat(valorCota),
+        cotas_delta:      cotasDelta,
+        data_solicitacao: data_entrada,
+        data_conversao:   data_entrada,
+        em_especie:       true,
+        observacao:       'Aporte inicial — registro automático',
+      });
+
+    if (movError) {
+      console.error('[cotistas] auto-aporte insert failed:', movError.message);
+    }
+  } catch (autoAporteErr) {
+    console.error('[cotistas] auto-aporte unexpected error:', autoAporteErr.message);
+  }
+
   res.status(201).json(data);
+});
+
+// GET /api/v1/clubes/:id/cotistas/retornos
+router.get('/:id/cotistas/retornos', authenticate, requireRole('club_manager'), async (req, res) => {
+  try {
+    const { data: navLatest } = await supabase
+      .from('nav_historico')
+      .select('valor_cota')
+      .eq('clube_id', Number(req.params.id))
+      .order('data', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!navLatest?.valor_cota) {
+      return res.json({ nav_atual: null, cotistas: [] });
+    }
+
+    const { data: cotistas } = await supabase
+      .from('cotistas')
+      .select('id, nome, cotas_detidas')
+      .eq('clube_id', Number(req.params.id))
+      .eq('ativo', true);
+
+    if (!cotistas?.length) {
+      return res.json({ nav_atual: navLatest.valor_cota, cotistas: [] });
+    }
+
+    const cotistaIds = cotistas.map(c => c.id);
+    const { data: aportes } = await supabase
+      .from('movimentacoes')
+      .select('cotista_id, valor_cota, data_solicitacao')
+      .in('cotista_id', cotistaIds)
+      .eq('tipo', 'aporte')
+      .eq('status', 'convertido')
+      .not('valor_cota', 'is', null)
+      .order('data_solicitacao', { ascending: true });
+
+    const { data: clube } = await supabase
+      .from('clubes')
+      .select('valor_cota_inicial')
+      .eq('id', Number(req.params.id))
+      .single();
+
+    const fallbackCostBasis = clube?.valor_cota_inicial ?? 1000;
+
+    const firstAporteMap = {};
+    for (const a of (aportes ?? [])) {
+      if (!firstAporteMap[a.cotista_id]) {
+        firstAporteMap[a.cotista_id] = a.valor_cota;
+      }
+    }
+
+    const result = cotistas.map(c => {
+      const costBasis = firstAporteMap[c.id] ?? fallbackCostBasis;
+      const retorno = costBasis ? ((navLatest.valor_cota / costBasis) - 1) * 100 : null;
+      return { id: c.id, nome: c.nome, retorno, cost_basis: costBasis };
+    });
+
+    return res.json({ nav_atual: navLatest.valor_cota, cotistas: result });
+  } catch (err) {
+    return res.status(500).json({ error: 'SERVER_ERROR', message: err.message });
+  }
 });
 
 // PUT /api/v1/clubes/:id/cotistas/:cid
 router.put('/:id/cotistas/:cid', authenticate, requireRole('club_manager'), async (req, res) => {
   const { id, cid } = req.params;
-  const allowed = ['nome', 'cotas_detidas', 'data_entrada', 'ativo'];
+  const allowed = ['nome', 'cotas_detidas', 'data_entrada', 'ativo', 'cpf_cnpj', 'email', 'auth_user_id'];
   const updates = {};
   for (const field of allowed) {
     if (field in req.body) updates[field] = req.body[field];
@@ -313,6 +423,32 @@ router.put('/:id/cotistas/:cid', authenticate, requireRole('club_manager'), asyn
   if (error) return res.status(500).json({ error: 'DB_ERROR', message: error.message });
   if (!data) return res.status(404).json({ error: 'NOT_FOUND', message: 'Cotista not found' });
   res.json(data);
+});
+
+// PATCH /api/v1/clubes/:id/cotistas/:cid/link-user
+router.patch('/:id/cotistas/:cid/link-user', authenticate, requireRole('club_manager'), async (req, res) => {
+  const { id, cid } = req.params;
+  const { auth_user_id } = req.body;
+
+  if (auth_user_id) {
+    const { data: { user }, error: userErr } = await supabase.auth.admin.getUserById(auth_user_id);
+    if (userErr || !user) {
+      return res.status(404).json({ error: 'NOT_FOUND', message: 'GMT user not found' });
+    }
+  }
+
+  const { data, error } = await supabase
+    .from('cotistas')
+    .update({ auth_user_id: auth_user_id || null })
+    .eq('id', Number(cid))
+    .eq('clube_id', Number(id))
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ error: 'DB_ERROR', message: error.message });
+  if (!data) return res.status(404).json({ error: 'NOT_FOUND', message: 'Cotista not found' });
+
+  return res.json(data);
 });
 
 // ── NAV ROUTES ────────────────────────────────────────────────────────────────
@@ -396,6 +532,28 @@ router.post('/:id/nav', authenticate, requireRole('club_manager'), async (req, r
     .select()
     .single();
   if (error) return res.status(500).json({ error: 'DB_ERROR', message: error.message });
+
+  try {
+    writeAuditLog({
+      clube_id: Number(id),
+      user_id: req.user.id,
+      action: 'nav.registrar',
+      table_name: 'nav_historico',
+      record_id: String(data.id),
+      before_state: null,
+      after_state: {
+        nav_id: data.id,
+        data: data.data,
+        valor_cota: data.valor_cota,
+        patrimonio_total: data.patrimonio_total,
+        registered_by_id: req.user.id,
+        registered_by_name: req.user.name ?? req.user.email,
+      },
+    });
+  } catch (auditErr) {
+    console.error('[nav.registrar] audit write failed:', auditErr);
+  }
+
   res.status(201).json(data);
 });
 
@@ -1987,7 +2145,7 @@ router.get('/:id/annual-close/:year', authenticate, requireRole('club_member'), 
       complete: checks.every(Boolean),
       completedCount: checks.filter(Boolean).length,
       steps: [
-        { key: 'movimentacoes_pendentes', label: 'Sem pendências operacionais', done: movimentacoesPendentes === 0, detail: movimentacoesPendentes > 0 ? `${movimentacoesPendentes} pendente(s)` : null, ctaPath: '/clube', ctaTab: 'operacional' },
+        { key: 'movimentacoes_pendentes', label: 'Sem pendências operacionais', done: movimentacoesPendentes === 0, detail: movimentacoesPendentes > 0 ? `${movimentacoesPendentes} pendente(s)` : null, ctaPath: '/clube', ctaTab: 'fila-operacoes' },
         { key: 'compliance_ok', label: 'Enquadramento RV ≥ 67%', done: complianceOk, ctaPath: '/clube/reenquadramento' },
         { key: 'assembleia_ago_realizada', label: 'AGO realizada', done: assembleiaAgoRealizada, ctaPath: '/clube/governanca' },
         { key: 'relatorio_anual_gerado', label: 'Relatório anual gerado', done: relatorioAnualGerado, ctaPath: '/clube/report' },
@@ -2056,5 +2214,118 @@ router.get('/:id/cotistas/:cid/export', authenticate, requireRole('club_manager'
     res.status(500).json({ error: 'DB_ERROR', message: err.message });
   }
 });
+
+// ── SCOPED ACCESS MANAGEMENT ────────────────────────────────────────────────
+// NOTE: role is global (user_metadata.role), not per-clube.
+// These endpoints are scoped to /:id for routing clarity, but the role
+// change affects all clube contexts platform-wide.
+
+// GET /api/v1/clubes/:id/access/members
+router.get('/:id/access/members',
+  authenticate, requireRole('club_manager'),
+  async (req, res) => {
+    try {
+      const { data: { users }, error } =
+        await supabase.auth.admin.listUsers();
+      if (error) throw error;
+      const members = users
+        .filter(u => {
+          const role = u.user_metadata?.role;
+          return role === 'club_member' ||
+                 role === 'club_manager';
+        })
+        .map(u => ({
+          id: u.id,
+          email: u.email,
+          name: u.user_metadata?.name || '',
+          role: u.user_metadata?.role || 'user',
+        }));
+      return res.json({ users: members });
+    } catch (err) {
+      return res.status(500).json({
+        error: 'SERVER_ERROR', message: err.message,
+      });
+    }
+  }
+);
+
+// GET /api/v1/clubes/:id/access/search
+// Reserved for Admin Panel — not used by frontend yet
+router.get('/:id/access/search',
+  authenticate, requireRole('club_manager'),
+  async (req, res) => {
+    const { q } = req.query;
+    if (!q || q.trim().length < 3) {
+      return res.status(400).json({
+        error: 'BAD_REQUEST',
+        message: 'Query must be at least 3 characters',
+      });
+    }
+    try {
+      const { data: { users }, error } =
+        await supabase.auth.admin.listUsers();
+      if (error) throw error;
+      const needle = q.trim().toLowerCase();
+      const matches = users
+        .filter(u =>
+          u.email?.toLowerCase().includes(needle) ||
+          u.user_metadata?.name?.toLowerCase()
+            .includes(needle)
+        )
+        .slice(0, 5)
+        .map(u => ({
+          id: u.id,
+          email: u.email,
+          name: u.user_metadata?.name || '',
+          role: u.user_metadata?.role || 'user',
+        }));
+      return res.json({ users: matches });
+    } catch (err) {
+      return res.status(500).json({
+        error: 'SERVER_ERROR', message: err.message,
+      });
+    }
+  }
+);
+
+// PATCH /api/v1/clubes/:id/access/:userId/role
+router.patch('/:id/access/:userId/role',
+  authenticate, requireRole('club_manager'),
+  async (req, res) => {
+    const { userId } = req.params;
+    const { role } = req.body;
+    const ALLOWED = ['user', 'club_member'];
+    if (!ALLOWED.includes(role)) {
+      return res.status(400).json({
+        error: 'BAD_REQUEST',
+        message: `Role must be one of: ${ALLOWED.join(', ')}`,
+      });
+    }
+    if (userId === req.user.id) {
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message: 'Cannot change your own role',
+      });
+    }
+    try {
+      const { data: { user }, error } =
+        await supabase.auth.admin.updateUserById(
+          userId,
+          { user_metadata: { role } }
+        );
+      if (error) throw error;
+      return res.json({
+        id: user.id,
+        email: user.email,
+        name: user.user_metadata?.name || '',
+        role: user.user_metadata?.role || 'user',
+      });
+    } catch (err) {
+      return res.status(500).json({
+        error: 'SERVER_ERROR', message: err.message,
+      });
+    }
+  }
+);
 
 export default router;

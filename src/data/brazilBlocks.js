@@ -143,7 +143,7 @@ export const BRAZIL_BLOCKS = [
     blockId:     "macro",
     label:       "Macro",
     icon:        "🔴",
-    accentColor: "#FF5252",
+    accentColor: "var(--c-error)",
     sections: [
 
       {

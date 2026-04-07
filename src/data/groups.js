@@ -104,6 +104,6 @@ export const GROUPS = [
     block_id:      "macro",
     sort_order:    2,
     icon:          "🔴",
-    color:         "#FF5252",
+    color:         "var(--c-error)",
   },
 ];

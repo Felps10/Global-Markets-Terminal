@@ -163,7 +163,7 @@ export function simulatePreTrade(proposedTrade, currentPositions, currentPatrimo
   } else {
     status = 'breach';
     statusLabel = 'BREACH';
-    statusColor = '#FF5252';
+    statusColor = 'var(--c-error)';
   }
 
   // Message
@@ -206,76 +206,5 @@ export function simulatePreTrade(proposedTrade, currentPositions, currentPatrimo
     minimumRVbrl,
     maxSellBrl,
     estimatedCost: valor_brl * 0.003,
-  };
-}
-
-/**
- * Compute a dry-run periodic tax for all cotistas.
- * Pure function — no API calls, no DB writes.
- */
-export function computePeriodicTaxPreview(
-  cotistas, cotas_tranches, currentValorCota, estatuto, dataReferencia
-) {
-  const irrfRate = estatuto?.irrf_rate ?? 0.15;
-  const regime   = estatuto?.regime_tributario ?? 'fia';
-
-  const perMember = cotistas.map((cotista) => {
-    const tranches = (cotas_tranches ?? []).filter(
-      (t) => String(t.cotista_id) === String(cotista.id) && t.cotas_restantes > 0
-    );
-
-    let totalCotas     = parseFloat(cotista.cotas_detidas ?? 0);
-    let totalCostBasis = 0;
-    let earliestAquisicao = null;
-
-    for (const t of tranches) {
-      const qty      = parseFloat(t.cotas_restantes);
-      const unitCost = parseFloat(t.valor_cota_aquisicao);
-      totalCostBasis += qty * unitCost;
-      if (!earliestAquisicao || t.data_aquisicao < earliestAquisicao) {
-        earliestAquisicao = t.data_aquisicao;
-      }
-    }
-
-    // If no tranches, use current cota as cost basis (no gain)
-    if (tranches.length === 0) totalCostBasis = totalCotas * currentValorCota;
-
-    const currentValue = totalCotas * currentValorCota;
-    const gain         = currentValue - totalCostBasis;
-
-    if (gain <= 0) {
-      return {
-        cotista_id: cotista.id, cotista_nome: cotista.nome,
-        cotas_detidas: totalCotas, currentValue, costBasis: totalCostBasis,
-        gain: 0, taxBrl: 0, cotasACancelar: 0, newCotas: totalCotas,
-        irrfRate, hasGain: false,
-      };
-    }
-
-    let effectiveRate = irrfRate;
-    if (regime !== 'fia' && earliestAquisicao) {
-      const days = Math.floor((new Date(dataReferencia) - new Date(earliestAquisicao)) / 86400000);
-      effectiveRate = days <= 180 ? 0.225 : days <= 360 ? 0.200 : days <= 720 ? 0.175 : 0.150;
-    }
-
-    const taxBrl         = gain * effectiveRate;
-    const cotasACancelar = taxBrl / currentValorCota;
-    const newCotas       = totalCotas - cotasACancelar;
-
-    return {
-      cotista_id: cotista.id, cotista_nome: cotista.nome,
-      cotas_detidas: totalCotas, currentValue, costBasis: totalCostBasis,
-      gain, taxBrl, cotasACancelar, newCotas,
-      irrfRate: effectiveRate, hasGain: true,
-    };
-  });
-
-  return {
-    dataReferencia, regime, irrfRate,
-    perMember,
-    totalTaxBrl:         perMember.reduce((s, m) => s + m.taxBrl, 0),
-    totalCotasACancelar: perMember.reduce((s, m) => s + m.cotasACancelar, 0),
-    membersWithGain:     perMember.filter((m) => m.hasGain).length,
-    totalMembers:        cotistas.length,
   };
 }

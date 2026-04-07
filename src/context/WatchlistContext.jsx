@@ -36,37 +36,66 @@ export function WatchlistProvider({ children }) {
   useEffect(() => { refresh(); }, [refresh]);
 
   const pin = useCallback(async (type, target_id) => {
-    const token = await getToken();
-    const res   = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/watchlist`, {
-      method:  'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization:  `Bearer ${token}`,
-      },
-      body: JSON.stringify({ type, target_id }),
-    });
+    // Optimistic: add immediately
+    const optimistic = { type, target_id, id: `opt_${Date.now()}` };
+    setItems((prev) => [optimistic, ...prev]);
 
-    if (res.status === 409) {
-      // Already pinned — re-sync to be safe
-      await refresh();
-      return;
+    try {
+      const token = await getToken();
+      const res   = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/watchlist`, {
+        method:  'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization:  `Bearer ${token}`,
+        },
+        body: JSON.stringify({ type, target_id }),
+      });
+
+      if (res.status === 409) {
+        // Already pinned — re-sync to be safe
+        await refresh();
+        return;
+      }
+      if (!res.ok) {
+        // Rollback optimistic add
+        setItems((prev) => prev.filter((i) => i.id !== optimistic.id));
+        return;
+      }
+
+      const newItem = await res.json();
+      // Replace optimistic placeholder with real server item
+      setItems((prev) => prev.map((i) => i.id === optimistic.id ? newItem : i));
+    } catch (err) {
+      // Rollback on network error
+      setItems((prev) => prev.filter((i) => i.id !== optimistic.id));
+      console.error('WatchlistContext pin error:', err);
     }
-    if (!res.ok) throw new Error('Failed to pin item');
-
-    const newItem = await res.json();
-    setItems((prev) => [newItem, ...prev]);
   }, [getToken, refresh]);
 
   const unpin = useCallback(async (type, target_id) => {
-    const token = await getToken();
-    const res   = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/watchlist/${type}/${target_id}`, {
-      method:  'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
+    // Optimistic: remove immediately
+    let removed = null;
+    setItems((prev) => {
+      const idx = prev.findIndex((i) => i.type === type && i.target_id === target_id);
+      if (idx >= 0) removed = prev[idx];
+      return prev.filter((i) => !(i.type === type && i.target_id === target_id));
     });
-    if (!res.ok) throw new Error('Failed to unpin item');
-    setItems((prev) =>
-      prev.filter((i) => !(i.type === type && i.target_id === target_id))
-    );
+
+    try {
+      const token = await getToken();
+      const res   = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/watchlist/${type}/${target_id}`, {
+        method:  'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok && removed) {
+        // Rollback: re-add the removed item
+        setItems((prev) => [removed, ...prev]);
+      }
+    } catch (err) {
+      // Rollback on network error
+      if (removed) setItems((prev) => [removed, ...prev]);
+      console.error('WatchlistContext unpin error:', err);
+    }
   }, [getToken]);
 
   const isPinned = useCallback(

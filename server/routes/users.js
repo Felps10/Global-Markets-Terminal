@@ -112,7 +112,48 @@ router.patch('/:id/role', authenticate, requireAdmin, async (req, res) => {
 
   const { data: { user: updated }, error } =
     await supabase.auth.admin.updateUserById(targetId, {
-      user_metadata: { ...target.user_metadata, role },
+      user_metadata: { ...target.user_metadata, role, notification_pending: true },
+    });
+
+  if (error) return res.status(500).json({ error: 'DB_ERROR', message: error.message });
+
+  return res.json({
+    id:    updated.id,
+    email: updated.email,
+    name:  updated.user_metadata?.name || '',
+    role:  updated.user_metadata?.role || 'user',
+  });
+});
+
+// POST /api/v1/users/:id/promote-manager
+// Admin-only. Promotes a user to club_manager. Only one club_manager allowed.
+router.post('/:id/promote-manager', authenticate, requireAdmin, async (req, res) => {
+  const targetId = req.params.id;
+
+  // Check for existing club_manager
+  const { data: { users }, error: listErr } = await supabase.auth.admin.listUsers();
+  if (listErr) return res.status(500).json({ error: 'DB_ERROR', message: listErr.message });
+
+  const existingManager = users.find(
+    u => (u.user_metadata?.role || 'user') === 'club_manager'
+  );
+  if (existingManager) {
+    return res.status(409).json({
+      error:   'CONFLICT',
+      message: 'A club_manager already exists',
+      existing_manager: { id: existingManager.id, email: existingManager.email },
+    });
+  }
+
+  const { data: { user: target }, error: fetchError } =
+    await supabase.auth.admin.getUserById(targetId);
+  if (fetchError || !target) {
+    return res.status(404).json({ error: 'NOT_FOUND', message: 'User not found' });
+  }
+
+  const { data: { user: updated }, error } =
+    await supabase.auth.admin.updateUserById(targetId, {
+      user_metadata: { ...target.user_metadata, role: 'club_manager', notification_pending: true },
     });
 
   if (error) return res.status(500).json({ error: 'DB_ERROR', message: error.message });

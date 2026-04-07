@@ -1,6 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
+import { hasRole } from '../lib/roles.js';
+
+function getRedirectForRole(role) {
+  if (role === 'admin') return '/admin';
+  if (hasRole(role, 'club_member')) return '/clubes';
+  return '/app/global';
+}
 
 // ── Small decorative globe (same as landing hero, scaled to 200×200) ────────
 function MiniGlobe() {
@@ -27,7 +34,7 @@ function MiniGlobe() {
 }
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,6 +45,11 @@ export default function LoginPage() {
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [submitHover, setSubmitHover] = useState(false);
 
+  // Redirect already-authenticated users to their role-appropriate page
+  useEffect(() => {
+    if (isAuthenticated) navigate(getRedirectForRole(user?.role), { replace: true });
+  }, [isAuthenticated, user, navigate]);
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
@@ -45,7 +57,7 @@ export default function LoginPage() {
     try {
       const data = await login(email, password);
       const role = data?.user?.user_metadata?.role || 'user';
-      navigate(role === 'admin' ? '/admin/taxonomy' : '/app', { replace: true });
+      navigate(getRedirectForRole(role), { replace: true });
     } catch (err) {
       setError(err?.message || 'Invalid credentials');
     } finally {
@@ -191,14 +203,14 @@ export default function LoginPage() {
 
             {error && (
               <div style={{
-                background: 'rgba(248,113,113,0.08)',
-                border: '1px solid rgba(248,113,113,0.25)',
+                background: 'var(--c-error-dim)',
+                border: '1px solid rgba(255,82,82,0.25)',
                 borderRadius: 4,
                 padding: '10px 14px',
                 marginBottom: 20,
                 fontFamily: "'IBM Plex Sans', sans-serif",
                 fontSize: 13,
-                color: '#f87171',
+                color: 'var(--c-error)',
               }}>
                 {error}
               </div>
@@ -216,10 +228,11 @@ export default function LoginPage() {
                   onBlur={() => setEmailFocused(false)}
                   autoFocus
                   required
+                  autoComplete="email"
                   style={{
                     ...inputBase,
                     border: error
-                      ? '1px solid rgba(248,113,113,0.5)'
+                      ? '1px solid rgba(255,82,82,0.5)'
                       : emailFocused
                         ? '1px solid rgba(59,130,246,0.5)'
                         : '1px solid rgba(255,255,255,0.08)',
@@ -238,11 +251,12 @@ export default function LoginPage() {
                     onFocus={() => setPasswordFocused(true)}
                     onBlur={() => setPasswordFocused(false)}
                     required
+                    autoComplete="current-password"
                     style={{
                       ...inputBase,
                       paddingRight: 44,
                       border: error
-                        ? '1px solid rgba(248,113,113,0.5)'
+                        ? '1px solid rgba(255,82,82,0.5)'
                         : passwordFocused
                           ? '1px solid rgba(59,130,246,0.5)'
                           : '1px solid rgba(255,255,255,0.08)',
@@ -251,6 +265,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(v => !v)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                     style={{
                       position: 'absolute',
                       right: 12,
@@ -261,12 +276,16 @@ export default function LoginPage() {
                       cursor: 'pointer',
                       padding: 4,
                       color: 'rgba(255,255,255,0.25)',
-                      fontSize: 14,
+                      display: 'flex',
+                      alignItems: 'center',
                     }}
                     onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.6)'}
                     onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.25)'}
                   >
-                    {showPassword ? '●' : '○'}
+                    {showPassword
+                      ? <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                      : <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    }
                   </button>
                 </div>
               </div>

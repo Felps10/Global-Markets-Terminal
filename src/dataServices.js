@@ -276,10 +276,15 @@ export async function fredSeries(seriesKey) {
 
 export async function fredAllMacro() {
   const keys = Object.keys(FRED_SERIES);
+  // Parallel fetch — partial data is acceptable (same contract as bcbMacro).
+  const settled = await Promise.allSettled(
+    keys.map(k => fredSeries(k).then(r => [k, r]))
+  );
   const results = {};
-  for (const k of keys) {
-    const r = await fredSeries(k);
-    if (r) results[k] = r;
+  for (const entry of settled) {
+    if (entry.status === 'fulfilled' && entry.value[1]) {
+      results[entry.value[0]] = entry.value[1];
+    }
   }
   return Object.keys(results).length > 0 ? results : null;
 }
@@ -646,13 +651,16 @@ export async function brapiQuote(tickers) {
   const sorted = [...tickers].sort();
   const response = await apiClient.call('brapi', 'quote', { tickers: sorted }, {
     fetcher: async () => {
+      // Parallel fetch — individual ticker failures are tolerated.
+      const settled = await Promise.allSettled(
+        sorted.map(ticker => brapiQuoteSingle(ticker))
+      );
       const result = {};
-      for (const ticker of sorted) {
-        try {
-          const entry = await brapiQuoteSingle(ticker);
-          if (entry) result[entry.symbol] = entry.quote;
-        } catch (err) {
-          console.warn(`[BRAPI] failed for ${ticker}:`, err?.message);
+      for (const entry of settled) {
+        if (entry.status === 'fulfilled' && entry.value) {
+          result[entry.value.symbol] = entry.value.quote;
+        } else if (entry.status === 'rejected') {
+          console.warn(`[BRAPI] failed for ticker:`, entry.reason?.message);
         }
       }
       if (!Object.keys(result).length) throw new ApiHttpError(204, 'No usable quote data');

@@ -11,7 +11,7 @@ import { getAllApiIds, getApiDef, getDormantEndpoints } from './services/apiRegi
 // ─── SHARED STYLES ───────────────────────────────────────────────────────────
 
 const mono = "'JetBrains Mono', monospace";
-const sans = "'DM Sans', sans-serif";
+const sans = "'IBM Plex Sans', sans-serif";
 
 // ─── ERROR BOUNDARY ─────────────────────────────────────────────────────────
 
@@ -30,7 +30,7 @@ class PanelErrorBoundary extends Component {
     if (this.state.hasError) {
       return (
         <div style={{ padding: "32px 20px", textAlign: "center" }}>
-          <div style={{ fontFamily: mono, fontSize: 11, color: "#FF5252", marginBottom: 12 }}>
+          <div style={{ fontFamily: mono, fontSize: 11, color: "var(--c-error)", marginBottom: 12 }}>
             Something went wrong loading this data point. Please try again.
           </div>
           <button
@@ -395,7 +395,7 @@ const ASSET_GROUPS = [
 const STATUS_BADGE = {
   operational:   { label: "OPERATIONAL",  color: "#00E676", bg: "rgba(0,230,118,0.1)",  border: "rgba(0,230,118,0.3)" },
   degraded:      { label: "DEGRADED",     color: "#FFD740", bg: "rgba(255,215,64,0.1)", border: "rgba(255,215,64,0.3)" },
-  outage:        { label: "OUTAGE",       color: "#FF5252", bg: "rgba(255,82,82,0.1)",  border: "rgba(255,82,82,0.3)" },
+  outage:        { label: "OUTAGE",       color: "var(--c-error)", bg: "rgba(255,82,82,0.1)",  border: "rgba(255,82,82,0.3)" },
   "rate-limited":{ label: "RATE LIMITED", color: "#FF9800", bg: "rgba(255,152,0,0.1)",  border: "rgba(255,152,0,0.3)" },
 };
 
@@ -459,7 +459,7 @@ function SuccessRateDots({ history }) {
     dots.push(
       <div key={i} style={{
         width: 8, height: 8, borderRadius: "50%",
-        background: val === undefined ? "var(--c-border)" : val ? "#00E676" : "#FF5252",
+        background: val === undefined ? "var(--c-border)" : val ? "#00E676" : "var(--c-error)",
         transition: "background 0.3s ease",
       }} />
     );
@@ -470,7 +470,7 @@ function SuccessRateDots({ history }) {
 function UsageBar({ used, max, per }) {
   if (!max) return <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)" }}>No limit</span>;
   const pct = Math.min((used / max) * 100, 100);
-  const barColor = pct > 90 ? "#FF5252" : pct > 70 ? "#FFD740" : "#00E676";
+  const barColor = pct > 90 ? "var(--c-error)" : pct > 70 ? "#FFD740" : "#00E676";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
       <div style={{ flex: 1, height: 4, background: "var(--c-border)", borderRadius: 2, overflow: "hidden" }}>
@@ -507,7 +507,7 @@ function TimeAgo({ timestamp }) {
 // ─── SOURCE DETAIL PANEL ─────────────────────────────────────────────────────
 
 const SEVERITY_STYLES = {
-  high:   { color: "#FF5252", bg: "rgba(255,82,82,0.1)",   border: "rgba(255,82,82,0.25)" },
+  high:   { color: "var(--c-error)", bg: "rgba(255,82,82,0.1)",   border: "rgba(255,82,82,0.25)" },
   medium: { color: "#FFD740", bg: "rgba(255,215,64,0.1)",  border: "rgba(255,215,64,0.25)" },
   low:    { color: "#00BCD4", bg: "rgba(0,188,212,0.1)",   border: "rgba(0,188,212,0.25)" },
 };
@@ -549,7 +549,7 @@ function StatCard({ label, value, valueColor, sub }) {
 
 function UptimeBar({ pct }) {
   if (pct == null) return <span style={{ fontFamily: mono, fontSize: 11, color: "var(--c-text-3)" }}>—</span>;
-  const color = pct >= 99 ? "#00E676" : pct >= 95 ? "#FFD740" : "#FF5252";
+  const color = pct >= 99 ? "#00E676" : pct >= 95 ? "#FFD740" : "var(--c-error)";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <div style={{ flex: 1, height: 5, background: "var(--c-border)", borderRadius: 3, overflow: "hidden" }}>
@@ -626,7 +626,7 @@ function SourceDetailPanel({ source, health, onClose }) {
               <TimeAgo timestamp={health?.timestamp} />
               {health?.responseTime != null && (
                 <span style={{
-                  fontFamily: mono, fontSize: 9, color: health.responseTime > 3000 ? "#FF5252" : health.responseTime > 1000 ? "#FFD740" : "#00E676",
+                  fontFamily: mono, fontSize: 9, color: health.responseTime > 3000 ? "var(--c-error)" : health.responseTime > 1000 ? "#FFD740" : "#00E676",
                 }}>
                   {health.responseTime}ms
                 </span>
@@ -728,7 +728,7 @@ function SourceDetailPanel({ source, health, onClose }) {
               label="AVG LATENCY"
               value={health?.responseTime != null ? `${health.responseTime}ms` : detail.avgLatencyMs ? `~${detail.avgLatencyMs}ms` : "—"}
               valueColor={
-                (health?.responseTime ?? detail.avgLatencyMs) > 3000 ? "#FF5252" :
+                (health?.responseTime ?? detail.avgLatencyMs) > 3000 ? "var(--c-error)" :
                 (health?.responseTime ?? detail.avgLatencyMs) > 1000 ? "#FFD740" : "#00E676"
               }
             />
@@ -743,7 +743,7 @@ function SourceDetailPanel({ source, health, onClose }) {
             <StatCard label="SCHEMA DRIFTS"   value={detail.schemaDriftEvents} sub="last 30 days"
               valueColor={detail.schemaDriftEvents > 2 ? "#FFD740" : undefined} />
             <StatCard label="FAILED SYNCS"    value={detail.failedSyncAttempts} sub="last 30 days"
-              valueColor={detail.failedSyncAttempts > 5 ? "#FF5252" : detail.failedSyncAttempts > 2 ? "#FFD740" : undefined} />
+              valueColor={detail.failedSyncAttempts > 5 ? "var(--c-error)" : detail.failedSyncAttempts > 2 ? "#FFD740" : undefined} />
             <StatCard label="DOWNSTREAM DEPS" value={detail.downstreamDeps} sub="data points" />
             <StatCard label="DATA VOLUME"     value={detail.dataVolumeGB != null ? `${detail.dataVolumeGB} GB` : "—"} />
           </StatGrid>
@@ -881,7 +881,7 @@ function SourceHealthCard({ source, health, usage, onRefresh, onSelect }) {
       {/* Response time + last checked */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
         {health?.responseTime != null ? (
-          <span style={{ fontFamily: mono, fontSize: 18, fontWeight: 700, color: health.responseTime > 3000 ? "#FF5252" : health.responseTime > 1000 ? "#FFD740" : "var(--c-text)" }}>
+          <span style={{ fontFamily: mono, fontSize: 18, fontWeight: 700, color: health.responseTime > 3000 ? "var(--c-error)" : health.responseTime > 1000 ? "#FFD740" : "var(--c-text)" }}>
             {health.responseTime}ms
           </span>
         ) : (
@@ -917,7 +917,7 @@ function SourceHealthCard({ source, health, usage, onRefresh, onSelect }) {
           border: `1px solid ${health.status === "rate-limited" ? "rgba(255,152,0,0.3)" : "rgba(255,82,82,0.2)"}`,
           borderRadius: 4, padding: "6px 10px", marginBottom: 10,
         }}>
-          <span style={{ fontFamily: mono, fontSize: 9, color: health.status === "rate-limited" ? "#FF9800" : "#FF5252" }}>{health.error}</span>
+          <span style={{ fontFamily: mono, fontSize: 9, color: health.status === "rate-limited" ? "#FF9800" : "var(--c-error)" }}>{health.error}</span>
         </div>
       )}
 
@@ -939,7 +939,7 @@ function SourceHealthCard({ source, health, usage, onRefresh, onSelect }) {
       {/* Yahoo-specific warning */}
       {source === "yahoo" && statusKey !== "operational" && meta.fallbackSuggestion && (
         <div style={{ background: "rgba(255,82,82,0.06)", border: "1px solid rgba(255,82,82,0.15)", borderRadius: 4, padding: "6px 10px", marginTop: 8 }}>
-          <span style={{ fontFamily: mono, fontSize: 8, color: "#FF5252", letterSpacing: "0.3px" }}>
+          <span style={{ fontFamily: mono, fontSize: 8, color: "var(--c-error)", letterSpacing: "0.3px" }}>
             Yahoo is unofficial and may break. Fallback: {meta.fallbackSuggestion}
           </span>
         </div>
@@ -1002,7 +1002,7 @@ function CatalogCard({ item, sourceHealth, onClick }) {
   const [hovered, setHovered] = useState(false);
   const sourceStatus = sourceHealth?.[item.source]?.status;
   const isOutage = sourceStatus === "outage";
-  const statusColor = sourceStatus === "operational" ? "#00E676" : sourceStatus === "degraded" ? "#FFD740" : sourceStatus === "outage" ? "#FF5252" : "var(--c-text-3)";
+  const statusColor = sourceStatus === "operational" ? "#00E676" : sourceStatus === "degraded" ? "#FFD740" : sourceStatus === "outage" ? "var(--c-error)" : "var(--c-text-3)";
 
   return (
     <div
@@ -1022,7 +1022,7 @@ function CatalogCard({ item, sourceHealth, onClick }) {
     >
       {/* Outage overlay icon */}
       {isOutage && (
-        <div style={{ position: "absolute", top: 8, right: 10, fontFamily: mono, fontSize: 10, color: "#FF5252", opacity: 0.7 }}>
+        <div style={{ position: "absolute", top: 8, right: 10, fontFamily: mono, fontSize: 10, color: "var(--c-error)", opacity: 0.7 }}>
           ⚠
         </div>
       )}
@@ -1117,7 +1117,7 @@ function DataPointPanel({ item, sourceHealth, onClose }) {
           </div>
           <button onClick={onClose}
             style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 6, cursor: "pointer", color: "var(--c-text-2)", fontSize: 16, padding: "6px 10px", transition: "all 0.15s ease" }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#FF5252"; e.currentTarget.style.color = "#FF5252"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--c-error)"; e.currentTarget.style.color = "var(--c-error)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--c-border)"; e.currentTarget.style.color = "var(--c-text-2)"; }}>
             ✕
           </button>
@@ -1206,9 +1206,9 @@ function DataPointPanel({ item, sourceHealth, onClose }) {
               {sampleData.status === "error" && (
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                    <span style={{ fontFamily: mono, fontSize: 10, color: "#FF5252" }}>Fetch failed</span>
+                    <span style={{ fontFamily: mono, fontSize: 10, color: "var(--c-error)" }}>Fetch failed</span>
                   </div>
-                  <div style={{ fontFamily: mono, fontSize: 9, color: "#FF5252", background: "rgba(255,82,82,0.08)", borderRadius: 4, padding: "6px 10px" }}>
+                  <div style={{ fontFamily: mono, fontSize: 9, color: "var(--c-error)", background: "rgba(255,82,82,0.08)", borderRadius: 4, padding: "6px 10px" }}>
                     {sampleData.error || "Unknown error"}
                   </div>
                   {item.fallback && (
@@ -1226,7 +1226,7 @@ function DataPointPanel({ item, sourceHealth, onClose }) {
             <div style={{ fontFamily: mono, fontSize: 10, color: "var(--c-text-3)", letterSpacing: "1.5px", marginBottom: 8 }}>RELIABILITY</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
               <MetricBox label="SUCCESS RATE" value={history.length > 0 ? `${successCount}/${history.length}` : "—"} valueColor={successCount === history.length ? "#00E676" : "#FFD740"} />
-              <MetricBox label="AVG RESPONSE" value={avgTime > 0 ? `${avgTime}ms` : "—"} valueColor={avgTime > 2000 ? "#FF5252" : avgTime > 500 ? "#FFD740" : "var(--c-text)"} />
+              <MetricBox label="AVG RESPONSE" value={avgTime > 0 ? `${avgTime}ms` : "—"} valueColor={avgTime > 2000 ? "var(--c-error)" : avgTime > 500 ? "#FFD740" : "var(--c-text)"} />
             </div>
             <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 6, padding: "10px 14px" }}>
               <div style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "0.5px", marginBottom: 6 }}>LAST 10 CHECKS</div>
@@ -1274,8 +1274,8 @@ function DataPointPanel({ item, sourceHealth, onClose }) {
 const QUOTA_HEALTH_COLORS = {
   healthy:   { color: "#00E676", bg: "rgba(0,230,118,0.08)",  border: "rgba(0,230,118,0.3)"  },
   warning:   { color: "#f59e0b", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.3)" },
-  critical:  { color: "#FF5252", bg: "rgba(255,82,82,0.08)",  border: "rgba(255,82,82,0.3)"  },
-  exhausted: { color: "#FF5252", bg: "rgba(255,82,82,0.08)",  border: "rgba(255,82,82,0.3)"  },
+  critical:  { color: "var(--c-error)", bg: "rgba(255,82,82,0.08)",  border: "rgba(255,82,82,0.3)"  },
+  exhausted: { color: "var(--c-error)", bg: "rgba(255,82,82,0.08)",  border: "rgba(255,82,82,0.3)"  },
 };
 
 // ── QuotaDashboard helpers ────────────────────────────────────────────────────
@@ -1294,7 +1294,7 @@ function qdFmtReset(nextDayResetISO) {
 function qdBarColor(pct) {
   if (pct < 0.6) return '#00E676';
   if (pct < 0.8) return '#f59e0b';
-  return '#FF5252';
+  return 'var(--c-error)';
 }
 
 function qdExportCSV(allStatus) {
@@ -1523,7 +1523,7 @@ function QuotaDashboard() {
               ref={el => { if (el) cardRefs.current[cardId] = el; }}
               style={{
                 background: isExhaustedCard ? 'rgba(255,82,82,0.04)' : 'var(--c-surface)',
-                border: `1px solid ${isExhaustedCard ? '#FF525244' : 'var(--c-border)'}`,
+                border: `1px solid ${isExhaustedCard ? 'rgba(255,82,82,0.27)' : 'var(--c-border)'}`,
                 borderRadius: 8, overflow: 'hidden', minHeight: 220,
                 display: 'flex', flexDirection: 'column',
               }}
@@ -1559,7 +1559,7 @@ function QuotaDashboard() {
                 {/* Exhausted badge */}
                 {isExhaustedCard && (
                   <div style={{ textAlign: 'center', padding: '6px 0', marginBottom: 8 }}>
-                    <span style={{ fontFamily: mono, fontSize: 11, fontWeight: 700, color: '#FF5252', letterSpacing: '0.12em' }}>QUOTA EXHAUSTED</span>
+                    <span style={{ fontFamily: mono, fontSize: 11, fontWeight: 700, color: 'var(--c-error)', letterSpacing: '0.12em' }}>QUOTA EXHAUSTED</span>
                     {resetTime && <div style={{ fontFamily: mono, fontSize: 9, color: 'var(--c-text-3)', marginTop: 2 }}>Resets in {resetTime}</div>}
                   </div>
                 )}
@@ -1824,7 +1824,7 @@ export default function CatalogPage() {
           <span style={{ color: "var(--c-text-3)" }}>{totalPoints} data points</span>
           <span style={{ color: "#00E676" }}>{totalActive} active</span>
           <span style={{ color: "#FFD740" }}>{totalPlanned} planned</span>
-          {issueCount > 0 && <span style={{ color: "#FF5252" }}>{issueCount} issues</span>}
+          {issueCount > 0 && <span style={{ color: "var(--c-error)" }}>{issueCount} issues</span>}
         </div>
       </div>
 
@@ -1864,7 +1864,7 @@ export default function CatalogPage() {
           <div style={{ background: "rgba(255,82,82,0.06)", border: "1px solid rgba(255,82,82,0.2)", borderRadius: 6, padding: "10px 16px", marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ fontSize: 16 }}>⚠</span>
             <div>
-              <div style={{ fontFamily: mono, fontSize: 10, color: "#FF5252", fontWeight: 700, letterSpacing: "0.5px" }}>YAHOO FINANCE UNAVAILABLE</div>
+              <div style={{ fontFamily: mono, fontSize: 10, color: "var(--c-error)", fontWeight: 700, letterSpacing: "0.5px" }}>YAHOO FINANCE UNAVAILABLE</div>
               <div style={{ fontFamily: sans, fontSize: 11, color: "var(--c-text-3)", marginTop: 2 }}>
                 Yahoo is an unofficial API and may break without notice. Finnhub and FMP are available as alternatives for equity data.
               </div>
@@ -1888,7 +1888,7 @@ export default function CatalogPage() {
               display: "flex", alignItems: "center", gap: 10,
             }}>
               <SourceBadge source={src} />
-              <span style={{ fontFamily: mono, fontSize: 10, color: isRed ? "#FF5252" : "#FFD740" }}>
+              <span style={{ fontFamily: mono, fontSize: 10, color: isRed ? "var(--c-error)" : "#FFD740" }}>
                 {u}/{m.rateLimitMax} calls used this session ({m.rateLimitPer})
               </span>
             </div>
@@ -1915,7 +1915,7 @@ export default function CatalogPage() {
           const active = sourceFilter === src;
           const c = SOURCE_COLORS[src];
           const srcStatus = sourceHealth[src]?.status;
-          const dotColor = srcStatus === "operational" ? "#00E676" : srcStatus === "degraded" ? "#FFD740" : srcStatus === "outage" ? "#FF5252" : "var(--c-text-3)";
+          const dotColor = srcStatus === "operational" ? "#00E676" : srcStatus === "degraded" ? "#FFD740" : srcStatus === "outage" ? "var(--c-error)" : "var(--c-text-3)";
           return (
             <button key={src} onClick={() => { setSourceFilter(src); setIssuesOnly(false); }}
               style={{
@@ -1938,7 +1938,7 @@ export default function CatalogPage() {
           onClick={() => { setIssuesOnly(!issuesOnly); setSourceFilter("all"); }}
           style={{
             fontFamily: mono, fontSize: 10, fontWeight: 700,
-            color: issuesOnly ? "#FF5252" : "var(--c-text-3)",
+            color: issuesOnly ? "var(--c-error)" : "var(--c-text-3)",
             background: issuesOnly ? "rgba(255,82,82,0.1)" : "var(--c-surface)",
             border: `1px solid ${issuesOnly ? "rgba(255,82,82,0.4)" : "var(--c-border)"}`,
             borderRadius: 20, padding: "5px 12px", cursor: "pointer",

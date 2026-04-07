@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
+import { hasRole } from '../lib/roles.js';
 import ClubeShell from '../components/clube/ClubeShell.jsx';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -15,7 +16,7 @@ const TXT_2    = '#94a3b8';
 const TXT_3    = '#475569';
 const ACCENT   = 'var(--c-accent)';
 const GREEN    = '#00E676';
-const RED      = '#FF5252';
+const RED      = 'var(--c-error)';
 const AMBER    = '#fbbf24';
 const MONO     = "'JetBrains Mono', monospace";
 
@@ -210,7 +211,7 @@ Instruções:
 
   // Header right actions
   const headerActions = [];
-  if (user?.role === 'admin') {
+  if (hasRole(user?.role, 'club_manager')) {
     if (a.status === 'agendada') headerActions.push({ label: 'MARCAR CONVOCADA', status: 'convocada' });
     if (a.status === 'convocada') headerActions.push({ label: 'ABRIR VOTAÇÃO', status: 'votacao_aberta' });
     if (a.status === 'votacao_aberta') headerActions.push({ label: 'ENCERRAR VOTAÇÃO', status: 'realizada' });
@@ -383,7 +384,7 @@ Instruções:
               <div style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 6, padding: 16, display: 'flex', gap: 24, alignItems: 'center' }}>
                 <div>
                   <div style={{ fontFamily: MONO, fontSize: 10, color: TXT_3, marginBottom: 4 }}>Presentes</div>
-                  {user?.role === 'admin' ? (
+                  {hasRole(user?.role, 'club_manager') ? (
                     <input type="number" min="0" max={cotistas.length} value={a.quorum_presente ?? ''}
                       onBlur={e => patchAssembly({ quorum_presente: Number(e.target.value) })}
                       onChange={e => setAssembleia(prev => ({ ...prev, quorum_presente: e.target.value }))}
@@ -417,7 +418,7 @@ Instruções:
               </div>
             )}
 
-            {isRealizada && !a.ata && !editingAta && user?.role === 'admin' && (
+            {isRealizada && !a.ata && !editingAta && hasRole(user?.role, 'club_manager') && (
               <div style={{ display: 'flex', gap: 10 }}>
                 <button onClick={() => { setEditingAta(true); setAtaText(''); }}
                   style={{ padding: '8px 16px', fontFamily: MONO, fontSize: 10, background: 'transparent', border: `1px solid ${ACCENT}`, color: ACCENT, borderRadius: 3, cursor: 'pointer' }}>
@@ -455,7 +456,7 @@ Instruções:
                 }}>
                   {a.ata}
                 </div>
-                {user?.role === 'admin' && (
+                {hasRole(user?.role, 'club_manager') && (
                   <button onClick={() => { setEditingAta(true); setAtaText(a.ata); }}
                     style={{ marginTop: 8, padding: '5px 12px', fontFamily: MONO, fontSize: 9, background: 'transparent', border: `1px solid ${TXT_3}60`, color: TXT_3, borderRadius: 3, cursor: 'pointer' }}>EDITAR</button>
                 )}
