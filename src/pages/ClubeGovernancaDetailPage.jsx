@@ -199,7 +199,7 @@ Instruções:
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: BG_PAGE, fontFamily: MONO, gap: 12 }}>
         <div style={{ fontSize: 12, color: TXT_2 }}>Assembleia não encontrada.</div>
-        <button onClick={() => navigate('/clube/governanca')} style={{ marginTop: 8, padding: '8px 20px', background: 'transparent', border: `1px solid ${BORDER2}`, borderRadius: 4, color: TXT_2, fontFamily: MONO, fontSize: 11, cursor: 'pointer' }}>← Voltar</button>
+        <button onClick={() => navigate(`/clube/${clubeIdParam}/governanca`)} style={{ marginTop: 8, padding: '8px 20px', background: 'transparent', border: `1px solid ${BORDER2}`, borderRadius: 4, color: TXT_2, fontFamily: MONO, fontSize: 11, cursor: 'pointer' }}>← Voltar</button>
       </div>
     );
   }

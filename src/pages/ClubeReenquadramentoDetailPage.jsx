@@ -319,7 +319,7 @@ export default function ClubeReenquadramentoDetailPage() {
                     </div>
                   )}
                   <button
-                    onClick={() => navigate('/clube/simulador')}
+                    onClick={() => navigate(`/clube/${clubeIdParam}/simulador`)}
                     style={{ marginTop: 10, padding: '5px 12px', fontFamily: MONO, fontSize: 10, background: 'transparent', border: `1px solid ${TXT_3}60`, color: TXT_3, borderRadius: 3, cursor: 'pointer' }}
                   >Abrir Simulador →</button>
                 </div>
