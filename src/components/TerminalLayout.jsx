@@ -53,7 +53,7 @@ export default function TerminalLayout() {
           if (key.startsWith('/')) { navigate(key); return; }
           const pathMap = {
             dashboard: `/app/${terminalMode}`,
-            heatmap:   '/app/heatmap',
+            heatmap:   '/markets/heatmap',
             catalog:   '/app/catalog',
             news:      '/app/news',
             watchlist: '/app/watchlist',
