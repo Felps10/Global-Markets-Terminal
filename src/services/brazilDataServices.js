@@ -2,8 +2,7 @@
 // Brazil Terminal data providers: BRAPI, BCB SGS
 // (via /api/v1/brazil/macro), AwesomeAPI.
 //
-// SCOPE RULE: This file must never import from
-// globalDataServices.js or call Yahoo Finance,
+// SCOPE RULE: This file must never call Yahoo Finance,
 // Finnhub, FMP, FRED, AlphaVantage, or CoinGecko.
 //
 // fetchBrazilMacro() calls the Express endpoint
