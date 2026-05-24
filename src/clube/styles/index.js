@@ -5,6 +5,7 @@
 
 export const CLUBE_COLORS = {
   accent:          '#F9C300',
+  goldMuted:       '#C5A059',
   accentDim:       'rgba(249,195,0,0.55)',
   accentFaint:     'rgba(249,195,0,0.12)',
   accentBorder:    'rgba(249,195,0,0.25)',
@@ -39,9 +40,13 @@ export const CLUBE_FONTS = {
 };
 
 export const CLUBE_RADIUS = {
-  sm: '6px',
-  md: '10px',
-  lg: '16px',
+  hairline: 1,
+  xs:       2,
+  sm:       4,
+  md:       6,
+  lg:       8,
+  xl:       10,
+  full:     9999,
 };
 
 // Nav items for the public Clube header
