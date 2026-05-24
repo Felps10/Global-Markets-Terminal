@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.js';
+import { hasRole } from '../../lib/roles.js';
 import { CLUBE_COLORS, CLUBE_FONTS } from '../../clube/styles/index.js';
 
 const C    = CLUBE_COLORS;
@@ -30,7 +31,7 @@ export default function ClubeShell({
   const location = useLocation();
   const { user } = useAuth();
   const role      = user?.role ?? 'user';
-  const isManager = role === 'club_manager' || role === 'admin';
+  const isManager = hasRole(role, 'club_manager');
 
   const [opsOpen, setOpsOpen] = useState(false);
 

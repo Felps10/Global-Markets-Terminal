@@ -16,6 +16,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.js';
 import { CLUBE_NAV, CLUBE_COLORS, CLUBE_FONTS } from '../styles/index.js';
+import { hasRole } from '../../lib/roles.js';
 
 // ─── Inject scoped styles ──────────────────────────────────────────────────────
 let stylesInjected = false;
@@ -91,7 +92,7 @@ function LangToggle({ lang, onLangChange }) {
 // ─── Auth buttons (shared between desktop + mobile) ─────────────────────────
 function AuthButtons({ lang, onSignIn, onSignUp, user, isAuthenticated, style }) {
   const navigate = useNavigate();
-  const isClubRole = isAuthenticated && (user?.role === 'club_member' || user?.role === 'club_manager' || user?.role === 'admin');
+  const isClubRole = isAuthenticated && hasRole(user?.role, 'club_member');
   const isPlainUser = isAuthenticated && !isClubRole;
 
   if (isClubRole) {
@@ -285,7 +286,7 @@ export default function ClubeHeader({ lang = 'pt', onLangChange, onSignIn, onSig
           gap: 10,
         }}>
           {/* Show lang toggle when NOT a club member (club members just see "Acessar clube") */}
-          {!(isAuthenticated && (user?.role === 'club_member' || user?.role === 'club_manager' || user?.role === 'admin')) && (
+          {!(isAuthenticated && hasRole(user?.role, 'club_member')) && (
             <LangToggle lang={lang} onLangChange={onLangChange} />
           )}
           <AuthButtons

@@ -12,6 +12,7 @@ import { useAuth } from '../../hooks/useAuth.js';
 import ClubeHeader from '../components/ClubeHeader.jsx';
 import ClubeFooter from '../components/ClubeFooter.jsx';
 import { CLUBE_COLORS, CLUBE_FONTS } from '../styles/index.js';
+import { hasRole } from '../../lib/roles.js';
 
 // ─── Data arrays ────────────────────────────────────────────────────────────────
 
@@ -153,7 +154,7 @@ export default function ClubeLandingPage() {
   useEffect(() => {
     if (loading) return;
     const role = user?.role;
-    if (role === 'club_member' || role === 'club_manager' || role === 'admin') {
+    if (hasRole(role, 'club_member')) {
       navigate('/clubes', { replace: true });
     }
   }, [loading, user, navigate]);
