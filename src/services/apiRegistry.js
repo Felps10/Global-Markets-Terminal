@@ -686,17 +686,6 @@ export function getEndpointDef(apiId, endpointId) {
 }
 
 /**
- * Get all APIs that have at least one documented quota limit (per-minute or per-day).
- * APIs with null limits on all windows are considered unlimited.
- * @returns {ApiDefinition[]}
- */
-export function getQuotaConstrainedApis() {
-  return Object.values(API_REGISTRY).filter(
-    api => api.limits.perDay !== null || api.limits.perMinute !== null
-  );
-}
-
-/**
  * Get all registered API IDs.
  * @returns {string[]}
  */

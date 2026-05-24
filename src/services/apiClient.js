@@ -48,7 +48,7 @@ import { get as cacheGet, set as cacheSet, stableParamHash } from './apiCache.js
 
 // ─── Error Types ──────────────────────────────────────────────────────────────
 
-export const ERROR_TYPES = Object.freeze({
+const ERROR_TYPES = Object.freeze({
   QUOTA_EXHAUSTED: "QuotaExhausted",
   AUTH:            "Auth",
   NETWORK:         "Network",

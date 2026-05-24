@@ -5,7 +5,6 @@ export const ROLE_RANK = {
   admin:        3,
 };
 
-export const VALID_ROLES        = Object.keys(ROLE_RANK);
 export const MANAGER_ASSIGNABLE = ['user', 'club_member'];
 export const ADMIN_ASSIGNABLE   = ['user', 'club_member', 'club_manager', 'admin'];
 

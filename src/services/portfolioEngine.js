@@ -71,36 +71,6 @@ export function buildPortfolioSnapshot(positions, marketData) {
  *   dailyReturnPct:     number,   // dailyReturn * 100 (percentage)
  *   coveredWeight:      number,   // sum of peso_alvo for positions with prices
  *   missingSymbols:     string[], // symbols with no price data
- *   isPartial:          boolean,  // true if any position has no price
- * }}
- */
-export function calculatePortfolioDailyReturn(snapshot) {
-  let dailyReturn    = 0;
-  let coveredWeight  = 0;
-  const missingSymbols = [];
-
-  for (const item of snapshot) {
-    if (item.hasPrice) {
-      dailyReturn   += item.contribution;
-      coveredWeight += item.peso_alvo;
-    } else {
-      missingSymbols.push(item.symbol);
-    }
-  }
-
-  if (coveredWeight === 0) {
-    return { dailyReturn: 0, dailyReturnPct: 0, coveredWeight: 0, missingSymbols, isPartial: missingSymbols.length > 0 };
-  }
-
-  return {
-    dailyReturn,
-    dailyReturnPct:  dailyReturn * 100,
-    coveredWeight,
-    missingSymbols,
-    isPartial:       missingSymbols.length > 0,
-  };
-}
-
 // ── FUNCTION 3 ────────────────────────────────────────────────────────────────
 
 /**

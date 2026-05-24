@@ -5,8 +5,6 @@ export const ROLE_RANK = {
   admin:        3,
 };
 
-export const VALID_ROLES = Object.keys(ROLE_RANK);
-
 export function hasRole(userRole, minRole) {
   return (ROLE_RANK[userRole] ?? -1) >= (ROLE_RANK[minRole] ?? 99);
 }

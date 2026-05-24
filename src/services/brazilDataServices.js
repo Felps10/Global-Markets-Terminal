@@ -10,13 +10,6 @@
 
 import { supabase } from '../lib/supabase.js';
 
-// ── BRAPI (re-exported from legacy dataServices) ────
-export {
-  hasBrapiToken,
-  brapiQuote,
-  fetchB3MarketData,
-} from '../dataServices.js';
-
 // ── Auth helpers (same pattern as taxonomyService.js) ──
 async function getToken() {
   const { data: { session } } = await supabase.auth.getSession();

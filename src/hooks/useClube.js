@@ -205,35 +205,3 @@ export function useCotistaData(clubeId, getToken, enabled) {
   return { minhaCotista, entryDate, minhasMovimentacoes, minhaPosicao, loading, error };
 }
 
-// ── useLazyFetch ─────────────────────────────────────────────────────────────
-// General-purpose lazy fetch. Does NOT auto-fetch on mount.
-// Consumer calls fetch() explicitly (e.g. on tab activation).
-// Subsequent calls after first success are no-ops (data cached in state).
-
-export function useLazyFetch(urlBuilder, getToken) {
-  const [data, setData]       = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState(null);
-  const [fetched, setFetched] = useState(false);
-  const fetchingRef           = useRef(false);
-
-  const doFetch = useCallback(async () => {
-    if (fetched || fetchingRef.current) return;
-    fetchingRef.current = true;
-    setLoading(true);
-    setError(null);
-    try {
-      const url = urlBuilder();
-      const result = await authFetch(url, getToken);
-      setData(result);
-      setFetched(true);
-    } catch (err) {
-      setError(err.message ?? 'Erro desconhecido');
-    } finally {
-      setLoading(false);
-      fetchingRef.current = false;
-    }
-  }, [urlBuilder, getToken, fetched]);
-
-  return { data, loading, error, fetch: doFetch, fetched };
-}

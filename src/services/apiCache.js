@@ -219,25 +219,16 @@ export function set(apiId, endpointId, params, data) {
   cache.set(key, { data, ts: Date.now(), apiId, endpointId, paramHash });
 }
 
-/**
- * Invalidate a specific cache entry by params.
- * Use when you know the cached data is stale due to a write or external event.
- *
- * @param {string} apiId
- * @param {string} endpointId
- * @param {*} params
- */
-export function invalidate(apiId, endpointId, params) {
+/** Invalidate a specific cache entry (used by self-test). */
+function invalidate(apiId, endpointId, params) {
   const paramHash = stableParamHash(params);
   cache.delete(makeCacheKey(apiId, endpointId, paramHash));
 }
 
 /**
  * Evict all entries that have exceeded 2× their TTL.
- * Call opportunistically (e.g. on each major fetch cycle).
- * No background timer is used — intentional for a personal dashboard.
  */
-export function clearExpired() {
+function clearExpired() {
   const now = Date.now();
   for (const [key, entry] of cache) {
     const ttlMs = getTTLms(entry.apiId, entry.endpointId);
@@ -247,21 +238,8 @@ export function clearExpired() {
   }
 }
 
-/**
- * Clear all cache entries for a specific API.
- * @param {string} apiId
- */
-export function clearApi(apiId) {
-  const prefix = `${apiId}:`;
-  for (const key of cache.keys()) {
-    if (key.startsWith(prefix)) cache.delete(key);
-  }
-}
-
-/** Clear the entire cache. */
-export function clearAll() {
-  cache.clear();
-}
+// Self-managed GC — evict stale entries every 5 minutes
+setInterval(clearExpired, 5 * 60 * 1000);
 
 // ─── Stats ────────────────────────────────────────────────────────────────────
 
