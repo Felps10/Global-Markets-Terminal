@@ -48,7 +48,7 @@ export default function ClubeShell({
     return path.startsWith(route);
   }
 
-  const opsRoutes = [`${base}/fila`, `${base}/membros`, `${base}/nav`, `${base}/simulador`];
+  const opsRoutes = [`${base}/membros`, `${base}/nav`, `${base}/simulador`];
   const opsActive = opsRoutes.some(r => isActive(r));
 
   // ── Nav items ───────────────────────────────────────────────────────────────
@@ -61,7 +61,6 @@ export default function ClubeShell({
   ];
 
   const opsItems = [
-    { label: 'Fila de Operações', route: `${base}/fila` },
     { label: 'Membros',           route: `${base}/membros` },
     { label: 'NAV',               route: `${base}/nav` },
     { label: 'Simulador',         route: `${base}/simulador` },
