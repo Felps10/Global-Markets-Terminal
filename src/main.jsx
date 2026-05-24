@@ -8,6 +8,7 @@ import { TaxonomyProvider } from './context/TaxonomyContext.jsx'
 import { PreferencesProvider } from './context/PreferencesContext.jsx'
 import { WatchlistProvider } from './context/WatchlistContext.jsx'
 import { AlertsProvider } from './context/AlertsContext.jsx'
+import { MarketDataProvider } from './context/MarketDataContext.jsx'
 import './index.css'
 import { initAnalytics } from './services/analytics.js'
 
@@ -27,6 +28,7 @@ const GlobalBaseline = createGlobalStyle`
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <GlobalBaseline />
+    <MarketDataProvider>
     <AuthProvider>
       <TaxonomyProvider>
         <PreferencesProvider>
@@ -38,5 +40,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         </PreferencesProvider>
       </TaxonomyProvider>
     </AuthProvider>
+    </MarketDataProvider>
   </React.StrictMode>,
 )

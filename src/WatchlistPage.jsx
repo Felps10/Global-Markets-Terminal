@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useWatchlist } from './context/WatchlistContext.jsx';
+import { useMarketData } from './context/MarketDataContext.jsx';
 import { STATIC_CATEGORIES, STATIC_ASSETS_MAP } from './GlobalMarketsTerminal.jsx';
 
 // Simple price formatter — avoids importing the private formatPrice from GMT
@@ -75,10 +76,10 @@ function AssetWatchRow({ symbol, marketData, assets, onUnpin }) {
 }
 
 // ─── WatchlistPage ─────────────────────────────────────────────────────────────
-// TODO: WatchlistPage needs marketData from a shared context (currently no live prices when rendered standalone)
-export default function WatchlistPage({ watchlistItems: propItems, marketData, assets: propAssets, categories: propCategories, onNavigate: propOnNavigate } = {}) {
+export default function WatchlistPage({ watchlistItems: propItems, assets: propAssets, categories: propCategories, onNavigate: propOnNavigate } = {}) {
   const navigate = useNavigate();
   const { items: ctxItems, unpin } = useWatchlist();
+  const { quotes } = useMarketData();
   const watchlistItems = propItems || ctxItems || [];
   const assets = propAssets || STATIC_ASSETS_MAP;
   const categories = propCategories || STATIC_CATEGORIES;
@@ -170,7 +171,7 @@ export default function WatchlistPage({ watchlistItems: propItems, marketData, a
             <AssetWatchRow
               key={item.id}
               symbol={item.target_id}
-              marketData={marketData}
+              marketData={quotes}
               assets={assets}
               onUnpin={unpin}
             />
@@ -239,7 +240,7 @@ export default function WatchlistPage({ watchlistItems: propItems, marketData, a
                     <AssetWatchRow
                       key={sym}
                       symbol={sym}
-                      marketData={marketData}
+                      marketData={quotes}
                       assets={assets}
                       onUnpin={() => {}} // subgroup assets can't be individually unpinned here
                     />
