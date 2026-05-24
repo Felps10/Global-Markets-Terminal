@@ -57,6 +57,113 @@ async function writeAuditLog({ clube_id, user_id, action, table_name, record_id,
   if (error) console.error('[audit_log] Failed to write:', error.message);
 }
 
+// ── SHARED COMPUTATION — used by compliance, operacional, and dashboard routes
+
+async function computeCompliance(clubeId) {
+  const { data: posicoes, error: posError } = await supabase
+    .from('posicoes')
+    .select('*')
+    .eq('clube_id', clubeId)
+    .order('peso_alvo', { ascending: false });
+  if (posError) throw posError;
+
+  if (posicoes.length === 0) {
+    return {
+      compliant:         false,
+      status:            'NO_POSITIONS',
+      percentual_rv:     0,
+      percentual_outras: 0,
+      positions_detail:  [],
+    };
+  }
+
+  const assetIds = posicoes.map((p) => p.asset_id);
+  const { data: assets, error: assetError } = await supabase
+    .from('assets')
+    .select('id, symbol, name, group_id, subgroup_id, type, exchange')
+    .in('id', assetIds);
+  if (assetError) throw assetError;
+
+  const assetMap = Object.fromEntries(assets.map((a) => [a.id, a]));
+
+  let percentual_rv     = 0;
+  let percentual_outras = 0;
+
+  const positions_detail = posicoes.map((p) => {
+    const asset  = assetMap[p.asset_id];
+    const is_rv  = asset?.group_id === 'equities';
+    const peso   = parseFloat(p.peso_alvo);
+    if (is_rv) percentual_rv     += peso;
+    else       percentual_outras += peso;
+    return {
+      asset_id:  p.asset_id,
+      symbol:    asset?.symbol    ?? null,
+      name:      asset?.name      ?? null,
+      group_id:  asset?.group_id  ?? null,
+      peso_alvo: peso,
+      is_rv,
+    };
+  });
+
+  let compliant, status;
+  if (percentual_rv >= 0.67) {
+    compliant = true;
+    status    = 'OK';
+  } else if (percentual_rv >= 0.60) {
+    compliant = false;
+    status    = 'WARNING';
+  } else {
+    compliant = false;
+    status    = 'BREACH';
+  }
+
+  return {
+    compliant,
+    status,
+    percentual_rv,
+    percentual_outras,
+    minimum_required: 0.67,
+    positions_detail,
+  };
+}
+
+function buildAlerts(clube, cotistas, posWithAssets) {
+  const alertas = [];
+  if (!clube || cotistas.length === 0) return alertas;
+
+  const checks = validateCVMRules(clube, cotistas, posWithAssets);
+
+  if (checks.rvCompliance.status !== 'ok') {
+    alertas.push({
+      tipo: 'compliance_breach',
+      titulo: 'Enquadramento RV',
+      descricao: checks.rvCompliance.message,
+      severity: classifyOperacionalSeverity({ tipo: 'compliance_breach', rvPct: checks.rvCompliance.value * 100 }),
+    });
+  }
+  if (checks.maxOwnership.status !== 'ok') {
+    alertas.push({
+      tipo: 'ownership_cap',
+      titulo: 'Concentração de Cotas',
+      descricao: checks.maxOwnership.message,
+      severity: classifyOperacionalSeverity({
+        tipo: checks.maxOwnership.status === 'critical' ? 'compliance_breach' : 'generic',
+        maxEquityPct: checks.maxOwnership.value * 100,
+      }),
+    });
+  }
+  if (checks.memberCount.status !== 'ok') {
+    alertas.push({
+      tipo: 'member_count',
+      titulo: 'Número de Cotistas',
+      descricao: checks.memberCount.message,
+      severity: classifyOperacionalSeverity({ memberCount: checks.memberCount.value }),
+    });
+  }
+
+  return sortBySeverity(alertas);
+}
+
 // ── CLUBE ROUTES ─────────────────────────────────────────────────────────────
 
 // GET /api/v1/clubes
@@ -232,6 +339,95 @@ router.put('/:id/posicoes', authenticate, requireRole('club_manager'), async (re
 });
 
 // ── COTISTAS ROUTES ───────────────────────────────────────────────────────────
+
+// GET /api/v1/clubes/:id/meu-cotista
+// Returns the logged-in user's own cotista row + entry date (first tranche).
+router.get('/:id/meu-cotista', authenticate, requireRole('club_member'), async (req, res) => {
+  const { id } = req.params;
+
+  const { data: cotista, error: cErr } = await supabase
+    .from('cotistas')
+    .select('id, clube_id, nome, cotas_detidas, data_entrada, ativo, created_at, updated_at')
+    .eq('clube_id', id)
+    .eq('auth_user_id', req.user.id)
+    .maybeSingle();
+
+  if (cErr) return res.status(500).json({ error: 'DB_ERROR', message: cErr.message });
+
+  if (!cotista) {
+    return res.json({ cotista: null, entryDate: null, reason: 'not_linked' });
+  }
+
+  // Earliest tranche → entry date
+  const { data: tranche, error: tErr } = await supabase
+    .from('cotas_tranches')
+    .select('data_aquisicao')
+    .eq('cotista_id', cotista.id)
+    .order('data_aquisicao', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (tErr) return res.status(500).json({ error: 'DB_ERROR', message: tErr.message });
+
+  const entryDate = tranche?.data_aquisicao ?? null;
+
+  res.json({ cotista, entryDate, reason: null });
+});
+
+// GET /api/v1/clubes/:id/cotistas/me
+// Returns the logged-in cotista's position + personal return vs entry NAV.
+router.get('/:id/cotistas/me', authenticate, requireRole('club_member'), async (req, res) => {
+  const clubeId = Number(req.params.id);
+
+  const { data: cotista, error: cErr } = await supabase
+    .from('cotistas')
+    .select('id, nome, cotas_detidas, data_entrada')
+    .eq('clube_id', clubeId)
+    .eq('auth_user_id', req.user.id)
+    .maybeSingle();
+
+  if (cErr) return res.status(500).json({ error: 'DB_ERROR', message: cErr.message });
+  if (!cotista) return res.status(404).json({ message: 'Cotista record not linked to your account' });
+
+  // valor_cota at or before entry date
+  const { data: entryNav, error: eErr } = await supabase
+    .from('nav_historico')
+    .select('valor_cota')
+    .eq('clube_id', clubeId)
+    .lte('data', cotista.data_entrada)
+    .order('data', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (eErr) return res.status(500).json({ error: 'DB_ERROR', message: eErr.message });
+
+  // latest valor_cota
+  const { data: latestNav, error: lErr } = await supabase
+    .from('nav_historico')
+    .select('valor_cota')
+    .eq('clube_id', clubeId)
+    .order('data', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (lErr) return res.status(500).json({ error: 'DB_ERROR', message: lErr.message });
+
+  const valorCotaEntrada = entryNav ? parseFloat(entryNav.valor_cota) : null;
+  const valorCotaAtual   = latestNav ? parseFloat(latestNav.valor_cota) : null;
+  const retornoPct       = (valorCotaEntrada && valorCotaAtual)
+    ? ((valorCotaAtual - valorCotaEntrada) / valorCotaEntrada) * 100
+    : null;
+
+  res.json({
+    id:                 cotista.id,
+    nome:               cotista.nome,
+    cotas_detidas:      cotista.cotas_detidas,
+    data_entrada:       cotista.data_entrada,
+    valor_cota_entrada: valorCotaEntrada,
+    valor_cota_atual:   valorCotaAtual,
+    retorno_pct:        retornoPct !== null ? Math.round(retornoPct * 100) / 100 : null,
+  });
+});
 
 // GET /api/v1/clubes/:id/cotistas
 router.get('/:id/cotistas', authenticate, requireRole('club_member'), async (req, res) => {
@@ -562,74 +758,141 @@ router.post('/:id/nav', authenticate, requireRole('club_manager'), async (req, r
 // GET /api/v1/clubes/:id/compliance
 router.get('/:id/compliance', authenticate, requireRole('club_member'), async (req, res) => {
   const { id } = req.params;
+  try {
+    const result = await computeCompliance(id);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: 'DB_ERROR', message: err.message });
+  }
+});
 
-  // Fetch posicoes
-  const { data: posicoes, error: posError } = await supabase
-    .from('posicoes')
-    .select('*')
-    .eq('clube_id', id)
-    .order('peso_alvo', { ascending: false });
-  if (posError) return res.status(500).json({ error: 'DB_ERROR', message: posError.message });
+// ── DASHBOARD ROUTE ──────────────────────────────────────────────────────────
 
-  if (posicoes.length === 0) {
-    return res.json({
-      compliant:         false,
-      status:            'NO_POSITIONS',
-      percentual_rv:     0,
-      percentual_outras: 0,
-      positions_detail:  [],
-    });
+// GET /api/v1/clubes/:id/dashboard
+// Aggregates key metrics for the gestor command screen. Read-only.
+router.get('/:id/dashboard', authenticate, requireRole('club_manager'), async (req, res) => {
+  const { id } = req.params;
+
+  const results = await Promise.allSettled([
+    // 0. Latest NAV row
+    supabase
+      .from('nav_historico')
+      .select('valor_cota, patrimonio_total, data')
+      .eq('clube_id', id)
+      .order('data', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    // 1. Clube record
+    supabase
+      .from('clubes')
+      .select('cotas_emitidas_total')
+      .eq('id', id)
+      .single(),
+    // 2. Active cotistas count
+    supabase
+      .from('cotistas')
+      .select('*', { count: 'exact', head: true })
+      .eq('clube_id', id)
+      .eq('ativo', true),
+    // 3. Pending movimentacoes count
+    supabase
+      .from('movimentacoes')
+      .select('*', { count: 'exact', head: true })
+      .eq('clube_id', id)
+      .in('status', ['aguardando_recursos', 'recursos_confirmados']),
+    // 4. Compliance
+    computeCompliance(id),
+    // 5. Alerts data — clube, cotistas, posicoes+assets
+    Promise.all([
+      supabase.from('clubes').select('*').eq('id', id).single(),
+      supabase.from('cotistas').select('*').eq('clube_id', id).eq('ativo', true),
+      supabase.from('posicoes').select('*').eq('clube_id', id),
+    ]),
+    // 6. Setup checklist counts
+    Promise.all([
+      supabase.from('estatuto_versoes').select('*', { count: 'exact', head: true }).eq('clube_id', id),
+      supabase.from('cotistas').select('*', { count: 'exact', head: true }).eq('clube_id', id).eq('ativo', true),
+      supabase.from('posicoes').select('*', { count: 'exact', head: true }).eq('clube_id', id),
+      supabase.from('nav_historico').select('*', { count: 'exact', head: true }).eq('clube_id', id),
+    ]),
+  ]);
+
+  const val = (i, label) => {
+    if (results[i].status === 'rejected') {
+      console.error(`[dashboard] sub-query failed (${label}):`, results[i].reason);
+      return null;
+    }
+    return results[i].value;
+  };
+
+  // 0. Latest NAV
+  const navRow = val(0, 'nav_latest')?.data ?? null;
+  const nav_latest = navRow
+    ? { valor_cota: parseFloat(navRow.valor_cota), data: navRow.data }
+    : null;
+  const patrimonio_total = navRow ? parseFloat(navRow.patrimonio_total) : null;
+
+  // 1. Clube record
+  const clubeRow = val(1, 'clube_record')?.data ?? null;
+  const cotas_emitidas = clubeRow ? parseFloat(clubeRow.cotas_emitidas_total ?? 0) : null;
+
+  // 2. Cotistas count
+  const cotistas_count = val(2, 'cotistas_count')?.count ?? 0;
+
+  // 3. Pending count
+  const pending_count = val(3, 'pending_count')?.count ?? 0;
+
+  // 4. Compliance
+  const compResult = val(4, 'compliance');
+  const compliance_status = compResult?.status ?? 'NO_POSITIONS';
+  const percentual_rv = compResult?.percentual_rv ?? 0;
+
+  // 5. Alerts — top 3 by severity
+  let alertas_top3 = [];
+  const alertsData = val(5, 'alerts_data');
+  if (alertsData) {
+    const [clubeRes, cotistasRes, posicoesRes] = alertsData;
+    const clube     = clubeRes?.data ?? null;
+    const cotistas  = cotistasRes?.data ?? [];
+    const posicoes  = posicoesRes?.data ?? [];
+
+    // Enrich posicoes with asset group_id for validateCVMRules
+    const assetIds = posicoes.map(p => p.asset_id).filter(Boolean);
+    let assetMap = {};
+    if (assetIds.length > 0) {
+      const { data: assets } = await supabase.from('assets').select('id, group_id').in('id', assetIds);
+      assetMap = Object.fromEntries((assets ?? []).map(a => [a.id, a]));
+    }
+    const posWithAssets = posicoes.map(p => ({ ...p, asset: assetMap[p.asset_id] ?? null }));
+
+    alertas_top3 = buildAlerts(clube, cotistas, posWithAssets).slice(0, 3);
   }
 
-  // Fetch asset details for group_id classification
-  const assetIds = posicoes.map((p) => p.asset_id);
-  const { data: assets, error: assetError } = await supabase
-    .from('assets')
-    .select('id, symbol, name, group_id, subgroup_id, type, exchange')
-    .in('id', assetIds);
-  if (assetError) return res.status(500).json({ error: 'DB_ERROR', message: assetError.message });
-
-  const assetMap = Object.fromEntries(assets.map((a) => [a.id, a]));
-
-  // Compute percentual_rv in JS from posicoes data (not from nav_historico)
-  let percentual_rv     = 0;
-  let percentual_outras = 0;
-
-  const positions_detail = posicoes.map((p) => {
-    const asset  = assetMap[p.asset_id];
-    const is_rv  = asset?.group_id === 'equities';
-    const peso   = parseFloat(p.peso_alvo);
-    if (is_rv) percentual_rv     += peso;
-    else       percentual_outras += peso;
-    return {
-      asset_id:  p.asset_id,
-      symbol:    asset?.symbol    ?? null,
-      name:      asset?.name      ?? null,
-      group_id:  asset?.group_id  ?? null,
-      peso_alvo: peso,
-      is_rv,
-    };
-  });
-
-  let compliant, status;
-  if (percentual_rv >= 0.67) {
-    compliant = true;
-    status    = 'OK';
-  } else if (percentual_rv >= 0.60) {
-    compliant = false;
-    status    = 'WARNING';
-  } else {
-    compliant = false;
-    status    = 'BREACH';
+  // 6. Setup checklist pct
+  let setup_checklist_pct = 0;
+  const checklistData = val(6, 'setup_checklist');
+  if (checklistData) {
+    const [estatutoRes, cotRes, posRes, navRes] = checklistData;
+    const checklist = computeSetupChecklist({
+      estatutos:  estatutoRes?.count ?? 0,
+      cotistas:   cotRes?.count ?? 0,
+      posicoes:   posRes?.count ?? 0,
+      navEntries: navRes?.count ?? 0,
+    });
+    const doneCount = checklist.filter(s => s.done).length;
+    setup_checklist_pct = Math.round((doneCount / checklist.length) * 100);
   }
 
   res.json({
-    compliant,
-    status,
+    nav_latest,
+    patrimonio_total,
+    cotas_emitidas,
+    cotistas_count,
+    compliance_status,
     percentual_rv,
-    percentual_outras,
-    minimum_required: 0.67,
-    positions_detail,
+    pending_count,
+    alertas_top3,
+    setup_checklist_pct,
   });
 });
 
@@ -1202,38 +1465,7 @@ router.get('/:id/operacional', authenticate, requireRole('club_member'), async (
   });
 
   // ── alertas_compliance ─────────────────────────────────────────────────────
-  const alertas_compliance = [];
-  if (clube && cotistas.length > 0) {
-    const checks = validateCVMRules(clube, cotistas, posWithAssets);
-
-    if (checks.rvCompliance.status !== 'ok') {
-      alertas_compliance.push({
-        tipo: 'compliance_breach',
-        titulo: 'Enquadramento RV',
-        descricao: checks.rvCompliance.message,
-        severity: classifyOperacionalSeverity({ tipo: 'compliance_breach', rvPct: checks.rvCompliance.value * 100 }),
-      });
-    }
-    if (checks.maxOwnership.status !== 'ok') {
-      alertas_compliance.push({
-        tipo: 'ownership_cap',
-        titulo: 'Concentração de Cotas',
-        descricao: checks.maxOwnership.message,
-        severity: classifyOperacionalSeverity({
-          tipo: checks.maxOwnership.status === 'critical' ? 'compliance_breach' : 'generic',
-          maxEquityPct: checks.maxOwnership.value * 100,
-        }),
-      });
-    }
-    if (checks.memberCount.status !== 'ok') {
-      alertas_compliance.push({
-        tipo: 'member_count',
-        titulo: 'Número de Cotistas',
-        descricao: checks.memberCount.message,
-        severity: classifyOperacionalSeverity({ memberCount: checks.memberCount.value }),
-      });
-    }
-  }
+  const alertas_compliance = buildAlerts(clube, cotistas, posWithAssets);
 
   // ── proximos_prazos ────────────────────────────────────────────────────────
   const proximos_prazos = [];
