@@ -169,7 +169,7 @@ export default function HamburgerMenu({
         <div style={{ padding: "16px 18px" }}>
           <SectionLabel>PAGES</SectionLabel>
           <NavItem icon="📊" label="Dashboard" path={dashboardPath} />
-          <NavItem icon="🔥" label="Heatmap" path="/app/heatmap" />
+          <NavItem icon="🔥" label="Heatmap" path="/markets/heatmap" />
           <NavItem icon="📋" label="Catalog" path="/app/catalog" />
           <NavItem icon="📰" label="News" path="/app/news" />
           <NavItem icon="★"  label="Watchlist" path="/app/watchlist" />
