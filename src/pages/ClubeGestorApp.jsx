@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
-import { CLUBE_COLORS } from '../clube/styles/index.js';
+import { CLUBE_COLORS, CLUBE_FONTS } from '../clube/styles/index.js';
 import {
   calculateNAVFromHistory,
   calculateRVCompliance,
@@ -15,7 +15,7 @@ import GestorRiscoTab from '../clube/components/gestor-tabs/GestorRiscoTab.jsx';
 import GestorEstatutoTab from '../clube/components/gestor-tabs/GestorEstatutoTab.jsx';
 
 const API = import.meta.env.VITE_API_URL || '';
-const MONO = "'JetBrains Mono', monospace";
+const MONO = CLUBE_FONTS.mono;
 
 const TABS = [
   { key: 'visao-geral',    label: 'VISÃO GERAL' },
