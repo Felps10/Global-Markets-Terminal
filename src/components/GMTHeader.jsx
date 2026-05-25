@@ -24,7 +24,7 @@ import MarketsDropdown from './MarketsDropdown.jsx';
 import { useTaxonomy } from '../context/TaxonomyContext.jsx';
 import { CLUBE_COLORS } from '../clube/styles/index.js';
 import { ROUTES } from '../lib/routes.js';
-import { injectStyles, GmtLogo } from './gmtHeaderShared.js';
+import { injectStyles, GmtLogo } from './gmtHeaderShared.jsx';
 
 
 // ─── Vertical divider ─────────────────────────────────────────────────────────

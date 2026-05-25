@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { injectStyles, GmtLogo, PRODUCTS_ITEMS } from './gmtHeaderShared.js';
+import { injectStyles, GmtLogo, PRODUCTS_ITEMS } from './gmtHeaderShared.jsx';
 
 export default function GMTHomepageHeader({ onSignIn, onSignUp, lang, onLangChange }) {
   const navigate = useNavigate();

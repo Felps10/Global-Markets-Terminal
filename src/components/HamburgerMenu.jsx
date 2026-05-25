@@ -171,10 +171,10 @@ export default function HamburgerMenu({
         <div style={{ padding: "16px 18px" }}>
           <SectionLabel>PAGES</SectionLabel>
           <NavItem icon="📊" label="Dashboard" path={dashboardPath} />
-          <NavItem icon="🔥" label="Heatmap" path=ROUTES.markets.heatmap />
-          <NavItem icon="📋" label="Catalog" path=ROUTES.terminal.catalog />
-          <NavItem icon="📰" label="News" path=ROUTES.terminal.news />
-          <NavItem icon="★"  label="Watchlist" path=ROUTES.terminal.watchlist />
+          <NavItem icon="🔥" label="Heatmap" path={ROUTES.markets.heatmap} />
+          <NavItem icon="📋" label="Catalog" path={ROUTES.terminal.catalog} />
+          <NavItem icon="📰" label="News" path={ROUTES.terminal.news} />
+          <NavItem icon="★"  label="Watchlist" path={ROUTES.terminal.watchlist} />
         </div>
 
         <Divider />
@@ -182,10 +182,10 @@ export default function HamburgerMenu({
         {/* Section 3 — Markets */}
         <div style={{ padding: "16px 18px" }}>
           <SectionLabel>MARKETS</SectionLabel>
-          <NavItem icon="📊" label="Chart & Research" path=ROUTES.markets.research accent="var(--c-accent)" />
-          <NavItem icon="📐" label="Fundamentals" path=ROUTES.markets.fundamentals accent="var(--c-accent)" />
-          <NavItem icon="🌍" label="Macro Hub" path=ROUTES.markets.macro accent="var(--c-accent)" />
-          <NavItem icon="⚡" label="Signals" path=ROUTES.markets.signals accent="var(--c-accent)" />
+          <NavItem icon="📊" label="Chart & Research" path={ROUTES.markets.research} accent="var(--c-accent)" />
+          <NavItem icon="📐" label="Fundamentals" path={ROUTES.markets.fundamentals} accent="var(--c-accent)" />
+          <NavItem icon="🌍" label="Macro Hub" path={ROUTES.markets.macro} accent="var(--c-accent)" />
+          <NavItem icon="⚡" label="Signals" path={ROUTES.markets.signals} accent="var(--c-accent)" />
         </div>
 
         <Divider />
@@ -193,7 +193,7 @@ export default function HamburgerMenu({
         {/* Section 4 — Clube */}
         <div style={{ padding: "16px 18px" }}>
           <SectionLabel>CLUBE</SectionLabel>
-          <NavItem icon="💼" label="Dashboard" path=ROUTES.clube.list accent="#8b5cf6" />
+          <NavItem icon="💼" label="Dashboard" path={ROUTES.clube.list} accent="#8b5cf6" />
         </div>
 
         {/* Section 5 — Admin (conditional) */}
@@ -202,7 +202,7 @@ export default function HamburgerMenu({
             <Divider />
             <div style={{ padding: "16px 18px" }}>
               <SectionLabel>ADMIN</SectionLabel>
-              <NavItem icon="⚙" label="Taxonomy" path=ROUTES.admin accent="#f59e0b" />
+              <NavItem icon="⚙" label="Taxonomy" path={ROUTES.admin} accent="#f59e0b" />
             </div>
           </>
         )}

@@ -11,7 +11,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { CLUBE_COLORS } from '../clube/styles/index.js';
 import { ROUTES } from '../lib/routes.js';
-import { injectStyles, GmtLogo, PRODUCTS_ITEMS } from './gmtHeaderShared.js';
+import { injectStyles, GmtLogo, PRODUCTS_ITEMS } from './gmtHeaderShared.jsx';
 
 const PUBLIC_NAV_BEFORE_PRODUCTS = [
   { label: 'About', path: '/about' },
