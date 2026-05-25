@@ -895,7 +895,6 @@ export default function GlobalMarketsTerminal() {
   useEffect(() => {
     if (!hasFmpKey() || !marketData) return;
     if (isExhausted('fmp')) {
-      console.log('[GMT] FMP quota exhausted — skipping batchProfile');
       return;
     }
     let cancelled = false;

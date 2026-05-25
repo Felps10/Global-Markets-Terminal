@@ -287,15 +287,10 @@ async function drainAllQueues() {
     while (queue.length > 0) {
       const health = quotaTracker.getQuotaHealth(apiId);
       if (health === "critical" || health === "exhausted") {
-        console.log(`[ApiClient] Drain paused for "${apiId}": health is still "${health}" (${queue.length} items pending)`);
         break;
       }
 
       const item = queue.shift();
-      console.log(
-        `[ApiClient] Draining deferred call: ${item.apiId}/${item.endpointId} ` +
-        `(${queue.length} remaining in ${item.apiId} queue)`
-      );
 
       // Execute with DRAIN_FLAG to bypass the deferred-queue check inside _executeCall
       await _executeCall(item.apiId, item.endpointId, item.params, {
@@ -355,7 +350,6 @@ async function _executeCall(apiId, endpointId, params, options) {
     if (!fetcher) return;
     // Check quota before the background refresh — never refresh if exhausted
     if (!quotaTracker.canCall(apiId, endpointId, effectiveCallCount)) {
-      console.log(`[ApiClient] Background refresh skipped for ${apiId}/${endpointId}: quota cannot support it`);
       return;
     }
     const result = await fetchWithRetry(apiId, endpointId, fetcher);
@@ -397,7 +391,6 @@ async function _executeCall(apiId, endpointId, params, options) {
       );
     }
     queue.push({ apiId, endpointId, params, options, enqueuedAt: Date.now() });
-    console.log(`[ApiClient] Deferred "${apiId}/${endpointId}" — queue: ${queue.length}/${DEFERRED_QUEUE_MAX}`);
     return makeDeferred(getQuotaRemaining(apiId));
   }
 
