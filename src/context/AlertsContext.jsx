@@ -27,7 +27,7 @@ export function AlertsProvider({ children }) {
       if (!res.ok) throw new Error('Failed to fetch alerts');
       setAlerts(await res.json());
     } catch (err) {
-      console.error('AlertsContext refresh error:', err);
+      console.error('[AlertsContext] refresh failed:', err.message);
     } finally {
       setLoading(false);
     }

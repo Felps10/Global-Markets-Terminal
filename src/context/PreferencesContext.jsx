@@ -46,7 +46,7 @@ export function PreferencesProvider({ children }) {
           setSynced(true);
         }
       } catch (err) {
-        console.error('PreferencesContext load error:', err);
+        console.error('[PreferencesContext] load failed:', err.message);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -73,7 +73,7 @@ export function PreferencesProvider({ children }) {
       const { prefs: saved } = await res.json();
       setPrefs(saved);
     } catch (err) {
-      console.error('PreferencesContext updatePrefs error:', err);
+      console.error('[PreferencesContext] updatePrefs failed:', err.message);
       // Revert on failure by re-fetching
       const token = await getToken();
       const res   = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/preferences`, {

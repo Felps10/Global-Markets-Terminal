@@ -819,7 +819,7 @@ router.get('/:id/dashboard', authenticate, requireRole('club_manager'), async (r
 
   const val = (i, label) => {
     if (results[i].status === 'rejected') {
-      console.error(`[dashboard] sub-query failed (${label}):`, results[i].reason);
+      console.error(`[dashboard] sub-query failed (${label}):`, results[i].reason?.message ?? String(results[i].reason));
       return null;
     }
     return results[i].value;

@@ -839,7 +839,7 @@ export default function GlobalMarketsTerminal() {
       setLastUpdate(new Date());
     } catch (err) {
       if (!mountedRef.current) return;
-      console.error('[GMT] loadData error:', err);
+      console.error('[GMT] loadData error:', err.message);
       if (prevDataRef.current) setMarketData(prevDataRef.current);
     } finally {
       if (mountedRef.current) setLoading(false);

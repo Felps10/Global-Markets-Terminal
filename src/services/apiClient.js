@@ -501,7 +501,7 @@ export const apiClient = {
       // Variable-cost callCount errors must propagate — they are programming bugs, not runtime errors
       if (err.message?.includes("callsPerRequest: 0")) throw err;
       // Everything else is an unexpected internal error — degrade gracefully
-      console.error(`[ApiClient] Unexpected internal error in call("${apiId}/${endpointId}"):`, err);
+      console.error(`[ApiClient] Unexpected internal error in call("${apiId}/${endpointId}"):`, err.message);
       return makeErr(ERROR_TYPES.BAD_REQUEST, `Internal error: ${err.message}`, false);
     }
   },

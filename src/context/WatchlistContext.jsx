@@ -26,7 +26,7 @@ export function WatchlistProvider({ children }) {
       const data = await res.json();
       setItems(data);
     } catch (err) {
-      console.error('WatchlistContext refresh error:', err);
+      console.error('[WatchlistContext] refresh failed:', err.message);
     } finally {
       setLoading(false);
     }
@@ -68,7 +68,7 @@ export function WatchlistProvider({ children }) {
     } catch (err) {
       // Rollback on network error
       setItems((prev) => prev.filter((i) => i.id !== optimistic.id));
-      console.error('WatchlistContext pin error:', err);
+      console.error('[WatchlistContext] pin failed:', err.message);
     }
   }, [getToken, refresh]);
 
@@ -94,7 +94,7 @@ export function WatchlistProvider({ children }) {
     } catch (err) {
       // Rollback on network error
       if (removed) setItems((prev) => [removed, ...prev]);
-      console.error('WatchlistContext unpin error:', err);
+      console.error('[WatchlistContext] unpin failed:', err.message);
     }
   }, [getToken]);
 
