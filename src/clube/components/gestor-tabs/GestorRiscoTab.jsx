@@ -11,7 +11,7 @@ import {
 import { severityColor, severityLabel, signColor, fmtDate }
   from '../../utils/formatters.js';
 
-import { CLUBE_COLORS, CLUBE_FONTS } from '../../styles/index.js';
+import { CLUBE_COLORS, CLUBE_FONTS, CLUBE_RADIUS } from '../../styles/index.js';
 
 const C = CLUBE_COLORS;
 const MONO = CLUBE_FONTS.mono;
@@ -130,7 +130,7 @@ function RenquadramentoSummary({ clubeId, getToken, navigate }) {
               onClick={() => navigate(`/clube/reenquadramento/${ev.id}`)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 12,
-                padding: '10px 14px', borderRadius: 4, cursor: 'pointer',
+                padding: '10px 14px', borderRadius: CLUBE_RADIUS.sm, cursor: 'pointer',
                 background: `${statusColor}08`,
                 border: `1px solid ${statusColor}30`,
                 transition: 'border-color 0.15s',
@@ -140,7 +140,7 @@ function RenquadramentoSummary({ clubeId, getToken, navigate }) {
             >
               <span style={{
                 fontFamily: MONO, fontSize: 9, fontWeight: 700,
-                padding: '2px 7px', borderRadius: 3, flexShrink: 0,
+                padding: '2px 7px', borderRadius: CLUBE_RADIUS.xs, flexShrink: 0,
                 background: `${statusColor}20`,
                 border: `1px solid ${statusColor}50`,
                 color: statusColor, letterSpacing: '0.08em',
@@ -328,7 +328,7 @@ export default function GestorRiscoTab({ clube, navHistory, gestorData, getToken
         if (allAlerts.length === 0) {
           return (
             <div style={{
-              padding: '14px 18px', borderRadius: 6,
+              padding: '14px 18px', borderRadius: CLUBE_RADIUS.md,
               background: 'rgba(0,230,118,0.06)',
               border: '1px solid rgba(0,230,118,0.25)',
               fontFamily: MONO, fontSize: 12, color: C.green,
@@ -353,7 +353,7 @@ export default function GestorRiscoTab({ clube, navHistory, gestorData, getToken
               return (
                 <div key={i} style={{
                   display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '10px 14px', borderRadius: 4,
+                  padding: '10px 14px', borderRadius: CLUBE_RADIUS.sm,
                   background: `${color}10`,
                   border: `1px solid ${color}40`,
                 }}>
@@ -362,7 +362,7 @@ export default function GestorRiscoTab({ clube, navHistory, gestorData, getToken
                     flexShrink: 0,
                     fontFamily: MONO, fontSize: 9, fontWeight: 700,
                     letterSpacing: '0.12em',
-                    padding: '2px 7px', borderRadius: 3,
+                    padding: '2px 7px', borderRadius: CLUBE_RADIUS.xs,
                     background: `${color}20`,
                     border: `1px solid ${color}60`,
                     color,
@@ -386,7 +386,7 @@ export default function GestorRiscoTab({ clube, navHistory, gestorData, getToken
                         fontFamily: MONO, fontSize: 9, letterSpacing: '0.06em',
                         background: 'transparent',
                         border: '1px solid rgba(255,82,82,0.4)',
-                        color: C.red, borderRadius: 3, cursor: 'pointer',
+                        color: C.red, borderRadius: CLUBE_RADIUS.xs, cursor: 'pointer',
                       }}
                     >REGISTRAR</button>
                   )}
@@ -403,7 +403,7 @@ export default function GestorRiscoTab({ clube, navHistory, gestorData, getToken
         {/* 1 — Drawdown Atual */}
         <div style={{
           background: C.bgCard, border: `1px solid ${C.borderSubtle}`,
-          borderRadius: 6, padding: 16, fontFamily: MONO,
+          borderRadius: CLUBE_RADIUS.md, padding: 16, fontFamily: MONO,
         }}>
           <div style={{ fontSize: 10, color: C.textDim, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
             DRAWDOWN ATUAL
@@ -417,7 +417,7 @@ export default function GestorRiscoTab({ clube, navHistory, gestorData, getToken
         {/* 2 — Max Drawdown */}
         <div style={{
           background: C.bgCard, border: `1px solid ${C.borderSubtle}`,
-          borderRadius: 6, padding: 16, fontFamily: MONO,
+          borderRadius: CLUBE_RADIUS.md, padding: 16, fontFamily: MONO,
         }}>
           <div style={{ fontSize: 10, color: C.textDim, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
             MAX DRAWDOWN
@@ -433,7 +433,7 @@ export default function GestorRiscoTab({ clube, navHistory, gestorData, getToken
         {/* 3 — Volatilidade 30d */}
         <div style={{
           background: C.bgCard, border: `1px solid ${C.borderSubtle}`,
-          borderRadius: 6, padding: 16, fontFamily: MONO,
+          borderRadius: CLUBE_RADIUS.md, padding: 16, fontFamily: MONO,
         }}>
           <div style={{ fontSize: 10, color: C.textDim, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
             VOLATILIDADE 30D
@@ -449,7 +449,7 @@ export default function GestorRiscoTab({ clube, navHistory, gestorData, getToken
         {/* 4 — Maior Posição */}
         <div style={{
           background: C.bgCard, border: `1px solid ${C.borderSubtle}`,
-          borderRadius: 6, padding: 16, fontFamily: MONO,
+          borderRadius: CLUBE_RADIUS.md, padding: 16, fontFamily: MONO,
         }}>
           <div style={{ fontSize: 10, color: C.textDim, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>
             MAIOR POSIÇÃO
@@ -467,7 +467,7 @@ export default function GestorRiscoTab({ clube, navHistory, gestorData, getToken
 
       {/* ── Drawdown chart ──────────────────────────────────────────────────── */}
       <div style={{
-        background: C.bgCard, border: `1px solid ${C.borderSubtle}`, borderRadius: 6, padding: 16,
+        background: C.bgCard, border: `1px solid ${C.borderSubtle}`, borderRadius: CLUBE_RADIUS.md, padding: 16,
       }}>
         <div style={{ fontSize: 10, color: C.textDim, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 16 }}>
           DRAWDOWN HISTÓRICO
@@ -477,7 +477,7 @@ export default function GestorRiscoTab({ clube, navHistory, gestorData, getToken
 
       {/* ── Enquadramento CVM ───────────────────────────────────────────────── */}
       <div style={{
-        background: C.bgCard, border: `1px solid ${C.borderSubtle}`, borderRadius: 6, padding: 16,
+        background: C.bgCard, border: `1px solid ${C.borderSubtle}`, borderRadius: CLUBE_RADIUS.md, padding: 16,
       }}>
         <div style={{ fontSize: 10, color: C.textDim, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 16 }}>
           ENQUADRAMENTO CVM — RENDA VARIÁVEL
@@ -489,7 +489,7 @@ export default function GestorRiscoTab({ clube, navHistory, gestorData, getToken
           <div>
             <div style={{
               width: '100%', height: 20, display: 'flex',
-              borderRadius: 3, overflow: 'hidden', marginBottom: 8,
+              borderRadius: CLUBE_RADIUS.xs, overflow: 'hidden', marginBottom: 8,
             }}>
               <div style={{
                 width: `${(rvCompliance?.percentualRV ?? 0) * 100}%`,
@@ -514,7 +514,7 @@ export default function GestorRiscoTab({ clube, navHistory, gestorData, getToken
               marginTop: 12, padding: '10px 12px',
               background: `${compColor}10`,
               border: `1px solid ${compColor}40`,
-              borderRadius: 4,
+              borderRadius: CLUBE_RADIUS.sm,
               fontFamily: MONO, fontSize: 11, color: compColor, lineHeight: 1.5,
             }}>
               {compBannerText}
@@ -542,7 +542,7 @@ export default function GestorRiscoTab({ clube, navHistory, gestorData, getToken
                   {formatPct((pos.peso_alvo ?? 0) * 100, { showSign: false })}
                 </span>
                 <span style={{
-                  fontSize: 9, padding: '2px 6px', borderRadius: 3,
+                  fontSize: 9, padding: '2px 6px', borderRadius: CLUBE_RADIUS.xs,
                   background: pos.is_rv ? 'rgba(0,230,118,0.1)' : 'rgba(71,85,105,0.2)',
                   border: `1px solid ${pos.is_rv ? 'rgba(0,230,118,0.3)' : C.borderFaint}`,
                   color: pos.is_rv ? C.green : C.textDim,

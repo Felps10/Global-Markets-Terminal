@@ -15,7 +15,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.js';
-import { CLUBE_NAV, CLUBE_COLORS, CLUBE_FONTS } from '../styles/index.js';
+import { CLUBE_NAV, CLUBE_COLORS, CLUBE_FONTS, CLUBE_RADIUS } from '../styles/index.js';
 import { hasRole } from '../../lib/roles.js';
 
 // ─── Inject scoped styles ──────────────────────────────────────────────────────
@@ -64,7 +64,7 @@ function LangToggle({ lang, onLangChange }) {
     <div style={{
       display: 'flex',
       border: '1px solid rgba(255,255,255,0.15)',
-      borderRadius: 6,
+      borderRadius: CLUBE_RADIUS.md,
       overflow: 'hidden',
     }}>
       {['pt', 'en'].map(l => (
@@ -104,7 +104,7 @@ function AuthButtons({ lang, onSignIn, onSignUp, user, isAuthenticated, style })
           color: CLUBE_COLORS.ctaText,
           border: 'none',
           padding: '7px 18px',
-          borderRadius: 6,
+          borderRadius: CLUBE_RADIUS.md,
           fontFamily: CLUBE_FONTS.sans,
           fontSize: 13,
           fontWeight: 600,
@@ -131,7 +131,7 @@ function AuthButtons({ lang, onSignIn, onSignUp, user, isAuthenticated, style })
             border: '1px solid rgba(255,255,255,0.2)',
             color: 'rgba(255,255,255,0.7)',
             padding: '7px 16px',
-            borderRadius: 6,
+            borderRadius: CLUBE_RADIUS.md,
             fontFamily: CLUBE_FONTS.sans,
             fontSize: 13,
             fontWeight: 400,
@@ -154,7 +154,7 @@ function AuthButtons({ lang, onSignIn, onSignUp, user, isAuthenticated, style })
           color: CLUBE_COLORS.ctaText,
           border: 'none',
           padding: '7px 18px',
-          borderRadius: 6,
+          borderRadius: CLUBE_RADIUS.md,
           fontFamily: CLUBE_FONTS.sans,
           fontSize: 13,
           fontWeight: 600,
@@ -319,7 +319,7 @@ export default function ClubeHeader({ lang = 'pt', onLangChange, onSignIn, onSig
             width: 18,
             height: 2,
             background: '#e2e8f0',
-            borderRadius: 1,
+            borderRadius: CLUBE_RADIUS.hairline,
             transition: 'transform 200ms, opacity 200ms',
             position: 'absolute',
             transform: mobileOpen ? 'rotate(45deg)' : 'translateY(-5px)',
@@ -328,7 +328,7 @@ export default function ClubeHeader({ lang = 'pt', onLangChange, onSignIn, onSig
             width: 18,
             height: 2,
             background: '#e2e8f0',
-            borderRadius: 1,
+            borderRadius: CLUBE_RADIUS.hairline,
             transition: 'opacity 200ms',
             position: 'absolute',
             opacity: mobileOpen ? 0 : 1,
@@ -337,7 +337,7 @@ export default function ClubeHeader({ lang = 'pt', onLangChange, onSignIn, onSig
             width: 18,
             height: 2,
             background: '#e2e8f0',
-            borderRadius: 1,
+            borderRadius: CLUBE_RADIUS.hairline,
             transition: 'transform 200ms, opacity 200ms',
             position: 'absolute',
             transform: mobileOpen ? 'rotate(-45deg)' : 'translateY(5px)',

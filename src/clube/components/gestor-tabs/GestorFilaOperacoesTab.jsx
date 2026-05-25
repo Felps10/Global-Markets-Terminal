@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { hasRole } from '../../../lib/roles.js';
-import { CLUBE_COLORS, CLUBE_FONTS } from '../../styles/index.js';
+import { CLUBE_COLORS, CLUBE_FONTS, CLUBE_RADIUS } from '../../styles/index.js';
 
 const C = CLUBE_COLORS;
 const MONO = CLUBE_FONTS.mono;
@@ -55,7 +55,7 @@ export default function GestorFilaOperacoesTab({ clube, getToken, user }) {
         {/* Error state */}
         {operacionalError && (
           <div style={{
-            padding: '12px 16px', borderRadius: 4,
+            padding: '12px 16px', borderRadius: CLUBE_RADIUS.sm,
             background: 'rgba(255,82,82,0.08)',
             border: '1px solid rgba(255,82,82,0.3)',
             fontFamily: MONO, fontSize: 11, color: C.red,
@@ -83,7 +83,7 @@ export default function GestorFilaOperacoesTab({ clube, getToken, user }) {
             ) : (
               <div style={{
                 background: C.bgCard, border: `1px solid ${C.borderSubtle}`,
-                borderRadius: 6, overflow: 'hidden',
+                borderRadius: CLUBE_RADIUS.md, overflow: 'hidden',
               }}>
                 {/* Table header */}
                 <div style={{
@@ -185,7 +185,7 @@ export default function GestorFilaOperacoesTab({ clube, getToken, user }) {
                         display: 'inline-flex', alignItems: 'center',
                         fontFamily: MONO, fontSize: 9, fontWeight: 600,
                         letterSpacing: '0.08em', padding: '3px 8px',
-                        borderRadius: 3, background: badge.bg, color: badge.color,
+                        borderRadius: CLUBE_RADIUS.xs, background: badge.bg, color: badge.color,
                         width: 'fit-content',
                       }}>
                         {badge.label}
@@ -199,7 +199,7 @@ export default function GestorFilaOperacoesTab({ clube, getToken, user }) {
                               padding: '3px 8px', fontFamily: MONO, fontSize: 9,
                               background: 'transparent',
                               border: `1px solid ${C.green}60`, color: C.green,
-                              borderRadius: 3, cursor: 'pointer', letterSpacing: '0.06em',
+                              borderRadius: CLUBE_RADIUS.xs, cursor: 'pointer', letterSpacing: '0.06em',
                             }}
                           >
                             CONFIRMAR
@@ -212,7 +212,7 @@ export default function GestorFilaOperacoesTab({ clube, getToken, user }) {
                               padding: '3px 8px', fontFamily: MONO, fontSize: 9,
                               background: 'transparent',
                               border: `1px solid ${C.accent}60`, color: C.accent,
-                              borderRadius: 3, cursor: 'pointer', letterSpacing: '0.06em',
+                              borderRadius: CLUBE_RADIUS.xs, cursor: 'pointer', letterSpacing: '0.06em',
                             }}
                           >
                             CONVERTER
@@ -225,7 +225,7 @@ export default function GestorFilaOperacoesTab({ clube, getToken, user }) {
                               padding: '3px 8px', fontFamily: MONO, fontSize: 9,
                               background: 'transparent',
                               border: `1px solid ${C.accent}60`, color: C.accent,
-                              borderRadius: 3, cursor: 'pointer', letterSpacing: '0.06em',
+                              borderRadius: CLUBE_RADIUS.xs, cursor: 'pointer', letterSpacing: '0.06em',
                             }}
                           >
                             MARCAR PAGO
@@ -238,7 +238,7 @@ export default function GestorFilaOperacoesTab({ clube, getToken, user }) {
                               padding: '3px 8px', fontFamily: MONO, fontSize: 9,
                               background: 'transparent',
                               border: `1px solid ${C.textDim}60`, color: C.textDim,
-                              borderRadius: 3, cursor: 'pointer', letterSpacing: '0.06em',
+                              borderRadius: CLUBE_RADIUS.xs, cursor: 'pointer', letterSpacing: '0.06em',
                             }}
                           >
                             CANCELAR

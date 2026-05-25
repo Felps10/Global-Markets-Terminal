@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth.js';
 import ClubeHeader from '../components/ClubeHeader.jsx';
 import ClubeFooter from '../components/ClubeFooter.jsx';
-import { CLUBE_COLORS, CLUBE_FONTS } from '../styles/index.js';
+import { CLUBE_COLORS, CLUBE_FONTS, CLUBE_RADIUS } from '../styles/index.js';
 import { hasRole } from '../../lib/roles.js';
 
 // ─── Data arrays ────────────────────────────────────────────────────────────────
@@ -133,7 +133,7 @@ const sectionLabelStyle = {
 const cardStyle = {
   background: 'rgba(255,255,255,0.03)',
   border: '0.5px solid rgba(255,255,255,0.08)',
-  borderRadius: 10,
+  borderRadius: CLUBE_RADIUS.xl,
   padding: 24,
 };
 
@@ -205,7 +205,7 @@ export default function ClubeLandingPage() {
             position: 'absolute',
             width: 600,
             height: 600,
-            borderRadius: '50%',
+            borderRadius: CLUBE_RADIUS.full,
             background: `radial-gradient(circle, ${CLUBE_COLORS.accentFaint} 0%, transparent 70%)`,
             top: '50%',
             left: '50%',
@@ -256,7 +256,7 @@ export default function ClubeLandingPage() {
                   background: CLUBE_COLORS.ctaBg,
                   color: CLUBE_COLORS.ctaText,
                   border: 'none',
-                  borderRadius: 8,
+                  borderRadius: CLUBE_RADIUS.lg,
                   padding: '11px 28px',
                   fontSize: 14,
                   fontWeight: 600,
@@ -322,7 +322,7 @@ export default function ClubeLandingPage() {
               <div key={i} style={{
                 background: 'rgba(255,255,255,0.02)',
                 borderLeft: `3px solid ${CLUBE_COLORS.accent}`,
-                borderRadius: 8,
+                borderRadius: CLUBE_RADIUS.lg,
                 padding: 16,
                 fontSize: 13,
                 color: CLUBE_COLORS.textPrimary,
@@ -467,7 +467,7 @@ export default function ClubeLandingPage() {
                 background: CLUBE_COLORS.ctaBg,
                 color: CLUBE_COLORS.ctaText,
                 border: 'none',
-                borderRadius: 8,
+                borderRadius: CLUBE_RADIUS.lg,
                 padding: '11px 28px',
                 fontSize: 14,
                 fontWeight: 600,
@@ -520,7 +520,7 @@ export default function ClubeLandingPage() {
               background: CLUBE_COLORS.ctaBg,
               color: CLUBE_COLORS.ctaText,
               border: 'none',
-              borderRadius: 8,
+              borderRadius: CLUBE_RADIUS.lg,
               padding: '11px 28px',
               fontSize: 14,
               fontWeight: 600,

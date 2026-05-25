@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CLUBE_COLORS, CLUBE_FONTS } from '../../styles/index.js';
+import { CLUBE_COLORS, CLUBE_FONTS, CLUBE_RADIUS } from '../../styles/index.js';
 import { formatCurrency, formatPct } from '../../../services/portfolioEngine.js';
 import NavChart from '../../../components/clube/NavChart.jsx';
 import { severityColor, severityLabel, signColor }
@@ -35,7 +35,7 @@ export default function GestorVisaoGeralTab({ dashboard, clube, navAnalytics, ge
     flex: 1,
     background: CLUBE_COLORS.bgSurface,
     border: `1px solid ${CLUBE_COLORS.border}`,
-    borderRadius: 6,
+    borderRadius: CLUBE_RADIUS.md,
     padding: '16px 20px',
     minWidth: 0,
   };
@@ -102,7 +102,7 @@ export default function GestorVisaoGeralTab({ dashboard, clube, navAnalytics, ge
               }}>
                 <span style={{
                   flexShrink: 0, fontFamily: MONO, fontSize: 8, fontWeight: 700,
-                  letterSpacing: '0.12em', padding: '2px 6px', borderRadius: 3,
+                  letterSpacing: '0.12em', padding: '2px 6px', borderRadius: CLUBE_RADIUS.xs,
                   background: `${color}15`, color,
                 }}>
                   {severityLabel(alert.severity)}
@@ -127,7 +127,7 @@ export default function GestorVisaoGeralTab({ dashboard, clube, navAnalytics, ge
   // ── Setup Banner ────────────────────────────────────────────────────────
   const showSetupBanner = dashboard.setup_checklist_pct < 100 && !dismissed;
   const setupBanner = showSetupBanner ? (
-    <div style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: 6, padding: '12px 16px' }}>
+    <div style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: CLUBE_RADIUS.md, padding: '12px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <span style={{ fontFamily: MONO, fontSize: 10, color: C.amber }}>
           ⚠ Configuração do clube: {dashboard.setup_checklist_pct}% completo
@@ -142,8 +142,8 @@ export default function GestorVisaoGeralTab({ dashboard, clube, navAnalytics, ge
           Dispensar
         </button>
       </div>
-      <div style={{ height: 3, background: CLUBE_COLORS.border, borderRadius: 2, overflow: 'hidden' }}>
-        <div style={{ width: `${dashboard.setup_checklist_pct}%`, height: '100%', background: C.amber, borderRadius: 2 }} />
+      <div style={{ height: 3, background: CLUBE_COLORS.border, borderRadius: CLUBE_RADIUS.xxs, overflow: 'hidden' }}>
+        <div style={{ width: `${dashboard.setup_checklist_pct}%`, height: '100%', background: C.amber, borderRadius: CLUBE_RADIUS.xxs }} />
       </div>
       <div style={{ fontFamily: MONO, fontSize: 9, color: C.textDim, marginTop: 6 }}>
         Complete a configuração para habilitar todas as funcionalidades do clube.
@@ -192,7 +192,7 @@ export default function GestorVisaoGeralTab({ dashboard, clube, navAnalytics, ge
             </div>
           </div>
 
-          <div style={{ background: C.bgCard, border: `1px solid ${C.borderSubtle}`, borderRadius: 6, padding: 16 }}>
+          <div style={{ background: C.bgCard, border: `1px solid ${C.borderSubtle}`, borderRadius: CLUBE_RADIUS.md, padding: 16 }}>
             <div style={{ fontFamily: MONO, fontSize: 11, color: C.textMain, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 16, borderLeft: `3px solid ${C.accent}`, paddingLeft: 8 }}>
               EVOLUÇÃO DA COTA
             </div>
@@ -211,7 +211,7 @@ export default function GestorVisaoGeralTab({ dashboard, clube, navAnalytics, ge
             ].map(({ title, benchKey, benchLabel }) => {
               const alpha = (navAnalytics.totalReturnPct ?? 0) - (navAnalytics[benchKey] ?? 0);
               return (
-                <div key={title} style={{ background: C.bgCard, border: `1px solid ${C.borderSubtle}`, borderRadius: 6, padding: 16 }}>
+                <div key={title} style={{ background: C.bgCard, border: `1px solid ${C.borderSubtle}`, borderRadius: CLUBE_RADIUS.md, padding: 16 }}>
                   <div style={{ fontFamily: MONO, fontSize: 10, color: C.textDim, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 14 }}>{title}</div>
                   {[
                     ['Carteira', navAnalytics.totalReturnPct, false],
@@ -238,8 +238,8 @@ export default function GestorVisaoGeralTab({ dashboard, clube, navAnalytics, ge
             {(gestorData.operacional.proximos_prazos ?? []).map((prazo, i) => {
               const color = severityColor(prazo.severity);
               return (
-                <div key={i} style={{ background: C.bgCard, border: `1px solid ${color}30`, borderRadius: 6, padding: '12px 14px', position: 'relative' }}>
-                  <div style={{ position: 'absolute', top: 10, right: 10, width: 6, height: 6, borderRadius: '50%', background: color }} />
+                <div key={i} style={{ background: C.bgCard, border: `1px solid ${color}30`, borderRadius: CLUBE_RADIUS.md, padding: '12px 14px', position: 'relative' }}>
+                  <div style={{ position: 'absolute', top: 10, right: 10, width: 6, height: 6, borderRadius: CLUBE_RADIUS.full, background: color }} />
                   <div style={{ fontFamily: MONO, fontSize: 10, color: C.textPrimary, fontWeight: 600, marginBottom: 4, paddingRight: 16 }}>{prazo.titulo}</div>
                   <div style={{ fontFamily: MONO, fontSize: 10, color: C.textMain }}>{prazo.descricao}</div>
                   {prazo.diasParaPrazo != null && (
@@ -261,7 +261,7 @@ export default function GestorVisaoGeralTab({ dashboard, clube, navAnalytics, ge
 
       {/* ── CAIXA ───────────────────────────────────────────────────────── */}
       {gestorData?.operacional?.caixa && (
-        <div style={{ background: C.bgCard, border: `1px solid ${C.borderSubtle}`, borderRadius: 6, padding: 16, maxWidth: 320 }}>
+        <div style={{ background: C.bgCard, border: `1px solid ${C.borderSubtle}`, borderRadius: CLUBE_RADIUS.md, padding: 16, maxWidth: 320 }}>
           <div style={{ fontFamily: MONO, fontSize: 10, color: C.textDim, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 16, borderLeft: `3px solid ${C.accent}`, paddingLeft: 8 }}>
             CAIXA
           </div>

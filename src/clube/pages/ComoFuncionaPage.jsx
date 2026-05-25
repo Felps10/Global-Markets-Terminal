@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import ClubeHeader from '../components/ClubeHeader.jsx';
 import ClubeFooter from '../components/ClubeFooter.jsx';
-import { CLUBE_COLORS, CLUBE_FONTS } from '../styles/index.js';
+import { CLUBE_COLORS, CLUBE_FONTS, CLUBE_RADIUS } from '../styles/index.js';
 
 // ─── Bilingual content ──────────────────────────────────────────────────────────
 
@@ -362,7 +362,7 @@ export default function ComoFuncionaPage() {
               background: CLUBE_COLORS.ctaBg,
               color: CLUBE_COLORS.ctaText,
               border: 'none',
-              borderRadius: 8,
+              borderRadius: CLUBE_RADIUS.lg,
               padding: '11px 28px',
               fontSize: 14,
               fontWeight: 600,

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { CLUBE_COLORS, CLUBE_FONTS } from '../../styles/index.js';
+import { CLUBE_COLORS, CLUBE_FONTS, CLUBE_RADIUS } from '../../styles/index.js';
 
 const API = import.meta.env.VITE_API_URL || '';
 
@@ -162,7 +162,7 @@ export default function GestorEstatutoTab({ clube, getToken }) {
 
       {/* Active statute card */}
       {estatuto && !estatutoLoading && (
-        <div style={{ background: C.bgCard, border: `1px solid ${C.borderSubtle}`, borderRadius: 6, padding: 20 }}>
+        <div style={{ background: C.bgCard, border: `1px solid ${C.borderSubtle}`, borderRadius: CLUBE_RADIUS.md, padding: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
             <div>
               <div style={{ fontFamily: MONO, fontSize: 10, color: C.textDim, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 4 }}>
@@ -177,7 +177,7 @@ export default function GestorEstatutoTab({ clube, getToken }) {
               style={{
                 padding: '6px 14px', fontFamily: MONO, fontSize: 10,
                 background: 'transparent', border: `1px solid ${C.accent}`,
-                color: C.accent, borderRadius: 3, cursor: 'pointer', letterSpacing: '0.08em',
+                color: C.accent, borderRadius: CLUBE_RADIUS.xs, cursor: 'pointer', letterSpacing: '0.08em',
               }}
             >
               {showNewStatuteForm ? '× FECHAR' : '+ NOVA VERSÃO'}
@@ -206,7 +206,7 @@ export default function GestorEstatutoTab({ clube, getToken }) {
           </div>
 
           {estatuto.politica_investimento && (
-            <div style={{ marginTop: 16, padding: '12px 14px', background: C.bgCardElevated, borderRadius: 4 }}>
+            <div style={{ marginTop: 16, padding: '12px 14px', background: C.bgCardElevated, borderRadius: CLUBE_RADIUS.sm }}>
               <div style={{ fontFamily: MONO, fontSize: 10, color: C.textDim, marginBottom: 6 }}>POLÍTICA DE INVESTIMENTO</div>
               <div style={{ fontFamily: MONO, fontSize: 11, color: C.textMain, lineHeight: 1.6 }}>
                 {estatuto.politica_investimento}
@@ -234,7 +234,7 @@ export default function GestorEstatutoTab({ clube, getToken }) {
             style={{
               marginTop: 12, padding: '8px 20px', fontFamily: MONO, fontSize: 10,
               background: 'transparent', border: `1px solid ${C.accent}`,
-              color: C.accent, borderRadius: 3, cursor: 'pointer',
+              color: C.accent, borderRadius: CLUBE_RADIUS.xs, cursor: 'pointer',
             }}
           >
             + CRIAR ESTATUTO INICIAL
@@ -246,7 +246,7 @@ export default function GestorEstatutoTab({ clube, getToken }) {
       {showNewStatuteForm && (
         <div style={{
           background: C.bgCardElevated, border: `1px solid ${C.accent}40`,
-          borderRadius: 6, padding: 20,
+          borderRadius: CLUBE_RADIUS.md, padding: 20,
         }}>
           <div style={{ fontFamily: MONO, fontSize: 10, color: C.accent, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 16 }}>
             NOVA VERSÃO DO ESTATUTO
@@ -273,7 +273,7 @@ export default function GestorEstatutoTab({ clube, getToken }) {
                   style={{
                     width: '100%', boxSizing: 'border-box',
                     background: C.bgCard, border: `1px solid ${C.borderFaint}`,
-                    borderRadius: 3, color: C.textPrimary, fontFamily: MONO, fontSize: 11,
+                    borderRadius: CLUBE_RADIUS.xs, color: C.textPrimary, fontFamily: MONO, fontSize: 11,
                     padding: '7px 10px', outline: 'none',
                   }}
                 />
@@ -289,7 +289,7 @@ export default function GestorEstatutoTab({ clube, getToken }) {
                 onChange={e => setNewStatuteValues(prev => ({ ...prev, benchmark_performance: e.target.value }))}
                 style={{
                   width: '100%', background: C.bgCard, border: `1px solid ${C.borderFaint}`,
-                  borderRadius: 3, color: C.textPrimary, fontFamily: MONO, fontSize: 11,
+                  borderRadius: CLUBE_RADIUS.xs, color: C.textPrimary, fontFamily: MONO, fontSize: 11,
                   padding: '7px 10px', outline: 'none',
                 }}
               >
@@ -309,7 +309,7 @@ export default function GestorEstatutoTab({ clube, getToken }) {
                 onChange={e => setNewStatuteValues(prev => ({ ...prev, regime_tributario: e.target.value }))}
                 style={{
                   width: '100%', background: C.bgCard, border: `1px solid ${C.borderFaint}`,
-                  borderRadius: 3, color: C.textPrimary, fontFamily: MONO, fontSize: 11,
+                  borderRadius: CLUBE_RADIUS.xs, color: C.textPrimary, fontFamily: MONO, fontSize: 11,
                   padding: '7px 10px', outline: 'none',
                 }}
               >
@@ -349,7 +349,7 @@ export default function GestorEstatutoTab({ clube, getToken }) {
               style={{
                 width: '100%', boxSizing: 'border-box',
                 background: C.bgCard, border: `1px solid ${C.borderFaint}`,
-                borderRadius: 3, color: C.textPrimary, fontFamily: MONO, fontSize: 11,
+                borderRadius: CLUBE_RADIUS.xs, color: C.textPrimary, fontFamily: MONO, fontSize: 11,
                 padding: '8px 10px', outline: 'none', resize: 'vertical',
               }}
             />
@@ -367,7 +367,7 @@ export default function GestorEstatutoTab({ clube, getToken }) {
               style={{
                 width: '100%', boxSizing: 'border-box',
                 background: C.bgCard, border: `1px solid ${C.borderFaint}`,
-                borderRadius: 3, color: C.textPrimary, fontFamily: MONO, fontSize: 11,
+                borderRadius: CLUBE_RADIUS.xs, color: C.textPrimary, fontFamily: MONO, fontSize: 11,
                 padding: '7px 10px', outline: 'none',
               }}
             />
@@ -383,7 +383,7 @@ export default function GestorEstatutoTab({ clube, getToken }) {
               style={{
                 padding: '7px 18px', fontFamily: MONO, fontSize: 10,
                 background: 'transparent', border: `1px solid ${C.textDim}`,
-                color: C.textDim, borderRadius: 3, cursor: 'pointer', letterSpacing: '0.08em',
+                color: C.textDim, borderRadius: CLUBE_RADIUS.xs, cursor: 'pointer', letterSpacing: '0.08em',
               }}
             >CANCELAR</button>
             <button
@@ -392,7 +392,7 @@ export default function GestorEstatutoTab({ clube, getToken }) {
               style={{
                 padding: '7px 18px', fontFamily: MONO, fontSize: 10,
                 background: (!newStatuteValues.valid_from || statuteSubmitting) ? C.textDim : C.accent,
-                border: 'none', color: '#fff', borderRadius: 3,
+                border: 'none', color: '#fff', borderRadius: CLUBE_RADIUS.xs,
                 cursor: (!newStatuteValues.valid_from || statuteSubmitting) ? 'not-allowed' : 'pointer',
                 letterSpacing: '0.08em',
               }}
@@ -411,7 +411,7 @@ export default function GestorEstatutoTab({ clube, getToken }) {
             {estatutoHistory.map((ev, i) => (
               <div key={ev.id} style={{
                 background: C.bgCard, border: `1px solid ${i === 0 ? C.accent + '40' : C.borderFaint}`,
-                borderRadius: 4, padding: '10px 14px',
+                borderRadius: CLUBE_RADIUS.sm, padding: '10px 14px',
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               }}>
                 <div>
@@ -445,7 +445,7 @@ export default function GestorEstatutoTab({ clube, getToken }) {
             placeholder="Filtrar por ação ou tabela..."
             value={auditFilter}
             onChange={e => setAuditFilter(e.target.value)}
-            style={{ flex: 1, background: C.bgCard, border: `1px solid ${C.borderFaint}`, borderRadius: 3, color: C.textPrimary, fontFamily: MONO, fontSize: 10, padding: '4px 10px', outline: 'none' }}
+            style={{ flex: 1, background: C.bgCard, border: `1px solid ${C.borderFaint}`, borderRadius: CLUBE_RADIUS.xs, color: C.textPrimary, fontFamily: MONO, fontSize: 10, padding: '4px 10px', outline: 'none' }}
           />
         </div>
 

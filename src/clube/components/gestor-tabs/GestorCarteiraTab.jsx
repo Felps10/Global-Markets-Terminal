@@ -8,7 +8,7 @@ import {
   formatPct,
 } from '../../../services/portfolioEngine.js';
 
-import { CLUBE_COLORS, CLUBE_FONTS } from '../../styles/index.js';
+import { CLUBE_COLORS, CLUBE_FONTS, CLUBE_RADIUS } from '../../styles/index.js';
 
 const API = import.meta.env.VITE_API_URL || '';
 
@@ -150,7 +150,7 @@ export default function GestorCarteiraTab({ clube, posicoes: initialPosicoes, ge
 
       {/* Compliance banner */}
       <div style={{
-        padding: '14px 18px', borderRadius: 6,
+        padding: '14px 18px', borderRadius: CLUBE_RADIUS.md,
         background: compBannerBg,
         border: `1px solid ${compColor}`,
         fontFamily: MONO, fontSize: 12, color: compColor,
@@ -160,7 +160,7 @@ export default function GestorCarteiraTab({ clube, posicoes: initialPosicoes, ge
 
       {/* Position table */}
       <div style={{
-        background: C.bgCard, border: `1px solid ${C.borderSubtle}`, borderRadius: 6, overflow: 'hidden',
+        background: C.bgCard, border: `1px solid ${C.borderSubtle}`, borderRadius: CLUBE_RADIUS.md, overflow: 'hidden',
       }}>
         {/* Header bar with title + refresh button */}
         <div style={{
@@ -182,7 +182,7 @@ export default function GestorCarteiraTab({ clube, posicoes: initialPosicoes, ge
               background: 'transparent',
               border: `1px solid ${refreshing ? C.textDim : C.accent}`,
               color: refreshing ? C.textDim : C.accent,
-              borderRadius: 3,
+              borderRadius: CLUBE_RADIUS.xs,
               cursor: refreshing ? 'not-allowed' : 'pointer',
               letterSpacing: '0.08em',
               transition: 'border-color 0.15s, color 0.15s',
@@ -297,7 +297,7 @@ export default function GestorCarteiraTab({ clube, posicoes: initialPosicoes, ge
       {hasRole(user?.role, 'club_manager') && (
         <div style={{
           background: C.bgCard, border: `1px solid ${C.borderSubtle}`,
-          borderRadius: 6, padding: 16,
+          borderRadius: CLUBE_RADIUS.md, padding: 16,
         }}>
           <div style={{
             fontSize: 10, color: C.textDim, letterSpacing: '0.12em',
@@ -319,7 +319,7 @@ export default function GestorCarteiraTab({ clube, posicoes: initialPosicoes, ge
               <label style={{
                 padding: '6px 14px', fontFamily: MONO, fontSize: 10,
                 background: 'transparent', border: `1px solid ${C.textDim}`,
-                color: C.textMain, borderRadius: 3, cursor: 'pointer',
+                color: C.textMain, borderRadius: CLUBE_RADIUS.xs, cursor: 'pointer',
                 letterSpacing: '0.08em',
               }}>
                 ESCOLHER ARQUIVO
@@ -369,7 +369,7 @@ export default function GestorCarteiraTab({ clube, posicoes: initialPosicoes, ge
               </div>
               <div style={{
                 background: C.bgCardElevated, border: `1px solid ${C.borderFaint}`,
-                borderRadius: 4, maxHeight: 200, overflowY: 'auto', marginBottom: 12,
+                borderRadius: CLUBE_RADIUS.sm, maxHeight: 200, overflowY: 'auto', marginBottom: 12,
               }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 8, padding: '6px 12px', borderBottom: `1px solid ${C.borderFaint}` }}>
                   {['ASSET ID', 'PESO'].map(h => (
@@ -396,7 +396,7 @@ export default function GestorCarteiraTab({ clube, posicoes: initialPosicoes, ge
                   style={{
                     padding: '6px 16px', fontFamily: MONO, fontSize: 10,
                     background: 'transparent', border: `1px solid ${C.textDim}`,
-                    color: C.textDim, borderRadius: 3, cursor: 'pointer', letterSpacing: '0.08em',
+                    color: C.textDim, borderRadius: CLUBE_RADIUS.xs, cursor: 'pointer', letterSpacing: '0.08em',
                   }}
                 >CANCELAR</button>
                 <button
@@ -430,7 +430,7 @@ export default function GestorCarteiraTab({ clube, posicoes: initialPosicoes, ge
                   style={{
                     padding: '6px 16px', fontFamily: MONO, fontSize: 10,
                     background: csvImporting ? C.textDim : C.accent,
-                    border: 'none', color: '#fff', borderRadius: 3,
+                    border: 'none', color: '#fff', borderRadius: CLUBE_RADIUS.xs,
                     cursor: csvImporting ? 'not-allowed' : 'pointer',
                     letterSpacing: '0.08em',
                   }}
