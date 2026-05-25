@@ -41,7 +41,8 @@ export const CLUBE_FONTS = {
 
 export const CLUBE_RADIUS = {
   hairline: 1,
-  xs:       2,
+  xxs:      2,
+  xs:       3,
   sm:       4,
   md:       6,
   lg:       8,
