@@ -2,25 +2,26 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 import ClubeShell from '../components/clube/ClubeShell.jsx';
+import { CLUBE_COLORS, CLUBE_FONTS } from '../clube/styles/index.js';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
-// ── Colors ────────────────────────────────────────────────────────────────────
-const BG_PAGE  = '#080f1a';
-const BG_CELL  = '#0d1829';
-const BORDER   = 'rgba(255,255,255,0.06)';
-const TXT_1    = '#e2e8f0';
-const TXT_2    = '#94a3b8';
-const TXT_3    = '#475569';
-const GOLD     = '#C5A059';
-const ACCENT   = 'var(--c-accent)';
+const C        = CLUBE_COLORS;
+const BG_PAGE  = C.bg;
+const BG_CELL  = C.bgCard;
+const BORDER   = C.border;
+const TXT_1    = C.textPrimary;
+const TXT_2    = C.textMain;
+const TXT_3    = C.textDim;
+const GOLD     = C.goldMuted;
+const ACCENT   = C.accent;
 
-const MONO     = "'JetBrains Mono', monospace";
+const MONO     = CLUBE_FONTS.mono;
 const SANS     = "'DM Sans', 'IBM Plex Sans', sans-serif";
 
 const CATEGORY_COLORS = {
   assembleia:   '#3b82f6',
-  fechamento:   '#C5A059',
+  fechamento:   C.goldMuted,
   tributacao:   '#ef4444',
   movimentacao: '#00E676',
   nav:          '#6b7280',

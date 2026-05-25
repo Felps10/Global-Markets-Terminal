@@ -4,22 +4,24 @@ import { useAuth } from '../hooks/useAuth.js';
 import { calculateNAVFromHistory, formatCurrency, formatPct } from '../services/portfolioEngine.js';
 import ClubeShell from '../components/clube/ClubeShell.jsx';
 import NavChart from '../components/clube/NavChart.jsx';
+import { CLUBE_COLORS, CLUBE_FONTS } from '../clube/styles/index.js';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
-const BG_PAGE  = '#080f1a';
-const BG_CARD  = '#0d1829';
-const BORDER   = 'rgba(255,255,255,0.06)';
-const BORDER2  = 'rgba(51,65,85,0.5)';
-const TXT_1    = '#e2e8f0';
-const TXT_2    = '#94a3b8';
-const TXT_3    = '#475569';
-const ACCENT   = 'var(--c-accent)';
-const GREEN    = '#00E676';
-const RED      = 'var(--c-error)';
-const GOLD     = '#C5A059';
+const C        = CLUBE_COLORS;
+const BG_PAGE  = C.bg;
+const BG_CARD  = C.bgCard;
+const BORDER   = C.border;
+const BORDER2  = C.borderFaint;
+const TXT_1    = C.textPrimary;
+const TXT_2    = C.textMain;
+const TXT_3    = C.textDim;
+const ACCENT   = C.accent;
+const GREEN    = C.green;
+const RED      = C.red;
+const GOLD     = C.goldMuted;
 
-const MONO = "'JetBrains Mono', monospace";
+const MONO     = CLUBE_FONTS.mono;
 const SANS = "'DM Sans', 'IBM Plex Sans', sans-serif";
 
 const INPUT_STYLE = {
