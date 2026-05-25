@@ -15,6 +15,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.js';
+import { ROUTES } from '../../lib/routes.js';
 import { CLUBE_NAV, CLUBE_COLORS, CLUBE_FONTS, CLUBE_RADIUS } from '../styles/index.js';
 import { hasRole } from '../../lib/roles.js';
 
@@ -54,7 +55,7 @@ function injectClubeStyles() {
 
 // ─── Active state helper ───────────────────────────────────────────────────────
 function isNavActive(pathname, itemPath) {
-  if (itemPath === '/clube') return pathname === '/clube';
+  if (itemPath === ROUTES.clube.landing) return pathname === ROUTES.clube.landing;
   return pathname === itemPath || pathname.startsWith(itemPath + '/');
 }
 
@@ -98,7 +99,7 @@ function AuthButtons({ lang, onSignIn, onSignUp, user, isAuthenticated, style })
   if (isClubRole) {
     return (
       <button
-        onClick={() => navigate('/clubes')}
+        onClick={() => navigate(ROUTES.clube.list)}
         style={{
           background: CLUBE_COLORS.ctaBg,
           color: CLUBE_COLORS.ctaText,
@@ -178,8 +179,8 @@ export default function ClubeHeader({ lang = 'pt', onLangChange, onSignIn, onSig
   const { isAuthenticated, user } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const handleSignIn = onSignIn || (() => navigate('/login'));
-  const handleSignUp = onSignUp || (() => navigate('/register'));
+  const handleSignIn = onSignIn || (() => navigate(ROUTES.auth.login));
+  const handleSignUp = onSignUp || (() => navigate(ROUTES.auth.register));
 
   useEffect(() => { injectClubeStyles(); }, []);
 
@@ -210,7 +211,7 @@ export default function ClubeHeader({ lang = 'pt', onLangChange, onSignIn, onSig
       }}>
         {/* ── LEFT — Brand mark ── */}
         <div
-          onClick={() => navigate('/clube')}
+          onClick={() => navigate(ROUTES.clube.landing)}
           style={{
             width: 140,
             flexShrink: 0,

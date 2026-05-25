@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 import { hasRole } from '../lib/roles.js';
+import { ROUTES } from '../lib/routes.js';
 import CotistaFormModal  from '../components/clube/CotistaFormModal.jsx';
 import MovimentacaoModal from '../components/clube/MovimentacaoModal.jsx';
 import ClubeShell from '../components/clube/ClubeShell.jsx';
@@ -870,11 +871,11 @@ export default function ClubeMembroPage() {
                 Compartilhe com cotistas que ainda não têm conta GMT
               </div>
               <div style={{ fontFamily: MONO, fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>
-                {window.location.origin}/register
+                {window.location.origin}{ROUTES.auth.register}
               </div>
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(window.location.origin + '/register').then(() => {
+                  navigator.clipboard.writeText(window.location.origin + ROUTES.auth.register).then(() => {
                     setLinkCopied(true);
                     setTimeout(() => setLinkCopied(false), 2000);
                   });

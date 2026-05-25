@@ -22,6 +22,7 @@ import TickerStrip from './TickerStrip.jsx';
 import MarketsDropdown from './MarketsDropdown.jsx';
 import { useTaxonomy } from '../context/TaxonomyContext.jsx';
 import { CLUBE_COLORS } from '../clube/styles/index.js';
+import { ROUTES } from '../lib/routes.js';
 
 
 // ─── Inject nav + dropdown styles ─────────────────────────────────────────────
@@ -219,17 +220,17 @@ function UserDropdown({ user, onNav, onLogout, onClose }) {
         </div>
       </div>
       {user.role === 'admin' && (
-        <button className="gmt-dropdown-item" onClick={() => { onNav?.('/admin'); onClose(); }}>
+        <button className="gmt-dropdown-item" onClick={() => { onNav?.(ROUTES.admin); onClose(); }}>
           <span>⚙</span> Admin Panel
           <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', color: '#f59e0b', background: 'rgba(245,158,11,0.1)', padding: '1px 5px', borderRadius: 2 }}>
             ADMIN
           </span>
         </button>
       )}
-      <button className="gmt-dropdown-item" onClick={() => { onNav?.('/clubes'); onClose(); }}>
+      <button className="gmt-dropdown-item" onClick={() => { onNav?.(ROUTES.clube.list); onClose(); }}>
         <span>📊</span> Clube
       </button>
-      <button className="gmt-dropdown-item" onClick={() => { onNav?.('/app/settings'); onClose(); }}>
+      <button className="gmt-dropdown-item" onClick={() => { onNav?.(ROUTES.terminal.settings); onClose(); }}>
         <span>⚙</span> Settings
       </button>
       <div className="gmt-dropdown-divider" />
@@ -243,7 +244,7 @@ function UserDropdown({ user, onNav, onLogout, onClose }) {
 // ─── Mode indicator badge (read-only — switching is in the hamburger menu) ───
 function ModeBadge() {
   const location  = useLocation();
-  const isBrasil  = location.pathname.startsWith('/app/brasil');
+  const isBrasil  = location.pathname.startsWith(ROUTES.terminal.brasil);
   const accent    = isBrasil ? CLUBE_COLORS.accent : '#00E676';
   return (
     <div style={{
@@ -356,7 +357,7 @@ function TopBar({ user, onMenuOpen, onNav, onLogout, selectedMarketId, setSelect
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => navigate(ROUTES.auth.login)}
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -373,7 +374,7 @@ function TopBar({ user, onMenuOpen, onNav, onLogout, selectedMarketId, setSelect
               Entrar
             </button>
             <button
-              onClick={() => navigate('/register')}
+              onClick={() => navigate(ROUTES.auth.register)}
               style={{
                 background: 'rgba(255,255,255,0.06)',
                 border: '0.5px solid rgba(255,255,255,0.15)',
@@ -428,18 +429,18 @@ export default function GMTHeader({
   const location = useLocation();
   const pathname = location.pathname;
 
-  const isBrasilMode = pathname.startsWith('/app/brasil');
-  const isTerminalPage = pathname.startsWith('/app/global') || pathname.startsWith('/app/brasil');
+  const isBrasilMode = pathname.startsWith(ROUTES.terminal.brasil);
+  const isTerminalPage = pathname.startsWith(ROUTES.terminal.global) || pathname.startsWith(ROUTES.terminal.brasil);
 
   // Derive active page from pathname for nav bar highlighting
   const derivedActivePage = useMemo(() => {
-    if (pathname.startsWith('/app/global') || pathname.startsWith('/app/brasil')) return 'terminal';
+    if (pathname.startsWith(ROUTES.terminal.global) || pathname.startsWith(ROUTES.terminal.brasil)) return 'terminal';
     if (pathname.startsWith('/markets/')) return 'markets';
-    if (pathname.startsWith('/app/catalog')) return 'catalog';
-    if (pathname.startsWith('/app/news')) return 'news';
-    if (pathname.startsWith('/app/watchlist')) return 'watchlist';
-    if (pathname.startsWith('/app/alerts')) return 'alerts';
-    if (pathname.startsWith('/clube') || pathname.startsWith('/clubes')) return 'clube';
+    if (pathname.startsWith(ROUTES.terminal.catalog)) return 'catalog';
+    if (pathname.startsWith(ROUTES.terminal.news)) return 'news';
+    if (pathname.startsWith(ROUTES.terminal.watchlist)) return 'watchlist';
+    if (pathname.startsWith(ROUTES.terminal.alerts)) return 'alerts';
+    if (pathname.startsWith('/clube') || pathname.startsWith(ROUTES.clube.list)) return 'clube';
     return activePage;
   }, [pathname, activePage]);
 
@@ -523,7 +524,7 @@ export default function GMTHeader({
       ))}
       <button
         className={`gmt-nav-item${derivedActivePage === 'clube' ? ' active' : ''}`}
-        onClick={() => navigate('/clubes')}
+        onClick={() => navigate(ROUTES.clube.list)}
       >
         Clube
         {!user && (
@@ -647,8 +648,8 @@ export function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) {
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
   const isActive = (path) => location.pathname === path;
-  const handleSignIn = onSignIn || (() => navigate('/login'));
-  const handleSignUp = onSignUp || (() => navigate('/register'));
+  const handleSignIn = onSignIn || (() => navigate(ROUTES.auth.login));
+  const handleSignUp = onSignUp || (() => navigate(ROUTES.auth.register));
 
   return (
     <>

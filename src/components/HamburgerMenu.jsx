@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { CLUBE_COLORS } from '../clube/styles/index.js';
+import { ROUTES } from '../lib/routes.js';
 
 export default function HamburgerMenu({
   open,
@@ -52,14 +53,14 @@ export default function HamburgerMenu({
     );
   };
 
-  const dashboardPath = terminalMode === "brasil" ? "/app/brasil" : "/app/global";
+  const dashboardPath = terminalMode === "brasil" ? ROUTES.terminal.brasil : ROUTES.terminal.global;
 
   // ── Confirmation overlay ──────────────────────────────────────────────────
   const ConfirmDialog = () => {
     if (!confirmTarget) return null;
     const isBrasil = confirmTarget === "brasil";
     const accent = isBrasil ? CLUBE_COLORS.accent : "#00E676";
-    const targetPath = isBrasil ? "/app/brasil" : "/app/global";
+    const targetPath = isBrasil ? ROUTES.terminal.brasil : ROUTES.terminal.global;
     return (
       <div style={{
         position: "absolute", inset: 0, zIndex: 10,
@@ -137,8 +138,8 @@ export default function HamburgerMenu({
         <div style={{ padding: "16px 18px" }}>
           <SectionLabel>TERMINAL</SectionLabel>
           {[
-            { key: "global", label: "Global Terminal", icon: "🌐", accent: "#00E676", path: "/app/global" },
-            { key: "brasil", label: "Brasil Terminal", icon: "🇧🇷", accent: CLUBE_COLORS.accent, path: "/app/brasil" },
+            { key: "global", label: "Global Terminal", icon: "🌐", accent: "#00E676", path: ROUTES.terminal.global },
+            { key: "brasil", label: "Brasil Terminal", icon: "🇧🇷", accent: CLUBE_COLORS.accent, path: ROUTES.terminal.brasil },
           ].map(mode => {
             const active = terminalMode === mode.key;
             return (
@@ -170,10 +171,10 @@ export default function HamburgerMenu({
         <div style={{ padding: "16px 18px" }}>
           <SectionLabel>PAGES</SectionLabel>
           <NavItem icon="📊" label="Dashboard" path={dashboardPath} />
-          <NavItem icon="🔥" label="Heatmap" path="/markets/heatmap" />
-          <NavItem icon="📋" label="Catalog" path="/app/catalog" />
-          <NavItem icon="📰" label="News" path="/app/news" />
-          <NavItem icon="★"  label="Watchlist" path="/app/watchlist" />
+          <NavItem icon="🔥" label="Heatmap" path=ROUTES.markets.heatmap />
+          <NavItem icon="📋" label="Catalog" path=ROUTES.terminal.catalog />
+          <NavItem icon="📰" label="News" path=ROUTES.terminal.news />
+          <NavItem icon="★"  label="Watchlist" path=ROUTES.terminal.watchlist />
         </div>
 
         <Divider />
@@ -181,10 +182,10 @@ export default function HamburgerMenu({
         {/* Section 3 — Markets */}
         <div style={{ padding: "16px 18px" }}>
           <SectionLabel>MARKETS</SectionLabel>
-          <NavItem icon="📊" label="Chart & Research" path="/markets/research" accent="var(--c-accent)" />
-          <NavItem icon="📐" label="Fundamentals" path="/markets/fundamentals" accent="var(--c-accent)" />
-          <NavItem icon="🌍" label="Macro Hub" path="/markets/macro" accent="var(--c-accent)" />
-          <NavItem icon="⚡" label="Signals" path="/markets/signals" accent="var(--c-accent)" />
+          <NavItem icon="📊" label="Chart & Research" path=ROUTES.markets.research accent="var(--c-accent)" />
+          <NavItem icon="📐" label="Fundamentals" path=ROUTES.markets.fundamentals accent="var(--c-accent)" />
+          <NavItem icon="🌍" label="Macro Hub" path=ROUTES.markets.macro accent="var(--c-accent)" />
+          <NavItem icon="⚡" label="Signals" path=ROUTES.markets.signals accent="var(--c-accent)" />
         </div>
 
         <Divider />
@@ -192,7 +193,7 @@ export default function HamburgerMenu({
         {/* Section 4 — Clube */}
         <div style={{ padding: "16px 18px" }}>
           <SectionLabel>CLUBE</SectionLabel>
-          <NavItem icon="💼" label="Dashboard" path="/clubes" accent="#8b5cf6" />
+          <NavItem icon="💼" label="Dashboard" path=ROUTES.clube.list accent="#8b5cf6" />
         </div>
 
         {/* Section 5 — Admin (conditional) */}
@@ -201,7 +202,7 @@ export default function HamburgerMenu({
             <Divider />
             <div style={{ padding: "16px 18px" }}>
               <SectionLabel>ADMIN</SectionLabel>
-              <NavItem icon="⚙" label="Taxonomy" path="/admin" accent="#f59e0b" />
+              <NavItem icon="⚙" label="Taxonomy" path=ROUTES.admin accent="#f59e0b" />
             </div>
           </>
         )}
@@ -247,7 +248,7 @@ export default function HamburgerMenu({
             </div>
           )}
           <button
-            onClick={() => onNavigate("/app/settings")}
+            onClick={() => onNavigate(ROUTES.terminal.settings)}
             style={{
               display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
               fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, color: "var(--c-text-2)",

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import styled, { createGlobalStyle } from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
+import { ROUTES } from '../lib/routes.js';
 import TaxonomyManager from '../components/admin/TaxonomyManager.jsx';
 import UserManager     from '../components/admin/UserManager.jsx';
 
@@ -136,7 +137,7 @@ export default function AdminPanel() {
 
   function handleLogout() {
     logout();
-    navigate('/login', { replace: true });
+    navigate(ROUTES.auth.login, { replace: true });
   }
 
   return (

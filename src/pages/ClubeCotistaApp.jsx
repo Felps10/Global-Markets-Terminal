@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
+import { ROUTES } from '../lib/routes.js';
 import { CLUBE_COLORS, CLUBE_FONTS } from '../clube/styles/index.js';
 import { calculateNAVFromHistory } from '../services/portfolioEngine.js';
 import { signColor, fmtDate } from '../clube/utils/formatters.js';
@@ -109,7 +110,7 @@ export default function ClubeCotistaApp({ clube, navHistory, posicoes, cotistaDa
         borderBottom: `1px solid ${C.borderSubtle}`,
       }}>
         <Link
-          to="/app/global"
+          to={ROUTES.terminal.global}
           style={{
             fontFamily: MONO,
             fontSize: 10,

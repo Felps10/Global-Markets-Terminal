@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 import { usePreferences } from '../context/PreferencesContext.jsx';
+import { ROUTES } from '../lib/routes.js';
 
 const mono = "'JetBrains Mono', monospace";
 const sans = "'IBM Plex Sans', sans-serif";
@@ -215,7 +216,7 @@ export default function SettingsPage() {
       <SectionLabel>DATA</SectionLabel>
       <Row label="Quota Dashboard" description="Monitor API usage, rate limits, and health status across all data providers.">
         <button
-          onClick={() => navigate('/app/catalog')}
+          onClick={() => navigate(ROUTES.terminal.catalog)}
           style={{
             fontFamily: mono, fontSize: 11, fontWeight: 600, color: 'var(--c-text-2)',
             background: 'transparent', border: '1px solid var(--c-border)',

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/useAuth.js';
+import { ROUTES } from '../lib/routes.js';
 import { GMTHomepageHeader } from '../components/GMTHeader.jsx';
 import styled, { keyframes } from 'styled-components';
 
@@ -88,8 +89,8 @@ export default function TerminalProLandingPage() {
       <GMTHomepageHeader
         lang={lang}
         onLangChange={handleLangChange}
-        onSignIn={() => navigate('/login')}
-        onSignUp={() => navigate('/register')}
+        onSignIn={() => navigate(ROUTES.auth.login)}
+        onSignUp={() => navigate(ROUTES.auth.register)}
       />
 
       {/* ── Section 1: Hero ──────────────────────────────────────────── */}
@@ -127,7 +128,7 @@ export default function TerminalProLandingPage() {
           </p>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
             <button
-              onClick={() => navigate('/register')}
+              onClick={() => navigate(ROUTES.auth.register)}
               style={{
                 background: 'white', color: '#080f1a', border: 'none', borderRadius: 8,
                 padding: '11px 28px', fontSize: 14, fontWeight: 500, cursor: 'pointer',
@@ -139,7 +140,7 @@ export default function TerminalProLandingPage() {
               {t('terminal_pro.cta_register')}
             </button>
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => navigate(ROUTES.auth.login)}
               style={{
                 background: 'transparent', color: 'rgba(255,255,255,0.35)', border: 'none',
                 fontSize: 13, cursor: 'pointer', fontFamily: "'IBM Plex Sans', sans-serif",
@@ -279,7 +280,7 @@ export default function TerminalProLandingPage() {
           {t('terminal_pro.final_sub')}
         </p>
         <button
-          onClick={() => navigate('/register')}
+          onClick={() => navigate(ROUTES.auth.register)}
           style={{
             background: 'white', color: '#080f1a', border: 'none', borderRadius: 8,
             padding: '11px 28px', fontSize: 14, fontWeight: 500, cursor: 'pointer',

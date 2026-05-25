@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 import { useWatchlist } from '../context/WatchlistContext.jsx';
 import GMTHeader from './GMTHeader.jsx';
+import { ROUTES } from '../lib/routes.js';
 
 export default function MarketsPageLayout({ moduleTitle, moduleIcon, rightControls, children }) {
   const { user, logout } = useAuth();
@@ -23,7 +24,7 @@ export default function MarketsPageLayout({ moduleTitle, moduleIcon, rightContro
   const navigate = useNavigate();
 
   const handleNav = (pageKey) => {
-    if (pageKey === 'watchlist') { navigate('/app/watchlist'); return; }
+    if (pageKey === 'watchlist') { navigate(ROUTES.terminal.watchlist); return; }
     if (pageKey.startsWith('/')) { navigate(pageKey); return; }
     navigate('/app');
   };

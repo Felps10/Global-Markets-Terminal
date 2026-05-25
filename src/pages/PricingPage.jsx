@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ROUTES } from '../lib/routes.js';
 
 const MONTHLY_PRO = 499;
 const ANNUAL_PRO  = Math.round(MONTHLY_PRO * 0.8);
@@ -257,7 +258,7 @@ export default function PricingPage() {
                 ))}
 
                 <button
-                  onClick={() => navigate('/register')}
+                  onClick={() => navigate(ROUTES.auth.register)}
                   onMouseEnter={() => setFreeCTAHovered(true)}
                   onMouseLeave={() => setFreeCTAHovered(false)}
                   style={{
@@ -313,7 +314,7 @@ export default function PricingPage() {
                 ))}
 
                 <button
-                  onClick={() => navigate('/register')}
+                  onClick={() => navigate(ROUTES.auth.register)}
                   onMouseEnter={() => setProCTAHovered(true)}
                   onMouseLeave={() => setProCTAHovered(false)}
                   style={{
@@ -530,7 +531,7 @@ export default function PricingPage() {
 
             <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
               <button
-                onClick={() => navigate('/register')}
+                onClick={() => navigate(ROUTES.auth.register)}
                 onMouseEnter={() => setCtaHover(true)}
                 onMouseLeave={() => setCtaHover(false)}
                 style={{

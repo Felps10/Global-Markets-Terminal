@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 import { hasRole } from '../lib/roles.js';
+import { ROUTES } from '../lib/routes.js';
 import {
   calculateNAVFromHistory,
   calculateDrawdown,
@@ -521,7 +522,7 @@ Instruções:
       }}>
         <div style={{ fontSize: 12, color: RED }}>{error}</div>
         <button
-          onClick={() => navigate('/clubes')}
+          onClick={() => navigate(ROUTES.clube.list)}
           style={{
             padding: '8px 20px', background: 'transparent',
             border: `1px solid ${BORDER2}`, borderRadius: 4,
@@ -541,7 +542,7 @@ Instruções:
       }}>
         <div style={{ fontSize: 12, color: TXT_2 }}>Nenhum clube encontrado.</div>
         <button
-          onClick={() => navigate('/clubes')}
+          onClick={() => navigate(ROUTES.clube.list)}
           style={{
             padding: '8px 20px', background: 'transparent',
             border: `1px solid ${BORDER2}`, borderRadius: 4,
@@ -596,7 +597,7 @@ Instruções:
         {/* Left */}
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <button
-            onClick={() => navigate('/clubes')}
+            onClick={() => navigate(ROUTES.clube.list)}
             style={{
               background: BG_HEAD, border: 'none', cursor: 'pointer',
               color: TXT_2, fontSize: 18, padding: '8px 12px',

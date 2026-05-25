@@ -7,6 +7,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { ROUTES } from '../../lib/routes.js';
 import ClubeHeader from '../components/ClubeHeader.jsx';
 import ClubeFooter from '../components/ClubeFooter.jsx';
 import { CLUBE_COLORS, CLUBE_FONTS, CLUBE_RADIUS } from '../styles/index.js';
@@ -159,8 +160,8 @@ export default function ComoFuncionaPage() {
       <ClubeHeader
         lang={lang}
         onLangChange={handleLangChange}
-        onSignIn={() => navigate('/login')}
-        onSignUp={() => navigate('/register')}
+        onSignIn={() => navigate(ROUTES.auth.login)}
+        onSignUp={() => navigate(ROUTES.auth.register)}
       />
 
       {/* Spacer for fixed header */}
@@ -378,7 +379,7 @@ export default function ComoFuncionaPage() {
           </button>
           <div>
             <button
-              onClick={() => navigate('/clube/para-gestores')}
+              onClick={() => navigate(ROUTES.clube.paraGestores)}
               style={{
                 background: 'transparent',
                 border: 'none',

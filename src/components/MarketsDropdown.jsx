@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { ROUTES } from '../lib/routes.js';
 
 const STYLE_ID = 'gmt-markets-dropdown-styles';
 
@@ -31,35 +32,35 @@ const MARKETS_ITEMS = [
     icon: '📈',
     label: 'Chart Center',
     description: 'Interactive price charts & comparisons',
-    route: '/markets/chart',
+    route: ROUTES.markets.chart,
     requiresAuth: true,
   },
   {
     icon: '🔬',
     label: 'Research Terminal',
     description: 'Deep-dive asset research workspace',
-    route: '/markets/research',
+    route: ROUTES.markets.research,
     requiresAuth: true,
   },
   {
     icon: '📊',
     label: 'Fundamental Lab',
     description: 'Multi-asset valuation & metric comparison',
-    route: '/markets/fundamentals',
+    route: ROUTES.markets.fundamentals,
     requiresAuth: true,
   },
   {
     icon: '🌐',
     label: 'Macro Hub',
     description: 'Global macro dashboards & economic calendar',
-    route: '/markets/macro',
+    route: ROUTES.markets.macro,
     requiresAuth: true,
   },
   {
     icon: '⚡',
     label: 'Signal Engine',
     description: 'RSI, MACD & technical signal scanner',
-    route: '/markets/signals',
+    route: ROUTES.markets.signals,
     requiresAuth: true,
   },
 ];

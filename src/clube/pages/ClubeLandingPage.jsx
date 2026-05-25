@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth.js';
+import { ROUTES } from '../../lib/routes.js';
 import ClubeHeader from '../components/ClubeHeader.jsx';
 import ClubeFooter from '../components/ClubeFooter.jsx';
 import { CLUBE_COLORS, CLUBE_FONTS, CLUBE_RADIUS } from '../styles/index.js';
@@ -155,7 +156,7 @@ export default function ClubeLandingPage() {
     if (loading) return;
     const role = user?.role;
     if (hasRole(role, 'club_member')) {
-      navigate('/clubes', { replace: true });
+      navigate(ROUTES.clube.list, { replace: true });
     }
   }, [loading, user, navigate]);
 
@@ -175,8 +176,8 @@ export default function ClubeLandingPage() {
       <ClubeHeader
         lang={lang}
         onLangChange={handleLangChange}
-        onSignIn={() => navigate('/login')}
-        onSignUp={() => navigate('/register')}
+        onSignIn={() => navigate(ROUTES.auth.login)}
+        onSignUp={() => navigate(ROUTES.auth.register)}
       />
 
       {/* Spacer for fixed header */}
@@ -270,7 +271,7 @@ export default function ClubeLandingPage() {
                 {t('clube.cta_request')}
               </button>
               <button
-                onClick={() => navigate('/login')}
+                onClick={() => navigate(ROUTES.auth.login)}
                 style={{
                   background: 'transparent',
                   color: 'rgba(255,255,255,0.35)',

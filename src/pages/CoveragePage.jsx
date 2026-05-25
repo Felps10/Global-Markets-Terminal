@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ROUTES } from '../lib/routes.js';
 import { CLUBE_COLORS } from '../clube/styles/index.js';
 
 const GLOBAL_COVERAGE = [
@@ -487,7 +488,7 @@ export default function CoveragePage() {
               Free account. Instant access. All 269 assets from day one.
             </p>
             <button
-              onClick={() => navigate('/register')}
+              onClick={() => navigate(ROUTES.auth.register)}
               onMouseEnter={() => setCtaHover(true)}
               onMouseLeave={() => setCtaHover(false)}
               style={{
@@ -507,7 +508,7 @@ export default function CoveragePage() {
               Create Free Account
             </button>
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => navigate(ROUTES.auth.login)}
               onMouseEnter={() => setSignInHover(true)}
               onMouseLeave={() => setSignInHover(false)}
               style={{

@@ -9,6 +9,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { ROUTES } from '../../lib/routes.js';
 import ClubeHeader from '../components/ClubeHeader.jsx';
 import ClubeFooter from '../components/ClubeFooter.jsx';
 import { CLUBE_COLORS, CLUBE_FONTS, CLUBE_RADIUS } from '../styles/index.js';
@@ -213,8 +214,8 @@ export default function ContatoPage() {
       <ClubeHeader
         lang={lang}
         onLangChange={handleLangChange}
-        onSignIn={() => navigate('/login')}
-        onSignUp={() => navigate('/register')}
+        onSignIn={() => navigate(ROUTES.auth.login)}
+        onSignUp={() => navigate(ROUTES.auth.register)}
       />
 
       <div style={{ height: 56 }} />

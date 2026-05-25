@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ROUTES } from '../lib/routes.js';
 
 const FEATURES_FULL = [
   {
@@ -387,7 +388,7 @@ export default function FeaturesPage() {
               Free account. Instant access. No credit card.
             </p>
             <button
-              onClick={() => navigate('/register')}
+              onClick={() => navigate(ROUTES.auth.register)}
               onMouseEnter={() => setCtaHover(true)}
               onMouseLeave={() => setCtaHover(false)}
               style={{
@@ -407,7 +408,7 @@ export default function FeaturesPage() {
               Create Free Account
             </button>
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => navigate(ROUTES.auth.login)}
               onMouseEnter={() => setSignInHover(true)}
               onMouseLeave={() => setSignInHover(false)}
               style={{

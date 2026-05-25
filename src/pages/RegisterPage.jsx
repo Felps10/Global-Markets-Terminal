@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 import { hasRole } from '../lib/roles.js';
+import { ROUTES } from '../lib/routes.js';
 
 function getRedirectForRole(role) {
-  if (role === 'admin') return '/admin';
-  if (hasRole(role, 'club_member')) return '/clubes';
-  return '/app/global';
+  if (role === 'admin') return ROUTES.admin;
+  if (hasRole(role, 'club_member')) return ROUTES.clube.list;
+  return ROUTES.terminal.global;
 }
 
 // ── Password strength ───────────────────────────────────────────────────────
@@ -102,7 +103,7 @@ export default function RegisterPage() {
     try {
       const result = await register(name, email, password, confirmPassword);
       if (result.success) {
-        navigate('/app/global', { replace: true });
+        navigate(ROUTES.terminal.global, { replace: true });
       } else {
         const err = result.error;
         if (err?.error === 'EMAIL_TAKEN') {
@@ -484,7 +485,7 @@ export default function RegisterPage() {
             }}>
               Already have an account?{' '}
               <button
-                onClick={() => navigate('/login')}
+                onClick={() => navigate(ROUTES.auth.login)}
                 style={{
                   fontFamily: "'IBM Plex Sans', sans-serif",
                   fontSize: 12,
