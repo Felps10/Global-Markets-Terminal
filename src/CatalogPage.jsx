@@ -1388,7 +1388,7 @@ function QuotaDashboard() {
     }
     refreshAll();
     setConfirmReset(prev => ({ ...prev, [cardId]: true }));
-    setTimeout(() => setConfirmReset(prev => { const n = { ...prev }; delete n[cardId]; return n; }), 2000);
+    setTimeout(() => setConfirmReset(prev => { const n = { ...prev }; delete n[cardId]; return n; }), 2000); /* reset confirm timeout ms */
   }
 
   function handleResetAll() {

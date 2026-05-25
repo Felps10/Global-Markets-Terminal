@@ -14,7 +14,7 @@ export default function AlertToast({ alerts, onDismiss }) {
     const timer = setTimeout(() => {
       setVisible(prev => prev.slice(1));
       onDismiss?.();
-    }, 5000);
+    }, 5000); /* toast auto-dismiss ms */
     return () => clearTimeout(timer);
   }, [visible, onDismiss]);
 

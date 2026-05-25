@@ -119,7 +119,7 @@ export default function SettingsPage() {
     updatePrefs(partial);
     const key = Object.keys(partial)[0];
     setSavedKey(key);
-    setTimeout(() => setSavedKey((prev) => prev === key ? null : prev), 2000);
+    setTimeout(() => setSavedKey((prev) => prev === key ? null : prev), 2000); /* "Saved" feedback ms */
   }, [updatePrefs]);
 
   const SavedIndicator = ({ field }) => {

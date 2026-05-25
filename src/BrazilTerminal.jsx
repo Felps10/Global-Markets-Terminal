@@ -521,7 +521,7 @@ export default function BrazilTerminal() {
       }
     };
     fetchMacro();
-    const interval = setInterval(fetchMacro, 5 * 60 * 1000);
+    const interval = setInterval(fetchMacro, 5 * 60 * 1000); /* macro refresh: 5 min */
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
