@@ -1,6 +1,6 @@
 import { useLocation } from 'react-router-dom';
 import PublicFooter from './PublicFooter.jsx';
-import { GMTPublicHeader } from './GMTHeader.jsx';
+import GMTPublicHeader from './GMTPublicHeader.jsx';
 
 export default function PublicLayout({ children }) {
   const location = useLocation();
