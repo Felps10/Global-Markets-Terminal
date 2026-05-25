@@ -1,20 +1,22 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
+import { CLUBE_COLORS, CLUBE_FONTS } from '../../clube/styles/index.js';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
-const BG_CARD  = '#0d1824';
-const BG_CARD2 = '#0f1f2e';
-const BORDER   = 'rgba(30,41,59,0.8)';
-const BORDER2  = 'rgba(51,65,85,0.5)';
-const TXT_1    = '#e2e8f0';
-const TXT_2    = '#94a3b8';
-const TXT_3    = '#475569';
-const ACCENT   = 'var(--c-accent)';
-const GREEN    = '#00E676';
-const RED      = 'var(--c-error)';
-const AMBER    = '#fbbf24';
-const MONO     = "'JetBrains Mono', monospace";
+const C        = CLUBE_COLORS;
+const BG_CARD  = C.bgCard;
+const BG_CARD2 = C.bgCardElevated;
+const BORDER   = C.borderSubtle;
+const BORDER2  = C.borderFaint;
+const TXT_1    = C.textPrimary;
+const TXT_2    = C.textMain;
+const TXT_3    = C.textDim;
+const ACCENT   = C.accent;
+const GREEN    = C.green;
+const RED      = C.red;
+const AMBER    = C.amber;
+const MONO     = CLUBE_FONTS.mono;
 
 const LABEL = {
   display: 'block', color: TXT_3, fontSize: 10,

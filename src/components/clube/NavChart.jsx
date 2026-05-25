@@ -1,9 +1,12 @@
-const MONO   = "'JetBrains Mono', monospace";
-const TXT_2  = '#94a3b8';
-const TXT_3  = '#475569';
-const ACCENT = 'var(--c-accent)';
-const GREEN  = '#00E676';
-const AMBER  = '#fbbf24';
+import { CLUBE_COLORS, CLUBE_FONTS } from '../../clube/styles/index.js';
+
+const C      = CLUBE_COLORS;
+const MONO   = CLUBE_FONTS.mono;
+const TXT_2  = C.textMain;
+const TXT_3  = C.textDim;
+const ACCENT = C.accent;
+const GREEN  = C.green;
+const AMBER  = C.amber;
 
 export default function NavChart({ navSeries, ibovSeries, cdiSeries, inceptionNAV }) {
   if (!navSeries || navSeries.length < 2) {

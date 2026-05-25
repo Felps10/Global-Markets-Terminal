@@ -4,8 +4,9 @@ import { hasRole } from '../lib/roles.js';
 import { useClubeCore, useGestorData, useCotistaData } from '../hooks/useClube.js';
 import ClubeGestorApp from './ClubeGestorApp.jsx';
 import ClubeCotistaApp from './ClubeCotistaApp.jsx';
+import { CLUBE_FONTS } from '../clube/styles/index.js';
 
-const MONO = "'JetBrains Mono', monospace";
+const MONO = CLUBE_FONTS.mono;
 
 export default function ClubePage() {
   const { id: clubeIdParam } = useParams();

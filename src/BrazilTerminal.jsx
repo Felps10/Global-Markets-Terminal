@@ -9,8 +9,10 @@ import { fetchBrazilMacro } from "./services/brazilDataServices.js";
 import { usePreferences } from './context/PreferencesContext.jsx';
 import { BRAZIL_BLOCKS, getSectionById } from "./data/brazilBlocks.js";
 
+import { CLUBE_COLORS } from './clube/styles/index.js';
+
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
-const GOLD             = "#F9C300";
+const GOLD             = CLUBE_COLORS.accent;
 
 const B3_VOLATILITY = {
   "Bancos": 0.016, "Petróleo": 0.020, "Mineração": 0.020,

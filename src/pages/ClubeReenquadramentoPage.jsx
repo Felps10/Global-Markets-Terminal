@@ -9,16 +9,18 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 import ClubeShell from '../components/clube/ClubeShell.jsx';
+import { CLUBE_COLORS, CLUBE_FONTS } from '../clube/styles/index.js';
 
-const BG_CARD = '#0d1824';
-const BORDER = 'rgba(30,41,59,0.8)';
-const TXT_1 = '#e2e8f0';
-const TXT_3 = '#475569';
-const TXT_4 = '#334155';
-const MONO = "'JetBrains Mono', monospace";
-const GOLD = '#F9C300';
-const GREEN = '#00E676';
-const RED = 'var(--c-error)';
+const C       = CLUBE_COLORS;
+const BG_CARD = C.bgCard;
+const BORDER  = C.borderSubtle;
+const TXT_1   = C.textPrimary;
+const TXT_3   = C.textDim;
+const TXT_4   = C.textFaint;
+const MONO    = CLUBE_FONTS.mono;
+const GOLD    = C.accent;
+const GREEN   = C.green;
+const RED     = C.red;
 
 const STATUS_STYLES = {
   pendente:       { color: GOLD,  bg: 'rgba(249,195,0,0.08)',  border: 'rgba(249,195,0,0.25)' },

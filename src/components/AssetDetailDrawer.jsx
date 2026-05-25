@@ -22,17 +22,19 @@ import {
 } from '../dataServices.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useAlerts } from '../context/AlertsContext.jsx';
+import { CLUBE_COLORS } from '../clube/styles/index.js';
 
 // ─── Color tokens ─────────────────────────────────────────────────────────────
-const BG_DRAWER = '#0a1628';
-const BG_CARD   = '#0d1824';
-const BORDER    = 'rgba(30,41,59,0.8)';
-const TXT_1     = '#e2e8f0';
-const TXT_2     = '#94a3b8';
-const TXT_3     = '#475569';
-const ACCENT    = 'var(--c-accent)';
-const GREEN     = '#00E676';
-const RED       = 'var(--c-error)';
+const C          = CLUBE_COLORS;
+const BG_DRAWER  = C.bgHead;
+const BG_CARD    = C.bgCard;
+const BORDER     = C.borderSubtle;
+const TXT_1      = C.textPrimary;
+const TXT_2      = C.textMain;
+const TXT_3      = C.textDim;
+const ACCENT     = C.accent;
+const GREEN      = C.green;
+const RED        = C.red;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TIMEFRAMES   = ['1D', '5D', '1W', '1M', '3M', 'YTD', '1Y', '5Y', 'MAX'];

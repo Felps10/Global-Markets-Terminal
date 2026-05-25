@@ -7,19 +7,20 @@ import {
   fredReleaseDates,
   hasFredKey,
 } from '../../dataServices.js';
+import { CLUBE_COLORS } from '../../clube/styles/index.js';
 
-// ─── Colors ───────────────────────────────────────────────────────────────────
-const BORDER  = 'rgba(30,41,59,0.8)';
-const BORDER2 = 'rgba(51,65,85,0.5)';
-const BG_PAGE = '#080f1a';
-const BG_HEAD = '#0a1628';
-const BG_CARD = '#0d1824';
-const TXT_1   = '#e2e8f0';
-const TXT_2   = '#94a3b8';
-const TXT_3   = '#475569';
-const ACCENT  = 'var(--c-accent)';
-const GREEN   = '#00E676';
-const RED     = 'var(--c-error)';
+const C       = CLUBE_COLORS;
+const BORDER  = C.borderSubtle;
+const BORDER2 = C.borderFaint;
+const BG_PAGE = C.bg;
+const BG_HEAD = C.bgHead;
+const BG_CARD = C.bgCard;
+const TXT_1   = C.textPrimary;
+const TXT_2   = C.textMain;
+const TXT_3   = C.textDim;
+const ACCENT  = C.accent;
+const GREEN   = C.green;
+const RED     = C.red;
 const AMBER   = '#fbbf24';
 
 // ─── Module-level data cache (survives tab switches) ──────────────────────────
