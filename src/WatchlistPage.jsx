@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useWatchlist } from './context/WatchlistContext.jsx';
 import { useMarketData } from './context/MarketDataContext.jsx';
-import { STATIC_CATEGORIES, STATIC_ASSETS_MAP } from './GlobalMarketsTerminal.jsx';
+import { STATIC_CATEGORIES, STATIC_ASSETS_MAP } from './components/gmtConfig.js';
 import { ROUTES } from './lib/routes.js';
 
 // Simple price formatter — avoids importing the private formatPrice from GMT

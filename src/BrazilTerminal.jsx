@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   AssetCard, AssetRow, ListColumnHeader, Sparkline,
   formatPrice, formatVolume, formatMarketCap,
-  STATIC_ASSETS_MAP,
 } from "./GlobalMarketsTerminal.jsx";
+import { STATIC_ASSETS_MAP } from "./components/gmtConfig.js";
 import { fetchB3MarketData, bcbMacro, awesomeFx } from "./dataServices.js";
 import { fetchBrazilMacro } from "./services/brazilDataServices.js";
 import { usePreferences } from './context/PreferencesContext.jsx';
