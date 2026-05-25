@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { CLUBE_COLORS } from '../clube/styles/index.js';
 
 const GLOBAL_COVERAGE = [
   {
@@ -151,7 +152,7 @@ export default function CoveragePage() {
             <div style={{
               fontFamily: "'JetBrains Mono', monospace",
               fontSize: 10,
-              color: accentColor === '#F9C300'
+              color: accentColor === CLUBE_COLORS.accent
                 ? 'rgba(249,195,0,0.4)'
                 : 'rgba(59,130,246,0.4)',
               letterSpacing: '0.15em',
@@ -414,7 +415,7 @@ export default function CoveragePage() {
                 fontSize: 10,
                 fontWeight: 600,
                 letterSpacing: '0.25em',
-                color: '#F9C300',
+                color: CLUBE_COLORS.accent,
                 textTransform: 'uppercase',
                 marginBottom: 16,
               }}>
@@ -452,7 +453,7 @@ export default function CoveragePage() {
               overflow: 'hidden',
             }}>
               {BRAZIL_COVERAGE.map((item, i) =>
-                renderCard(item, i, hoveredBrazil, setHoveredBrazil, '#F9C300', '#040810')
+                renderCard(item, i, hoveredBrazil, setHoveredBrazil, CLUBE_COLORS.accent, '#040810')
               )}
             </div>
           </div>

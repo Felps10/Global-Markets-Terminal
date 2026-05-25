@@ -21,6 +21,7 @@ import MarketStatusPill, { MARKETS } from './MarketStatusPill.jsx';
 import TickerStrip from './TickerStrip.jsx';
 import MarketsDropdown from './MarketsDropdown.jsx';
 import { useTaxonomy } from '../context/TaxonomyContext.jsx';
+import { CLUBE_COLORS } from '../clube/styles/index.js';
 
 
 // ─── Inject nav + dropdown styles ─────────────────────────────────────────────
@@ -243,7 +244,7 @@ function UserDropdown({ user, onNav, onLogout, onClose }) {
 function ModeBadge() {
   const location  = useLocation();
   const isBrasil  = location.pathname.startsWith('/app/brasil');
-  const accent    = isBrasil ? '#F9C300' : '#00E676';
+  const accent    = isBrasil ? CLUBE_COLORS.accent : '#00E676';
   return (
     <div style={{
       display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -812,12 +813,12 @@ export function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) {
                 display: 'flex',
                 alignItems: 'center',
                 color: location.pathname.startsWith('/clube')
-                  ? '#F9C300'
+                  ? CLUBE_COLORS.accent
                   : 'rgba(249,195,0,0.55)',
                 transition: 'color 150ms',
                 letterSpacing: '0.01em',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = '#F9C300'; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = CLUBE_COLORS.accent; }}
               onMouseLeave={(e) => {
                 if (!location.pathname.startsWith('/clube')) {
                   e.currentTarget.style.color = 'rgba(249,195,0,0.55)';
@@ -1025,7 +1026,7 @@ export function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) {
               fontFamily: "'IBM Plex Sans', sans-serif",
               fontSize: 18,
               fontWeight: 600,
-              color: '#F9C300',
+              color: CLUBE_COLORS.accent,
               letterSpacing: '0.01em',
               padding: '4px 0',
             }}

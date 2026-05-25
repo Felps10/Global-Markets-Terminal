@@ -3,6 +3,7 @@ import styled, { keyframes } from 'styled-components';
 import { getUsers, deleteUser, patchUserRole, promoteToManager } from '../../services/userService.js';
 import { ROLE_LABEL, ADMIN_ASSIGNABLE_ROLES } from '../../lib/roles.js';
 import { useAuth } from '../../hooks/useAuth.js';
+import { CLUBE_COLORS } from '../../clube/styles/index.js';
 
 // ── Animations ─────────────────────────────────────────────────────────────────
 const fadeIn = keyframes`
@@ -71,8 +72,8 @@ const Td = styled.td`
 
 const ROLE_BADGE_STYLES = {
   admin:        { background: 'var(--c-accent)', color: '#fff' },
-  club_manager: { background: '#C5A059',         color: '#1a1a1a' },
-  club_member:  { background: 'rgba(197,160,89,0.3)', color: '#C5A059' },
+  club_manager: { background: CLUBE_COLORS.goldMuted,  color: '#1a1a1a' },
+  club_member:  { background: 'rgba(197,160,89,0.3)', color: CLUBE_COLORS.goldMuted },
   user:         { background: 'rgba(255,255,255,0.06)', color: 'var(--c-text-2)' },
 };
 

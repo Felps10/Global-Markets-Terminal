@@ -450,7 +450,7 @@ export default function ClubeMembroPage() {
 
   const shellPatrimonio = navLatest?.valor_cota != null ? totalCotas * navLatest.valor_cota : null;
 
-  const PIE_COLORS = ['#3b82f6', '#C5A059', '#00E676', '#ef4444', '#8b5cf6', '#f59e0b'];
+  const PIE_COLORS = ['#3b82f6', C.goldMuted, '#00E676', '#ef4444', '#8b5cf6', '#f59e0b'];
 
   const renderPieChart = () => {
     if (!perCotistaData.length) return null;
@@ -597,7 +597,7 @@ export default function ClubeMembroPage() {
                 color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em',
                 textTransform: 'uppercase', marginBottom: 8,
               }}>{label}</span>
-              <div style={{ fontFamily: MONO, fontSize: 24, color: '#C5A059' }}>{value}</div>
+              <div style={{ fontFamily: MONO, fontSize: 24, color: C.goldMuted }}>{value}</div>
             </div>
           ))}
         </div>
@@ -615,7 +615,7 @@ export default function ClubeMembroPage() {
           ].map(({ id, label }) => (
             <button key={id} onClick={() => setActiveView(id)} style={{
               display: 'inline-block', padding: '10px 20px', fontSize: 10, letterSpacing: '0.1em',
-              borderBottom: `2px solid ${activeView === id ? '#C5A059' : 'transparent'}`,
+              borderBottom: `2px solid ${activeView === id ? C.goldMuted : 'transparent'}`,
               borderTop: 'none', borderLeft: 'none', borderRight: 'none',
               background: 'transparent', cursor: 'pointer',
               color: activeView === id ? TXT_1 : TXT_3,
@@ -694,7 +694,7 @@ export default function ClubeMembroPage() {
                 <div style={{ fontSize: 10, fontFamily: MONO, color: TXT_2, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
                   Cotistas Ativos
                 </div>
-                <div style={{ fontSize: 24, fontFamily: MONO, color: '#C5A059' }}>
+                <div style={{ fontSize: 24, fontFamily: MONO, color: C.goldMuted }}>
                   {cotistasAtivos.length}
                 </div>
                 <div style={{ fontSize: 11, color: TXT_2, fontFamily: MONO, marginTop: 4 }}>
@@ -783,7 +783,7 @@ export default function ClubeMembroPage() {
                         <td style={{ ...TD, fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{c.email || '—'}</td>
                         <td style={{ ...TD, fontFamily: MONO }}>{cotas.toLocaleString('pt-BR', { maximumFractionDigits: 6 })}</td>
                         <td style={{ ...TD, fontFamily: MONO, fontSize: 11 }}>{c.data_entrada?.split('-').reverse().join('/')}</td>
-                        <td style={{ ...TD, fontFamily: MONO, color: '#C5A059' }}>
+                        <td style={{ ...TD, fontFamily: MONO, color: C.goldMuted }}>
                           {valorAtual != null ? valorAtual.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}
                         </td>
                         <td style={{ ...TD, textAlign: 'right', fontFamily: MONO, color: participacao > 40 ? '#ef4444' : 'inherit' }}>
@@ -801,15 +801,15 @@ export default function ClubeMembroPage() {
                   })}
                   {!cotistasSearch && (
                     <tr>
-                      <td style={{ ...TD, fontFamily: MONO, color: '#C5A059', borderTop: '1px solid rgba(255,255,255,0.08)' }}>Total</td>
+                      <td style={{ ...TD, fontFamily: MONO, color: C.goldMuted, borderTop: '1px solid rgba(255,255,255,0.08)' }}>Total</td>
                       <td style={TD}>—</td>
                       <td style={TD}>—</td>
-                      <td style={{ ...TD, fontFamily: MONO, color: '#C5A059' }}>{totalCotas.toLocaleString('pt-BR', { maximumFractionDigits: 6 })}</td>
+                      <td style={{ ...TD, fontFamily: MONO, color: C.goldMuted }}>{totalCotas.toLocaleString('pt-BR', { maximumFractionDigits: 6 })}</td>
                       <td style={TD}>—</td>
-                      <td style={{ ...TD, fontFamily: MONO, color: '#C5A059' }}>
+                      <td style={{ ...TD, fontFamily: MONO, color: C.goldMuted }}>
                         {navLatest?.valor_cota ? (totalCotas * navLatest.valor_cota).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}
                       </td>
-                      <td style={{ ...TD, textAlign: 'right', fontFamily: MONO, color: '#C5A059' }}>100%</td>
+                      <td style={{ ...TD, textAlign: 'right', fontFamily: MONO, color: C.goldMuted }}>100%</td>
                       <td style={TD}>—</td>
                     </tr>
                   )}
@@ -853,7 +853,7 @@ export default function ClubeMembroPage() {
                   fontSize: 9, fontFamily: MONO, letterSpacing: '0.06em',
                   padding: '2px 6px', borderRadius: 2,
                   background: m.role === 'club_manager' ? 'rgba(197,160,89,0.15)' : 'rgba(59,130,246,0.15)',
-                  color: m.role === 'club_manager' ? '#C5A059' : '#3b82f6',
+                  color: m.role === 'club_manager' ? C.goldMuted : '#3b82f6',
                   border: `1px solid ${m.role === 'club_manager' ? 'rgba(197,160,89,0.3)' : 'rgba(59,130,246,0.3)'}`,
                 }}>
                   {m.role === 'club_manager' ? 'MANAGER' : 'MEMBER'}
@@ -880,7 +880,7 @@ export default function ClubeMembroPage() {
                   });
                 }}
                 style={{
-                  background: linkCopied ? 'rgba(0,230,118,0.1)' : '#C5A059',
+                  background: linkCopied ? 'rgba(0,230,118,0.1)' : C.goldMuted,
                   color: linkCopied ? '#00E676' : '#000',
                   border: linkCopied ? '1px solid #00E676' : 'none',
                   borderRadius: 3, padding: '6px 14px',
@@ -1269,8 +1269,8 @@ export default function ClubeMembroPage() {
                   style={{
                     background: 'none', border: 'none', cursor: 'pointer', padding: '8px 16px',
                     fontFamily: MONO, fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase',
-                    color: analiseMode === mode ? '#C5A059' : 'rgba(255,255,255,0.4)',
-                    borderBottom: analiseMode === mode ? '2px solid #C5A059' : '2px solid transparent',
+                    color: analiseMode === mode ? C.goldMuted : 'rgba(255,255,255,0.4)',
+                    borderBottom: analiseMode === mode ? `2px solid ${C.goldMuted}` : '2px solid transparent',
                     marginBottom: -1,
                   }}>
                   {mode === 'individual' ? 'Individual' : 'Comparação'}
@@ -1294,10 +1294,10 @@ export default function ClubeMembroPage() {
                         style={{
                           background: analiseSelectedId === c.id ? 'rgba(197,160,89,0.1)' : 'transparent',
                           border: 'none',
-                          borderLeft: analiseSelectedId === c.id ? '2px solid #C5A059' : '2px solid transparent',
+                          borderLeft: analiseSelectedId === c.id ? `2px solid ${C.goldMuted}` : '2px solid transparent',
                           borderRadius: 3, cursor: 'pointer', padding: '8px 12px', textAlign: 'left', width: '100%',
                         }}>
-                        <div style={{ fontSize: 12, color: analiseSelectedId === c.id ? '#C5A059' : '#e2e8f0' }}>
+                        <div style={{ fontSize: 12, color: analiseSelectedId === c.id ? C.goldMuted : '#e2e8f0' }}>
                           {c.nome}
                         </div>
                         {cotistasRetornos[c.id] != null && (
@@ -1320,10 +1320,10 @@ export default function ClubeMembroPage() {
                         onClick={() => setAnaliseTimeWindow(w)}
                         style={{
                           background: analiseTimeWindow === w ? 'rgba(197,160,89,0.15)' : 'transparent',
-                          border: `1px solid ${analiseTimeWindow === w ? '#C5A059' : 'rgba(255,255,255,0.12)'}`,
+                          border: `1px solid ${analiseTimeWindow === w ? C.goldMuted : 'rgba(255,255,255,0.12)'}`,
                           borderRadius: 3, cursor: 'pointer', padding: '4px 10px',
                           fontFamily: MONO, fontSize: 10, letterSpacing: '0.06em',
-                          color: analiseTimeWindow === w ? '#C5A059' : 'rgba(255,255,255,0.4)',
+                          color: analiseTimeWindow === w ? C.goldMuted : 'rgba(255,255,255,0.4)',
                         }}>
                         {w}
                       </button>
@@ -1361,7 +1361,7 @@ export default function ClubeMembroPage() {
                         {/* COTAS ATUAIS */}
                         <div style={{ flex: 1, background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 6, padding: '16px 20px' }}>
                           <div style={{ fontSize: 10, fontFamily: MONO, color: TXT_2, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Cotas Atuais</div>
-                          <div style={{ fontSize: 24, fontFamily: MONO, color: '#C5A059' }}>
+                          <div style={{ fontSize: 24, fontFamily: MONO, color: C.goldMuted }}>
                             {analiseCotas.toLocaleString('pt-BR', { maximumFractionDigits: 6 })}
                           </div>
                         </div>
@@ -1484,7 +1484,7 @@ export default function ClubeMembroPage() {
                                 />
                                 <polyline
                                   points={cotasHistory.map((p, i) => `${toX(i).toFixed(1)},${toY(p.cotas).toFixed(1)}`).join(' ')}
-                                  fill="none" stroke="#C5A059" strokeWidth={1.5}
+                                  fill="none" stroke={C.goldMuted} strokeWidth={1.5}
                                 />
                                 <text x={PAD.l - 4} y={PAD.t + 4} textAnchor="end" fontSize={9} fontFamily={MONO} fill="rgba(255,255,255,0.3)">{maxV.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</text>
                                 <text x={PAD.l - 4} y={H - PAD.b} textAnchor="end" fontSize={9} fontFamily={MONO} fill="rgba(255,255,255,0.3)">0</text>
@@ -1525,7 +1525,7 @@ export default function ClubeMembroPage() {
                               <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" style={{ display: 'block' }}>
                                 <polyline
                                   points={patrimonioPts.map((v, i) => `${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ')}
-                                  fill="none" stroke="#C5A059" strokeWidth={1.5}
+                                  fill="none" stroke={C.goldMuted} strokeWidth={1.5}
                                 />
                                 <text x={PAD.l - 4} y={PAD.t + 4} textAnchor="end" fontSize={9} fontFamily={MONO} fill="rgba(255,255,255,0.3)">{(maxV / 1000).toFixed(0)}k</text>
                                 <text x={PAD.l - 4} y={H - PAD.b} textAnchor="end" fontSize={9} fontFamily={MONO} fill="rgba(255,255,255,0.3)">0</text>
@@ -1589,7 +1589,7 @@ export default function ClubeMembroPage() {
                                         <span style={{
                                           fontSize: 9, fontFamily: MONO, letterSpacing: '0.06em', padding: '2px 6px', borderRadius: 2,
                                           background: m.status === 'convertido' ? 'rgba(0,230,118,0.1)' : m.status === 'pendente' ? 'rgba(197,160,89,0.1)' : 'rgba(255,255,255,0.05)',
-                                          color: m.status === 'convertido' ? '#00E676' : m.status === 'pendente' ? '#C5A059' : TXT_2,
+                                          color: m.status === 'convertido' ? '#00E676' : m.status === 'pendente' ? C.goldMuted : TXT_2,
                                         }}>{m.status?.toUpperCase() ?? '—'}</span>
                                       </td>
                                     </tr>
@@ -1614,7 +1614,7 @@ export default function ClubeMembroPage() {
 
                 {/* COTISTA SEARCH SELECTOR */}
                 {(() => {
-                  const COLORS = ['#3b82f6', '#C5A059', '#00E676', '#ef4444', '#8b5cf6', '#f59e0b'];
+                  const COLORS = ['#3b82f6', C.goldMuted, '#00E676', '#ef4444', '#8b5cf6', '#f59e0b'];
                   return (
                     <div style={{ display: 'flex', gap: 16, marginBottom: 20, alignItems: 'flex-start' }}>
 
@@ -1692,7 +1692,7 @@ export default function ClubeMembroPage() {
                                     onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                                   >
                                     <span>{c.nome}</span>
-                                    {isSelected && <span style={{ fontSize: 9, fontFamily: MONO, color: '#C5A059', letterSpacing: '0.06em' }}>JÁ SELECIONADO</span>}
+                                    {isSelected && <span style={{ fontSize: 9, fontFamily: MONO, color: C.goldMuted, letterSpacing: '0.06em' }}>JÁ SELECIONADO</span>}
                                   </div>
                                 );
                               })}
@@ -1712,10 +1712,10 @@ export default function ClubeMembroPage() {
                       onClick={() => setAnaliseTimeWindow(w)}
                       style={{
                         background: analiseTimeWindow === w ? 'rgba(197,160,89,0.15)' : 'transparent',
-                        border: `1px solid ${analiseTimeWindow === w ? '#C5A059' : 'rgba(255,255,255,0.12)'}`,
+                        border: `1px solid ${analiseTimeWindow === w ? C.goldMuted : 'rgba(255,255,255,0.12)'}`,
                         borderRadius: 3, cursor: 'pointer', padding: '4px 10px',
                         fontFamily: MONO, fontSize: 10, letterSpacing: '0.06em',
-                        color: analiseTimeWindow === w ? '#C5A059' : 'rgba(255,255,255,0.4)',
+                        color: analiseTimeWindow === w ? C.goldMuted : 'rgba(255,255,255,0.4)',
                       }}>
                       {w}
                     </button>
@@ -1731,7 +1731,7 @@ export default function ClubeMembroPage() {
 
                 {/* CHARTS + TABLE */}
                 {comparacaoIds.length >= 2 && (() => {
-                  const COLORS = ['#3b82f6', '#C5A059', '#00E676', '#ef4444', '#8b5cf6', '#f59e0b'];
+                  const COLORS = ['#3b82f6', C.goldMuted, '#00E676', '#ef4444', '#8b5cf6', '#f59e0b'];
                   const W = 800, H = 180;
                   const PAD = { t: 16, r: 20, b: 28, l: 52 };
                   const cW = W - PAD.l - PAD.r;

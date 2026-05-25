@@ -85,12 +85,12 @@ function IndicatorCard({ symbol, name, value, date, unit, source, category, chan
   return (
     <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: "14px 16px", minWidth: 180, flex: 1 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700, color: "#F9C300", letterSpacing: "0.5px" }}>{symbol}</span>
+        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700, color: GOLD, letterSpacing: "0.5px" }}>{symbol}</span>
         <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, fontWeight: 700, letterSpacing: "0.5px", color: sc.color, background: sc.bg, border: `1px solid ${sc.border}`, borderRadius: 3, padding: "1px 6px" }}>{source}</span>
       </div>
       <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 11, color: "var(--c-text-3)", marginBottom: 8, lineHeight: 1.3 }}>{name}</div>
       {hasValue ? (
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 20, fontWeight: 700, color: "#F9C300", marginBottom: 4 }}>{fmtValue}</div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 20, fontWeight: 700, color: GOLD, marginBottom: 4 }}>{fmtValue}</div>
       ) : (
         <div style={{ width: 40, height: 20, borderRadius: 3, background: "rgba(249,195,0,0.15)", marginBottom: 4 }} className="gmt-blink" />
       )}
@@ -127,7 +127,7 @@ function MacroStrip({ macro, extended }) {
         background: "rgba(21,101,192,0.08)", border: "1px solid rgba(21,101,192,0.2)",
         borderRadius: 8, padding: "8px 14px", marginBottom: 16,
       }}>
-        <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#F5C518", animation: "pulse 1.2s ease-in-out infinite" }} />
+        <div style={{ width: 6, height: 6, borderRadius: "50%", background: GOLD, animation: "pulse 1.2s ease-in-out infinite" }} />
         <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)" }}>
           Loading macro data...
         </span>
@@ -157,7 +157,7 @@ function MacroStrip({ macro, extended }) {
       {items.map(it => (
         <span key={it.label} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)" }}>{it.label}:</span>
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 20, fontWeight: 600, color: it.value === "—" ? "var(--c-text-3)" : "#F5C518", fontVariantNumeric: "tabular-nums" }}>{it.value}</span>
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 20, fontWeight: 600, color: it.value === "—" ? "var(--c-text-3)" : GOLD, fontVariantNumeric: "tabular-nums" }}>{it.value}</span>
           {it.pct != null && (
             <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: it.pct >= 0 ? "#00E676" : "var(--c-error)" }}>
               {it.pct >= 0 ? "+" : ""}{it.pct.toFixed(2)}%
@@ -936,7 +936,7 @@ export default function BrazilTerminal() {
                 fontFamily: "'JetBrains Mono', monospace",
                 fontSize: 11,
                 fontWeight: 700,
-                color: "#F9C300",
+                color: GOLD,
                 letterSpacing: "0.5px",
               }}>
                 ⚠ BRAPI QUOTA ESGOTADA

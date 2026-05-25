@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { CLUBE_COLORS } from '../clube/styles/index.js';
 
 export default function HamburgerMenu({
   open,
@@ -57,7 +58,7 @@ export default function HamburgerMenu({
   const ConfirmDialog = () => {
     if (!confirmTarget) return null;
     const isBrasil = confirmTarget === "brasil";
-    const accent = isBrasil ? "#F9C300" : "#00E676";
+    const accent = isBrasil ? CLUBE_COLORS.accent : "#00E676";
     const targetPath = isBrasil ? "/app/brasil" : "/app/global";
     return (
       <div style={{
@@ -137,7 +138,7 @@ export default function HamburgerMenu({
           <SectionLabel>TERMINAL</SectionLabel>
           {[
             { key: "global", label: "Global Terminal", icon: "🌐", accent: "#00E676", path: "/app/global" },
-            { key: "brasil", label: "Brasil Terminal", icon: "🇧🇷", accent: "#F9C300", path: "/app/brasil" },
+            { key: "brasil", label: "Brasil Terminal", icon: "🇧🇷", accent: CLUBE_COLORS.accent, path: "/app/brasil" },
           ].map(mode => {
             const active = terminalMode === mode.key;
             return (
