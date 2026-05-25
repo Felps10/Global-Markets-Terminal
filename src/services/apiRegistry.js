@@ -125,6 +125,7 @@ export const API_REGISTRY = {
     proxyPath: "/proxy/finnhub",
     currentTier: "Free",
     limits: { perMinute: 60, perDay: null, perMonth: null },
+    throttleMs: 1000, // 60 req/min = 1 req/s
     costPerCall: null,
     upgradeUrl: "https://finnhub.io/pricing",
     notes:
@@ -426,6 +427,7 @@ export const API_REGISTRY = {
     proxyPath: "/proxy/fmp",
     currentTier: "Free",
     limits: { perMinute: null, perDay: 250, perMonth: null },
+    throttleMs: 1000, // free tier rate limit
     costPerCall: null,
     upgradeUrl: "https://site.financialmodelingprep.com/developer/docs/pricing",
     notes:

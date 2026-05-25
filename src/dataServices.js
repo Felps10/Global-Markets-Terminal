@@ -3,6 +3,7 @@
 // Each source has its own fetch helpers, rate-limit guards, and caching.
 
 import { apiClient, ApiHttpError } from './services/apiClient.js';
+import { getApiDef } from './services/apiRegistry.js';
 import { MINI_ASSETS, MINI_YAHOO_SYMBOLS, MINI_BRAPI_SYMBOLS, MINI_CRYPTO_SYMBOLS } from './data/miniAssets.js';
 
 // ─── API KEYS (from .env.local via Vite) ─────────────────────────────────────
@@ -79,7 +80,7 @@ function processFinnhubQueue() {
   setTimeout(() => {
     finnhubProcessing = false;
     processFinnhubQueue();
-  }, 1000);
+  }, getApiDef('finnhub').throttleMs);
 }
 
 function finnhubFetch(url) {
@@ -446,7 +447,7 @@ function processFmpQueue() {
     setTimeout(() => {
       fmpProcessing = false;
       processFmpQueue();
-    }, 1000); // 1s between requests = max 60/min, safe for any FMP plan tier
+    }, getApiDef('fmp').throttleMs);
   });
 }
 
@@ -593,9 +594,8 @@ export async function fmpBatchProfile(symbols) {
             description:   p.description?.slice(0, 200),
           };
         }
-        // 1s between symbols — stay within FMP burst limit
         if (sym !== symbols[symbols.length - 1]) {
-          await new Promise(r => setTimeout(r, 1000));
+          await new Promise(r => setTimeout(r, getApiDef('fmp').throttleMs));
         }
       }
       if (!Object.keys(result).length) throw new ApiHttpError(204, 'No usable batch profile data');
