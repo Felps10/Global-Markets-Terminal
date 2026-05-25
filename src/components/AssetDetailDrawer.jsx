@@ -510,15 +510,10 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
 
     let cancelled = false;
 
-    console.log('[AssetDetailDrawer] FMP key present:', hasFmpKey());
-    console.log('[AssetDetailDrawer] Fetching expand data for:', currentSymbol);
-
     if (isEquity && hasFmpKey()) {
       setLoadingFunds(true);
       Promise.allSettled([fmpProfile(currentSymbol), fmpRatios(currentSymbol)])
         .then(([prof, rat]) => {
-          console.log('[AssetDetailDrawer] fmpProfile result:', prof.status, prof.value ?? prof.reason);
-          console.log('[AssetDetailDrawer] fmpRatios result:', rat.status, rat.value ?? rat.reason);
           if (!cancelled) {
             if (prof.status === 'fulfilled') setProfileData(prof.value);
             if (rat.status  === 'fulfilled') setRatiosData(rat.value);

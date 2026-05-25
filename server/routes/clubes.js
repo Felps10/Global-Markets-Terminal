@@ -747,7 +747,7 @@ router.post('/:id/nav', authenticate, requireRole('club_manager'), async (req, r
       },
     });
   } catch (auditErr) {
-    console.error('[nav.registrar] audit write failed:', auditErr);
+    console.error('[nav.registrar] audit write failed:', auditErr.message);
   }
 
   res.status(201).json(data);
