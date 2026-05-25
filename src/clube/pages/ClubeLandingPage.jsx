@@ -537,7 +537,7 @@ export default function ClubeLandingPage() {
           </button>
           <div>
             <button
-              onClick={() => navigate('/terminal')}
+              onClick={() => navigate(ROUTES.public.terminal)}
               style={{
                 background: 'transparent',
                 border: 'none',
