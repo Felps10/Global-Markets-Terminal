@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/useAuth.js';
 import { ROUTES } from '../lib/routes.js';
-import { GMTHomepageHeader } from '../components/GMTHeader.jsx';
+import GMTHomepageHeader from '../components/GMTHomepageHeader.jsx';
 import styled, { keyframes } from 'styled-components';
 
 // ─── Decorative elements ─────────────────────────────────────────────────────
