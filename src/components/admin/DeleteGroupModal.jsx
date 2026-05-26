@@ -1,72 +1,61 @@
 import { useState } from 'react';
-import styled from 'styled-components';
 import { deleteGroup } from '../../services/taxonomyService.js';
 
-const Overlay = styled.div`
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.7);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 1000;
-`;
-const Modal = styled.div`
-  background: #0D1220;
-  border: 1px solid #1E2740;
-  border-radius: 8px;
-  width: 420px;
-  max-width: 95vw;
-  padding: 28px;
-`;
-const Title = styled.h2`
-  font-family: 'IBM Plex Sans', sans-serif;
-  font-size: 16px; font-weight: 700;
-  color: #E8EAF0; margin: 0 0 12px;
-`;
-const Body = styled.p`
-  font-family: 'Space Mono', monospace;
-  font-size: 12px; color: #8892A4;
-  line-height: 1.6; margin: 0 0 20px;
-`;
-const BlockedBox = styled.div`
-  background: rgba(255,82,82,0.06);
-  border: 1px solid rgba(255,82,82,0.25);
-  border-radius: 4px;
-  color: var(--c-error);
-  font-family: 'Space Mono', monospace;
-  font-size: 12px;
-  padding: 12px 14px;
-  margin-bottom: 20px;
-`;
-const ErrorMsg = styled.div`
-  background: rgba(255,82,82,0.08);
-  border: 1px solid rgba(255,82,82,0.3);
-  border-radius: 4px;
-  color: var(--c-error);
-  font-size: 12px;
-  padding: 10px 12px;
-  margin-bottom: 16px;
-  font-family: 'Space Mono', monospace;
-`;
-const Actions = styled.div`display: flex; justify-content: flex-end; gap: 10px;`;
-const Btn = styled.button`
-  border-radius: 4px;
-  font-family: 'Space Mono', monospace;
-  font-size: 11px; font-weight: 700;
-  letter-spacing: 0.08em;
-  padding: 9px 18px; cursor: pointer;
-  text-transform: uppercase;
-  transition: background 0.15s;
-`;
-const CancelBtn = styled(Btn)`
-  background: transparent; border: 1px solid #1E2740; color: #4A5568;
-  &:hover { border-color: #4A5568; color: #E8EAF0; }
-`;
-const DeleteBtn = styled(Btn)`
-  background: ${(p) => (p.disabled ? '#1E2740' : 'var(--c-error)')};
-  border: none;
-  color: ${(p) => (p.disabled ? '#4A5568' : '#fff')};
-  cursor: ${(p) => (p.disabled ? 'not-allowed' : 'pointer')};
-  &:hover:not(:disabled) { background: #FF6B6B; }
-`;
+const S = {
+  overlay: {
+    position: 'fixed', inset: 0,
+    background: 'rgba(0,0,0,0.7)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    zIndex: 1000,
+  },
+  modal: {
+    background: '#0D1220',
+    border: '1px solid #1E2740',
+    borderRadius: 8,
+    width: 420,
+    maxWidth: '95vw',
+    padding: 28,
+  },
+  title: {
+    fontFamily: "'IBM Plex Sans', sans-serif",
+    fontSize: 16, fontWeight: 700,
+    color: '#E8EAF0', margin: '0 0 12px',
+  },
+  body: {
+    fontFamily: "'Space Mono', monospace",
+    fontSize: 12, color: '#8892A4',
+    lineHeight: 1.6, margin: '0 0 20px',
+  },
+  blockedBox: {
+    background: 'rgba(255,82,82,0.06)',
+    border: '1px solid rgba(255,82,82,0.25)',
+    borderRadius: 4,
+    color: 'var(--c-error)',
+    fontFamily: "'Space Mono', monospace",
+    fontSize: 12,
+    padding: '12px 14px',
+    marginBottom: 20,
+  },
+  errorMsg: {
+    background: 'rgba(255,82,82,0.08)',
+    border: '1px solid rgba(255,82,82,0.3)',
+    borderRadius: 4, color: 'var(--c-error)',
+    fontSize: 12, padding: '10px 12px', marginBottom: 16,
+    fontFamily: "'Space Mono', monospace",
+  },
+  actions: {
+    display: 'flex', justifyContent: 'flex-end', gap: 10,
+  },
+  btn: {
+    borderRadius: 4, fontFamily: "'Space Mono', monospace",
+    fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+    padding: '9px 18px', cursor: 'pointer', textTransform: 'uppercase',
+    transition: 'background 0.15s',
+  },
+  cancelBtn: {
+    background: 'transparent', border: '1px solid #1E2740', color: '#4A5568',
+  },
+};
 
 export default function DeleteGroupModal({ group, onClose, onDeleted }) {
   const [error, setError] = useState('');
@@ -88,32 +77,51 @@ export default function DeleteGroupModal({ group, onClose, onDeleted }) {
     }
   }
 
+  const deleteDisabled = isBlocked || loading;
+
   return (
-    <Overlay onClick={onClose}>
-      <Modal onClick={(e) => e.stopPropagation()}>
-        <Title>Delete Group</Title>
+    <div style={S.overlay} onClick={onClose}>
+      <div style={S.modal} onClick={(e) => e.stopPropagation()}>
+        <h2 style={S.title}>Delete Group</h2>
 
         {isBlocked ? (
-          <BlockedBox>
+          <div style={S.blockedBox}>
             ⛔ <strong>{group.display_name}</strong> has {group.subgroup_count} subgroup(s).<br />
             Remove all subgroups before this group can be deleted.
-          </BlockedBox>
+          </div>
         ) : (
-          <Body>
+          <p style={S.body}>
             Permanently delete <strong style={{ color: '#E8EAF0' }}>{group.display_name}</strong>?<br />
             This action cannot be undone.
-          </Body>
+          </p>
         )}
 
-        {error && <ErrorMsg>⚠ {error}</ErrorMsg>}
+        {error && <div style={S.errorMsg}>⚠ {error}</div>}
 
-        <Actions>
-          <CancelBtn onClick={onClose}>Cancel</CancelBtn>
-          <DeleteBtn onClick={handleDelete} disabled={isBlocked || loading}>
+        <div style={S.actions}>
+          <button
+            style={{ ...S.btn, ...S.cancelBtn }}
+            onClick={onClose}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#4A5568'; e.currentTarget.style.color = '#E8EAF0'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = '#1E2740'; e.currentTarget.style.color = '#4A5568'; }}
+          >Cancel</button>
+          <button
+            style={{
+              ...S.btn,
+              background: deleteDisabled ? '#1E2740' : 'var(--c-error)',
+              border: 'none',
+              color: deleteDisabled ? '#4A5568' : '#fff',
+              cursor: deleteDisabled ? 'not-allowed' : 'pointer',
+            }}
+            onClick={handleDelete}
+            disabled={deleteDisabled}
+            onMouseEnter={e => { if (!deleteDisabled) e.currentTarget.style.background = '#FF6B6B'; }}
+            onMouseLeave={e => { if (!deleteDisabled) e.currentTarget.style.background = 'var(--c-error)'; }}
+          >
             {loading ? 'Deleting...' : 'Delete Group'}
-          </DeleteBtn>
-        </Actions>
-      </Modal>
-    </Overlay>
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

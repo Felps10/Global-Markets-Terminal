@@ -1,103 +1,101 @@
 import { useState } from 'react';
-import styled from 'styled-components';
 import { bulkRelocateAssets, deleteSubgroup } from '../../services/taxonomyService.js';
 
-const Overlay = styled.div`
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.7);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 1000;
-`;
-const Modal = styled.div`
-  background: #0D1220;
-  border: 1px solid #1E2740;
-  border-radius: 8px;
-  width: 540px;
-  max-width: 95vw;
-  padding: 28px;
-  max-height: 90vh;
-  overflow-y: auto;
-`;
-const Title = styled.h2`
-  font-family: 'IBM Plex Sans', sans-serif;
-  font-size: 16px; font-weight: 700;
-  color: #E8EAF0; margin: 0 0 10px;
-`;
-const Body = styled.p`
-  font-family: 'Space Mono', monospace;
-  font-size: 12px; color: #8892A4;
-  line-height: 1.6; margin: 0 0 20px;
-`;
-const SectionLabel = styled.div`
-  font-size: 10px; font-weight: 600; letter-spacing: 0.15em;
-  color: #4A5568; text-transform: uppercase; margin-bottom: 8px;
-`;
-const Select = styled.select`
-  width: 100%; background: #080C18;
-  border: 1px solid ${(p) => (p.$error ? 'var(--c-error)' : '#1E2740')};
-  border-radius: 4px; color: #E8EAF0;
-  font-family: 'Space Mono', monospace; font-size: 12px;
-  padding: 9px 12px; outline: none; box-sizing: border-box;
-  cursor: pointer; margin-bottom: 20px;
-  &:focus { border-color: var(--c-accent); }
-`;
-const AssetPreview = styled.div`
-  background: #080C18;
-  border: 1px solid #1E2740;
-  border-radius: 4px;
-  padding: 10px 12px;
-  margin-bottom: 20px;
-  max-height: 180px;
-  overflow-y: auto;
-`;
-const AssetRow = styled.div`
-  display: flex; align-items: center; gap: 10px;
-  padding: 4px 0;
-  border-bottom: 1px solid #0D1220;
-  &:last-child { border-bottom: none; }
-`;
-const AssetSymbol = styled.span`
-  font-family: 'Space Mono', monospace;
-  font-size: 11px; font-weight: 700;
-  color: var(--c-accent); min-width: 70px;
-`;
-const AssetName = styled.span`
-  font-family: 'Space Mono', monospace;
-  font-size: 11px; color: #8892A4;
-`;
-const AssetCount = styled.div`
-  font-size: 11px; color: #4A5568; margin-bottom: 8px;
-  font-family: 'Space Mono', monospace;
-`;
-const ErrorMsg = styled.div`
-  background: rgba(255,82,82,0.08);
-  border: 1px solid rgba(255,82,82,0.3);
-  border-radius: 4px; color: var(--c-error);
-  font-size: 12px; padding: 10px 12px; margin-bottom: 16px;
-  font-family: 'Space Mono', monospace;
-`;
-const Actions = styled.div`display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px;`;
-const Btn = styled.button`
-  border-radius: 4px;
-  font-family: 'Space Mono', monospace;
-  font-size: 11px; font-weight: 700;
-  letter-spacing: 0.08em;
-  padding: 9px 18px; cursor: pointer;
-  text-transform: uppercase;
-  transition: background 0.15s;
-`;
-const CancelBtn = styled(Btn)`
-  background: transparent; border: 1px solid #1E2740; color: #4A5568;
-  &:hover { border-color: #4A5568; color: #E8EAF0; }
-`;
-const ActionBtn = styled(Btn)`
-  background: ${(p) => (p.disabled ? '#1E2740' : 'var(--c-error)')};
-  border: none;
-  color: ${(p) => (p.disabled ? '#4A5568' : '#fff')};
-  cursor: ${(p) => (p.disabled ? 'not-allowed' : 'pointer')};
-  &:hover:not(:disabled) { background: #FF6B6B; }
-`;
-const OptGroup = styled.optgroup`color: #8892A4;`;
+const S = {
+  overlay: {
+    position: 'fixed', inset: 0,
+    background: 'rgba(0,0,0,0.7)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    zIndex: 1000,
+  },
+  modal: {
+    background: '#0D1220',
+    border: '1px solid #1E2740',
+    borderRadius: 8,
+    width: 540,
+    maxWidth: '95vw',
+    padding: 28,
+    maxHeight: '90vh',
+    overflowY: 'auto',
+  },
+  title: {
+    fontFamily: "'IBM Plex Sans', sans-serif",
+    fontSize: 16, fontWeight: 700,
+    color: '#E8EAF0', margin: '0 0 10px',
+  },
+  body: {
+    fontFamily: "'Space Mono', monospace",
+    fontSize: 12, color: '#8892A4',
+    lineHeight: 1.6, margin: '0 0 20px',
+  },
+  sectionLabel: {
+    fontSize: 10, fontWeight: 600, letterSpacing: '0.15em',
+    color: '#4A5568', textTransform: 'uppercase', marginBottom: 8,
+  },
+  select: {
+    width: '100%', background: '#080C18',
+    border: '1px solid #1E2740',
+    borderRadius: 4, color: '#E8EAF0',
+    fontFamily: "'Space Mono', monospace", fontSize: 12,
+    padding: '9px 12px', outline: 'none', boxSizing: 'border-box',
+    cursor: 'pointer', marginBottom: 20,
+  },
+  selectError: {
+    border: '1px solid var(--c-error)',
+  },
+  assetPreview: {
+    background: '#080C18',
+    border: '1px solid #1E2740',
+    borderRadius: 4,
+    padding: '10px 12px',
+    marginBottom: 20,
+    maxHeight: 180,
+    overflowY: 'auto',
+  },
+  assetRow: {
+    display: 'flex', alignItems: 'center', gap: 10,
+    padding: '4px 0',
+    borderBottom: '1px solid #0D1220',
+  },
+  assetRowLast: {
+    display: 'flex', alignItems: 'center', gap: 10,
+    padding: '4px 0',
+    borderBottom: 'none',
+  },
+  assetSymbol: {
+    fontFamily: "'Space Mono', monospace",
+    fontSize: 11, fontWeight: 700,
+    color: 'var(--c-accent)', minWidth: 70,
+  },
+  assetName: {
+    fontFamily: "'Space Mono', monospace",
+    fontSize: 11, color: '#8892A4',
+  },
+  assetCount: {
+    fontSize: 11, color: '#4A5568', marginBottom: 8,
+    fontFamily: "'Space Mono', monospace",
+  },
+  errorMsg: {
+    background: 'rgba(255,82,82,0.08)',
+    border: '1px solid rgba(255,82,82,0.3)',
+    borderRadius: 4, color: 'var(--c-error)',
+    fontSize: 12, padding: '10px 12px', marginBottom: 16,
+    fontFamily: "'Space Mono', monospace",
+  },
+  actions: {
+    display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8,
+  },
+  btn: {
+    borderRadius: 4, fontFamily: "'Space Mono', monospace",
+    fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+    padding: '9px 18px', cursor: 'pointer', textTransform: 'uppercase',
+    transition: 'background 0.15s',
+  },
+  cancelBtn: {
+    background: 'transparent', border: '1px solid #1E2740', color: '#4A5568',
+  },
+  optGroup: { color: '#8892A4' },
+};
 
 export default function DeleteSubgroupModal({ subgroup, assets = [], allSubgroups = [], onClose, onDeleted }) {
   const hasAssets             = assets.length > 0;
@@ -136,75 +134,119 @@ export default function DeleteSubgroupModal({ subgroup, assets = [], allSubgroup
     }
   }
 
+  const actionDisabledRelocate = loading || !targetId;
+  const actionDisabledDelete = loading;
+
   return (
-    <Overlay onClick={onClose}>
-      <Modal onClick={(e) => e.stopPropagation()}>
+    <div style={S.overlay} onClick={onClose}>
+      <style>{`
+        .admin-modal input:focus, .admin-modal select:focus, .admin-modal textarea:focus {
+          outline: none;
+          border-color: var(--c-accent);
+        }
+        .admin-modal input.field-error:focus, .admin-modal select.field-error:focus, .admin-modal textarea.field-error:focus {
+          border-color: var(--c-error);
+        }
+      `}</style>
+      <div className="admin-modal" style={S.modal} onClick={(e) => e.stopPropagation()}>
         {hasAssets ? (
           <>
-            <Title>Relocate Assets Before Deleting</Title>
-            <Body>
+            <h2 style={S.title}>Relocate Assets Before Deleting</h2>
+            <p style={S.body}>
               <strong style={{ color: '#E8EAF0' }}>{subgroup.display_name}</strong> contains {assets.length} asset(s).
               Choose a destination subgroup before this subgroup can be deleted.
-            </Body>
+            </p>
 
-            <SectionLabel>Assets to be moved</SectionLabel>
-            <AssetCount>{assets.length} asset{assets.length !== 1 ? 's' : ''}</AssetCount>
-            <AssetPreview>
-              {assets.map((a) => (
-                <AssetRow key={a.id}>
-                  <AssetSymbol>{a.symbol}</AssetSymbol>
-                  <AssetName>{a.name}</AssetName>
-                </AssetRow>
+            <div style={S.sectionLabel}>Assets to be moved</div>
+            <div style={S.assetCount}>{assets.length} asset{assets.length !== 1 ? 's' : ''}</div>
+            <div style={S.assetPreview}>
+              {assets.map((a, i) => (
+                <div key={a.id} style={i === assets.length - 1 ? S.assetRowLast : S.assetRow}>
+                  <span style={S.assetSymbol}>{a.symbol}</span>
+                  <span style={S.assetName}>{a.name}</span>
+                </div>
               ))}
-            </AssetPreview>
+            </div>
 
-            <SectionLabel>Move all assets to...</SectionLabel>
-            <Select
+            <div style={S.sectionLabel}>Move all assets to...</div>
+            <select
+              style={(!targetId && !!error) ? { ...S.select, ...S.selectError } : S.select}
+              className={(!targetId && !!error) ? 'field-error' : ''}
               value={targetId}
               onChange={(e) => setTargetId(e.target.value)}
-              $error={!targetId && !!error}
             >
               <option value="">— Select destination subgroup —</option>
               {Object.entries(byGroup).map(([groupLabel, subs]) => (
-                <OptGroup key={groupLabel} label={groupLabel}>
+                <optgroup key={groupLabel} label={groupLabel} style={S.optGroup}>
                   {subs.map((s) => (
                     <option key={s.id} value={s.id}>{s.display_name}</option>
                   ))}
-                </OptGroup>
+                </optgroup>
               ))}
-            </Select>
+            </select>
 
-            {error && <ErrorMsg>⚠ {error}</ErrorMsg>}
+            {error && <div style={S.errorMsg}>⚠ {error}</div>}
 
-            <Actions>
-              <CancelBtn onClick={onClose}>Cancel</CancelBtn>
-              <ActionBtn
+            <div style={S.actions}>
+              <button
+                style={{ ...S.btn, ...S.cancelBtn }}
+                onClick={onClose}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#4A5568'; e.currentTarget.style.color = '#E8EAF0'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = '#1E2740'; e.currentTarget.style.color = '#4A5568'; }}
+              >Cancel</button>
+              <button
+                style={{
+                  ...S.btn,
+                  background: actionDisabledRelocate ? '#1E2740' : 'var(--c-error)',
+                  border: 'none',
+                  color: actionDisabledRelocate ? '#4A5568' : '#fff',
+                  cursor: actionDisabledRelocate ? 'not-allowed' : 'pointer',
+                }}
                 onClick={handleConfirm}
-                disabled={loading || !targetId}
+                disabled={actionDisabledRelocate}
+                onMouseEnter={e => { if (!actionDisabledRelocate) e.currentTarget.style.background = '#FF6B6B'; }}
+                onMouseLeave={e => { if (!actionDisabledRelocate) e.currentTarget.style.background = 'var(--c-error)'; }}
               >
                 {loading ? 'Processing...' : `Relocate & Delete`}
-              </ActionBtn>
-            </Actions>
+              </button>
+            </div>
           </>
         ) : (
           <>
-            <Title>Delete Subgroup</Title>
-            <Body>
+            <h2 style={S.title}>Delete Subgroup</h2>
+            <p style={S.body}>
               Permanently delete <strong style={{ color: '#E8EAF0' }}>{subgroup.display_name}</strong>?<br />
               This subgroup has no assets. This action cannot be undone.
-            </Body>
+            </p>
 
-            {error && <ErrorMsg>⚠ {error}</ErrorMsg>}
+            {error && <div style={S.errorMsg}>⚠ {error}</div>}
 
-            <Actions>
-              <CancelBtn onClick={onClose}>Cancel</CancelBtn>
-              <ActionBtn onClick={handleConfirm} disabled={loading}>
+            <div style={S.actions}>
+              <button
+                style={{ ...S.btn, ...S.cancelBtn }}
+                onClick={onClose}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#4A5568'; e.currentTarget.style.color = '#E8EAF0'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = '#1E2740'; e.currentTarget.style.color = '#4A5568'; }}
+              >Cancel</button>
+              <button
+                style={{
+                  ...S.btn,
+                  background: actionDisabledDelete ? '#1E2740' : 'var(--c-error)',
+                  border: 'none',
+                  color: actionDisabledDelete ? '#4A5568' : '#fff',
+                  cursor: actionDisabledDelete ? 'not-allowed' : 'pointer',
+                }}
+                onClick={handleConfirm}
+                disabled={actionDisabledDelete}
+                onMouseEnter={e => { if (!actionDisabledDelete) e.currentTarget.style.background = '#FF6B6B'; }}
+                onMouseLeave={e => { if (!actionDisabledDelete) e.currentTarget.style.background = 'var(--c-error)'; }}
+              >
                 {loading ? 'Deleting...' : 'Delete Subgroup'}
-              </ActionBtn>
-            </Actions>
+              </button>
+            </div>
           </>
         )}
-      </Modal>
-    </Overlay>
+      </div>
+    </div>
   );
 }

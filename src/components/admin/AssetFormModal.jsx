@@ -1,114 +1,5 @@
 import { useState, useEffect } from 'react';
-import styled from 'styled-components';
 import { createAsset, updateAsset, deleteAsset } from '../../services/taxonomyService.js';
-
-const Overlay = styled.div`
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.7);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 1000;
-`;
-const Modal = styled.div`
-  background: #0D1220;
-  border: 1px solid #1E2740;
-  border-radius: 8px;
-  width: 540px;
-  max-width: 95vw;
-  max-height: 92vh;
-  overflow-y: auto;
-  padding: 28px;
-  font-family: 'Space Mono', monospace;
-  &::-webkit-scrollbar { width: 4px; }
-  &::-webkit-scrollbar-track { background: transparent; }
-  &::-webkit-scrollbar-thumb { background: #1E2740; border-radius: 2px; }
-`;
-const ModalTitle = styled.h2`
-  font-family: 'IBM Plex Sans', sans-serif;
-  font-size: 16px; font-weight: 700;
-  color: #E8EAF0; margin: 0 0 24px;
-`;
-const Field    = styled.div`margin-bottom: 16px;`;
-const Label    = styled.label`
-  display: block; font-size: 10px; font-weight: 600;
-  letter-spacing: 0.15em; color: #4A5568;
-  text-transform: uppercase; margin-bottom: 6px;
-`;
-const Input    = styled.input`
-  width: 100%; background: #080C18;
-  border: 1px solid ${(p) => (p.$error ? 'var(--c-error)' : '#1E2740')};
-  border-radius: 4px; color: #E8EAF0;
-  font-family: 'Space Mono', monospace; font-size: 13px;
-  padding: 9px 12px; outline: none; box-sizing: border-box;
-  &:focus { border-color: ${(p) => (p.$error ? 'var(--c-error)' : 'var(--c-accent)')}; }
-`;
-const Select   = styled.select`
-  width: 100%; background: #080C18;
-  border: 1px solid ${(p) => (p.$error ? 'var(--c-error)' : '#1E2740')};
-  border-radius: 4px; color: #E8EAF0;
-  font-family: 'Space Mono', monospace; font-size: 13px;
-  padding: 9px 12px; outline: none; box-sizing: border-box;
-  cursor: pointer;
-  &:focus { border-color: ${(p) => (p.$error ? 'var(--c-error)' : 'var(--c-accent)')}; }
-`;
-const Textarea = styled.textarea`
-  width: 100%; background: #080C18;
-  border: 1px solid ${(p) => (p.$error ? 'var(--c-error)' : '#1E2740')};
-  border-radius: 4px; color: #E8EAF0;
-  font-family: 'Space Mono', monospace; font-size: 12px;
-  padding: 9px 12px; outline: none; resize: vertical;
-  min-height: 80px; box-sizing: border-box;
-  &:focus { border-color: ${(p) => (p.$error ? 'var(--c-error)' : 'var(--c-accent)')}; }
-`;
-const FieldError = styled.div`font-size: 11px; color: var(--c-error); margin-top: 4px;`;
-const Row2 = styled.div`
-  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
-`;
-const ErrorMsg = styled.div`
-  background: rgba(255,82,82,0.08);
-  border: 1px solid rgba(255,82,82,0.3);
-  border-radius: 4px; color: var(--c-error);
-  font-size: 12px; padding: 10px 12px; margin-bottom: 18px;
-`;
-const ConfirmText = styled.p`
-  color: #8892A4; font-size: 13px; line-height: 1.6; margin-bottom: 24px;
-  span { color: var(--c-error); font-weight: 700; }
-`;
-const Actions = styled.div`
-  display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px;
-`;
-const ActionsWithDelete = styled(Actions)`
-  justify-content: space-between;
-`;
-const Btn = styled.button`
-  border-radius: 4px; font-family: 'Space Mono', monospace;
-  font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
-  padding: 9px 18px; cursor: pointer; text-transform: uppercase;
-  transition: background 0.15s;
-`;
-const CancelBtn = styled(Btn)`
-  background: transparent; border: 1px solid #1E2740; color: #4A5568;
-  &:hover { border-color: #4A5568; color: #E8EAF0; }
-`;
-const SaveBtn = styled(Btn)`
-  background: ${(p) => (p.disabled ? '#1E2740' : 'var(--c-accent)')};
-  border: 1px solid transparent;
-  color: ${(p) => (p.disabled ? '#4A5568' : '#080C18')};
-  cursor: ${(p) => (p.disabled ? 'not-allowed' : 'pointer')};
-  &:hover:not(:disabled) { background: #26C6DA; }
-`;
-const DeleteBtn = styled(Btn)`
-  background: transparent;
-  border: 1px solid rgba(255,82,82,0.35);
-  color: var(--c-error);
-  &:hover { background: rgba(255,82,82,0.12); border-color: var(--c-error); }
-`;
-const DeleteConfirmBtn = styled(Btn)`
-  background: ${(p) => (p.disabled ? '#1E2740' : 'var(--c-error)')};
-  border: none;
-  color: ${(p) => (p.disabled ? '#4A5568' : '#fff')};
-  cursor: ${(p) => (p.disabled ? 'not-allowed' : 'pointer')};
-  &:hover:not(:disabled) { background: #FF6B6B; }
-`;
 
 const ASSET_TYPES = [
   { value: 'equity',          label: 'Equity' },
@@ -141,6 +32,107 @@ function suggestCurrency(exchange) {
   if (ex) return 'USD';
   return '';
 }
+
+const S = {
+  overlay: {
+    position: 'fixed', inset: 0,
+    background: 'rgba(0,0,0,0.7)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    zIndex: 1000,
+  },
+  modal: {
+    background: '#0D1220',
+    border: '1px solid #1E2740',
+    borderRadius: 8,
+    width: 540,
+    maxWidth: '95vw',
+    maxHeight: '92vh',
+    overflowY: 'auto',
+    padding: 28,
+    fontFamily: "'Space Mono', monospace",
+  },
+  title: {
+    fontFamily: "'IBM Plex Sans', sans-serif",
+    fontSize: 16, fontWeight: 700,
+    color: '#E8EAF0', margin: '0 0 24px',
+  },
+  field: { marginBottom: 16 },
+  label: {
+    display: 'block', fontSize: 10, fontWeight: 600,
+    letterSpacing: '0.15em', color: '#4A5568',
+    textTransform: 'uppercase', marginBottom: 6,
+  },
+  input: {
+    width: '100%', background: '#080C18',
+    border: '1px solid #1E2740',
+    borderRadius: 4, color: '#E8EAF0',
+    fontFamily: "'Space Mono', monospace", fontSize: 13,
+    padding: '9px 12px', outline: 'none', boxSizing: 'border-box',
+  },
+  inputError: {
+    border: '1px solid var(--c-error)',
+  },
+  select: {
+    width: '100%', background: '#080C18',
+    border: '1px solid #1E2740',
+    borderRadius: 4, color: '#E8EAF0',
+    fontFamily: "'Space Mono', monospace", fontSize: 13,
+    padding: '9px 12px', outline: 'none', boxSizing: 'border-box',
+    cursor: 'pointer',
+  },
+  selectError: {
+    border: '1px solid var(--c-error)',
+  },
+  textarea: {
+    width: '100%', background: '#080C18',
+    border: '1px solid #1E2740',
+    borderRadius: 4, color: '#E8EAF0',
+    fontFamily: "'Space Mono', monospace", fontSize: 12,
+    padding: '9px 12px', outline: 'none',
+    resize: 'vertical', minHeight: 80, boxSizing: 'border-box',
+  },
+  textareaError: {
+    border: '1px solid var(--c-error)',
+  },
+  fieldError: {
+    fontSize: 11, color: 'var(--c-error)', marginTop: 4,
+  },
+  row2: {
+    display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12,
+  },
+  errorMsg: {
+    background: 'rgba(255,82,82,0.08)',
+    border: '1px solid rgba(255,82,82,0.3)',
+    borderRadius: 4, color: 'var(--c-error)',
+    fontSize: 12, padding: '10px 12px', marginBottom: 18,
+  },
+  confirmText: {
+    color: '#8892A4', fontSize: 13, lineHeight: 1.6, marginBottom: 24,
+  },
+  confirmSpan: {
+    color: 'var(--c-error)', fontWeight: 700,
+  },
+  actions: {
+    display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24,
+  },
+  actionsWithDelete: {
+    display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 24,
+  },
+  btn: {
+    borderRadius: 4, fontFamily: "'Space Mono', monospace",
+    fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+    padding: '9px 18px', cursor: 'pointer', textTransform: 'uppercase',
+    transition: 'background 0.15s',
+  },
+  cancelBtn: {
+    background: 'transparent', border: '1px solid #1E2740', color: '#4A5568',
+  },
+  deleteBtn: {
+    background: 'transparent',
+    border: '1px solid rgba(255,82,82,0.35)',
+    color: 'var(--c-error)',
+  },
+};
 
 export default function AssetFormModal({
   asset,
@@ -243,92 +235,140 @@ export default function AssetFormModal({
     }
   }
 
+  const saveDisabled = loading || !canSave;
+
   // ── Inline delete confirmation ─────────────────────────────────────────────
   if (confirmDelete) {
     return (
-      <Overlay onClick={onClose}>
-        <Modal onClick={(e) => e.stopPropagation()}>
-          <ModalTitle>Delete Asset</ModalTitle>
-          {error && <ErrorMsg>⚠ {error}</ErrorMsg>}
-          <ConfirmText>
-            Delete <span>{asset?.symbol}</span> permanently?<br />
+      <div style={S.overlay} onClick={onClose}>
+        <style>{`
+          .admin-modal input:focus, .admin-modal select:focus, .admin-modal textarea:focus {
+            outline: none;
+            border-color: var(--c-accent);
+          }
+          .admin-modal input.field-error:focus, .admin-modal select.field-error:focus, .admin-modal textarea.field-error:focus {
+            border-color: var(--c-error);
+          }
+          .admin-modal::-webkit-scrollbar { width: 4px; }
+          .admin-modal::-webkit-scrollbar-track { background: transparent; }
+          .admin-modal::-webkit-scrollbar-thumb { background: #1E2740; border-radius: 2px; }
+        `}</style>
+        <div className="admin-modal" style={S.modal} onClick={(e) => e.stopPropagation()}>
+          <h2 style={S.title}>Delete Asset</h2>
+          {error && <div style={S.errorMsg}>⚠ {error}</div>}
+          <p style={S.confirmText}>
+            Delete <span style={S.confirmSpan}>{asset?.symbol}</span> permanently?<br />
             This cannot be undone.
-          </ConfirmText>
-          <Actions>
-            <CancelBtn onClick={() => setConfirmDelete(false)}>Cancel</CancelBtn>
-            <DeleteConfirmBtn onClick={handleDelete} disabled={loading}>
+          </p>
+          <div style={S.actions}>
+            <button
+              style={{ ...S.btn, ...S.cancelBtn }}
+              onClick={() => setConfirmDelete(false)}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = '#4A5568'; e.currentTarget.style.color = '#E8EAF0'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = '#1E2740'; e.currentTarget.style.color = '#4A5568'; }}
+            >Cancel</button>
+            <button
+              style={{
+                ...S.btn,
+                background: loading ? '#1E2740' : 'var(--c-error)',
+                border: 'none',
+                color: loading ? '#4A5568' : '#fff',
+                cursor: loading ? 'not-allowed' : 'pointer',
+              }}
+              onClick={handleDelete}
+              disabled={loading}
+              onMouseEnter={e => { if (!loading) e.currentTarget.style.background = '#FF6B6B'; }}
+              onMouseLeave={e => { if (!loading) e.currentTarget.style.background = 'var(--c-error)'; }}
+            >
               {loading ? 'Deleting...' : 'Confirm Delete'}
-            </DeleteConfirmBtn>
-          </Actions>
-        </Modal>
-      </Overlay>
+            </button>
+          </div>
+        </div>
+      </div>
     );
   }
 
   // ── Add / Edit form ────────────────────────────────────────────────────────
   return (
-    <Overlay onClick={onClose}>
-      <Modal onClick={(e) => e.stopPropagation()}>
-        <ModalTitle>{isEdit ? `Edit Asset: ${asset.symbol}` : 'Add Asset'}</ModalTitle>
+    <div style={S.overlay} onClick={onClose}>
+      <style>{`
+        .admin-modal input:focus, .admin-modal select:focus, .admin-modal textarea:focus {
+          outline: none;
+          border-color: var(--c-accent);
+        }
+        .admin-modal input.field-error:focus, .admin-modal select.field-error:focus, .admin-modal textarea.field-error:focus {
+          border-color: var(--c-error);
+        }
+        .admin-modal::-webkit-scrollbar { width: 4px; }
+        .admin-modal::-webkit-scrollbar-track { background: transparent; }
+        .admin-modal::-webkit-scrollbar-thumb { background: #1E2740; border-radius: 2px; }
+      `}</style>
+      <div className="admin-modal" style={S.modal} onClick={(e) => e.stopPropagation()}>
+        <h2 style={S.title}>{isEdit ? `Edit Asset: ${asset.symbol}` : 'Add Asset'}</h2>
 
-        {error && <ErrorMsg>⚠ {error}</ErrorMsg>}
+        {error && <div style={S.errorMsg}>⚠ {error}</div>}
 
-        <Row2>
-          <Field>
-            <Label>Symbol *</Label>
-            <Input
+        <div style={S.row2}>
+          <div style={S.field}>
+            <label style={S.label}>Symbol *</label>
+            <input
+              style={(!symbol && !!error) ? { ...S.input, ...S.inputError } : S.input}
+              className={(!symbol && !!error) ? 'field-error' : ''}
               value={symbol}
               onChange={(e) => setSymbol(e.target.value.toUpperCase())}
               placeholder="e.g. AAPL"
-              $error={!symbol && !!error}
             />
-          </Field>
-          <Field>
-            <Label>Exchange</Label>
-            <Input
+          </div>
+          <div style={S.field}>
+            <label style={S.label}>Exchange</label>
+            <input
+              style={S.input}
               value={exchange}
               onChange={(e) => setExchange(e.target.value)}
               placeholder="e.g. NASDAQ"
             />
-          </Field>
-        </Row2>
+          </div>
+        </div>
 
-        <Field>
-          <Label>Name *</Label>
-          <Input
+        <div style={S.field}>
+          <label style={S.label}>Name *</label>
+          <input
+            style={(!name && !!error) ? { ...S.input, ...S.inputError } : S.input}
+            className={(!name && !!error) ? 'field-error' : ''}
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Apple Inc."
-            $error={!name && !!error}
           />
-        </Field>
+        </div>
 
-        <Row2>
-          <Field>
-            <Label>Type</Label>
-            <Select value={type} onChange={(e) => setType(e.target.value)}>
+        <div style={S.row2}>
+          <div style={S.field}>
+            <label style={S.label}>Type</label>
+            <select style={S.select} value={type} onChange={(e) => setType(e.target.value)}>
               <option value="">— Select —</option>
               {ASSET_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}
-            </Select>
-          </Field>
-          <Field>
-            <Label>Currency</Label>
-            <Input
+            </select>
+          </div>
+          <div style={S.field}>
+            <label style={S.label}>Currency</label>
+            <input
+              style={S.input}
               value={currency}
               onChange={(e) => { setCurrency(e.target.value); setCurrencyManual(true); }}
               placeholder="e.g. USD"
             />
-          </Field>
-        </Row2>
+          </div>
+        </div>
 
-        <Field>
-          <Label>Subgroup *</Label>
-          <Select
+        <div style={S.field}>
+          <label style={S.label}>Subgroup *</label>
+          <select
+            style={(!subgroupId && !!error) ? { ...S.select, ...S.selectError } : S.select}
+            className={(!subgroupId && !!error) ? 'field-error' : ''}
             value={subgroupId}
             onChange={(e) => setSubgroupId(e.target.value)}
-            $error={!subgroupId && !!error}
           >
             <option value="">— Select Subgroup —</option>
             {Object.entries(subgroupsByGroup).map(([groupName, sgs]) => (
@@ -338,22 +378,23 @@ export default function AssetFormModal({
                 ))}
               </optgroup>
             ))}
-          </Select>
-          {!subgroupId && !!error && <FieldError>Subgroup is required</FieldError>}
-        </Field>
+          </select>
+          {!subgroupId && !!error && <div style={S.fieldError}>Subgroup is required</div>}
+        </div>
 
-        <Row2>
-          <Field>
-            <Label>Sort Order</Label>
-            <Input
+        <div style={S.row2}>
+          <div style={S.field}>
+            <label style={S.label}>Sort Order</label>
+            <input
+              style={S.input}
               type="number"
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value)}
               placeholder="0"
             />
-          </Field>
-          <Field>
-            <Label>Active</Label>
+          </div>
+          <div style={S.field}>
+            <label style={S.label}>Active</label>
             <div style={{ paddingTop: 10 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#8892A4' }}>
                 <input
@@ -365,48 +406,89 @@ export default function AssetFormModal({
                 Active
               </label>
             </div>
-          </Field>
-        </Row2>
+          </div>
+        </div>
 
-        <Field>
-          <Label>Sector</Label>
-          <Input
+        <div style={S.field}>
+          <label style={S.label}>Sector</label>
+          <input
+            style={S.input}
             value={sector}
             onChange={(e) => setSector(e.target.value)}
             placeholder="e.g. Bancos, Petróleo, Tijolo"
           />
-        </Field>
+        </div>
 
-        <Field>
-          <Label>Meta (JSON)</Label>
-          <Textarea
+        <div style={S.field}>
+          <label style={S.label}>Meta (JSON)</label>
+          <textarea
+            style={metaInvalid ? { ...S.textarea, ...S.textareaError } : S.textarea}
+            className={metaInvalid ? 'field-error' : ''}
             value={metaJson}
             onChange={(e) => { setMetaJson(e.target.value); setMetaManual(true); }}
             placeholder={'{\n  "isB3": true\n}'}
-            $error={metaInvalid}
           />
-          {metaInvalid && <FieldError>Invalid JSON</FieldError>}
-        </Field>
+          {metaInvalid && <div style={S.fieldError}>Invalid JSON</div>}
+        </div>
 
         {isEdit ? (
-          <ActionsWithDelete>
-            <DeleteBtn onClick={() => setConfirmDelete(true)}>Delete Asset</DeleteBtn>
+          <div style={S.actionsWithDelete}>
+            <button
+              style={{ ...S.btn, ...S.deleteBtn }}
+              onClick={() => setConfirmDelete(true)}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,82,82,0.12)'; e.currentTarget.style.borderColor = 'var(--c-error)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'rgba(255,82,82,0.35)'; }}
+            >Delete Asset</button>
             <div style={{ display: 'flex', gap: 10 }}>
-              <CancelBtn onClick={onClose}>Cancel</CancelBtn>
-              <SaveBtn onClick={handleSave} disabled={loading || !canSave}>
+              <button
+                style={{ ...S.btn, ...S.cancelBtn }}
+                onClick={onClose}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#4A5568'; e.currentTarget.style.color = '#E8EAF0'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = '#1E2740'; e.currentTarget.style.color = '#4A5568'; }}
+              >Cancel</button>
+              <button
+                style={{
+                  ...S.btn,
+                  background: saveDisabled ? '#1E2740' : 'var(--c-accent)',
+                  border: '1px solid transparent',
+                  color: saveDisabled ? '#4A5568' : '#080C18',
+                  cursor: saveDisabled ? 'not-allowed' : 'pointer',
+                }}
+                onClick={handleSave}
+                disabled={saveDisabled}
+                onMouseEnter={e => { if (!saveDisabled) e.currentTarget.style.background = '#26C6DA'; }}
+                onMouseLeave={e => { if (!saveDisabled) e.currentTarget.style.background = 'var(--c-accent)'; }}
+              >
                 {loading ? 'Saving...' : 'Save Changes'}
-              </SaveBtn>
+              </button>
             </div>
-          </ActionsWithDelete>
+          </div>
         ) : (
-          <Actions>
-            <CancelBtn onClick={onClose}>Cancel</CancelBtn>
-            <SaveBtn onClick={handleSave} disabled={loading || !canSave}>
+          <div style={S.actions}>
+            <button
+              style={{ ...S.btn, ...S.cancelBtn }}
+              onClick={onClose}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = '#4A5568'; e.currentTarget.style.color = '#E8EAF0'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = '#1E2740'; e.currentTarget.style.color = '#4A5568'; }}
+            >Cancel</button>
+            <button
+              style={{
+                ...S.btn,
+                background: saveDisabled ? '#1E2740' : 'var(--c-accent)',
+                border: '1px solid transparent',
+                color: saveDisabled ? '#4A5568' : '#080C18',
+                cursor: saveDisabled ? 'not-allowed' : 'pointer',
+              }}
+              onClick={handleSave}
+              disabled={saveDisabled}
+              onMouseEnter={e => { if (!saveDisabled) e.currentTarget.style.background = '#26C6DA'; }}
+              onMouseLeave={e => { if (!saveDisabled) e.currentTarget.style.background = 'var(--c-accent)'; }}
+            >
               {loading ? 'Saving...' : 'Create Asset'}
-            </SaveBtn>
-          </Actions>
+            </button>
+          </div>
         )}
-      </Modal>
-    </Overlay>
+      </div>
+    </div>
   );
 }
