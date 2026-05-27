@@ -1,7 +1,6 @@
 import './i18n.js'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { createGlobalStyle } from 'styled-components'
 import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { TaxonomyProvider } from './context/TaxonomyContext.jsx'
@@ -14,20 +13,8 @@ import { initAnalytics } from './services/analytics.js'
 
 initAnalytics()
 
-const GlobalBaseline = createGlobalStyle`
-  *, *::before, *::after { box-sizing: border-box; }
-  body {
-    margin: 0;
-    padding: 0;
-    background: #080C18;
-    color: #E8EAF0;
-    -webkit-font-smoothing: antialiased;
-  }
-`
-
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <GlobalBaseline />
     <MarketDataProvider>
     <AuthProvider>
       <TaxonomyProvider>
