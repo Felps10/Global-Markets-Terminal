@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import styled, { keyframes, css } from "styled-components";
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * MarketHeatmap — Full-page treemap visualization
@@ -39,6 +38,44 @@ const COLORS = {
   redDark: "#991833",
   neutral: "#334455",
 };
+
+// ── Scoped styles for animations and scrollbar ────────────────────────────────
+function ScopedStyles() {
+  return (
+    <style>{`
+      @keyframes mh-fadeIn {
+        from { opacity: 0; transform: scale(0.95); }
+        to   { opacity: 1; transform: scale(1); }
+      }
+      @keyframes mh-pulseGlow {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(0, 200, 255, 0); }
+        50%      { box-shadow: 0 0 12px 2px rgba(0, 200, 255, 0.3); }
+      }
+      @keyframes mh-cellFadeIn {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+      }
+      @keyframes mh-tooltipFadeIn {
+        from { opacity: 0; transform: scale(0.95); }
+        to   { opacity: 1; transform: scale(1); }
+      }
+      .mh-wrapper { animation: mh-fadeIn 0.4s ease-out; }
+      .mh-cell {
+        animation: mh-cellFadeIn 0.3s ease-out both;
+      }
+      .mh-cell:hover {
+        filter: brightness(1.25);
+        border-color: ${COLORS.accent}88;
+        z-index: 10;
+      }
+      .mh-tooltip { animation: mh-tooltipFadeIn 0.12s ease-out; }
+      /* @media handled via CSS */
+      @media (max-width: 768px) {
+        .mh-sidebar { width: 180px !important; min-width: 180px !important; }
+      }
+    `}</style>
+  );
+}
 
 // ─── Google Fonts ────────────────────────────────────────────────────────────
 const FONT_LINK_ID = "heatmap-google-fonts";
@@ -265,240 +302,6 @@ function formatVolume(v) {
   return String(v);
 }
 
-// ─── Animations ──────────────────────────────────────────────────────────────
-
-const fadeIn = keyframes`
-  from { opacity: 0; transform: scale(0.95); }
-  to   { opacity: 1; transform: scale(1); }
-`;
-
-const pulseGlow = keyframes`
-  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 200, 255, 0); }
-  50%      { box-shadow: 0 0 12px 2px rgba(0, 200, 255, 0.3); }
-`;
-
-// ─── Styled Components ───────────────────────────────────────────────────────
-
-const Wrapper = styled.div`
-  display: flex;
-  height: 100vh;
-  width: 100%;
-  background: ${COLORS.bg};
-  font-family: "IBM Plex Mono", monospace;
-  color: ${COLORS.textPrimary};
-  animation: ${fadeIn} 0.4s ease-out;
-`;
-
-const Sidebar = styled.aside`
-  width: 240px;
-  min-width: 240px;
-  background: ${COLORS.surface};
-  border-right: 1px solid ${COLORS.border};
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-
-  @media (max-width: 768px) {
-    width: 180px;
-    min-width: 180px;
-  }
-`;
-
-const SidebarTitle = styled.h2`
-  font-family: "Barlow Condensed", sans-serif;
-  font-weight: 700;
-  font-size: 14px;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  color: ${COLORS.accent};
-  padding: 20px 16px 12px;
-  margin: 0;
-  border-bottom: 1px solid ${COLORS.border};
-`;
-
-const SectorItem = styled.button`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 10px 16px;
-  background: ${(p) => (p.$active ? COLORS.surfaceHover : "transparent")};
-  border: none;
-  border-left: 3px solid ${(p) => (p.$active ? COLORS.accent : "transparent")};
-  color: ${(p) => (p.$active ? COLORS.textPrimary : COLORS.textSecondary)};
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-
-  &:hover {
-    background: ${COLORS.surfaceHover};
-    color: ${COLORS.textPrimary};
-  }
-`;
-
-const SectorName = styled.span`
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-`;
-
-const SectorStats = styled.span`
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-size: 10px;
-  flex-shrink: 0;
-  margin-left: 8px;
-`;
-
-const SectorPct = styled.span`
-  color: ${(p) => p.$color};
-  font-weight: 600;
-`;
-
-const SectorVol = styled.span`
-  color: ${COLORS.textMuted};
-`;
-
-const MainArea = styled.main`
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-`;
-
-const Toolbar = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 20px;
-  border-bottom: 1px solid ${COLORS.border};
-  background: ${COLORS.surface};
-  flex-shrink: 0;
-`;
-
-const ToolbarTitle = styled.h1`
-  font-family: "Barlow Condensed", sans-serif;
-  font-weight: 700;
-  font-size: 20px;
-  letter-spacing: 1px;
-  color: ${COLORS.textPrimary};
-  margin: 0;
-`;
-
-const SortControls = styled.div`
-  display: flex;
-  gap: 4px;
-`;
-
-const SortBtn = styled.button`
-  padding: 4px 10px;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
-  background: ${(p) => (p.$active ? COLORS.accent + "22" : "transparent")};
-  color: ${(p) => (p.$active ? COLORS.accent : COLORS.textSecondary)};
-  border: 1px solid ${(p) => (p.$active ? COLORS.accent + "44" : COLORS.border)};
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-
-  &:hover {
-    color: ${COLORS.accent};
-    border-color: ${COLORS.accent}44;
-  }
-`;
-
-const TreemapContainer = styled.div`
-  flex: 1;
-  position: relative;
-  overflow: hidden;
-  padding: 4px;
-`;
-
-const cellFadeIn = keyframes`
-  from { opacity: 0; }
-  to   { opacity: 1; }
-`;
-
-const Cell = styled.div`
-  position: absolute;
-  box-sizing: border-box;
-  border: 1px solid ${COLORS.bg};
-  border-radius: 3px;
-  overflow: hidden;
-  cursor: pointer;
-  transition: filter 0.15s ease, border-color 0.15s ease;
-  animation: ${cellFadeIn} 0.3s ease-out both;
-  animation-delay: ${(p) => p.$delay || "0s"};
-
-  &:hover {
-    filter: brightness(1.25);
-    border-color: ${COLORS.accent}88;
-    z-index: 10;
-    ${pulseGlow}
-  }
-`;
-
-const CellContent = styled.div`
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 4px;
-`;
-
-const CellSymbol = styled.span`
-  font-family: "Barlow Condensed", sans-serif;
-  font-weight: 700;
-  color: #fff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
-  line-height: 1.1;
-`;
-
-const CellPct = styled.span`
-  font-family: "IBM Plex Mono", monospace;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-`;
-
-const Tooltip = styled.div`
-  position: fixed;
-  pointer-events: none;
-  z-index: 1000;
-  background: ${COLORS.surface};
-  border: 1px solid ${COLORS.accent}44;
-  border-radius: 6px;
-  padding: 12px 16px;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-  min-width: 200px;
-  animation: ${fadeIn} 0.12s ease-out;
-`;
-
-const TtRow = styled.div`
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-
-  & + & {
-    margin-top: 4px;
-  }
-`;
-
-const TtLabel = styled.span`
-  color: ${COLORS.textMuted};
-`;
-
-const TtValue = styled.span`
-  color: ${(p) => p.$color || COLORS.textPrimary};
-  font-weight: 500;
-`;
-
 // ─── Component ───────────────────────────────────────────────────────────────
 
 const SORT_OPTIONS = [
@@ -519,6 +322,9 @@ export default function MarketHeatmap({
   const [tooltip, setTooltip] = useState(null);
   const containerRef = useRef(null);
   const [dims, setDims] = useState({ w: 0, h: 0 });
+
+  // Hover states
+  const [hoveredSector, setHoveredSector] = useState(null);
 
   // Normalize incoming data
   const stocks = useMemo(() => {
@@ -614,70 +420,128 @@ export default function MarketHeatmap({
   };
 
   return (
-    <Wrapper>
+    <div className="mh-wrapper" style={{
+      display: "flex", height: "100vh", width: "100%",
+      background: COLORS.bg, fontFamily: '"IBM Plex Mono", monospace',
+      color: COLORS.textPrimary,
+    }}>
+      <ScopedStyles />
       {/* ─── Sector Sidebar ─────────────────────────── */}
-      <Sidebar>
-        <SidebarTitle>Sectors</SidebarTitle>
-        <SectorItem
-          $active={activeSector === null}
+      <aside className="mh-sidebar" style={{
+        width: 240, minWidth: 240, background: COLORS.surface,
+        borderRight: `1px solid ${COLORS.border}`,
+        display: "flex", flexDirection: "column", overflowY: "auto",
+      }}>
+        <h2 style={{
+          fontFamily: '"Barlow Condensed", sans-serif', fontWeight: 700,
+          fontSize: 14, textTransform: "uppercase", letterSpacing: "2px",
+          color: COLORS.accent, padding: "20px 16px 12px", margin: 0,
+          borderBottom: `1px solid ${COLORS.border}`,
+        }}>Sectors</h2>
+        {/* All Sectors button */}
+        <button
           onClick={() => setActiveSector(null)}
+          onMouseEnter={() => setHoveredSector("__all__")}
+          onMouseLeave={() => setHoveredSector(null)}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            width: "100%", padding: "10px 16px",
+            background: activeSector === null ? COLORS.surfaceHover : hoveredSector === "__all__" ? COLORS.surfaceHover : "transparent",
+            border: "none",
+            borderLeft: `3px solid ${activeSector === null ? COLORS.accent : "transparent"}`,
+            color: activeSector === null ? COLORS.textPrimary : hoveredSector === "__all__" ? COLORS.textPrimary : COLORS.textSecondary,
+            fontFamily: '"IBM Plex Mono", monospace', fontSize: 12,
+            cursor: "pointer", transition: "all 0.15s ease",
+          }}
         >
-          <SectorName>All Sectors</SectorName>
-          <SectorStats>
-            <SectorVol>{stocks.length}</SectorVol>
-          </SectorStats>
-        </SectorItem>
-        {sectors.map((sec) => (
-          <SectorItem
-            key={sec.name}
-            $active={activeSector === sec.name}
-            onClick={() => toggleSector(sec.name)}
-          >
-            <SectorName>{sec.name}</SectorName>
-            <SectorStats>
-              <SectorPct $color={changeColor(sec.avgPct)}>
-                {sec.avgPct >= 0 ? "+" : ""}
-                {sec.avgPct.toFixed(1)}%
-              </SectorPct>
-              <SectorVol>{formatVolume(sec.totalVol)}</SectorVol>
-            </SectorStats>
-          </SectorItem>
-        ))}
-      </Sidebar>
+          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>All Sectors</span>
+          <span style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 10, flexShrink: 0, marginLeft: 8 }}>
+            <span style={{ color: COLORS.textMuted }}>{stocks.length}</span>
+          </span>
+        </button>
+        {sectors.map((sec) => {
+          const isActive = activeSector === sec.name;
+          const isHovered = hoveredSector === sec.name;
+          return (
+            <button
+              key={sec.name}
+              onClick={() => toggleSector(sec.name)}
+              onMouseEnter={() => setHoveredSector(sec.name)}
+              onMouseLeave={() => setHoveredSector(null)}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                width: "100%", padding: "10px 16px",
+                background: isActive ? COLORS.surfaceHover : isHovered ? COLORS.surfaceHover : "transparent",
+                border: "none",
+                borderLeft: `3px solid ${isActive ? COLORS.accent : "transparent"}`,
+                color: isActive ? COLORS.textPrimary : isHovered ? COLORS.textPrimary : COLORS.textSecondary,
+                fontFamily: '"IBM Plex Mono", monospace', fontSize: 12,
+                cursor: "pointer", transition: "all 0.15s ease",
+              }}
+            >
+              <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {sec.name}
+              </span>
+              <span style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 10, flexShrink: 0, marginLeft: 8 }}>
+                <span style={{ color: changeColor(sec.avgPct), fontWeight: 600 }}>
+                  {sec.avgPct >= 0 ? "+" : ""}
+                  {sec.avgPct.toFixed(1)}%
+                </span>
+                <span style={{ color: COLORS.textMuted }}>{formatVolume(sec.totalVol)}</span>
+              </span>
+            </button>
+          );
+        })}
+      </aside>
 
       {/* ─── Main Content ─────────────────────────── */}
-      <MainArea>
-        <Toolbar>
-          <ToolbarTitle>
+      <main style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "12px 20px", borderBottom: `1px solid ${COLORS.border}`,
+          background: COLORS.surface, flexShrink: 0,
+        }}>
+          <h1 style={{
+            fontFamily: '"Barlow Condensed", sans-serif', fontWeight: 700,
+            fontSize: 20, letterSpacing: "1px", color: COLORS.textPrimary, margin: 0,
+          }}>
             MARKET HEATMAP
             {activeSector && (
               <span style={{ color: COLORS.accent, fontWeight: 500, fontSize: 14, marginLeft: 12 }}>
                 / {activeSector}
               </span>
             )}
-          </ToolbarTitle>
-          <SortControls>
+          </h1>
+          <div style={{ display: "flex", gap: 4 }}>
             {SORT_OPTIONS.map((opt) => (
-              <SortBtn
+              <SortBtnComp
                 key={opt.key}
-                $active={sort === opt.key}
+                active={sort === opt.key}
                 onClick={() => setSort(opt.key)}
               >
                 {opt.label}
-              </SortBtn>
+              </SortBtnComp>
             ))}
-          </SortControls>
-        </Toolbar>
+          </div>
+        </div>
 
-        <TreemapContainer ref={containerRef}>
+        <div ref={containerRef} style={{ flex: 1, position: "relative", overflow: "hidden", padding: 4 }}>
           {cells.map((cell, idx) => {
             const bg = changeColor(cell.changePercent);
             const fonts = cellFontSize(cell._w, cell._h);
             return (
-              <Cell
+              <div
                 key={cell.symbol}
-                $delay={`${idx * 15}ms`}
+                className="mh-cell"
                 style={{
+                  position: "absolute",
+                  boxSizing: "border-box",
+                  border: `1px solid ${COLORS.bg}`,
+                  borderRadius: 3,
+                  overflow: "hidden",
+                  cursor: "pointer",
+                  transition: "filter 0.15s ease, border-color 0.15s ease",
+                  animationDelay: `${idx * 15}ms`,
                   left: cell._x,
                   top: cell._y,
                   width: cell._w,
@@ -688,62 +552,94 @@ export default function MarketHeatmap({
                 onMouseLeave={handleMouseLeave}
                 onClick={() => handleClick(cell)}
               >
-                <CellContent>
+                <div style={{
+                  width: "100%", height: "100%",
+                  display: "flex", flexDirection: "column",
+                  alignItems: "center", justifyContent: "center", padding: 4,
+                }}>
                   {fonts.sym > 0 && (
-                    <CellSymbol style={{ fontSize: fonts.sym }}>
+                    <span style={{
+                      fontFamily: '"Barlow Condensed", sans-serif',
+                      fontWeight: 700, color: "#fff",
+                      textShadow: "0 1px 3px rgba(0, 0, 0, 0.6)",
+                      lineHeight: 1.1, fontSize: fonts.sym,
+                    }}>
                       {cell.symbol}
-                    </CellSymbol>
+                    </span>
                   )}
                   {fonts.pct > 0 && (
-                    <CellPct style={{ fontSize: fonts.pct }}>
+                    <span style={{
+                      fontFamily: '"IBM Plex Mono", monospace',
+                      fontWeight: 600, color: "rgba(255, 255, 255, 0.9)",
+                      textShadow: "0 1px 2px rgba(0, 0, 0, 0.5)",
+                      fontSize: fonts.pct,
+                    }}>
                       {cell.changePercent >= 0 ? "+" : ""}
                       {cell.changePercent.toFixed(2)}%
-                    </CellPct>
+                    </span>
                   )}
-                </CellContent>
-              </Cell>
+                </div>
+              </div>
             );
           })}
-        </TreemapContainer>
-      </MainArea>
+        </div>
+      </main>
 
       {/* ─── Tooltip ─────────────────────────────── */}
       {tooltip && (
-        <Tooltip
-          style={{
-            left: tooltip.x + 16,
-            top: tooltip.y + 16,
-          }}
-        >
-          <TtRow>
-            <TtLabel>Symbol</TtLabel>
-            <TtValue $color={COLORS.accent}>{tooltip.stock.symbol}</TtValue>
-          </TtRow>
-          <TtRow>
-            <TtLabel>Name</TtLabel>
-            <TtValue>{tooltip.stock.name}</TtValue>
-          </TtRow>
-          <TtRow>
-            <TtLabel>Sector</TtLabel>
-            <TtValue>{tooltip.stock.sector}</TtValue>
-          </TtRow>
-          <TtRow>
-            <TtLabel>Price</TtLabel>
-            <TtValue>${tooltip.stock.price.toFixed(2)}</TtValue>
-          </TtRow>
-          <TtRow>
-            <TtLabel>Change</TtLabel>
-            <TtValue $color={changeColor(tooltip.stock.changePercent)}>
-              {tooltip.stock.changePercent >= 0 ? "+" : ""}
-              {tooltip.stock.changePercent.toFixed(2)}%
-            </TtValue>
-          </TtRow>
-          <TtRow>
-            <TtLabel>Volume</TtLabel>
-            <TtValue>{formatVolume(tooltip.stock.volume)}</TtValue>
-          </TtRow>
-        </Tooltip>
+        <div className="mh-tooltip" style={{
+          position: "fixed", pointerEvents: "none", zIndex: 1000,
+          background: COLORS.surface,
+          border: `1px solid ${COLORS.accent}44`,
+          borderRadius: 6, padding: "12px 16px",
+          fontFamily: '"IBM Plex Mono", monospace', fontSize: 12,
+          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.6)",
+          minWidth: 200,
+          left: tooltip.x + 16, top: tooltip.y + 16,
+        }}>
+          {[
+            { label: "Symbol", value: tooltip.stock.symbol, color: COLORS.accent },
+            { label: "Name", value: tooltip.stock.name },
+            { label: "Sector", value: tooltip.stock.sector },
+            { label: "Price", value: `$${tooltip.stock.price.toFixed(2)}` },
+            { label: "Change", value: `${tooltip.stock.changePercent >= 0 ? "+" : ""}${tooltip.stock.changePercent.toFixed(2)}%`, color: changeColor(tooltip.stock.changePercent) },
+            { label: "Volume", value: formatVolume(tooltip.stock.volume) },
+          ].map((row, i) => (
+            <div key={row.label} style={{
+              display: "flex", justifyContent: "space-between", gap: 16,
+              marginTop: i > 0 ? 4 : 0,
+            }}>
+              <span style={{ color: COLORS.textMuted }}>{row.label}</span>
+              <span style={{ color: row.color || COLORS.textPrimary, fontWeight: 500 }}>{row.value}</span>
+            </div>
+          ))}
+        </div>
       )}
-    </Wrapper>
+    </div>
+  );
+}
+
+// ── Sort button with hover ──────────────────────────────────────────────────
+function SortBtnComp({ active, onClick, children }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        padding: "4px 10px",
+        fontFamily: '"IBM Plex Mono", monospace',
+        fontSize: 11,
+        background: active ? COLORS.accent + "22" : "transparent",
+        color: active ? COLORS.accent : hovered ? COLORS.accent : COLORS.textSecondary,
+        border: `1px solid ${active ? COLORS.accent + "44" : hovered ? COLORS.accent + "44" : COLORS.border}`,
+        borderRadius: 4,
+        cursor: "pointer",
+        transition: "all 0.15s ease",
+      }}
+    >
+      {children}
+    </button>
   );
 }

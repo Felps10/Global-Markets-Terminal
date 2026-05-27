@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useCallback } from "react";
 import MarketsPageLayout from "./components/MarketsPageLayout.jsx";
-import styled, { keyframes } from "styled-components";
 import MarketHeatmap from "./components/MarketHeatmap";
 import { finnhubQuote, hasFinnhubKey } from "./dataServices.js";
 
@@ -30,6 +29,38 @@ const C = {
   redDark:       "#991833",
   neutral:       "#334455",
 };
+
+// ─── Scoped styles for animations and scrollbar ─────────────────────────────
+function ScopedStyles() {
+  return (
+    <style>{`
+      @keyframes mhp-slideInRight {
+        from { transform: translateX(100%); opacity: 0; }
+        to   { transform: translateX(0);    opacity: 1; }
+      }
+      @keyframes mhp-slideInUp {
+        from { transform: translateY(100%); opacity: 0; }
+        to   { transform: translateY(0);    opacity: 1; }
+      }
+      @keyframes mhp-fadeIn {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+      }
+      .mhp-ctrl-panel { animation: mhp-slideInRight 0.2s ease-out; }
+      .mhp-ctrl-panel::-webkit-scrollbar { width: 4px; }
+      .mhp-ctrl-panel::-webkit-scrollbar-track { background: transparent; }
+      .mhp-ctrl-panel::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 2px; }
+      .mhp-stats-bar { animation: mhp-slideInUp 0.3s ease-out; }
+      .mhp-detail-panel { animation: mhp-slideInRight 0.2s ease-out; }
+      .mhp-detail-panel::-webkit-scrollbar { width: 4px; }
+      .mhp-detail-panel::-webkit-scrollbar-track { background: transparent; }
+      .mhp-detail-panel::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 2px; }
+      .mhp-compare-bar { animation: mhp-slideInUp 0.2s ease-out; }
+      .mhp-search-input::placeholder { color: ${C.textMuted}; }
+      .mhp-search-input:focus { border-color: ${C.accent}66; }
+    `}</style>
+  );
+}
 
 // ─── Base Dataset (mirrors MarketHeatmap MOCK_DATA + marketCap field) ─────────
 const BASE_STOCKS = [
@@ -102,494 +133,61 @@ function changeColor(pct) {
   return pct > 0 ? C.green : C.red;
 }
 
-// ─── Animations ──────────────────────────────────────────────────────────────
-
-const slideInRight = keyframes`
-  from { transform: translateX(100%); opacity: 0; }
-  to   { transform: translateX(0);    opacity: 1; }
-`;
-
-const slideInUp = keyframes`
-  from { transform: translateY(100%); opacity: 0; }
-  to   { transform: translateY(0);    opacity: 1; }
-`;
-
-const fadeIn = keyframes`
-  from { opacity: 0; }
-  to   { opacity: 1; }
-`;
-
-// ─── Styled Components ───────────────────────────────────────────────────────
-
-/* Full-screen fixed root — sits above GlobalMarketsTerminal (z:1) but
-   below the hamburger menu panel (z:200). Users can still open the menu
-   to navigate away. */
-const PageRoot = styled.div`
-  position: relative;
-  flex: 1;
-  overflow: hidden;
-  background: ${C.bg};
-  font-family: "IBM Plex Mono", monospace;
-`;
-
-/* ── Floating overlay layer (events pass through to children) ── */
-const FloatLayer = styled.div`
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 100;
-
-  & > * {
-    pointer-events: all;
-  }
-`;
-
-/* ── Back button ── */
-const BackBtn = styled.button`
-  position: absolute;
-  top: 12px;
-  left: 248px; /* just after the heatmap's 240px sector sidebar */
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  background: ${C.surface};
-  border: 1px solid ${C.border};
-  border-radius: 5px;
-  color: ${C.textSecondary};
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
-  cursor: pointer;
-  letter-spacing: 0.5px;
-  transition: all 0.15s ease;
-
-  &:hover {
-    border-color: ${C.accent};
-    color: ${C.accent};
-  }
-`;
-
-/* ── Controls toggle ── */
-const CtrlToggle = styled.button`
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 34px;
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: ${(p) => (p.$open ? C.accent + "22" : C.surface)};
-  border: 1px solid ${(p) => (p.$open ? C.accent + "88" : C.border)};
-  border-radius: 6px;
-  color: ${(p) => (p.$open ? C.accent : C.textSecondary)};
-  font-size: 15px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  z-index: 10;
-
-  &:hover {
-    border-color: ${C.accent}88;
-    color: ${C.accent};
-  }
-`;
-
-/* ── Controls panel ── */
-const CtrlPanel = styled.div`
-  position: absolute;
-  top: 52px;
-  right: 10px;
-  width: 272px;
-  max-height: calc(100vh - 80px);
-  overflow-y: auto;
-  background: ${C.surface};
-  border: 1px solid ${C.border};
-  border-radius: 8px;
-  padding: 0 0 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
-  animation: ${slideInRight} 0.2s ease-out;
-
-  &::-webkit-scrollbar       { width: 4px; }
-  &::-webkit-scrollbar-track { background: transparent; }
-  &::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 2px; }
-`;
-
-const PanelHeader = styled.div`
-  padding: 12px 14px;
-  border-bottom: 1px solid ${C.border};
-  font-family: "Barlow Condensed", sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  color: ${C.accent};
-  text-transform: uppercase;
-`;
-
-const PanelSection = styled.div`
-  padding: 10px 14px 0;
-`;
-
-const Label = styled.div`
-  font-size: 10px;
-  color: ${C.textMuted};
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  margin-bottom: 6px;
-`;
-
-const SearchInput = styled.input`
-  width: 100%;
-  padding: 7px 10px;
-  background: ${C.bg};
-  border: 1px solid ${C.border};
-  border-radius: 4px;
-  color: ${C.textPrimary};
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 12px;
-  outline: none;
-  transition: border-color 0.15s ease;
-  box-sizing: border-box;
-
-  &::placeholder { color: ${C.textMuted}; }
-  &:focus { border-color: ${C.accent}66; }
-`;
-
-const BtnGroup = styled.div`
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-`;
-
-const ToggleBtn = styled.button`
-  padding: 4px 10px;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
-  background: ${(p) => (p.$active ? C.accent + "22" : "transparent")};
-  color: ${(p) => (p.$active ? C.accent : C.textSecondary)};
-  border: 1px solid ${(p) => (p.$active ? C.accent + "66" : C.border)};
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-
-  &:hover {
-    color: ${C.accent};
-    border-color: ${C.accent}44;
-  }
-`;
-
-const Divider = styled.div`
-  height: 1px;
-  background: ${C.border};
-  margin: 12px 0 0;
-`;
-
-const DataRow = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-`;
-
-const DataBadge = styled.span`
-  padding: 2px 7px;
-  border-radius: 3px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  background: ${(p) =>
-    p.$status === "live"    ? C.green + "22" :
-    p.$status === "partial" ? "#FF9100" + "22" :
-    p.$status === "loading" ? C.accent + "22" :
-    C.neutral + "44"};
-  color: ${(p) =>
-    p.$status === "live"    ? C.green :
-    p.$status === "partial" ? "#FF9100" :
-    p.$status === "loading" ? C.accent :
-    C.textMuted};
-  border: 1px solid ${(p) =>
-    p.$status === "live"    ? C.green + "44" :
-    p.$status === "partial" ? "#FF9100" + "44" :
-    p.$status === "loading" ? C.accent + "44" :
-    C.border};
-`;
-
-const RefreshBtn = styled.button`
-  padding: 3px 10px;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 10px;
-  background: transparent;
-  border: 1px solid ${C.border};
-  border-radius: 4px;
-  color: ${C.textSecondary};
-  cursor: pointer;
-  transition: all 0.15s ease;
-  &:hover:not(:disabled) { border-color: ${C.accent}66; color: ${C.accent}; }
-  &:disabled { opacity: 0.4; cursor: not-allowed; }
-`;
-
-const SubLabel = styled.div`
-  font-size: 10px;
-  color: ${C.textMuted};
-  margin-top: 4px;
-`;
-
-/* ── Stats bar (bottom strip) ── */
-const StatsBar = styled.div`
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 38px;
-  display: flex;
-  align-items: center;
-  gap: 0;
-  background: ${C.surface}EE;
-  border-top: 1px solid ${C.border};
-  backdrop-filter: blur(8px);
-  padding: 0 16px;
-  gap: 24px;
-  animation: ${slideInUp} 0.3s ease-out;
-`;
-
-const StatItem = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-`;
-
-const StatLabel = styled.span`
-  font-size: 10px;
-  color: ${C.textMuted};
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-`;
-
-const StatVal = styled.span`
-  font-size: 11px;
-  font-weight: 600;
-  color: ${(p) => p.$c || C.textPrimary};
-`;
-
-/* Legend */
-const LegendWrap = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: auto;
-  flex-shrink: 0;
-`;
-
-const LegendGradient = styled.div`
-  width: 80px;
-  height: 8px;
-  border-radius: 4px;
-  background: linear-gradient(
-    to right,
-    #991833, #FF2D55, #334455, #009950, #00FF9D
+// ─── Toggle button with hover ───────────────────────────────────────────────
+function ToggleBtnComp({ active, onClick, children, style: extraStyle }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        padding: "4px 10px",
+        fontFamily: '"IBM Plex Mono", monospace',
+        fontSize: 11,
+        background: active ? C.accent + "22" : "transparent",
+        color: active ? C.accent : hovered ? C.accent : C.textSecondary,
+        border: `1px solid ${active ? C.accent + "66" : hovered ? C.accent + "44" : C.border}`,
+        borderRadius: 4,
+        cursor: "pointer",
+        transition: "all 0.15s ease",
+        ...extraStyle,
+      }}
+    >
+      {children}
+    </button>
   );
-`;
+}
 
-const LegendLbl = styled.span`
-  font-size: 10px;
-  color: ${C.textMuted};
-`;
-
-/* ── Detail panel ── */
-const DetailPanel = styled.div`
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 38px;
-  width: 300px;
-  background: ${C.surface};
-  border-left: 1px solid ${C.border};
-  overflow-y: auto;
-  animation: ${slideInRight} 0.2s ease-out;
-  display: flex;
-  flex-direction: column;
-
-  &::-webkit-scrollbar       { width: 4px; }
-  &::-webkit-scrollbar-track { background: transparent; }
-  &::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 2px; }
-`;
-
-const DetailHeader = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px 10px;
-  border-bottom: 1px solid ${C.border};
-  flex-shrink: 0;
-`;
-
-const DetailSymbol = styled.div`
-  font-family: "Barlow Condensed", sans-serif;
-  font-size: 22px;
-  font-weight: 700;
-  color: ${C.textPrimary};
-`;
-
-const CloseBtn = styled.button`
-  background: transparent;
-  border: none;
-  color: ${C.textMuted};
-  font-size: 16px;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 3px;
-  transition: color 0.15s ease;
-  &:hover { color: ${C.textPrimary}; }
-`;
-
-const DetailBody = styled.div`
-  padding: 14px 16px;
-  flex: 1;
-`;
-
-const DetailName = styled.div`
-  font-size: 12px;
-  color: ${C.textSecondary};
-  margin-bottom: 14px;
-  line-height: 1.4;
-`;
-
-const DetailTable = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-`;
-
-const DRow = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 0;
-  border-bottom: 1px solid ${C.border}66;
-
-  &:last-child { border-bottom: none; }
-`;
-
-const DKey = styled.span`
-  font-size: 11px;
-  color: ${C.textMuted};
-`;
-
-const DVal = styled.span`
-  font-size: 12px;
-  font-weight: 600;
-  color: ${(p) => p.$c || C.textPrimary};
-`;
-
-const ActionRow = styled.div`
-  display: flex;
-  gap: 8px;
-  padding: 14px 16px;
-  border-top: 1px solid ${C.border};
-  flex-shrink: 0;
-`;
-
-const ActionBtn = styled.button`
-  flex: 1;
-  padding: 7px 0;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  background: ${(p) => (p.$primary ? C.accent + "22" : "transparent")};
-  color: ${(p) => (p.$primary ? C.accent : C.textSecondary)};
-  border: 1px solid ${(p) => (p.$primary ? C.accent + "66" : C.border)};
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-
-  &:hover {
-    border-color: ${(p) => (p.$primary ? C.accent : C.accent + "44")};
-    color: ${C.accent};
-  }
-`;
-
-/* ── Compare bar ── */
-const CompareBar = styled.div`
-  position: absolute;
-  bottom: 38px;
-  left: 240px;
-  right: ${(p) => (p.$detailOpen ? "300px" : "0")};
-  background: ${C.surface}EE;
-  border-top: 1px solid ${C.border};
-  border-left: 1px solid ${C.border};
-  backdrop-filter: blur(8px);
-  padding: 10px 16px;
-  animation: ${slideInUp} 0.2s ease-out;
-`;
-
-const CompareTitle = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  font-size: 10px;
-  color: ${C.textMuted};
-  text-transform: uppercase;
-  letter-spacing: 1px;
-`;
-
-const ClearBtn = styled.button`
-  background: transparent;
-  border: none;
-  color: ${C.textMuted};
-  font-size: 10px;
-  cursor: pointer;
-  font-family: "IBM Plex Mono", monospace;
-  letter-spacing: 0.5px;
-  &:hover { color: ${C.red}; }
-`;
-
-const CompareGrid = styled.div`
-  display: flex;
-  gap: 8px;
-`;
-
-const CompareCard = styled.div`
-  position: relative;
-  padding: 8px 28px 8px 10px;
-  background: ${C.bg};
-  border: 1px solid ${C.border};
-  border-radius: 5px;
-  min-width: 100px;
-`;
-
-const CCSym = styled.div`
-  font-family: "Barlow Condensed", sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-  color: ${C.textPrimary};
-`;
-
-const CCPct = styled.div`
-  font-size: 12px;
-  font-weight: 600;
-  color: ${(p) => p.$c};
-`;
-
-const CCPrice = styled.div`
-  font-size: 10px;
-  color: ${C.textMuted};
-  margin-top: 2px;
-`;
-
-const CCRemove = styled.button`
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  background: transparent;
-  border: none;
-  color: ${C.textMuted};
-  font-size: 11px;
-  cursor: pointer;
-  padding: 2px 4px;
-  &:hover { color: ${C.red}; }
-`;
+// ─── Action button with hover ───────────────────────────────────────────────
+function ActionBtnComp({ primary, onClick, disabled, title, children }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        flex: 1,
+        padding: "7px 0",
+        fontFamily: '"IBM Plex Mono", monospace',
+        fontSize: 11,
+        fontWeight: 600,
+        letterSpacing: "0.5px",
+        background: primary ? C.accent + "22" : "transparent",
+        color: primary ? C.accent : hovered ? C.accent : C.textSecondary,
+        border: `1px solid ${primary ? (hovered ? C.accent : C.accent + "66") : (hovered ? C.accent + "44" : C.border)}`,
+        borderRadius: 4,
+        cursor: disabled ? "default" : "pointer",
+        transition: "all 0.15s ease",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
@@ -609,6 +207,9 @@ export default function MarketHeatmapPage() {
   // ── Detail / compare state ──────────────────────────────────────────────────
   const [selectedStock, setSelectedStock] = useState(null);
   const [pinnedStocks,  setPinnedStocks]  = useState([]);
+
+  // ── Hover states ────────────────────────────────────────────────────────────
+  const [hoveredBtn, setHoveredBtn] = useState(null);
 
   // ── Derived heatmap data ─────────────────────────────────────────────────────
   const heatmapData = useMemo(() => {
@@ -680,8 +281,6 @@ export default function MarketHeatmapPage() {
     setDataStatus("loading");
     const symbols = BASE_STOCKS.map((s) => s.symbol);
 
-    // Fire all requests; the Finnhub rate-limit queue in dataServices.js
-    // processes them at ≤1/sec, so expect ~36 seconds for the full batch.
     const results = await Promise.allSettled(symbols.map((sym) => finnhubQuote(sym)));
 
     const updated = BASE_STOCKS.map((stock, i) => {
@@ -715,12 +314,29 @@ export default function MarketHeatmapPage() {
     ? pinnedStocks.some((s) => s.symbol === selectedStock.symbol)
     : false;
 
+  // ── Data badge style helper ────────────────────────────────────────────────
+  function dataBadgeStyle(status) {
+    const colorMap = {
+      live:    { bg: C.green + "22", color: C.green, border: C.green + "44" },
+      partial: { bg: "#FF910022", color: "#FF9100", border: "#FF910044" },
+      loading: { bg: C.accent + "22", color: C.accent, border: C.accent + "44" },
+    };
+    const colors = colorMap[status] || { bg: C.neutral + "44", color: C.textMuted, border: C.border };
+    return {
+      padding: "2px 7px", borderRadius: 3, fontSize: 10, fontWeight: 700,
+      letterSpacing: "0.5px", background: colors.bg, color: colors.color,
+      border: `1px solid ${colors.border}`,
+    };
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <MarketsPageLayout moduleTitle="Market Heatmap" moduleIcon="🔥">
-    <PageRoot>
-      {/* MarketHeatmap fills the full fixed root. It renders its own Sector
-          sidebar (240px) + Toolbar + Treemap. We layer our controls on top. */}
+    <div style={{
+      position: "relative", flex: 1, overflow: "hidden",
+      background: C.bg, fontFamily: '"IBM Plex Mono", monospace',
+    }}>
+      <ScopedStyles />
       <MarketHeatmap
         data={heatmapData}
         dataSource="generic"
@@ -728,247 +344,366 @@ export default function MarketHeatmapPage() {
       />
 
       {/* ── Floating overlay ────────────────────────────────────────────── */}
-      <FloatLayer>
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 100 }}>
+        <div style={{ pointerEvents: "all" }}>
 
-        {/* Controls toggle button — top-right corner */}
-        <CtrlToggle $open={ctrlOpen} onClick={() => setCtrlOpen((o) => !o)}>
-          {ctrlOpen ? "✕" : "⚙"}
-        </CtrlToggle>
+          {/* Controls toggle button */}
+          <button
+            onClick={() => setCtrlOpen((o) => !o)}
+            onMouseEnter={() => setHoveredBtn("ctrl")}
+            onMouseLeave={() => setHoveredBtn(null)}
+            style={{
+              position: "absolute", top: 10, right: 10, width: 34, height: 34,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              background: ctrlOpen ? C.accent + "22" : C.surface,
+              border: `1px solid ${ctrlOpen ? C.accent + "88" : hoveredBtn === "ctrl" ? C.accent + "88" : C.border}`,
+              borderRadius: 6,
+              color: ctrlOpen ? C.accent : hoveredBtn === "ctrl" ? C.accent : C.textSecondary,
+              fontSize: 15, cursor: "pointer", transition: "all 0.15s ease", zIndex: 10,
+            }}
+          >
+            {ctrlOpen ? "✕" : "⚙"}
+          </button>
 
-        {/* ── Controls panel ────────────────────────────────────────────── */}
-        {ctrlOpen && (
-          <CtrlPanel>
-            <PanelHeader>Controls</PanelHeader>
+          {/* ── Controls panel ────────────────────────────────────────────── */}
+          {ctrlOpen && (
+            <div className="mhp-ctrl-panel" style={{
+              position: "absolute", top: 52, right: 10, width: 272,
+              maxHeight: "calc(100vh - 80px)", overflowY: "auto",
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 8, padding: "0 0 12px",
+              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.7)",
+            }}>
+              <div style={{
+                padding: "12px 14px", borderBottom: `1px solid ${C.border}`,
+                fontFamily: '"Barlow Condensed", sans-serif', fontSize: 13,
+                fontWeight: 700, letterSpacing: "1.5px", color: C.accent, textTransform: "uppercase",
+              }}>Controls</div>
 
-            {/* Search */}
-            <PanelSection>
-              <Label>Search ticker or name</Label>
-              <SearchInput
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="e.g. AAPL, Apple..."
-                autoFocus
+              {/* Search */}
+              <div style={{ padding: "10px 14px 0" }}>
+                <div style={{
+                  fontSize: 10, color: C.textMuted, letterSpacing: "1px",
+                  textTransform: "uppercase", marginBottom: 6,
+                }}>Search ticker or name</div>
+                <input
+                  className="mhp-search-input"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="e.g. AAPL, Apple..."
+                  autoFocus
+                  style={{
+                    width: "100%", padding: "7px 10px", background: C.bg,
+                    border: `1px solid ${C.border}`, borderRadius: 4,
+                    color: C.textPrimary, fontFamily: '"IBM Plex Mono", monospace',
+                    fontSize: 12, outline: "none", transition: "border-color 0.15s ease",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              <div style={{ height: 1, background: C.border, margin: "12px 0 0" }} />
+
+              {/* Cell size metric */}
+              <div style={{ padding: "10px 14px 0" }}>
+                <div style={{
+                  fontSize: 10, color: C.textMuted, letterSpacing: "1px",
+                  textTransform: "uppercase", marginBottom: 6,
+                }}>Cell size driven by</div>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {[
+                    { key: "volume",    label: "Volume" },
+                    { key: "marketCap", label: "Mkt Cap" },
+                  ].map(({ key, label }) => (
+                    <ToggleBtnComp
+                      key={key}
+                      active={sizeMetric === key}
+                      onClick={() => setSizeMetric(key)}
+                    >
+                      {label}
+                    </ToggleBtnComp>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ height: 1, background: C.border, margin: "12px 0 0" }} />
+
+              {/* Top-N highlight */}
+              <div style={{ padding: "10px 14px 0" }}>
+                <div style={{
+                  fontSize: 10, color: C.textMuted, letterSpacing: "1px",
+                  textTransform: "uppercase", marginBottom: 6,
+                }}>Highlight top performers</div>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  <ToggleBtnComp active={!topN} onClick={() => setTopN(null)}>All</ToggleBtnComp>
+                  {[5, 10, 20].map((n) => (
+                    <ToggleBtnComp
+                      key={n}
+                      active={topN === n}
+                      onClick={() => setTopN(n)}
+                    >
+                      Top {n}
+                    </ToggleBtnComp>
+                  ))}
+                </div>
+
+                {topN && (
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
+                    <ToggleBtnComp
+                      active={topDir === "gainers"}
+                      onClick={() => setTopDir("gainers")}
+                    >
+                      Gainers
+                    </ToggleBtnComp>
+                    <ToggleBtnComp
+                      active={topDir === "losers"}
+                      onClick={() => setTopDir("losers")}
+                    >
+                      Losers
+                    </ToggleBtnComp>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ height: 1, background: C.border, margin: "12px 0 0" }} />
+
+              {/* Live data */}
+              <div style={{ padding: "10px 14px 0" }}>
+                <div style={{
+                  fontSize: 10, color: C.textMuted, letterSpacing: "1px",
+                  textTransform: "uppercase", marginBottom: 6,
+                }}>Data source</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                  <span style={dataBadgeStyle(dataStatus)}>
+                    {dataStatus === "loading" ? "Loading…" :
+                     dataStatus === "live"    ? "LIVE"     :
+                     dataStatus === "partial" ? "PARTIAL"  : "MOCK"}
+                  </span>
+                  {hasFinnhubKey() && (
+                    <button
+                      onClick={loadLiveData}
+                      disabled={dataStatus === "loading"}
+                      onMouseEnter={() => setHoveredBtn("refresh")}
+                      onMouseLeave={() => setHoveredBtn(null)}
+                      style={{
+                        padding: "3px 10px",
+                        fontFamily: '"IBM Plex Mono", monospace',
+                        fontSize: 10,
+                        background: "transparent",
+                        border: `1px solid ${hoveredBtn === "refresh" && dataStatus !== "loading" ? C.accent + "66" : C.border}`,
+                        borderRadius: 4,
+                        color: hoveredBtn === "refresh" && dataStatus !== "loading" ? C.accent : C.textSecondary,
+                        cursor: dataStatus === "loading" ? "not-allowed" : "pointer",
+                        transition: "all 0.15s ease",
+                        opacity: dataStatus === "loading" ? 0.4 : 1,
+                      }}
+                    >
+                      Refresh
+                    </button>
+                  )}
+                </div>
+                {lastUpdated && (
+                  <div style={{ fontSize: 10, color: C.textMuted, marginTop: 4 }}>
+                    Updated {lastUpdated.toLocaleTimeString()}
+                  </div>
+                )}
+                {!hasFinnhubKey() && (
+                  <div style={{ fontSize: 10, color: C.textMuted, marginTop: 4 }}>
+                    Set VITE_FINNHUB_KEY for live data
+                  </div>
+                )}
+                {dataStatus === "loading" && (
+                  <div style={{ fontSize: 10, color: C.textMuted, marginTop: 4 }}>
+                    Fetching ~36 quotes (rate-limited, ~36s)…
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── Stats bar (bottom of screen) ──────────────────────────────── */}
+          <div className="mhp-stats-bar" style={{
+            position: "absolute", bottom: 0, left: 0, right: 0, height: 38,
+            display: "flex", alignItems: "center",
+            background: C.surface + "EE", borderTop: `1px solid ${C.border}`,
+            backdropFilter: "blur(8px)", padding: "0 16px", gap: 24,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <span style={{ fontSize: 10, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.5px" }}>Assets</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: C.textPrimary }}>{stats.total}</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <span style={{ fontSize: 10, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.5px" }}>Gainers</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: C.green }}>▲ {stats.gainers}</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <span style={{ fontSize: 10, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.5px" }}>Losers</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: C.red }}>▼ {stats.losers}</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <span style={{ fontSize: 10, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.5px" }}>Avg Δ</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: changeColor(stats.avgChange) }}>
+                {fmtPct(stats.avgChange)}
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <span style={{ fontSize: 10, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.5px" }}>Total Mkt Cap</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: C.textPrimary }}>{fmtLarge(stats.totalMCap)}</span>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto", flexShrink: 0 }}>
+              <span style={{ fontSize: 10, color: C.textMuted }}>−5%</span>
+              <div
+                title="Color = 1-day % change (±5% scale)"
+                style={{
+                  width: 80, height: 8, borderRadius: 4,
+                  background: "linear-gradient(to right, #991833, #FF2D55, #334455, #009950, #00FF9D)",
+                }}
               />
-            </PanelSection>
+              <span style={{ fontSize: 10, color: C.textMuted }}>+5%</span>
+              <span style={{ marginLeft: 8, fontSize: 9, color: C.textMuted }}>
+                SIZE = {sizeMetric === "marketCap" ? "Market Cap" : "Volume"}
+              </span>
+            </div>
+          </div>
 
-            <Divider />
-
-            {/* Cell size metric */}
-            <PanelSection>
-              <Label>Cell size driven by</Label>
-              <BtnGroup>
-                {[
-                  { key: "volume",    label: "Volume" },
-                  { key: "marketCap", label: "Mkt Cap" },
-                ].map(({ key, label }) => (
-                  <ToggleBtn
-                    key={key}
-                    $active={sizeMetric === key}
-                    onClick={() => setSizeMetric(key)}
-                  >
-                    {label}
-                  </ToggleBtn>
+          {/* ── Compare bar (above stats bar, shows pinned stocks) ─────────── */}
+          {pinnedStocks.length > 0 && (
+            <div className="mhp-compare-bar" style={{
+              position: "absolute", bottom: 38, left: 240,
+              right: selectedStock ? 300 : 0,
+              background: C.surface + "EE", borderTop: `1px solid ${C.border}`,
+              borderLeft: `1px solid ${C.border}`, backdropFilter: "blur(8px)",
+              padding: "10px 16px",
+            }}>
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                marginBottom: 8, fontSize: 10, color: C.textMuted,
+                textTransform: "uppercase", letterSpacing: "1px",
+              }}>
+                <span>Compare ({pinnedStocks.length}/3)</span>
+                <button
+                  onClick={() => setPinnedStocks([])}
+                  onMouseEnter={() => setHoveredBtn("clear")}
+                  onMouseLeave={() => setHoveredBtn(null)}
+                  style={{
+                    background: "transparent", border: "none",
+                    color: hoveredBtn === "clear" ? C.red : C.textMuted,
+                    fontSize: 10, cursor: "pointer", fontFamily: '"IBM Plex Mono", monospace',
+                    letterSpacing: "0.5px",
+                  }}
+                >Clear all</button>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                {pinnedStocks.map((s) => (
+                  <div key={s.symbol} style={{
+                    position: "relative", padding: "8px 28px 8px 10px",
+                    background: C.bg, border: `1px solid ${C.border}`,
+                    borderRadius: 5, minWidth: 100,
+                  }}>
+                    <div style={{
+                      fontFamily: '"Barlow Condensed", sans-serif',
+                      fontSize: 14, fontWeight: 700, color: C.textPrimary,
+                    }}>{s.symbol}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: changeColor(s.changePercent) }}>
+                      {fmtPct(s.changePercent)}
+                    </div>
+                    <div style={{ fontSize: 10, color: C.textMuted, marginTop: 2 }}>
+                      {fmtPrice(s.price)}
+                    </div>
+                    <button
+                      onClick={() => handleUnpin(s.symbol)}
+                      style={{
+                        position: "absolute", top: 4, right: 4,
+                        background: "transparent", border: "none",
+                        color: C.textMuted, fontSize: 11, cursor: "pointer", padding: "2px 4px",
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = C.red}
+                      onMouseLeave={(e) => e.currentTarget.style.color = C.textMuted}
+                    >✕</button>
+                  </div>
                 ))}
-              </BtnGroup>
-            </PanelSection>
+              </div>
+            </div>
+          )}
 
-            <Divider />
+          {/* ── Detail panel (right side, slides in on cell click) ─────────── */}
+          {selectedStock && (
+            <div className="mhp-detail-panel" style={{
+              position: "absolute", top: 0, right: 0, bottom: 38, width: 300,
+              background: C.surface, borderLeft: `1px solid ${C.border}`,
+              overflowY: "auto", display: "flex", flexDirection: "column",
+            }}>
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "14px 16px 10px", borderBottom: `1px solid ${C.border}`, flexShrink: 0,
+              }}>
+                <div style={{
+                  fontFamily: '"Barlow Condensed", sans-serif',
+                  fontSize: 22, fontWeight: 700, color: C.textPrimary,
+                }}>{selectedStock.symbol}</div>
+                <button
+                  onClick={() => setSelectedStock(null)}
+                  style={{
+                    background: "transparent", border: "none", color: C.textMuted,
+                    fontSize: 16, cursor: "pointer", padding: "2px 6px", borderRadius: 3,
+                    transition: "color 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = C.textPrimary}
+                  onMouseLeave={(e) => e.currentTarget.style.color = C.textMuted}
+                >✕</button>
+              </div>
 
-            {/* Top-N highlight */}
-            <PanelSection>
-              <Label>Highlight top performers</Label>
-              <BtnGroup>
-                <ToggleBtn $active={!topN} onClick={() => setTopN(null)}>All</ToggleBtn>
-                {[5, 10, 20].map((n) => (
-                  <ToggleBtn
-                    key={n}
-                    $active={topN === n}
-                    onClick={() => setTopN(n)}
-                  >
-                    Top {n}
-                  </ToggleBtn>
-                ))}
-              </BtnGroup>
+              <div style={{ padding: "14px 16px", flex: 1 }}>
+                <div style={{ fontSize: 12, color: C.textSecondary, marginBottom: 14, lineHeight: 1.4 }}>
+                  {selectedStock.name}
+                </div>
 
-              {topN && (
-                <BtnGroup style={{ marginTop: 6 }}>
-                  <ToggleBtn
-                    $active={topDir === "gainers"}
-                    onClick={() => setTopDir("gainers")}
-                  >
-                    Gainers
-                  </ToggleBtn>
-                  <ToggleBtn
-                    $active={topDir === "losers"}
-                    onClick={() => setTopDir("losers")}
-                  >
-                    Losers
-                  </ToggleBtn>
-                </BtnGroup>
-              )}
-            </PanelSection>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {[
+                    { label: "Sector", value: selectedStock.sector },
+                    { label: "Price", value: fmtPrice(selectedStock.price) },
+                    { label: "Change ($)", value: `${selectedStock.change >= 0 ? "+" : ""}${fmtPrice(selectedStock.change)}`, color: changeColor(selectedStock.changePercent) },
+                    { label: "Change (%)", value: fmtPct(selectedStock.changePercent), color: changeColor(selectedStock.changePercent) },
+                    { label: "Volume", value: fmtLarge(selectedStock.volume) },
+                    ...(selectedBase?.marketCap ? [{ label: "Market Cap", value: fmtLarge(selectedBase.marketCap) }] : []),
+                    ...(dataStatus !== "mock" && lastUpdated ? [{ label: "Updated", value: lastUpdated.toLocaleTimeString(), style: { fontSize: 10 } }] : []),
+                  ].map((row, i, arr) => (
+                    <div key={row.label} style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      padding: "6px 0",
+                      borderBottom: i < arr.length - 1 ? `1px solid ${C.border}66` : "none",
+                    }}>
+                      <span style={{ fontSize: 11, color: C.textMuted }}>{row.label}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: row.color || C.textPrimary, ...(row.style || {}) }}>
+                        {row.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-            <Divider />
-
-            {/* Live data */}
-            <PanelSection>
-              <Label>Data source</Label>
-              <DataRow>
-                <DataBadge $status={dataStatus}>
-                  {dataStatus === "loading" ? "Loading…" :
-                   dataStatus === "live"    ? "LIVE"     :
-                   dataStatus === "partial" ? "PARTIAL"  : "MOCK"}
-                </DataBadge>
-                {hasFinnhubKey() && (
-                  <RefreshBtn
-                    onClick={loadLiveData}
-                    disabled={dataStatus === "loading"}
-                  >
-                    Refresh
-                  </RefreshBtn>
-                )}
-              </DataRow>
-              {lastUpdated && (
-                <SubLabel>Updated {lastUpdated.toLocaleTimeString()}</SubLabel>
-              )}
-              {!hasFinnhubKey() && (
-                <SubLabel>Set VITE_FINNHUB_KEY for live data</SubLabel>
-              )}
-              {dataStatus === "loading" && (
-                <SubLabel>Fetching ~36 quotes (rate-limited, ~36s)…</SubLabel>
-              )}
-            </PanelSection>
-          </CtrlPanel>
-        )}
-
-        {/* ── Stats bar (bottom of screen) ──────────────────────────────── */}
-        <StatsBar>
-          <StatItem>
-            <StatLabel>Assets</StatLabel>
-            <StatVal>{stats.total}</StatVal>
-          </StatItem>
-          <StatItem>
-            <StatLabel>Gainers</StatLabel>
-            <StatVal $c={C.green}>▲ {stats.gainers}</StatVal>
-          </StatItem>
-          <StatItem>
-            <StatLabel>Losers</StatLabel>
-            <StatVal $c={C.red}>▼ {stats.losers}</StatVal>
-          </StatItem>
-          <StatItem>
-            <StatLabel>Avg Δ</StatLabel>
-            <StatVal $c={changeColor(stats.avgChange)}>
-              {fmtPct(stats.avgChange)}
-            </StatVal>
-          </StatItem>
-          <StatItem>
-            <StatLabel>Total Mkt Cap</StatLabel>
-            <StatVal>{fmtLarge(stats.totalMCap)}</StatVal>
-          </StatItem>
-
-          <LegendWrap>
-            <LegendLbl>−5%</LegendLbl>
-            <LegendGradient title="Color = 1-day % change (±5% scale)" />
-            <LegendLbl>+5%</LegendLbl>
-            <LegendLbl style={{ marginLeft: 8, fontSize: 9 }}>
-              SIZE = {sizeMetric === "marketCap" ? "Market Cap" : "Volume"}
-            </LegendLbl>
-          </LegendWrap>
-        </StatsBar>
-
-        {/* ── Compare bar (above stats bar, shows pinned stocks) ─────────── */}
-        {pinnedStocks.length > 0 && (
-          <CompareBar $detailOpen={!!selectedStock}>
-            <CompareTitle>
-              <span>Compare ({pinnedStocks.length}/3)</span>
-              <ClearBtn onClick={() => setPinnedStocks([])}>Clear all</ClearBtn>
-            </CompareTitle>
-            <CompareGrid>
-              {pinnedStocks.map((s) => (
-                <CompareCard key={s.symbol}>
-                  <CCSym>{s.symbol}</CCSym>
-                  <CCPct $c={changeColor(s.changePercent)}>
-                    {fmtPct(s.changePercent)}
-                  </CCPct>
-                  <CCPrice>{fmtPrice(s.price)}</CCPrice>
-                  <CCRemove onClick={() => handleUnpin(s.symbol)}>✕</CCRemove>
-                </CompareCard>
-              ))}
-            </CompareGrid>
-          </CompareBar>
-        )}
-
-        {/* ── Detail panel (right side, slides in on cell click) ─────────── */}
-        {selectedStock && (
-          <DetailPanel>
-            <DetailHeader>
-              <DetailSymbol>{selectedStock.symbol}</DetailSymbol>
-              <CloseBtn onClick={() => setSelectedStock(null)}>✕</CloseBtn>
-            </DetailHeader>
-
-            <DetailBody>
-              <DetailName>{selectedStock.name}</DetailName>
-
-              <DetailTable>
-                <DRow>
-                  <DKey>Sector</DKey>
-                  <DVal>{selectedStock.sector}</DVal>
-                </DRow>
-                <DRow>
-                  <DKey>Price</DKey>
-                  <DVal>{fmtPrice(selectedStock.price)}</DVal>
-                </DRow>
-                <DRow>
-                  <DKey>Change ($)</DKey>
-                  <DVal $c={changeColor(selectedStock.changePercent)}>
-                    {selectedStock.change >= 0 ? "+" : ""}
-                    {fmtPrice(selectedStock.change)}
-                  </DVal>
-                </DRow>
-                <DRow>
-                  <DKey>Change (%)</DKey>
-                  <DVal $c={changeColor(selectedStock.changePercent)}>
-                    {fmtPct(selectedStock.changePercent)}
-                  </DVal>
-                </DRow>
-                <DRow>
-                  <DKey>Volume</DKey>
-                  <DVal>{fmtLarge(selectedStock.volume)}</DVal>
-                </DRow>
-                {selectedBase?.marketCap && (
-                  <DRow>
-                    <DKey>Market Cap</DKey>
-                    <DVal>{fmtLarge(selectedBase.marketCap)}</DVal>
-                  </DRow>
-                )}
-                {dataStatus !== "mock" && lastUpdated && (
-                  <DRow>
-                    <DKey>Updated</DKey>
-                    <DVal style={{ fontSize: 10 }}>
-                      {lastUpdated.toLocaleTimeString()}
-                    </DVal>
-                  </DRow>
-                )}
-              </DetailTable>
-            </DetailBody>
-
-            <ActionRow>
-              <ActionBtn
-                $primary={!isPinned}
-                onClick={() => handlePin(selectedStock)}
-                disabled={!isPinned && pinnedStocks.length >= 3}
-                title={!isPinned && pinnedStocks.length >= 3 ? "Max 3 pinned" : ""}
-              >
-                {isPinned ? "Unpin" : "Compare"}
-              </ActionBtn>
-              <ActionBtn onClick={() => setSelectedStock(null)}>
-                Close
-              </ActionBtn>
-            </ActionRow>
-          </DetailPanel>
-        )}
-      </FloatLayer>
-    </PageRoot>
+              <div style={{
+                display: "flex", gap: 8, padding: "14px 16px",
+                borderTop: `1px solid ${C.border}`, flexShrink: 0,
+              }}>
+                <ActionBtnComp
+                  primary={!isPinned}
+                  onClick={() => handlePin(selectedStock)}
+                  disabled={!isPinned && pinnedStocks.length >= 3}
+                  title={!isPinned && pinnedStocks.length >= 3 ? "Max 3 pinned" : ""}
+                >
+                  {isPinned ? "Unpin" : "Compare"}
+                </ActionBtnComp>
+                <ActionBtnComp onClick={() => setSelectedStock(null)}>
+                  Close
+                </ActionBtnComp>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
     </MarketsPageLayout>
   );
 }

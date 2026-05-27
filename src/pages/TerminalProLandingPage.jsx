@@ -4,37 +4,19 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/useAuth.js';
 import { ROUTES } from '../lib/routes.js';
 import GMTHomepageHeader from '../components/GMTHomepageHeader.jsx';
-import styled, { keyframes } from 'styled-components';
 
-// ─── Decorative elements ─────────────────────────────────────────────────────
-const orbFloat = keyframes`
-  0%, 100% { transform: translate(-50%, -50%) scale(1); }
-  33%      { transform: translate(calc(-50% + 30px), calc(-50% - 20px)) scale(1.05); }
-  66%      { transform: translate(calc(-50% - 20px), calc(-50% + 15px)) scale(0.97); }
-`;
-
-const GridOverlay = styled.div`
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-  background-size: 60px 60px;
-  pointer-events: none;
-`;
-
-const GradientOrb = styled.div`
-  position: absolute;
-  width: 600px;
-  height: 600px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 70%);
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  animation: ${orbFloat} 14s ease-in-out infinite;
-  pointer-events: none;
-`;
+// ── Scoped styles for keyframes ───────────────────────────────────────────────
+function ScopedStyles() {
+  return (
+    <style>{`
+      @keyframes tplp-orbFloat {
+        0%, 100% { transform: translate(-50%, -50%) scale(1); }
+        33%      { transform: translate(calc(-50% + 30px), calc(-50% - 20px)) scale(1.05); }
+        66%      { transform: translate(calc(-50% - 20px), calc(-50% + 15px)) scale(0.97); }
+      }
+    `}</style>
+  );
+}
 
 // ─── Mock terminal card ──────────────────────────────────────────────────────
 const MOCK_ASSETS = [
@@ -86,6 +68,7 @@ export default function TerminalProLandingPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#080f1a', color: '#e2e8f0', fontFamily: "'IBM Plex Sans', sans-serif" }}>
+      <ScopedStyles />
       <GMTHomepageHeader
         lang={lang}
         onLangChange={handleLangChange}
@@ -95,8 +78,19 @@ export default function TerminalProLandingPage() {
 
       {/* ── Section 1: Hero ──────────────────────────────────────────── */}
       <section style={{ padding: '80px 40px 64px', position: 'relative', overflow: 'hidden', textAlign: 'center' }}>
-        <GridOverlay />
-        <GradientOrb />
+        {/* GridOverlay */}
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          backgroundImage: 'linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)',
+          backgroundSize: '60px 60px',
+        }} />
+        {/* GradientOrb */}
+        <div style={{
+          position: 'absolute', width: 600, height: 600, borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 70%)',
+          top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+          animation: 'tplp-orbFloat 14s ease-in-out infinite', pointerEvents: 'none',
+        }} />
         <div style={{ position: 'relative', zIndex: 1, maxWidth: 680, margin: '0 auto' }}>
           <div style={{
             display: 'inline-block',
