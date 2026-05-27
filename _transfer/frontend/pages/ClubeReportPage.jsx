@@ -1,0 +1,1125 @@
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth.js';
+import { hasRole } from '../lib/roles.js';
+import { ROUTES } from '../lib/routes.js';
+import {
+  calculateNAVFromHistory,
+  calculateDrawdown,
+  calculateVolatility,
+  calculateRVCompliance,
+  formatCurrency,
+  formatPct,
+} from '../services/portfolioEngine.js';
+
+import { CLUBE_COLORS, CLUBE_FONTS } from '../clube/styles/index.js';
+
+const C        = CLUBE_COLORS;
+const BG_PAGE  = C.bg;
+const BG_HEAD  = C.bgHead;
+const BG_CARD  = C.bgCard;
+const BG_CARD2 = C.bgCardElevated;
+const BORDER   = C.borderSubtle;
+const BORDER2  = C.borderFaint;
+const TXT_1    = C.textPrimary;
+const TXT_2    = C.textMain;
+const TXT_3    = C.textDim;
+const TXT_4    = C.textFaint;
+const ACCENT   = C.accent;
+const GREEN    = C.green;
+const RED      = C.red;
+const AMBER    = C.amber;
+const GOLD     = C.accent;
+const MONO     = CLUBE_FONTS.mono;
+
+const PT_MONTHS = [
+  'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+  'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro',
+];
+
+// ── Print styles ───────────────────────────────────────────────────────────────
+const PRINT_STYLE_ID = 'clube-report-print-styles';
+
+function injectPrintStyles() {
+  if (typeof document === 'undefined' || document.getElementById(PRINT_STYLE_ID)) return;
+  const el = document.createElement('style');
+  el.id = PRINT_STYLE_ID;
+  el.textContent = `
+    @media print {
+      body { background: #fff !important; color: #000 !important; }
+      #report-header-bar { display: none !important; }
+      #report-content {
+        max-width: 100% !important;
+        padding: 20px !important;
+        background: #fff !important;
+        color: #000 !important;
+      }
+      #report-content * { color: #000 !important; border-color: #ccc !important; }
+      #report-content .no-print { display: none !important; }
+    }
+  `;
+  document.head.appendChild(el);
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+function fmtDate(dateStr) {
+  if (!dateStr) return '—';
+  return dateStr.split('-').reverse().join('/');
+}
+
+function signColor(v) {
+  if (v == null || (typeof v === 'number' && isNaN(v))) return TXT_1;
+  if (v > 0) return GREEN;
+  if (v < 0) return RED;
+  return TXT_1;
+}
+
+// ── Simplified NAV chart (2 series, print-friendly) ───────────────────────────
+function ReportNavChart({ navSeries, ibovSeries }) {
+  if (!navSeries || navSeries.length < 2) {
+    return (
+      <div style={{
+        height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <div style={{ fontFamily: MONO, fontSize: 12, color: TXT_3, textAlign: 'center', lineHeight: 1.8 }}>
+          Registre entradas de NAV diárias para visualizar a evolução.
+        </div>
+      </div>
+    );
+  }
+
+  const W = 800, H = 180;
+  const PAD = { t: 12, r: 20, b: 24, l: 20 };
+  const cW = W - PAD.l - PAD.r;
+  const cH = H - PAD.t - PAD.b;
+  const N  = navSeries.length;
+
+  const allVals = [
+    ...navSeries.map(p => p.nav),
+    ...(ibovSeries ?? []).map(p => p.nav),
+  ];
+  const minV  = Math.min(...allVals);
+  const maxV  = Math.max(...allVals);
+  const range = maxV - minV || 1;
+
+  const toX = (i) => PAD.l + (i / Math.max(N - 1, 1)) * cW;
+  const toY = (v) => PAD.t + cH - ((v - minV) / range) * cH;
+
+  const pts = (series) =>
+    series.map((p, i) => `${toX(i).toFixed(1)},${toY(p.nav).toFixed(1)}`).join(' ');
+
+  const firstDate = navSeries[0]?.date     ? fmtDate(navSeries[0].date)     : '';
+  const lastDate  = navSeries[N - 1]?.date ? fmtDate(navSeries[N - 1].date) : '';
+
+  return (
+    <div>
+      <svg
+        width="100%"
+        height={H}
+        viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="none"
+        style={{ display: 'block' }}
+      >
+        {/* Grid lines at 25%, 50%, 75% */}
+        {[0.25, 0.5, 0.75].map((pct, i) => {
+          const y = PAD.t + pct * cH;
+          return (
+            <line key={i}
+              x1={PAD.l} y1={y} x2={W - PAD.r} y2={y}
+              stroke="rgba(255,255,255,0.05)" strokeWidth={1}
+            />
+          );
+        })}
+        {/* IBOV */}
+        {ibovSeries && ibovSeries.length >= 2 && (
+          <polyline points={pts(ibovSeries)} fill="none" stroke={AMBER} strokeWidth={1.5} />
+        )}
+        {/* Portfolio */}
+        <polyline points={pts(navSeries)} fill="none" stroke={ACCENT} strokeWidth={1.5} />
+      </svg>
+
+      {/* Date labels */}
+      <div style={{
+        display: 'flex', justifyContent: 'space-between',
+        padding: '4px 20px 0', fontFamily: MONO, fontSize: 9, color: TXT_3,
+      }}>
+        <span>{firstDate}</span>
+        <span>{lastDate}</span>
+      </div>
+
+      {/* Legend */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 16, padding: '6px 20px 0' }}>
+        {[['Portfolio', ACCENT], ['IBOV', AMBER]].map(([label, color]) => (
+          <span key={label} style={{
+            fontFamily: MONO, fontSize: 10, color: TXT_2,
+            display: 'flex', alignItems: 'center', gap: 4,
+          }}>
+            <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: color }} />
+            {label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+export default function ClubeReportPage() {
+  const navigate         = useNavigate();
+  const { id: clubeIdParam } = useParams();
+  const { getToken, user } = useAuth();
+
+  const [clube,      setClube]      = useState(null);
+  const [navHistory, setNavHistory] = useState([]);
+  const [posicoes,   setPosicoes]   = useState([]);
+  const [cotistas,   setCotistas]   = useState(null);
+  const [period,     setPeriod]     = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState(null);
+  const [commentary, setCommentary] = useState('');
+  const [aiLoading,  setAiLoading]  = useState(false);
+  const [aiError,    setAiError]    = useState(null);
+
+  const [movimentacoesPeriodo, setMovimentacoesPeriodo] = useState([]);
+  const [documentos,           setDocumentos]           = useState([]);
+  const [sendingDoc,           setSendingDoc]           = useState(false);
+  const [sendSuccess,          setSendSuccess]          = useState(false);
+
+  const [docFilter,    setDocFilter]    = useState({ tipo: '', search: '' });
+  const [irYear,       setIrYear]       = useState(new Date().getFullYear() - 1);
+  const [irGenerating, setIrGenerating] = useState(false);
+  const [irResult,     setIrResult]     = useState(null);
+
+  useEffect(() => { injectPrintStyles(); }, []);
+
+  // ── Data fetch ───────────────────────────────────────────────────────────────
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      setError(null);
+      try {
+        const token = await getToken();
+        if (!token) throw new Error('Sessão expirada. Faça login novamente.');
+        const headers = { Authorization: `Bearer ${token}` };
+
+        const clubeRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes/${clubeIdParam}`, { headers });
+        if (!clubeRes.ok) { setClube(null); setLoading(false); return; }
+        const c = await clubeRes.json();
+        setClube(c);
+
+        const [posicoesRes, cotistasRes, navRes, movRes, docsRes] = await Promise.all([
+          fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes/${c.id}/posicoes`, { headers }),
+          fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes/${c.id}/cotistas`, { headers }),
+          fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes/${c.id}/nav`,      { headers }),
+          fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes/${c.id}/movimentacoes?periodo=${period}`, { headers }),
+          fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/clubes/${c.id}/documentos/archive`, { headers }),
+        ]);
+
+        const posicoesData = posicoesRes.ok ? await posicoesRes.json() : [];
+        const cotistasRaw  = cotistasRes.ok ? await cotistasRes.json() : null;
+        const navData      = navRes.ok      ? await navRes.json()      : [];
+        const movData      = movRes?.ok     ? await movRes.json()      : [];
+        const docsData     = docsRes?.ok    ? await docsRes.json()     : [];
+
+        setPosicoes(Array.isArray(posicoesData) ? posicoesData : []);
+        setCotistas(cotistasRaw
+          ? { data: cotistasRaw.cotistas ?? [], summary: cotistasRaw.summary ?? {} }
+          : null);
+        setNavHistory(Array.isArray(navData) ? navData : []);
+        setMovimentacoesPeriodo(Array.isArray(movData) ? movData : []);
+        setDocumentos(Array.isArray(docsData) ? docsData : []);
+      } catch (err) {
+        setError(err.message ?? 'Erro desconhecido');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, [getToken]);
+
+  // ── Refresh movimentacoes when period changes ──────────────────────────────
+  useEffect(() => {
+    if (!clube?.id) return;
+    async function fetchMovForPeriod() {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL || ''}/api/v1/clubes/${clube.id}/movimentacoes?periodo=${period}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (res.ok) setMovimentacoesPeriodo(await res.json());
+      } catch (_) {}
+    }
+    fetchMovForPeriod();
+  }, [clube?.id, period, getToken]);
+
+  // ── Period filtering ─────────────────────────────────────────────────────────
+  const periodNavHistory = useMemo(() => {
+    if (!navHistory.length) return [];
+    return navHistory.filter(e => e.data.startsWith(period));
+  }, [navHistory, period]);
+
+  const periodStartNAV = useMemo(() => {
+    const [year, month] = period.split('-').map(Number);
+    const periodStart   = `${year}-${String(month).padStart(2, '0')}-01`;
+    const before        = navHistory.filter(e => e.data < periodStart);
+    return before.length ? before[before.length - 1] : null;
+  }, [navHistory, period]);
+
+  const periodAnalytics = useMemo(() => {
+    if (!periodNavHistory.length) return null;
+    const baseClube = {
+      ...clube,
+      valor_cota_inicial: periodStartNAV?.valor_cota
+        ?? clube?.valor_cota_inicial
+        ?? 1000,
+    };
+    return calculateNAVFromHistory(periodNavHistory, baseClube);
+  }, [periodNavHistory, periodStartNAV, clube]);
+
+  const periodDrawdown = useMemo(() =>
+    periodAnalytics ? calculateDrawdown(periodAnalytics.navSeries) : null,
+    [periodAnalytics]);
+
+  const periodVolatility = useMemo(() =>
+    calculateVolatility(periodNavHistory, null), [periodNavHistory]);
+
+  const rvCompliance = useMemo(() =>
+    calculateRVCompliance(posicoes), [posicoes]);
+
+  // ── Period selector options (unique YYYY-MM) ─────────────────────────────────
+  const periodOptions = useMemo(() => {
+    const seen = new Set();
+    const opts = [];
+    for (const e of navHistory) {
+      const ym = e.data.slice(0, 7);
+      if (!seen.has(ym)) {
+        seen.add(ym);
+        const [yr, mo] = ym.split('-').map(Number);
+        opts.push({ value: ym, label: `${PT_MONTHS[mo - 1]} ${yr}` });
+      }
+    }
+    return opts;
+  }, [navHistory]);
+
+  // ── Display helpers ──────────────────────────────────────────────────────────
+  const periodLabel = useMemo(() => {
+    const [yr, mo] = period.split('-').map(Number);
+    return `${PT_MONTHS[mo - 1].toUpperCase()} ${yr}`;
+  }, [period]);
+
+  const todayFormatted = useMemo(() => {
+    const d = new Date();
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  }, []);
+
+  // ── AI commentary generation ─────────────────────────────────────────────────
+  const generateCommentary = useCallback(async () => {
+    if (!clube) return;
+
+    const [yr, mo]       = period.split('-').map(Number);
+    const periodoFormatado = `${PT_MONTHS[mo - 1]} ${yr}`;
+
+    const ctx = {
+      clube: {
+        nome:             clube.nome,
+        periodo:          period,
+        periodoFormatado,
+      },
+      desempenho: {
+        retornoPeriodo: periodAnalytics?.totalReturnPct ?? null,
+        retornoIbov:    periodAnalytics?.ibovReturnPct  ?? null,
+        retornoCdi:     periodAnalytics?.cdiReturnPct   ?? null,
+        alphaIbov:      periodAnalytics
+          ? (periodAnalytics.totalReturnPct - periodAnalytics.ibovReturnPct)
+          : null,
+        alphaCdi:       periodAnalytics
+          ? (periodAnalytics.totalReturnPct - periodAnalytics.cdiReturnPct)
+          : null,
+      },
+      risco: {
+        maxDrawdown:   periodDrawdown?.maxDrawdownPct     ?? null,
+        drawdownAtual: periodDrawdown?.currentDrawdown    ?? null,
+        volatilidade:  periodVolatility?.annualizedVolPct ?? null,
+      },
+      carteira: posicoes.map(p => ({
+        symbol: p.asset?.symbol,
+        nome:   p.asset?.name,
+        grupo:  p.asset?.group_id,
+        peso:   p.peso_alvo,
+      })),
+      cotistas: {
+        total:      cotistas?.summary?.total_cotistas  ?? null,
+        patrimonio: cotistas?.summary?.patrimonio_total ?? null,
+        valorCota:  cotistas?.summary?.valor_cota_atual ?? null,
+      },
+      enquadramento: {
+        percentualRV: (rvCompliance?.percentualRV ?? 0) * 100,
+        status:       rvCompliance?.status ?? 'NO_POSITIONS',
+        conforme:     rvCompliance?.compliant ?? false,
+      },
+    };
+
+    const userPrompt = `Você é o gestor de um clube de investimento brasileiro.
+Escreva a carta mensal do clube para o período ${ctx.clube.periodoFormatado}.
+
+Use os dados abaixo para fundamentar o comentário:
+${JSON.stringify(ctx, null, 2)}
+
+Instruções:
+- Escreva em português brasileiro, tom profissional mas acessível
+- Estruture em 3 parágrafos: (1) contexto e desempenho, (2) composição e decisões, (3) perspectivas
+- Seja objetivo — máximo 250 palavras no total
+- Não invente dados além dos fornecidos acima
+- Não use markdown, asteriscos ou formatação especial — apenas texto corrido
+- Se retornoPeriodo for null, mencione que os dados do período ainda estão sendo consolidados
+- Nunca faça recomendações de compra ou venda`;
+
+    setAiLoading(true);
+    setAiError(null);
+    setCommentary('');
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type':      'application/json',
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model:      'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          messages:   [{ role: 'user', content: userPrompt }],
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err?.error?.message || `API error ${response.status}`);
+      }
+
+      const data = await response.json();
+      const text = data.content
+        ?.filter(b => b.type === 'text')
+        .map(b => b.text)
+        .join('') || '';
+
+      setCommentary(text);
+    } catch (e) {
+      setAiError(e.message);
+    } finally {
+      setAiLoading(false);
+    }
+  }, [clube, periodAnalytics, periodDrawdown, periodVolatility, posicoes, cotistas, period, rvCompliance]);
+
+  // ── Send report ────────────────────────────────────────────────────────────
+  const sendReport = useCallback(async () => {
+    if (!clube?.id) return;
+    setSendingDoc(true);
+    setSendSuccess(false);
+    try {
+      const token = await getToken();
+      const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+      const base = import.meta.env.VITE_API_URL || '';
+
+      const payload = {
+        tipo: 'anexo_b',
+        periodo: period,
+        payload_json: {
+          clube_nome: clube.nome,
+          periodo: period,
+          valor_cota: cotistas?.summary?.valor_cota_atual ?? null,
+          retorno_periodo: periodAnalytics?.totalReturnPct ?? null,
+          retorno_ibov: periodAnalytics?.ibovReturnPct ?? null,
+          cotistas_count: cotistas?.summary?.total_cotistas ?? null,
+          patrimonio: cotistas?.summary?.patrimonio_total ?? null,
+          generated_at: new Date().toISOString(),
+        },
+      };
+
+      let docId = null;
+      const createRes = await fetch(`${base}/api/v1/clubes/${clube.id}/documentos`, {
+        method: 'POST', headers, body: JSON.stringify(payload),
+      });
+
+      if (createRes.status === 409) {
+        const existing = documentos.find(d => d.tipo === 'anexo_b' && d.periodo === period && !d.cotista_id);
+        docId = existing?.id ?? null;
+      } else if (createRes.ok) {
+        const created = await createRes.json();
+        docId = created.id;
+        setDocumentos(prev => [created, ...prev]);
+      }
+
+      if (!docId) throw new Error('Não foi possível localizar ou criar o registro do documento.');
+
+      const enviadoRes = await fetch(`${base}/api/v1/clubes/${clube.id}/documentos/${docId}/enviado`, {
+        method: 'PATCH', headers,
+      });
+      if (!enviadoRes.ok) throw new Error('Erro ao registrar envio do documento.');
+      const updated = await enviadoRes.json();
+      setDocumentos(prev => prev.map(d => d.id === updated.id ? updated : d));
+      setSendSuccess(true);
+      setTimeout(() => setSendSuccess(false), 3000);
+    } catch (err) {
+      alert(err.message ?? 'Erro ao enviar relatório');
+    } finally {
+      setSendingDoc(false);
+    }
+  }, [clube, period, getToken, documentos, periodAnalytics, cotistas]);
+
+  // ── Generate IR declarations ──────────────────────────────────────────────
+  const generateIR = useCallback(async (year) => {
+    if (!clube?.id) return;
+    setIrGenerating(true);
+    setIrResult(null);
+    try {
+      const token = await getToken();
+      const base  = import.meta.env.VITE_API_URL || '';
+      const res   = await fetch(
+        `${base}/api/v1/clubes/${clube.id}/documentos/ir/${year}`,
+        { method: 'POST', headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) throw new Error(`Erro ao gerar declarações (${res.status})`);
+      const data = await res.json();
+      setIrResult(data);
+      const docsRes = await fetch(
+        `${base}/api/v1/clubes/${clube.id}/documentos/archive`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (docsRes.ok) setDocumentos(await docsRes.json());
+    } catch (err) {
+      alert(err.message ?? 'Erro ao gerar IR');
+    } finally {
+      setIrGenerating(false);
+    }
+  }, [clube?.id, getToken]);
+
+  // ── Loading / error states ───────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div style={{
+        height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: BG_PAGE, fontFamily: MONO,
+      }}>
+        <div style={{ fontSize: 12, color: TXT_3, letterSpacing: '0.1em' }}>
+          CARREGANDO RELATÓRIO...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{
+        height: '100vh', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        background: BG_PAGE, fontFamily: MONO, gap: 12,
+      }}>
+        <div style={{ fontSize: 12, color: RED }}>{error}</div>
+        <button
+          onClick={() => navigate(ROUTES.clube.list)}
+          style={{
+            padding: '8px 20px', background: 'transparent',
+            border: `1px solid ${BORDER2}`, borderRadius: 4,
+            color: TXT_2, fontFamily: MONO, fontSize: 11, cursor: 'pointer',
+          }}
+        >← Voltar</button>
+      </div>
+    );
+  }
+
+  if (!clube) {
+    return (
+      <div style={{
+        height: '100vh', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        background: BG_PAGE, fontFamily: MONO, gap: 12,
+      }}>
+        <div style={{ fontSize: 12, color: TXT_2 }}>Nenhum clube encontrado.</div>
+        <button
+          onClick={() => navigate(ROUTES.clube.list)}
+          style={{
+            padding: '8px 20px', background: 'transparent',
+            border: `1px solid ${BORDER2}`, borderRadius: 4,
+            color: TXT_2, fontFamily: MONO, fontSize: 11, cursor: 'pointer',
+          }}
+        >← Voltar</button>
+      </div>
+    );
+  }
+
+  // ── Derived display values ───────────────────────────────────────────────────
+  const rvPct        = (rvCompliance?.percentualRV ?? 0) * 100 | 0;
+  const rvStatusText = rvCompliance?.status === 'OK' ? 'CONFORME' : 'DESENQUADRADO';
+  const rvColor      = rvCompliance?.status === 'OK' ? GREEN : RED;
+
+  // Shared table cell styles
+  const TH_STYLE = {
+    fontSize: 10, color: TXT_3, letterSpacing: '0.08em',
+    textTransform: 'uppercase', fontFamily: MONO,
+    padding: '8px 12px', borderBottom: `1px solid ${BORDER2}`, textAlign: 'left',
+  };
+  const TD_STYLE = {
+    fontSize: 13, fontFamily: MONO,
+    padding: '10px 12px', borderBottom: `1px solid ${BORDER}`,
+  };
+
+  // Performance table rows
+  const perfRows = [
+    { label: 'Retorno no Período',   carteira: periodAnalytics?.totalReturnPct,  bench: null },
+    { label: 'Retorno IBOV',         carteira: null,  bench: periodAnalytics?.ibovReturnPct },
+    { label: 'Retorno CDI',          carteira: null,  bench: periodAnalytics?.cdiReturnPct  },
+    { label: 'Alpha vs IBOV',        carteira: periodAnalytics ? (periodAnalytics.totalReturnPct - periodAnalytics.ibovReturnPct) : null, bench: null },
+    { label: 'Alpha vs CDI',         carteira: periodAnalytics ? (periodAnalytics.totalReturnPct - periodAnalytics.cdiReturnPct)  : null, bench: null },
+    { label: 'Volatilidade (a.a.)',  carteira: periodVolatility?.annualizedVolPct, bench: null },
+    { label: 'Max Drawdown',         carteira: periodDrawdown?.maxDrawdownPct,     bench: null },
+  ];
+
+  // ── Render ───────────────────────────────────────────────────────────────────
+  return (
+    <div style={{ minHeight: '100vh', background: BG_PAGE, fontFamily: MONO }}>
+
+      {/* ── Header bar (screen only) ───────────────────────────────────────── */}
+      <div
+        id="report-header-bar"
+        style={{
+          height: 56, display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', padding: '0 20px',
+          background: BG_HEAD, borderBottom: `1px solid ${BORDER}`,
+          position: 'sticky', top: 0, zIndex: 10,
+        }}
+      >
+        {/* Left */}
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <button
+            onClick={() => navigate(ROUTES.clube.list)}
+            style={{
+              background: BG_HEAD, border: 'none', cursor: 'pointer',
+              color: TXT_2, fontSize: 18, padding: '8px 12px',
+              fontFamily: MONO, lineHeight: 1,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.color = TXT_1; }}
+            onMouseLeave={e => { e.currentTarget.style.color = TXT_2; }}
+          >←</button>
+          <span style={{ fontSize: 11, color: ACCENT, letterSpacing: '0.2em' }}>GMT</span>
+          <span style={{ fontSize: 11, color: TXT_3, margin: '0 6px' }}>/</span>
+          <span style={{ fontSize: 11, color: TXT_2, letterSpacing: '0.2em' }}>CLUBE</span>
+          <span style={{ fontSize: 11, color: TXT_3, margin: '0 6px' }}>/</span>
+          <span style={{ fontSize: 11, color: TXT_1, letterSpacing: '0.2em' }}>RELATÓRIO</span>
+        </div>
+
+        {/* Right — controls */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* Period selector */}
+          <select
+            value={period}
+            onChange={e => setPeriod(e.target.value)}
+            style={{
+              background: BG_CARD2, border: `1px solid ${BORDER2}`,
+              color: TXT_1, fontFamily: MONO, fontSize: 11,
+              padding: '6px 10px', borderRadius: 3, cursor: 'pointer',
+            }}
+          >
+            {periodOptions.length === 0 && (
+              <option value={period}>
+                {PT_MONTHS[parseInt(period.split('-')[1], 10) - 1]} {period.split('-')[0]}
+              </option>
+            )}
+            {periodOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+
+          {/* EXPORTAR */}
+          <button
+            onClick={() => window.print()}
+            style={{
+              background: 'transparent', border: `1px solid ${ACCENT}`, color: ACCENT,
+              fontFamily: MONO, fontSize: 10, letterSpacing: '0.1em',
+              padding: '6px 12px', cursor: 'pointer', borderRadius: 3,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.opacity = '0.7'; }}
+            onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
+          >
+            EXPORTAR
+          </button>
+
+          {/* ENVIAR button */}
+          <button
+            onClick={sendReport}
+            disabled={sendingDoc}
+            style={{
+              padding: '6px 12px',
+              border: `1px solid ${sendSuccess ? GREEN : BORDER2}`,
+              background: sendSuccess ? 'rgba(0,230,118,0.1)' : 'transparent',
+              color: sendSuccess ? GREEN : sendingDoc ? TXT_3 : TXT_2,
+              fontFamily: MONO, fontSize: 10, letterSpacing: '0.1em',
+              cursor: sendingDoc ? 'not-allowed' : 'pointer',
+              borderRadius: 3, marginRight: 8,
+              transition: 'all 0.2s',
+            }}
+          >
+            {sendSuccess ? '✓ ENVIADO' : sendingDoc ? 'ENVIANDO...' : 'ENVIAR AOS COTISTAS'}
+          </button>
+
+          {/* GERAR COMENTÁRIO IA */}
+          <button
+            onClick={generateCommentary}
+            disabled={aiLoading}
+            style={{
+              background: 'transparent',
+              border: `1px solid ${aiLoading ? TXT_3 : GREEN}`,
+              color: aiLoading ? TXT_3 : GREEN,
+              fontFamily: MONO, fontSize: 10, letterSpacing: '0.1em',
+              padding: '6px 12px',
+              cursor: aiLoading ? 'not-allowed' : 'pointer',
+              borderRadius: 3,
+            }}
+          >
+            {aiLoading ? 'GERANDO...' : 'GERAR COMENTÁRIO IA'}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Document Archive (no-print) ──────────────────────────────────── */}
+      <div className="no-print" style={{ maxWidth: 900, margin: '0 auto', padding: '20px 48px 0' }}>
+        <div style={{ background: BG_CARD2, border: `1px solid ${BORDER2}`, borderRadius: 6, overflow: 'hidden' }}>
+          {/* Archive header */}
+          <div style={{ padding: '12px 16px', borderBottom: `1px solid ${BORDER2}`, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <span style={{ fontFamily: MONO, fontSize: 10, color: TXT_3, letterSpacing: '0.12em', textTransform: 'uppercase', flexShrink: 0 }}>
+              ARQUIVO DE DOCUMENTOS
+            </span>
+            <select value={docFilter.tipo} onChange={e => setDocFilter(f => ({ ...f, tipo: e.target.value }))}
+              style={{ background: BG_CARD, border: `1px solid ${BORDER2}`, color: TXT_2, fontFamily: MONO, fontSize: 10, padding: '4px 8px', borderRadius: 3, outline: 'none' }}>
+              <option value="">Todos os tipos</option>
+              <option value="anexo_b">Anexo B</option>
+              <option value="declaracao_ir">Declaração IR</option>
+              <option value="darf">DARF</option>
+              <option value="relatorio_anual">Relatório Anual</option>
+            </select>
+            <input type="text" placeholder="Filtrar por período ou cotista..." value={docFilter.search}
+              onChange={e => setDocFilter(f => ({ ...f, search: e.target.value }))}
+              style={{ flex: 1, minWidth: 180, background: BG_CARD, border: `1px solid ${BORDER2}`, color: TXT_1, fontFamily: MONO, fontSize: 10, padding: '4px 10px', borderRadius: 3, outline: 'none' }}
+            />
+            {hasRole(user?.role, 'club_manager') && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                <select value={irYear} onChange={e => setIrYear(Number(e.target.value))}
+                  style={{ background: BG_CARD, border: `1px solid ${BORDER2}`, color: TXT_2, fontFamily: MONO, fontSize: 10, padding: '4px 8px', borderRadius: 3, outline: 'none' }}>
+                  {[0, 1, 2, 3].map(offset => {
+                    const y = new Date().getFullYear() - 1 - offset;
+                    return <option key={y} value={y}>{y}</option>;
+                  })}
+                </select>
+                <button onClick={() => generateIR(irYear)} disabled={irGenerating}
+                  style={{ padding: '4px 12px', fontFamily: MONO, fontSize: 10, background: 'transparent', border: `1px solid ${irGenerating ? TXT_3 : ACCENT}`, color: irGenerating ? TXT_3 : ACCENT, borderRadius: 3, cursor: irGenerating ? 'not-allowed' : 'pointer', letterSpacing: '0.08em', flexShrink: 0 }}>
+                  {irGenerating ? 'GERANDO...' : 'GERAR IR'}
+                </button>
+              </div>
+            )}
+            {irResult && (
+              <span style={{ fontFamily: MONO, fontSize: 10, color: GREEN }}>
+                ✓ {irResult.generated} declarações geradas para {irResult.year}
+              </span>
+            )}
+          </div>
+
+          {/* Document list */}
+          {(() => {
+            const filtered = documentos.filter(doc => {
+              if (docFilter.tipo && doc.tipo !== docFilter.tipo) return false;
+              if (docFilter.search) {
+                const q = docFilter.search.toLowerCase();
+                if (!(doc.periodo ?? '').toLowerCase().includes(q) && !(doc.cotista_nome ?? '').toLowerCase().includes(q)) return false;
+              }
+              return true;
+            });
+
+            if (filtered.length === 0) {
+              return (
+                <div style={{ padding: '24px 16px', textAlign: 'center', fontFamily: MONO, fontSize: 11, color: TXT_3 }}>
+                  {documentos.length === 0
+                    ? 'Nenhum documento gerado ainda. Use ENVIAR AOS COTISTAS para criar o primeiro.'
+                    : 'Nenhum documento corresponde ao filtro.'}
+                </div>
+              );
+            }
+
+            const typeBadges = {
+              anexo_b:         { label: 'ANEXO B',   color: ACCENT },
+              declaracao_ir:   { label: 'IR',         color: GOLD },
+              darf:            { label: 'DARF',       color: AMBER },
+              relatorio_anual: { label: 'REL. ANUAL', color: GREEN },
+            };
+            const statusColors = { enviado: GREEN, gerado: TXT_3, erro: RED };
+
+            return (
+              <div>
+                {filtered.map((doc, i) => {
+                  const tb = typeBadges[doc.tipo] ?? { label: doc.tipo?.toUpperCase() ?? '—', color: TXT_3 };
+                  const sc = statusColors[doc.delivery_status] ?? TXT_3;
+                  return (
+                    <div key={doc.id} style={{
+                      display: 'grid', gridTemplateColumns: '80px 70px 110px 1fr 80px 100px',
+                      gap: 8, padding: '8px 16px',
+                      borderBottom: i < filtered.length - 1 ? `1px solid ${BORDER2}` : 'none',
+                      alignItems: 'center', fontSize: 10, fontFamily: MONO,
+                    }}>
+                      <span style={{ padding: '2px 6px', borderRadius: 3, fontSize: 9, background: `${tb.color}18`, border: `1px solid ${tb.color}40`, color: tb.color, textAlign: 'center' }}>{tb.label}</span>
+                      <span style={{ color: TXT_2 }}>{doc.periodo ?? '—'}</span>
+                      <span style={{ color: TXT_2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{doc.cotista_nome ?? 'Clube'}</span>
+                      <span style={{ color: TXT_3, fontSize: 9 }}>{doc.created_at ? new Date(doc.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
+                      <span style={{ color: TXT_3, fontSize: 9 }}>{doc.retencao_ate ? `até ${doc.retencao_ate.split('-')[0]}` : '—'}</span>
+                      <span style={{ padding: '2px 6px', borderRadius: 3, fontSize: 9, background: `${sc}18`, border: `1px solid ${sc}40`, color: sc, textAlign: 'center', textTransform: 'uppercase' }}>{doc.delivery_status ?? 'gerado'}</span>
+                    </div>
+                  );
+                })}
+                <div style={{ padding: '8px 16px', borderTop: `1px solid ${BORDER2}`, fontFamily: MONO, fontSize: 9, color: TXT_4, display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{filtered.length} documento{filtered.length !== 1 ? 's' : ''}</span>
+                  {filtered.length < documentos.length && <span>{documentos.length - filtered.length} oculto{documentos.length - filtered.length !== 1 ? 's' : ''} pelo filtro</span>}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      </div>
+
+      {/* ── Printable report ───────────────────────────────────────────────── */}
+      <div id="report-content" style={{ maxWidth: 900, margin: '0 auto', padding: '40px 48px' }}>
+
+        {/* SECTION 1 — Report header */}
+        <div style={{ marginBottom: 32 }}>
+          <div style={{
+            fontFamily: 'Syne, sans-serif', fontSize: 24, fontWeight: 700,
+            color: TXT_1, marginBottom: 6,
+          }}>
+            {clube.nome}
+          </div>
+          <div style={{ fontSize: 13, color: TXT_2, letterSpacing: '0.08em', marginBottom: 4 }}>
+            CARTA MENSAL — {periodLabel}
+          </div>
+          {clube.corretora && (
+            <div style={{ fontSize: 11, color: TXT_3, marginBottom: 4 }}>{clube.corretora}</div>
+          )}
+          <div style={{ height: 1, background: BORDER2, marginTop: 16 }} />
+        </div>
+
+        {/* SECTION 2 — Performance summary table */}
+        <div style={{ marginBottom: 40 }}>
+          <div style={{
+            fontSize: 10, color: TXT_3, letterSpacing: '0.12em',
+            textTransform: 'uppercase', marginBottom: 12,
+          }}>
+            DESEMPENHO DO PERÍODO
+          </div>
+
+          {periodNavHistory.length === 0 ? (
+            <div style={{
+              padding: '24px 0', textAlign: 'center', color: TXT_3,
+              fontSize: 12, lineHeight: 1.8,
+            }}>
+              Nenhum dado de NAV registrado para este período.<br />
+              Registre entradas de NAV diárias no painel do clube para visualizar o relatório.
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  {['MÉTRICA', 'CARTEIRA', 'BENCHMARK'].map(h => (
+                    <th key={h} style={{ ...TH_STYLE, textAlign: h === 'MÉTRICA' ? 'left' : 'right' }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {perfRows.map(row => (
+                  <tr key={row.label}>
+                    <td style={{ ...TD_STYLE, color: TXT_2 }}>{row.label}</td>
+                    <td style={{
+                      ...TD_STYLE, textAlign: 'right', fontWeight: 600,
+                      color: row.carteira != null ? signColor(row.carteira) : TXT_3,
+                    }}>
+                      {row.carteira != null ? formatPct(row.carteira, { showSign: true }) : '—'}
+                    </td>
+                    <td style={{
+                      ...TD_STYLE, textAlign: 'right',
+                      color: row.bench != null ? TXT_1 : TXT_3,
+                    }}>
+                      {row.bench != null ? formatPct(row.bench, { showSign: true }) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* SECTION 3 — NAV chart */}
+        <div style={{ marginBottom: 40 }}>
+          <div style={{
+            fontSize: 10, color: TXT_3, letterSpacing: '0.12em',
+            textTransform: 'uppercase', marginBottom: 12,
+          }}>
+            EVOLUÇÃO DA COTA
+          </div>
+          <div style={{
+            background: BG_CARD, border: `1px solid ${BORDER}`,
+            borderRadius: 4, padding: '16px 0 12px',
+          }}>
+            <ReportNavChart
+              navSeries={periodAnalytics?.navSeries ?? []}
+              ibovSeries={periodAnalytics?.ibovSeries ?? []}
+            />
+          </div>
+        </div>
+
+        {/* SECTION 4 — Positions table */}
+        <div style={{ marginBottom: 40 }}>
+          <div style={{
+            fontSize: 10, color: TXT_3, letterSpacing: '0.12em',
+            textTransform: 'uppercase', marginBottom: 12,
+          }}>
+            COMPOSIÇÃO DA CARTEIRA
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                {['ATIVO', 'NOME', 'GRUPO', 'PESO'].map(h => (
+                  <th key={h} style={{ ...TH_STYLE, textAlign: h === 'PESO' ? 'right' : 'left' }}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {posicoes.length === 0 ? (
+                <tr>
+                  <td colSpan={4} style={{ ...TD_STYLE, color: TXT_3, textAlign: 'center' }}>
+                    Nenhuma posição registrada.
+                  </td>
+                </tr>
+              ) : posicoes.map((p, i) => (
+                <tr key={p.asset_id ?? i}>
+                  <td style={{ ...TD_STYLE, color: ACCENT, fontWeight: 600 }}>{p.asset?.symbol ?? '—'}</td>
+                  <td style={{ ...TD_STYLE, color: TXT_1 }}>{p.asset?.name ?? '—'}</td>
+                  <td style={{ ...TD_STYLE, color: TXT_2 }}>{p.asset?.group_id ?? '—'}</td>
+                  <td style={{ ...TD_STYLE, color: TXT_2, textAlign: 'right' }}>
+                    {p.peso_alvo != null ? `${(p.peso_alvo * 100).toFixed(1)}%` : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ marginTop: 8, fontSize: 11, color: rvColor, fontFamily: MONO }}>
+            Enquadramento RV: {rvPct}% (mín. 67%) — {rvStatusText}
+          </div>
+        </div>
+
+        {/* SECTION 5 — Cotistas */}
+        <div style={{ marginBottom: 40 }}>
+          <div style={{
+            fontSize: 10, color: TXT_3, letterSpacing: '0.12em',
+            textTransform: 'uppercase', marginBottom: 12,
+          }}>
+            COTISTAS
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                {['NOME', 'COTAS', 'ENTRADA', 'VALOR ATUAL'].map(h => (
+                  <th key={h} style={{ ...TH_STYLE, textAlign: h === 'VALOR ATUAL' ? 'right' : 'left' }}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(cotistas?.data ?? []).length === 0 ? (
+                <tr>
+                  <td colSpan={4} style={{ ...TD_STYLE, color: TXT_3, textAlign: 'center' }}>
+                    Nenhum cotista registrado.
+                  </td>
+                </tr>
+              ) : (cotistas?.data ?? []).map((c, i) => (
+                <tr key={c.id ?? i}>
+                  <td style={{ ...TD_STYLE, color: TXT_1 }}>{c.nome}</td>
+                  <td style={{ ...TD_STYLE, color: TXT_2 }}>{Number(c.cotas_detidas).toFixed(0)}</td>
+                  <td style={{ ...TD_STYLE, color: TXT_2 }}>{fmtDate(c.data_entrada)}</td>
+                  <td style={{ ...TD_STYLE, color: c.valor_atual != null ? GOLD : TXT_3, textAlign: 'right' }}>
+                    {c.valor_atual != null ? formatCurrency(c.valor_atual) : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {(cotistas?.data ?? []).length > 0 && (
+            <div style={{
+              display: 'flex', justifyContent: 'space-between',
+              marginTop: 8, fontSize: 11, color: TXT_2, fontFamily: MONO,
+            }}>
+              <span>Total cotas: {cotistas?.summary?.total_cotas ?? '—'}</span>
+              <span>Patrimônio: {formatCurrency(cotistas?.summary?.patrimonio_total, { compact: true })}</span>
+            </div>
+          )}
+        </div>
+
+        {/* SECTION 5b — Member movements for period */}
+        <div style={{ marginBottom: 40 }}>
+          <div style={{
+            fontSize: 10, color: TXT_3, letterSpacing: '0.12em',
+            textTransform: 'uppercase', marginBottom: 12,
+          }}>
+            MOVIMENTAÇÕES DO PERÍODO
+          </div>
+          {movimentacoesPeriodo.length === 0 ? (
+            <div style={{ fontFamily: MONO, fontSize: 12, color: TXT_3, padding: '8px 0' }}>
+              Nenhuma movimentação no período.
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  {['DATA', 'COTISTA', 'TIPO', 'VALOR', 'COTAS Δ', 'STATUS'].map(h => (
+                    <th key={h} style={{ ...TH_STYLE, textAlign: h === 'VALOR' || h === 'COTAS Δ' ? 'right' : 'left' }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {movimentacoesPeriodo.map((m, i) => (
+                  <tr key={m.id ?? i}>
+                    <td style={{ ...TD_STYLE }}>{m.data_solicitacao?.split('-').reverse().join('/') ?? '—'}</td>
+                    <td style={{ ...TD_STYLE, color: TXT_1 }}>{m.cotista_nome ?? '—'}</td>
+                    <td style={{ ...TD_STYLE, color: m.tipo === 'aporte' ? GREEN : AMBER, textTransform: 'uppercase' }}>{m.tipo}</td>
+                    <td style={{ ...TD_STYLE, textAlign: 'right' }}>
+                      {Number(m.valor_brl).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </td>
+                    <td style={{ ...TD_STYLE, textAlign: 'right', color: (m.cotas_delta ?? 0) >= 0 ? GREEN : RED }}>
+                      {m.cotas_delta != null ? `${m.cotas_delta > 0 ? '+' : ''}${Number(m.cotas_delta).toFixed(6)}` : '—'}
+                    </td>
+                    <td style={{ ...TD_STYLE, textTransform: 'uppercase', fontSize: 10 }}>{m.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* SECTION 5c — Expense breakdown */}
+        <div style={{ marginBottom: 40 }}>
+          <div style={{
+            fontSize: 10, color: TXT_3, letterSpacing: '0.12em',
+            textTransform: 'uppercase', marginBottom: 12,
+          }}>
+            DEMONSTRATIVO DE DESPESAS
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                {['DESPESA', 'VALOR', '% PATRIMÔNIO'].map(h => (
+                  <th key={h} style={{ ...TH_STYLE, textAlign: h === 'DESPESA' ? 'left' : 'right' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { label: 'Taxa de Administração', note: 'Via ledger' },
+                { label: 'Taxa de Performance',    note: 'Via ledger' },
+                { label: 'Corretagem',             note: 'Via ledger' },
+                { label: 'Outras Despesas',        note: 'Via ledger' },
+              ].map((row, i) => (
+                <tr key={i}>
+                  <td style={{ ...TD_STYLE, color: TXT_2 }}>{row.label}</td>
+                  <td style={{ ...TD_STYLE, textAlign: 'right', color: TXT_3 }}>—</td>
+                  <td style={{ ...TD_STYLE, textAlign: 'right', color: TXT_3, fontSize: 10 }}>{row.note}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ fontFamily: MONO, fontSize: 9, color: TXT_3, marginTop: 8 }}>
+            * Dados de despesas disponíveis após integração com ledger (Fase 2).
+          </div>
+        </div>
+
+        {/* SECTION 5d — Derivatives */}
+        <div style={{ marginBottom: 40 }}>
+          <div style={{
+            fontSize: 10, color: TXT_3, letterSpacing: '0.12em',
+            textTransform: 'uppercase', marginBottom: 12,
+          }}>
+            INSTRUMENTOS DERIVATIVOS
+          </div>
+          <div style={{ fontFamily: MONO, fontSize: 12, color: TXT_2, padding: '8px 0' }}>
+            O clube não utiliza instrumentos derivativos.
+          </div>
+          <div style={{ fontFamily: MONO, fontSize: 9, color: TXT_3, marginTop: 4 }}>
+            Conforme estatuto vigente — derivativos não permitidos.
+          </div>
+        </div>
+
+        {/* SECTION 6 — AI Commentary */}
+        <div style={{ marginBottom: 40 }}>
+          <div style={{
+            fontSize: 10, color: TXT_3, letterSpacing: '0.12em',
+            textTransform: 'uppercase', marginBottom: 12,
+          }}>
+            COMENTÁRIO DO GESTOR
+          </div>
+
+          {commentary ? (
+            <div style={{
+              background: BG_CARD2, border: `1px solid ${BORDER2}`, borderRadius: 4,
+              padding: '20px 24px', fontFamily: "'IBM Plex Sans', sans-serif",
+              fontSize: 13, lineHeight: 1.7, color: TXT_1, whiteSpace: 'pre-wrap',
+            }}>
+              {commentary}
+            </div>
+          ) : aiLoading ? (
+            <div className="no-print" style={{ padding: '24px 0', color: TXT_2, fontSize: 12, fontFamily: MONO }}>
+              Gerando comentário...
+            </div>
+          ) : aiError ? (
+            <div className="no-print" style={{ padding: '8px 0', color: RED, fontSize: 12, fontFamily: MONO }}>
+              Erro ao gerar comentário: {aiError}
+            </div>
+          ) : (
+            <div
+              className="no-print"
+              style={{
+                border: `1px dashed ${BORDER2}`, borderRadius: 4, padding: 24,
+                textAlign: 'center', color: TXT_3, fontSize: 12, fontFamily: MONO,
+              }}
+            >
+              Clique em GERAR COMENTÁRIO IA para gerar o comentário do gestor automaticamente.
+            </div>
+          )}
+        </div>
+
+        {/* SECTION 7 — Legal disclaimer */}
+        <div style={{
+          borderTop: `1px solid ${BORDER2}`, paddingTop: 16, marginTop: 32,
+          fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 10, color: TXT_3, lineHeight: 1.6,
+        }}>
+          <p style={{ margin: '0 0 8px 0' }}>
+            Este relatório foi elaborado exclusivamente para fins informativos e não constitui
+            recomendação de investimento, oferta ou solicitação de compra ou venda de valores
+            mobiliários. As informações aqui contidas são baseadas em dados históricos e não
+            garantem resultados futuros. O Clube de Investimento está sujeito às normas da
+            Comissão de Valores Mobiliários (CVM) e da B3. Rentabilidade passada não é garantia
+            de rentabilidade futura. Antes de investir, leia o regulamento do clube.
+          </p>
+          <p style={{ margin: 0 }}>
+            Gerado por GMT — Global Markets Terminal · {todayFormatted}
+          </p>
+        </div>
+
+      </div>
+    </div>
+  );
+}

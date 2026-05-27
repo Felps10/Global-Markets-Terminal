@@ -1,0 +1,49 @@
+/**
+ * clube.css
+ * CSS custom properties for the Clube GMT brand.
+ *
+ * Design decisions:
+ * - Same dark background as GMT Terminal (#080f1a)
+ * - Gold (#F9C300) as the brand detail/accent color
+ * - Neutral whites and greys for text (same as Terminal)
+ * - Separate from Terminal's green (#00E676) accent
+ *
+ * Usage: import this file in ClubeHeader.jsx and
+ * any Clube page that needs brand-specific variables.
+ */
+
+:root {
+  /* ── Clube brand colors ──────────────────────────────── */
+  --clube-accent:          #F9C300;
+  --clube-accent-dim:      rgba(249, 195, 0, 0.55);
+  --clube-accent-faint:    rgba(249, 195, 0, 0.12);
+  --clube-accent-border:   rgba(249, 195, 0, 0.25);
+
+  /* ── Background (shared with Terminal) ───────────────── */
+  --clube-bg:              #080f1a;
+  --clube-bg-surface:      #0c1525;
+  --clube-bg-elevated:     #111827;
+
+  /* ── Text (shared with Terminal) ─────────────────────── */
+  --clube-text-primary:    #e2e8f0;
+  --clube-text-secondary:  rgba(255, 255, 255, 0.55);
+  --clube-text-muted:      rgba(255, 255, 255, 0.3);
+
+  /* ── Borders ──────────────────────────────────────────── */
+  --clube-border:          rgba(255, 255, 255, 0.08);
+  --clube-border-gold:     rgba(249, 195, 0, 0.2);
+
+  /* ── Typography ───────────────────────────────────────── */
+  --clube-font-sans:       'IBM Plex Sans', sans-serif;
+  --clube-font-mono:       'JetBrains Mono', monospace;
+
+  /* ── Spacing scale ────────────────────────────────────── */
+  --clube-radius-sm:       6px;
+  --clube-radius-md:       10px;
+  --clube-radius-lg:       16px;
+
+  /* ── CTA button ───────────────────────────────────────── */
+  --clube-cta-bg:          #F9C300;
+  --clube-cta-text:        #080f1a;
+  --clube-cta-hover:       #FFD740;
+}
