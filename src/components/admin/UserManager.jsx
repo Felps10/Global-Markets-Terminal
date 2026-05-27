@@ -1,75 +1,32 @@
 import { useState, useEffect, useCallback } from 'react';
-import styled, { keyframes } from 'styled-components';
 import { getUsers, deleteUser, patchUserRole, promoteToManager } from '../../services/userService.js';
 import { ROLE_LABEL, ADMIN_ASSIGNABLE_ROLES } from '../../lib/roles.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { CLUBE_COLORS } from '../../clube/styles/index.js';
 
-// ── Animations ─────────────────────────────────────────────────────────────────
-const fadeIn = keyframes`
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-`;
+// ── Scoped styles for animations and scrollbar ────────────────────────────────
+function ScopedStyles() {
+  return (
+    <style>{`
+      @keyframes um-fadeIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes um-slideIn {
+        from { opacity: 0; transform: translateX(40px); }
+        to   { opacity: 1; transform: translateX(0); }
+      }
+      .um-wrap { animation: um-fadeIn 0.25s ease; }
+      .um-wrap::-webkit-scrollbar { width: 4px; }
+      .um-wrap::-webkit-scrollbar-track { background: transparent; }
+      .um-wrap::-webkit-scrollbar-thumb { background: #1E2740; border-radius: 2px; }
+      .um-toast-item { animation: um-slideIn 0.25s ease; }
+      .um-modal-box { animation: um-fadeIn 0.2s ease; }
+    `}</style>
+  );
+}
 
-const slideIn = keyframes`
-  from { opacity: 0; transform: translateX(40px); }
-  to   { opacity: 1; transform: translateX(0); }
-`;
-
-// ── Styled components ──────────────────────────────────────────────────────────
-const Wrap = styled.div`
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: 28px 32px;
-  overflow-y: auto;
-  animation: ${fadeIn} 0.25s ease;
-  &::-webkit-scrollbar { width: 4px; }
-  &::-webkit-scrollbar-track { background: transparent; }
-  &::-webkit-scrollbar-thumb { background: #1E2740; border-radius: 2px; }
-`;
-
-const SectionTitle = styled.div`
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  color: #4A5568;
-  text-transform: uppercase;
-  margin-bottom: 16px;
-  font-family: 'IBM Plex Sans', sans-serif;
-`;
-
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-  font-family: 'JetBrains Mono', monospace;
-`;
-
-const Th = styled.th`
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.15em;
-  color: #4A5568;
-  text-transform: uppercase;
-  text-align: left;
-  padding: 8px 14px;
-  border-bottom: 1px solid #1E2740;
-  font-family: 'IBM Plex Sans', sans-serif;
-`;
-
-const Tr = styled.tr`
-  border-bottom: 1px solid #0D1220;
-  transition: background 0.1s;
-  &:hover { background: rgba(255,255,255,0.02); }
-`;
-
-const Td = styled.td`
-  padding: 10px 14px;
-  font-size: 12px;
-  color: #8892A4;
-  vertical-align: middle;
-`;
-
+// ── Role badge ────────────────────────────────────────────────────────────────
 const ROLE_BADGE_STYLES = {
   admin:        { background: 'var(--c-accent)', color: '#fff' },
   club_manager: { background: CLUBE_COLORS.goldMuted,  color: '#1a1a1a' },
@@ -97,152 +54,7 @@ function RoleBadgeInline({ role, children }) {
   );
 }
 
-const DeleteBtn = styled.button`
-  background: transparent;
-  border: 1px solid #1E2740;
-  border-radius: 3px;
-  color: #4A5568;
-  cursor: pointer;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  padding: 4px 10px;
-  transition: all 0.15s;
-
-  &:hover:not(:disabled) {
-    background: rgba(255,82,82,0.1);
-    border-color: var(--c-error);
-    color: var(--c-error);
-  }
-  &:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-  }
-`;
-
-const StatusRow = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 0;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  color: #2D3748;
-`;
-
-const EmptyState = styled.div`
-  padding: 60px 0;
-  text-align: center;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  color: #2D3748;
-  line-height: 1.8;
-`;
-
-// ── Confirmation modal ─────────────────────────────────────────────────────────
-const Overlay = styled.div`
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.6);
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-`;
-
-const ModalBox = styled.div`
-  background: #0D1220;
-  border: 1px solid #1E2740;
-  border-radius: 8px;
-  padding: 28px 32px;
-  width: 420px;
-  max-width: 90vw;
-  animation: ${fadeIn} 0.2s ease;
-`;
-
-const ModalTitle = styled.div`
-  font-family: 'IBM Plex Sans', sans-serif;
-  font-size: 15px;
-  font-weight: 700;
-  color: #E8EAF0;
-  margin-bottom: 10px;
-`;
-
-const ModalBody = styled.div`
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  color: #8892A4;
-  line-height: 1.6;
-  margin-bottom: 24px;
-  word-break: break-all;
-`;
-
-const ModalActions = styled.div`
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-`;
-
-const ModalCancelBtn = styled.button`
-  background: transparent;
-  border: 1px solid #1E2740;
-  border-radius: 4px;
-  color: #4A5568;
-  cursor: pointer;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  padding: 8px 18px;
-  transition: all 0.15s;
-  &:hover { border-color: #8892A4; color: #8892A4; }
-`;
-
-const ModalConfirmBtn = styled.button`
-  background: rgba(255,82,82,0.12);
-  border: 1px solid rgba(255,82,82,0.4);
-  border-radius: 4px;
-  color: var(--c-error);
-  cursor: pointer;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  padding: 8px 18px;
-  transition: all 0.15s;
-  &:hover:not(:disabled) { background: rgba(255,82,82,0.2); border-color: var(--c-error); }
-  &:disabled { opacity: 0.5; cursor: not-allowed; }
-`;
-
-const ModalError = styled.div`
-  margin-top: 12px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  color: var(--c-error);
-`;
-
 // ── Toast ──────────────────────────────────────────────────────────────────────
-const ToastWrap = styled.div`
-  position: fixed;
-  bottom: 28px;
-  right: 28px;
-  z-index: 2000;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-`;
-
-const ToastItem = styled.div`
-  background: ${(p) => (p.$type === 'error' ? '#2D0A0A' : '#0A1F1A')};
-  border: 1px solid ${(p) => (p.$type === 'error' ? 'var(--c-error)' : '#00E676')};
-  border-radius: 6px;
-  color: ${(p) => (p.$type === 'error' ? 'var(--c-error)' : '#00E676')};
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  padding: 12px 18px;
-  min-width: 280px;
-  animation: ${slideIn} 0.25s ease;
-`;
-
 function useToast() {
   const [toasts, setToasts] = useState([]);
   const push = useCallback((message, type = 'success') => {
@@ -258,6 +70,90 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', {
     year: 'numeric', month: 'short', day: 'numeric',
   });
+}
+
+// ── Delete button with hover ──────────────────────────────────────────────────
+function DeleteBtnComp({ disabled, title, onClick }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      disabled={disabled}
+      title={title}
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: !disabled && hovered ? 'rgba(255,82,82,0.1)' : 'transparent',
+        border: `1px solid ${!disabled && hovered ? 'var(--c-error)' : '#1E2740'}`,
+        borderRadius: 3,
+        color: !disabled && hovered ? 'var(--c-error)' : '#4A5568',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: 10,
+        letterSpacing: '0.06em',
+        padding: '4px 10px',
+        transition: 'all 0.15s',
+        opacity: disabled ? 0.3 : 1,
+      }}
+    >
+      Delete
+    </button>
+  );
+}
+
+// ── Modal buttons with hover ──────────────────────────────────────────────────
+function ModalCancelBtnComp({ onClick, disabled, children }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: 'transparent',
+        border: `1px solid ${hovered ? '#8892A4' : '#1E2740'}`,
+        borderRadius: 4,
+        color: hovered ? '#8892A4' : '#4A5568',
+        cursor: 'pointer',
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: 11,
+        letterSpacing: '0.06em',
+        padding: '8px 18px',
+        transition: 'all 0.15s',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ModalConfirmBtnComp({ onClick, disabled, children }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: !disabled && hovered ? 'rgba(255,82,82,0.2)' : 'rgba(255,82,82,0.12)',
+        border: `1px solid ${!disabled && hovered ? 'var(--c-error)' : 'rgba(255,82,82,0.4)'}`,
+        borderRadius: 4,
+        color: 'var(--c-error)',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: '0.08em',
+        padding: '8px 18px',
+        transition: 'all 0.15s',
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      {children}
+    </button>
+  );
 }
 
 // ── Role selector ─────────────────────────────────────────────────────────────
@@ -312,6 +208,9 @@ export default function UserManager() {
   // Promote-to-manager inline confirmation state
   const [managerConfirmId,     setManagerConfirmId]     = useState(null); // user id showing confirmation
   const [managerPromoteLoading, setManagerPromoteLoading] = useState(false);
+
+  // Table row hover state
+  const [hoveredRowId, setHoveredRowId] = useState(null);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -386,44 +285,84 @@ export default function UserManager() {
 
   const nonAdminUsers = users.filter((u) => u.role !== 'admin');
 
+  const thStyle = {
+    fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', color: '#4A5568',
+    textTransform: 'uppercase', textAlign: 'left', padding: '8px 14px',
+    borderBottom: '1px solid #1E2740', fontFamily: "'IBM Plex Sans', sans-serif",
+  };
+
+  const tdStyle = {
+    padding: '10px 14px', fontSize: 12, color: '#8892A4', verticalAlign: 'middle',
+  };
+
   return (
     <>
-      <Wrap>
-        <SectionTitle>Registered Users — {users.length} total</SectionTitle>
+      <ScopedStyles />
+      <div className="um-wrap" style={{
+        flex: 1, display: 'flex', flexDirection: 'column',
+        padding: '28px 32px', overflowY: 'auto',
+      }}>
+        <div style={{
+          fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', color: '#4A5568',
+          textTransform: 'uppercase', marginBottom: 16, fontFamily: "'IBM Plex Sans', sans-serif",
+        }}>
+          Registered Users — {users.length} total
+        </div>
 
-        {loading && <StatusRow>Loading users…</StatusRow>}
+        {loading && (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 0',
+            fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: '#2D3748',
+          }}>Loading users…</div>
+        )}
 
         {!loading && error && (
-          <StatusRow style={{ color: 'var(--c-error)' }}>⚠ {error}</StatusRow>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 0',
+            fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: 'var(--c-error)',
+          }}>⚠ {error}</div>
         )}
 
         {!loading && !error && users.length === 0 && (
-          <EmptyState>No registered users yet.</EmptyState>
+          <div style={{
+            padding: '60px 0', textAlign: 'center', fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 12, color: '#2D3748', lineHeight: 1.8,
+          }}>No registered users yet.</div>
         )}
 
         {!loading && !error && users.length > 0 && (
-          <Table>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: "'JetBrains Mono', monospace" }}>
             <thead>
               <tr>
-                <Th>ID</Th>
-                <Th>Email</Th>
-                <Th>Name</Th>
-                <Th>Role</Th>
-                <Th>Registered</Th>
-                <Th>Actions</Th>
+                <th style={thStyle}>ID</th>
+                <th style={thStyle}>Email</th>
+                <th style={thStyle}>Name</th>
+                <th style={thStyle}>Role</th>
+                <th style={thStyle}>Registered</th>
+                <th style={thStyle}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {users.map((u) => {
                 const isSelf = u.id === currentUser?.id;
+                const isHovered = hoveredRowId === u.id;
                 return (
-                  <Tr key={u.id}>
-                    <Td style={{ color: '#2D3748', fontFamily: "'JetBrains Mono', monospace" }}>
+                  <tr
+                    key={u.id}
+                    onMouseEnter={() => setHoveredRowId(u.id)}
+                    onMouseLeave={() => setHoveredRowId(null)}
+                    style={{
+                      borderBottom: '1px solid #0D1220',
+                      transition: 'background 0.1s',
+                      background: isHovered ? 'rgba(255,255,255,0.02)' : 'transparent',
+                    }}
+                  >
+                    <td style={{ ...tdStyle, color: '#2D3748', fontFamily: "'JetBrains Mono', monospace" }}>
                       {u.id}
-                    </Td>
-                    <Td style={{ color: '#E8EAF0' }}>{u.email}</Td>
-                    <Td>{u.name || <span style={{ color: '#2D3748' }}>—</span>}</Td>
-                    <Td>
+                    </td>
+                    <td style={{ ...tdStyle, color: '#E8EAF0' }}>{u.email}</td>
+                    <td style={tdStyle}>{u.name || <span style={{ color: '#2D3748' }}>—</span>}</td>
+                    <td style={tdStyle}>
                       <RoleSelector
                         user={u}
                         currentUserId={currentUser?.id}
@@ -438,9 +377,9 @@ export default function UserManager() {
                           });
                         }}
                       />
-                    </Td>
-                    <Td>{fmtDate(u.created_at)}</Td>
-                    <Td style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    </td>
+                    <td style={tdStyle}>{fmtDate(u.created_at)}</td>
+                    <td style={{ ...tdStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
                       {u.role !== 'club_manager' && u.role !== 'admin' && !isSelf && (
                         managerConfirmId === u.id ? (
                           <span style={{
@@ -507,60 +446,96 @@ export default function UserManager() {
                           </button>
                         )
                       )}
-                      <DeleteBtn
+                      <DeleteBtnComp
                         disabled={isSelf}
                         title={isSelf ? 'Cannot delete your own account' : `Delete ${u.email}`}
                         onClick={() => { setDeleteError(null); setConfirming({ id: u.id, email: u.email }); }}
-                      >
-                        Delete
-                      </DeleteBtn>
-                    </Td>
-                  </Tr>
+                      />
+                    </td>
+                  </tr>
                 );
               })}
             </tbody>
-          </Table>
+          </table>
         )}
 
         {!loading && !error && nonAdminUsers.length === 0 && users.length > 0 && (
-          <EmptyState style={{ marginTop: 32 }}>No registered users yet.</EmptyState>
+          <div style={{
+            padding: '60px 0', textAlign: 'center', fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 12, color: '#2D3748', lineHeight: 1.8, marginTop: 32,
+          }}>No registered users yet.</div>
         )}
-      </Wrap>
+      </div>
 
       {/* ── Confirm modal ── */}
       {confirming && (
-        <Overlay onClick={() => !deleteLoading && setConfirming(null)}>
-          <ModalBox onClick={(e) => e.stopPropagation()}>
-            <ModalTitle>Delete user?</ModalTitle>
-            <ModalBody>
+        <div
+          onClick={() => !deleteLoading && setConfirming(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <div className="um-modal-box" onClick={(e) => e.stopPropagation()} style={{
+            background: '#0D1220', border: '1px solid #1E2740', borderRadius: 8,
+            padding: '28px 32px', width: 420, maxWidth: '90vw',
+          }}>
+            <div style={{
+              fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 15, fontWeight: 700,
+              color: '#E8EAF0', marginBottom: 10,
+            }}>Delete user?</div>
+            <div style={{
+              fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: '#8892A4',
+              lineHeight: 1.6, marginBottom: 24, wordBreak: 'break-all',
+            }}>
               Delete user <strong style={{ color: '#E8EAF0' }}>{confirming.email}</strong>?
               This action cannot be undone.
-            </ModalBody>
-            {deleteError && <ModalError>⚠ {deleteError}</ModalError>}
-            <ModalActions>
-              <ModalCancelBtn
+            </div>
+            {deleteError && (
+              <div style={{
+                marginTop: 12, fontFamily: "'JetBrains Mono', monospace",
+                fontSize: 11, color: 'var(--c-error)',
+              }}>⚠ {deleteError}</div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <ModalCancelBtnComp
                 onClick={() => setConfirming(null)}
                 disabled={deleteLoading}
               >
                 Cancel
-              </ModalCancelBtn>
-              <ModalConfirmBtn
+              </ModalCancelBtnComp>
+              <ModalConfirmBtnComp
                 onClick={handleDeleteConfirm}
                 disabled={deleteLoading}
               >
                 {deleteLoading ? 'Deleting…' : 'Delete'}
-              </ModalConfirmBtn>
-            </ModalActions>
-          </ModalBox>
-        </Overlay>
+              </ModalConfirmBtnComp>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Promote confirm modal ── */}
       {promotingUser && (
-        <Overlay onClick={() => !promoteLoading && setPromotingUser(null)}>
-          <ModalBox onClick={(e) => e.stopPropagation()}>
-            <ModalTitle>Change role?</ModalTitle>
-            <ModalBody>
+        <div
+          onClick={() => !promoteLoading && setPromotingUser(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <div className="um-modal-box" onClick={(e) => e.stopPropagation()} style={{
+            background: '#0D1220', border: '1px solid #1E2740', borderRadius: 8,
+            padding: '28px 32px', width: 420, maxWidth: '90vw',
+          }}>
+            <div style={{
+              fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 15, fontWeight: 700,
+              color: '#E8EAF0', marginBottom: 10,
+            }}>Change role?</div>
+            <div style={{
+              fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: '#8892A4',
+              lineHeight: 1.6, marginBottom: 24, wordBreak: 'break-all',
+            }}>
               Change <strong style={{ color: '#E8EAF0' }}>
                 {promotingUser.name || promotingUser.email}
               </strong> from{' '}
@@ -571,34 +546,51 @@ export default function UserManager() {
               <strong style={{ color: '#E8EAF0' }}>
                 {ROLE_LABEL[promotingUser.targetRole]}
               </strong>?
-            </ModalBody>
-            {promoteError && <ModalError>⚠ {promoteError}</ModalError>}
-            <ModalActions>
-              <ModalCancelBtn
+            </div>
+            {promoteError && (
+              <div style={{
+                marginTop: 12, fontFamily: "'JetBrains Mono', monospace",
+                fontSize: 11, color: 'var(--c-error)',
+              }}>⚠ {promoteError}</div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <ModalCancelBtnComp
                 onClick={() => setPromotingUser(null)}
                 disabled={promoteLoading}
               >
                 Cancel
-              </ModalCancelBtn>
-              <ModalConfirmBtn
+              </ModalCancelBtnComp>
+              <ModalConfirmBtnComp
                 onClick={handlePromoteConfirm}
                 disabled={promoteLoading}
               >
                 {promoteLoading ? 'Saving…' : 'Confirm'}
-              </ModalConfirmBtn>
-            </ModalActions>
-          </ModalBox>
-        </Overlay>
+              </ModalConfirmBtnComp>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Toast notifications ── */}
-      <ToastWrap>
+      <div style={{
+        position: 'fixed', bottom: 28, right: 28, zIndex: 2000,
+        display: 'flex', flexDirection: 'column', gap: 8,
+      }}>
         {toasts.map((t) => (
-          <ToastItem key={t.id} $type={t.type}>
+          <div key={t.id} className="um-toast-item" style={{
+            background: t.type === 'error' ? '#2D0A0A' : '#0A1F1A',
+            border: `1px solid ${t.type === 'error' ? 'var(--c-error)' : '#00E676'}`,
+            borderRadius: 6,
+            color: t.type === 'error' ? 'var(--c-error)' : '#00E676',
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 12,
+            padding: '12px 18px',
+            minWidth: 280,
+          }}>
             {t.type === 'error' ? '⚠' : '✓'} {t.message}
-          </ToastItem>
+          </div>
         ))}
-      </ToastWrap>
+      </div>
     </>
   );
 }

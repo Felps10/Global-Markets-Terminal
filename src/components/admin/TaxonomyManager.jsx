@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import styled, { keyframes } from 'styled-components';
 import {
   fetchGroups, fetchSubgroups, fetchAssets,
 } from '../../services/taxonomyService.js';
@@ -8,41 +7,37 @@ import SubgroupFormModal   from './SubgroupFormModal.jsx';
 import DeleteGroupModal    from './DeleteGroupModal.jsx';
 import DeleteSubgroupModal from './DeleteSubgroupModal.jsx';
 import AssetFormModal      from './AssetFormModal.jsx';
+import { CLUBE_COLORS } from '../../clube/styles/index.js';
 
-// ── Animations ─────────────────────────────────────────────────────────────────
-const slideIn = keyframes`
-  from { opacity: 0; transform: translateX(40px); }
-  to   { opacity: 1; transform: translateX(0); }
-`;
-
-const shimmer = keyframes`
-  from { background-position: -400px 0; }
-  to   { background-position:  400px 0; }
-`;
+// ── Scoped styles for animations, focus, and scrollbar ────────────────────────
+function ScopedStyles() {
+  return (
+    <style>{`
+      @keyframes tm-slideIn {
+        from { opacity: 0; transform: translateX(40px); }
+        to   { opacity: 1; transform: translateX(0); }
+      }
+      @keyframes tm-shimmer {
+        from { background-position: -400px 0; }
+        to   { background-position:  400px 0; }
+      }
+      .tm-toast-item { animation: tm-slideIn 0.25s ease; }
+      .tm-skeleton-bar {
+        border-radius: 3px;
+        background: linear-gradient(90deg, #0D1220 25%, #1A2035 50%, #0D1220 75%);
+        background-size: 400px 100%;
+        animation: tm-shimmer 1.5s ease infinite;
+      }
+      .tm-col-body::-webkit-scrollbar { width: 4px; }
+      .tm-col-body::-webkit-scrollbar-track { background: transparent; }
+      .tm-col-body::-webkit-scrollbar-thumb { background: #1E2740; border-radius: 2px; }
+      .tm-filter-input::placeholder { color: #2D3748; }
+      .tm-filter-input:focus { border-color: rgba(0,188,212,0.4); }
+    `}</style>
+  );
+}
 
 // ── Toast ──────────────────────────────────────────────────────────────────────
-const ToastWrap = styled.div`
-  position: fixed;
-  bottom: 28px;
-  right: 28px;
-  z-index: 2000;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-`;
-
-const ToastItem = styled.div`
-  background: ${(p) => (p.$type === 'error' ? '#2D0A0A' : '#0A1F1A')};
-  border: 1px solid ${(p) => (p.$type === 'error' ? 'var(--c-error)' : '#00E676')};
-  border-radius: 6px;
-  color: ${(p) => (p.$type === 'error' ? 'var(--c-error)' : '#00E676')};
-  font-family: 'Space Mono', monospace;
-  font-size: 12px;
-  padding: 12px 18px;
-  min-width: 280px;
-  animation: ${slideIn} 0.25s ease;
-`;
-
 function useToast() {
   const [toasts, setToasts] = useState([]);
   const push = useCallback((message, type = 'success') => {
@@ -120,265 +115,113 @@ function AssetTypeBadge({ type }) {
   );
 }
 
-// ── Styled components ──────────────────────────────────────────────────────────
-const Body = styled.div`
-  flex: 1;
-  display: grid;
-  grid-template-columns: 280px 280px 1fr;
-  overflow: hidden;
-  min-height: 0;
-`;
-
-const Column = styled.div`
-  border-right: 1px solid #1E2740;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  &:last-child { border-right: none; }
-`;
-
-const ColHeader = styled.div`
-  padding: 10px 14px;
-  border-bottom: 1px solid #1E2740;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-shrink: 0;
-  min-height: 44px;
-  gap: 8px;
-`;
-
-const ColTitleGroup = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-`;
-
-const ColTitle = styled.div`
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.15em;
-  color: #64748B;
-  text-transform: uppercase;
-  white-space: nowrap;
-  flex-shrink: 0;
-`;
-
-const ColBreadcrumb = styled.span`
-  font-size: 10px;
-  color: #4A5568;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 130px;
-  flex-shrink: 1;
-  &::before { content: '/'; margin-right: 5px; color: #2D3748; }
-`;
-
-const ColCount = styled.span`
-  font-size: 10px;
-  color: #64748B;
-  background: #0A0F1E;
-  border: 1px solid #2D3748;
-  border-radius: 10px;
-  padding: 1px 8px;
-  flex-shrink: 0;
-`;
-
-const AddBtn = styled.button`
-  background: transparent;
-  border: 1px solid #1E2740;
-  border-radius: 4px;
-  color: var(--c-accent);
-  cursor: pointer;
-  font-family: 'Space Mono', monospace;
-  font-size: 10px;
-  letter-spacing: 0.05em;
-  padding: 5px 12px;
-  min-height: 30px;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: all 0.15s;
-  &:hover { background: var(--c-accent-muted); border-color: var(--c-accent); }
-`;
-
-const FilterWrap = styled.div`
-  padding: 7px 12px;
-  border-bottom: 1px solid #0D1220;
-  flex-shrink: 0;
-`;
-
-const FilterInput = styled.input`
-  width: 100%;
-  background: #0A0F1E;
-  border: 1px solid #1E2740;
-  border-radius: 4px;
-  color: #CBD5E1;
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
-  padding: 5px 10px;
-  outline: none;
-  box-sizing: border-box;
-  &::placeholder { color: #2D3748; }
-  &:focus { border-color: rgba(0,188,212,0.4); }
-`;
-
-const ColBody = styled.div`
-  flex: 1;
-  overflow-y: auto;
-  &::-webkit-scrollbar { width: 4px; }
-  &::-webkit-scrollbar-track { background: transparent; }
-  &::-webkit-scrollbar-thumb { background: #1E2740; border-radius: 2px; }
-`;
-
-const ListRow = styled.div`
-  padding: 9px 14px;
-  border-bottom: 1px solid #0D1220;
-  cursor: pointer;
-  background: ${(p) => (p.$active ? 'rgba(0,188,212,0.10)' : 'transparent')};
-  border-left: 3px solid ${(p) => (p.$active ? 'var(--c-accent)' : 'transparent')};
-  transition: background 0.12s, border-color 0.12s;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-
-  &:hover {
-    background: ${(p) => (p.$active ? 'rgba(0,188,212,0.10)' : 'rgba(255,255,255,0.04)')};
-    border-left-color: ${(p) => (p.$active ? 'var(--c-accent)' : 'rgba(0,188,212,0.25)')};
-  }
-`;
-
-const RowMain = styled.div`
-  flex: 1;
-  min-width: 0;
-`;
-
-const RowName = styled.div`
-  font-family: 'IBM Plex Sans', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  color: ${(p) => (p.$active ? '#E8EAF0' : '#94A3B8')};
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-`;
-
-const RowMeta = styled.div`
-  font-size: 10px;
-  color: #4A5568;
-  margin-top: 2px;
-`;
-
-const RowActions = styled.div`
-  display: flex;
-  gap: 3px;
-  opacity: 0;
-  flex-shrink: 0;
-  transition: opacity 0.15s;
-  ${ListRow}:hover & { opacity: 1; }
-`;
-
-const IconBtn = styled.button`
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  color: #4A5568;
-  cursor: pointer;
-  padding: 5px 6px;
-  min-width: 28px;
-  min-height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.12s;
-  &:hover {
-    background: ${(p) => (p.$danger ? 'rgba(255,82,82,0.10)' : 'rgba(0,188,212,0.10)')};
-    border-color: ${(p) => (p.$danger ? 'var(--c-error)' : 'var(--c-accent)')};
-    color: ${(p) => (p.$danger ? 'var(--c-error)' : 'var(--c-accent)')};
-  }
-`;
-
-const ChevronWrap = styled.div`
-  color: #2D3748;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  transition: color 0.12s;
-  ${ListRow}:hover & { color: rgba(0,188,212,0.45); }
-`;
-
-// Terminal-origin pill (replaces emoji flags)
-const OriginBadge = styled.span`
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  padding: 1px 5px;
-  border-radius: 3px;
-  flex-shrink: 0;
-  ${(p) => p.$br ? `
-    background: rgba(197,160,89,0.12);
-    border: 1px solid rgba(197,160,89,0.28);
-    color: #C5A059;
-  ` : `
-    background: rgba(0,188,212,0.08);
-    border: 1px solid rgba(0,188,212,0.2);
-    color: #26C6DA;
-  `}
-`;
-
-const EmptyState = styled.div`
-  padding: 40px 18px;
-  text-align: center;
-  color: #4A5568;
-  font-size: 11px;
-  line-height: 1.8;
-`;
-
-const AssetSymbolLabel = styled.span`
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--c-accent);
-  font-family: 'Space Mono', monospace;
-  min-width: 66px;
-  flex-shrink: 0;
-`;
-
 // ── Skeleton loading rows ──────────────────────────────────────────────────────
-const SkeletonRow = styled.div`
-  padding: 9px 14px;
-  border-bottom: 1px solid #0D1220;
-  min-height: 44px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 6px;
-`;
-
-const SkeletonBar = styled.div`
-  height: ${(p) => p.$h || 10}px;
-  width: ${(p) => p.$w || '60%'};
-  border-radius: 3px;
-  background: linear-gradient(90deg, #0D1220 25%, #1A2035 50%, #0D1220 75%);
-  background-size: 400px 100%;
-  animation: ${shimmer} 1.5s ease infinite;
-`;
-
 const SKELETON_WIDTHS = ['55%', '70%', '45%', '62%', '50%', '68%'];
 
 function SkeletonRows({ count = 4 }) {
   return Array.from({ length: count }, (_, i) => (
-    <SkeletonRow key={i}>
-      <SkeletonBar $w={SKELETON_WIDTHS[i % SKELETON_WIDTHS.length]} />
-      <SkeletonBar $h={8} $w={SKELETON_WIDTHS[(i + 2) % SKELETON_WIDTHS.length]} />
-    </SkeletonRow>
+    <div key={i} style={{
+      padding: '9px 14px',
+      borderBottom: '1px solid #0D1220',
+      minHeight: 44,
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      gap: 6,
+    }}>
+      <div className="tm-skeleton-bar" style={{
+        height: 10,
+        width: SKELETON_WIDTHS[i % SKELETON_WIDTHS.length],
+      }} />
+      <div className="tm-skeleton-bar" style={{
+        height: 8,
+        width: SKELETON_WIDTHS[(i + 2) % SKELETON_WIDTHS.length],
+      }} />
+    </div>
   ));
+}
+
+// ── Reusable inline style helpers ─────────────────────────────────────────────
+function ListRowComp({ active, onClick, onMouseEnter, onMouseLeave, hovered, children }) {
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      style={{
+        padding: '9px 14px',
+        borderBottom: '1px solid #0D1220',
+        cursor: 'pointer',
+        background: active ? 'rgba(0,188,212,0.10)' : hovered ? 'rgba(255,255,255,0.04)' : 'transparent',
+        borderLeft: `3px solid ${active ? 'var(--c-accent)' : hovered ? 'rgba(0,188,212,0.25)' : 'transparent'}`,
+        transition: 'background 0.12s, border-color 0.12s',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        minHeight: 44,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function IconBtnComp({ danger, title, onClick, children }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: hovered
+          ? (danger ? 'rgba(255,82,82,0.10)' : 'rgba(0,188,212,0.10)')
+          : 'transparent',
+        border: `1px solid ${hovered ? (danger ? 'var(--c-error)' : 'var(--c-accent)') : 'transparent'}`,
+        borderRadius: 4,
+        color: hovered ? (danger ? 'var(--c-error)' : 'var(--c-accent)') : '#4A5568',
+        cursor: 'pointer',
+        padding: '5px 6px',
+        minWidth: 28,
+        minHeight: 28,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'all 0.12s',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function AddBtnComp({ onClick, children }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: hovered ? 'var(--c-accent-muted)' : 'transparent',
+        border: `1px solid ${hovered ? 'var(--c-accent)' : '#1E2740'}`,
+        borderRadius: 4,
+        color: 'var(--c-accent)',
+        cursor: 'pointer',
+        fontFamily: "'Space Mono', monospace",
+        fontSize: 10,
+        letterSpacing: '0.05em',
+        padding: '5px 12px',
+        minHeight: 30,
+        whiteSpace: 'nowrap',
+        flexShrink: 0,
+        transition: 'all 0.15s',
+      }}
+    >
+      {children}
+    </button>
+  );
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -400,6 +243,9 @@ export default function TaxonomyManager() {
 
   const [groupFilter,    setGroupFilter]    = useState('');
   const [subgroupFilter, setSubgroupFilter] = useState('');
+
+  // Hover state for list rows
+  const [hoveredRowId, setHoveredRowId] = useState(null);
 
   // ── Data loaders ─────────────────────────────────────────────────────────────
   const loadGroups = useCallback(async () => {
@@ -521,182 +367,342 @@ export default function TaxonomyManager() {
     push(deleted ? 'Asset deleted' : 'Asset saved');
   }
 
+  // ── Column style constants ────────────────────────────────────────────────────
+  const columnStyle = {
+    borderRight: '1px solid #1E2740',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+  };
+  const lastColumnStyle = { ...columnStyle, borderRight: 'none' };
+
   return (
     <>
-      <Body>
+      <ScopedStyles />
+      <div style={{
+        flex: 1,
+        display: 'grid',
+        gridTemplateColumns: '280px 280px 1fr',
+        overflow: 'hidden',
+        minHeight: 0,
+      }}>
         {/* ── LEFT: Groups ── */}
-        <Column>
-          <ColHeader>
-            <ColTitleGroup>
-              <ColTitle>Groups</ColTitle>
-              {!loadingGroups && <ColCount>{groups.length}</ColCount>}
-            </ColTitleGroup>
-            <AddBtn onClick={() => setModal({ type: 'addGroup' })}>+ Add</AddBtn>
-          </ColHeader>
-          <FilterWrap>
-            <FilterInput
+        <div style={columnStyle}>
+          <div style={{
+            padding: '10px 14px',
+            borderBottom: '1px solid #1E2740',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexShrink: 0,
+            minHeight: 44,
+            gap: 8,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1, overflow: 'hidden' }}>
+              <div style={{
+                fontSize: 10, fontWeight: 700, letterSpacing: '0.15em',
+                color: '#64748B', textTransform: 'uppercase', whiteSpace: 'nowrap', flexShrink: 0,
+              }}>Groups</div>
+              {!loadingGroups && (
+                <span style={{
+                  fontSize: 10, color: '#64748B', background: '#0A0F1E',
+                  border: '1px solid #2D3748', borderRadius: 10, padding: '1px 8px', flexShrink: 0,
+                }}>{groups.length}</span>
+              )}
+            </div>
+            <AddBtnComp onClick={() => setModal({ type: 'addGroup' })}>+ Add</AddBtnComp>
+          </div>
+          <div style={{ padding: '7px 12px', borderBottom: '1px solid #0D1220', flexShrink: 0 }}>
+            <input
+              className="tm-filter-input"
               placeholder="Filter groups…"
               value={groupFilter}
               onChange={(e) => setGroupFilter(e.target.value)}
+              style={{
+                width: '100%', background: '#0A0F1E', border: '1px solid #1E2740',
+                borderRadius: 4, color: '#CBD5E1', fontFamily: "'Space Mono', monospace",
+                fontSize: 11, padding: '5px 10px', outline: 'none', boxSizing: 'border-box',
+              }}
             />
-          </FilterWrap>
-          <ColBody>
+          </div>
+          <div className="tm-col-body" style={{ flex: 1, overflowY: 'auto' }}>
             {loadingGroups ? (
               <SkeletonRows count={5} />
             ) : filteredGroups.length === 0 ? (
-              <EmptyState>
+              <div style={{ padding: '40px 18px', textAlign: 'center', color: '#4A5568', fontSize: 11, lineHeight: 1.8 }}>
                 {groupFilter.trim() ? 'No matches.' : 'No groups yet.\nClick + Add to create one.'}
-              </EmptyState>
+              </div>
             ) : (
-              filteredGroups.map((g) => (
-                <ListRow
-                  key={g.id}
-                  $active={selectedGroupId === g.id}
-                  onClick={() => setSelectedGroupId(g.id)}
-                >
-                  <RowMain>
-                    <RowName $active={selectedGroupId === g.id}>
-                      {g.display_name}
-                      <OriginBadge $br={g.l1_id === 'brasil'}>
-                        {g.l1_id === 'brasil' ? 'BR' : 'GL'}
-                      </OriginBadge>
-                    </RowName>
-                    <RowMeta>
-                      {g.subgroup_count} subgroup{g.subgroup_count !== 1 ? 's' : ''} · {g.slug}
-                    </RowMeta>
-                  </RowMain>
-                  <RowActions>
-                    <IconBtn
-                      title="Edit group"
-                      onClick={(e) => { e.stopPropagation(); setModal({ type: 'editGroup', payload: g }); }}
-                    ><IconEdit /></IconBtn>
-                    <IconBtn
-                      $danger
-                      title="Delete group"
-                      onClick={(e) => { e.stopPropagation(); setModal({ type: 'deleteGroup', payload: g }); }}
-                    ><IconTrash /></IconBtn>
-                  </RowActions>
-                  <ChevronWrap><IconChevron /></ChevronWrap>
-                </ListRow>
-              ))
+              filteredGroups.map((g) => {
+                const isActive = selectedGroupId === g.id;
+                const isHovered = hoveredRowId === `g-${g.id}`;
+                return (
+                  <ListRowComp
+                    key={g.id}
+                    active={isActive}
+                    hovered={isHovered}
+                    onClick={() => setSelectedGroupId(g.id)}
+                    onMouseEnter={() => setHoveredRowId(`g-${g.id}`)}
+                    onMouseLeave={() => setHoveredRowId(null)}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, fontWeight: 600,
+                        color: isActive ? '#E8EAF0' : '#94A3B8',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        display: 'flex', alignItems: 'center', gap: 7,
+                      }}>
+                        {g.display_name}
+                        <span style={{
+                          fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
+                          padding: '1px 5px', borderRadius: 3, flexShrink: 0,
+                          ...(g.l1_id === 'brasil' ? {
+                            background: 'rgba(197,160,89,0.12)',
+                            border: `1px solid rgba(197,160,89,0.28)`,
+                            color: CLUBE_COLORS.goldMuted,
+                          } : {
+                            background: 'rgba(0,188,212,0.08)',
+                            border: '1px solid rgba(0,188,212,0.2)',
+                            color: '#26C6DA',
+                          }),
+                        }}>
+                          {g.l1_id === 'brasil' ? 'BR' : 'GL'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 10, color: '#4A5568', marginTop: 2 }}>
+                        {g.subgroup_count} subgroup{g.subgroup_count !== 1 ? 's' : ''} · {g.slug}
+                      </div>
+                    </div>
+                    <div style={{
+                      display: 'flex', gap: 3, opacity: isHovered ? 1 : 0,
+                      flexShrink: 0, transition: 'opacity 0.15s',
+                    }}>
+                      <IconBtnComp
+                        title="Edit group"
+                        onClick={(e) => { e.stopPropagation(); setModal({ type: 'editGroup', payload: g }); }}
+                      ><IconEdit /></IconBtnComp>
+                      <IconBtnComp
+                        danger
+                        title="Delete group"
+                        onClick={(e) => { e.stopPropagation(); setModal({ type: 'deleteGroup', payload: g }); }}
+                      ><IconTrash /></IconBtnComp>
+                    </div>
+                    <div style={{
+                      color: isHovered ? 'rgba(0,188,212,0.45)' : '#2D3748',
+                      flexShrink: 0, display: 'flex', alignItems: 'center', transition: 'color 0.12s',
+                    }}><IconChevron /></div>
+                  </ListRowComp>
+                );
+              })
             )}
-          </ColBody>
-        </Column>
+          </div>
+        </div>
 
         {/* ── CENTER: Subgroups ── */}
-        <Column>
-          <ColHeader>
-            <ColTitleGroup>
-              <ColTitle>Subgroups</ColTitle>
+        <div style={columnStyle}>
+          <div style={{
+            padding: '10px 14px',
+            borderBottom: '1px solid #1E2740',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexShrink: 0,
+            minHeight: 44,
+            gap: 8,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1, overflow: 'hidden' }}>
+              <div style={{
+                fontSize: 10, fontWeight: 700, letterSpacing: '0.15em',
+                color: '#64748B', textTransform: 'uppercase', whiteSpace: 'nowrap', flexShrink: 0,
+              }}>Subgroups</div>
               {selectedGroup && (
-                <ColBreadcrumb title={selectedGroup.display_name}>
+                <span style={{
+                  fontSize: 10, color: '#4A5568', whiteSpace: 'nowrap', overflow: 'hidden',
+                  textOverflow: 'ellipsis', maxWidth: 130, flexShrink: 1,
+                }} title={selectedGroup.display_name}>
+                  <span style={{ marginRight: 5, color: '#2D3748' }}>/</span>
                   {selectedGroup.display_name}
-                </ColBreadcrumb>
+                </span>
               )}
-              {selectedGroup && !loadingSubgroups && <ColCount>{subgroups.length}</ColCount>}
-            </ColTitleGroup>
+              {selectedGroup && !loadingSubgroups && (
+                <span style={{
+                  fontSize: 10, color: '#64748B', background: '#0A0F1E',
+                  border: '1px solid #2D3748', borderRadius: 10, padding: '1px 8px', flexShrink: 0,
+                }}>{subgroups.length}</span>
+              )}
+            </div>
             {selectedGroup && (
-              <AddBtn onClick={() => setModal({ type: 'addSubgroup' })}>+ Add</AddBtn>
+              <AddBtnComp onClick={() => setModal({ type: 'addSubgroup' })}>+ Add</AddBtnComp>
             )}
-          </ColHeader>
+          </div>
           {selectedGroup && (
-            <FilterWrap>
-              <FilterInput
+            <div style={{ padding: '7px 12px', borderBottom: '1px solid #0D1220', flexShrink: 0 }}>
+              <input
+                className="tm-filter-input"
                 placeholder="Filter subgroups…"
                 value={subgroupFilter}
                 onChange={(e) => setSubgroupFilter(e.target.value)}
+                style={{
+                  width: '100%', background: '#0A0F1E', border: '1px solid #1E2740',
+                  borderRadius: 4, color: '#CBD5E1', fontFamily: "'Space Mono', monospace",
+                  fontSize: 11, padding: '5px 10px', outline: 'none', boxSizing: 'border-box',
+                }}
               />
-            </FilterWrap>
+            </div>
           )}
-          <ColBody>
+          <div className="tm-col-body" style={{ flex: 1, overflowY: 'auto' }}>
             {!selectedGroup ? (
-              <EmptyState>← Select a group<br />to view subgroups</EmptyState>
+              <div style={{ padding: '40px 18px', textAlign: 'center', color: '#4A5568', fontSize: 11, lineHeight: 1.8 }}>
+                ← Select a group<br />to view subgroups
+              </div>
             ) : loadingSubgroups ? (
               <SkeletonRows count={4} />
             ) : filteredSubgroups.length === 0 ? (
-              <EmptyState>
+              <div style={{ padding: '40px 18px', textAlign: 'center', color: '#4A5568', fontSize: 11, lineHeight: 1.8 }}>
                 {subgroupFilter.trim()
                   ? 'No matches.'
                   : `No subgroups in\n${selectedGroup.display_name}.\nClick + Add.`}
-              </EmptyState>
+              </div>
             ) : (
-              filteredSubgroups.map((s) => (
-                <ListRow
-                  key={s.id}
-                  $active={selectedSubgroupId === s.id}
-                  onClick={() => setSelectedSubgroupId(s.id)}
-                >
-                  <RowMain>
-                    <RowName $active={selectedSubgroupId === s.id}>{s.display_name}</RowName>
-                    <RowMeta>{s.asset_count} asset{s.asset_count !== 1 ? 's' : ''} · {s.slug}</RowMeta>
-                  </RowMain>
-                  <RowActions>
-                    <IconBtn
-                      title="Edit subgroup"
-                      onClick={(e) => { e.stopPropagation(); setModal({ type: 'editSubgroup', payload: s }); }}
-                    ><IconEdit /></IconBtn>
-                    <IconBtn
-                      $danger
-                      title="Delete subgroup"
-                      onClick={(e) => { e.stopPropagation(); setModal({ type: 'deleteSubgroup', payload: s }); }}
-                    ><IconTrash /></IconBtn>
-                  </RowActions>
-                  <ChevronWrap><IconChevron /></ChevronWrap>
-                </ListRow>
-              ))
+              filteredSubgroups.map((s) => {
+                const isActive = selectedSubgroupId === s.id;
+                const isHovered = hoveredRowId === `s-${s.id}`;
+                return (
+                  <ListRowComp
+                    key={s.id}
+                    active={isActive}
+                    hovered={isHovered}
+                    onClick={() => setSelectedSubgroupId(s.id)}
+                    onMouseEnter={() => setHoveredRowId(`s-${s.id}`)}
+                    onMouseLeave={() => setHoveredRowId(null)}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, fontWeight: 600,
+                        color: isActive ? '#E8EAF0' : '#94A3B8',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        display: 'flex', alignItems: 'center', gap: 7,
+                      }}>{s.display_name}</div>
+                      <div style={{ fontSize: 10, color: '#4A5568', marginTop: 2 }}>
+                        {s.asset_count} asset{s.asset_count !== 1 ? 's' : ''} · {s.slug}
+                      </div>
+                    </div>
+                    <div style={{
+                      display: 'flex', gap: 3, opacity: isHovered ? 1 : 0,
+                      flexShrink: 0, transition: 'opacity 0.15s',
+                    }}>
+                      <IconBtnComp
+                        title="Edit subgroup"
+                        onClick={(e) => { e.stopPropagation(); setModal({ type: 'editSubgroup', payload: s }); }}
+                      ><IconEdit /></IconBtnComp>
+                      <IconBtnComp
+                        danger
+                        title="Delete subgroup"
+                        onClick={(e) => { e.stopPropagation(); setModal({ type: 'deleteSubgroup', payload: s }); }}
+                      ><IconTrash /></IconBtnComp>
+                    </div>
+                    <div style={{
+                      color: isHovered ? 'rgba(0,188,212,0.45)' : '#2D3748',
+                      flexShrink: 0, display: 'flex', alignItems: 'center', transition: 'color 0.12s',
+                    }}><IconChevron /></div>
+                  </ListRowComp>
+                );
+              })
             )}
-          </ColBody>
-        </Column>
+          </div>
+        </div>
 
         {/* ── RIGHT: Assets ── */}
-        <Column>
-          <ColHeader>
-            <ColTitleGroup>
-              <ColTitle>Assets</ColTitle>
+        <div style={lastColumnStyle}>
+          <div style={{
+            padding: '10px 14px',
+            borderBottom: '1px solid #1E2740',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexShrink: 0,
+            minHeight: 44,
+            gap: 8,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1, overflow: 'hidden' }}>
+              <div style={{
+                fontSize: 10, fontWeight: 700, letterSpacing: '0.15em',
+                color: '#64748B', textTransform: 'uppercase', whiteSpace: 'nowrap', flexShrink: 0,
+              }}>Assets</div>
               {selectedSubgroup && (
-                <ColBreadcrumb title={selectedSubgroup.display_name}>
+                <span style={{
+                  fontSize: 10, color: '#4A5568', whiteSpace: 'nowrap', overflow: 'hidden',
+                  textOverflow: 'ellipsis', maxWidth: 130, flexShrink: 1,
+                }} title={selectedSubgroup.display_name}>
+                  <span style={{ marginRight: 5, color: '#2D3748' }}>/</span>
                   {selectedSubgroup.display_name}
-                </ColBreadcrumb>
+                </span>
               )}
-              {selectedSubgroup && !loadingAssets && <ColCount>{assets.length}</ColCount>}
-            </ColTitleGroup>
+              {selectedSubgroup && !loadingAssets && (
+                <span style={{
+                  fontSize: 10, color: '#64748B', background: '#0A0F1E',
+                  border: '1px solid #2D3748', borderRadius: 10, padding: '1px 8px', flexShrink: 0,
+                }}>{assets.length}</span>
+              )}
+            </div>
             {selectedSubgroup && (
-              <AddBtn onClick={() => setModal({ type: 'addAsset' })}>+ Add</AddBtn>
+              <AddBtnComp onClick={() => setModal({ type: 'addAsset' })}>+ Add</AddBtnComp>
             )}
-          </ColHeader>
-          <ColBody>
+          </div>
+          <div className="tm-col-body" style={{ flex: 1, overflowY: 'auto' }}>
             {!selectedSubgroup ? (
-              <EmptyState>← Select a subgroup<br />to view assets</EmptyState>
+              <div style={{ padding: '40px 18px', textAlign: 'center', color: '#4A5568', fontSize: 11, lineHeight: 1.8 }}>
+                ← Select a subgroup<br />to view assets
+              </div>
             ) : loadingAssets ? (
               <SkeletonRows count={6} />
             ) : assets.length === 0 ? (
-              <EmptyState>No assets in<br />{selectedSubgroup.display_name}.<br />Click + Add.</EmptyState>
+              <div style={{ padding: '40px 18px', textAlign: 'center', color: '#4A5568', fontSize: 11, lineHeight: 1.8 }}>
+                No assets in<br />{selectedSubgroup.display_name}.<br />Click + Add.
+              </div>
             ) : (
-              assets.map((a) => (
-                <ListRow
-                  key={a.id}
-                  onClick={() => setModal({ type: 'editAsset', payload: a })}
-                >
-                  <AssetSymbolLabel>{a.symbol}</AssetSymbolLabel>
-                  <RowMain>
-                    <RowName style={{ color: '#94A3B8' }}>{a.name}</RowName>
-                    <RowMeta>
-                      {[a.exchange, a.currency].filter(Boolean).join(' · ')}
-                    </RowMeta>
-                  </RowMain>
-                  <AssetTypeBadge type={a.type} />
-                  <RowActions>
-                    <IconBtn
-                      title="Edit asset"
-                      onClick={(e) => { e.stopPropagation(); setModal({ type: 'editAsset', payload: a }); }}
-                    ><IconEdit /></IconBtn>
-                  </RowActions>
-                </ListRow>
-              ))
+              assets.map((a) => {
+                const isHovered = hoveredRowId === `a-${a.id}`;
+                return (
+                  <ListRowComp
+                    key={a.id}
+                    hovered={isHovered}
+                    onClick={() => setModal({ type: 'editAsset', payload: a })}
+                    onMouseEnter={() => setHoveredRowId(`a-${a.id}`)}
+                    onMouseLeave={() => setHoveredRowId(null)}
+                  >
+                    <span style={{
+                      fontSize: 12, fontWeight: 700, color: 'var(--c-accent)',
+                      fontFamily: "'Space Mono', monospace", minWidth: 66, flexShrink: 0,
+                    }}>{a.symbol}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, fontWeight: 600,
+                        color: '#94A3B8',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        display: 'flex', alignItems: 'center', gap: 7,
+                      }}>{a.name}</div>
+                      <div style={{ fontSize: 10, color: '#4A5568', marginTop: 2 }}>
+                        {[a.exchange, a.currency].filter(Boolean).join(' · ')}
+                      </div>
+                    </div>
+                    <AssetTypeBadge type={a.type} />
+                    <div style={{
+                      display: 'flex', gap: 3, opacity: isHovered ? 1 : 0,
+                      flexShrink: 0, transition: 'opacity 0.15s',
+                    }}>
+                      <IconBtnComp
+                        title="Edit asset"
+                        onClick={(e) => { e.stopPropagation(); setModal({ type: 'editAsset', payload: a }); }}
+                      ><IconEdit /></IconBtnComp>
+                    </div>
+                  </ListRowComp>
+                );
+              })
             )}
-          </ColBody>
-        </Column>
-      </Body>
+          </div>
+        </div>
+      </div>
 
       {/* ── Modals ── */}
       {modal?.type === 'addGroup' && (
@@ -760,13 +766,25 @@ export default function TaxonomyManager() {
       )}
 
       {/* ── Toast notifications ── */}
-      <ToastWrap>
+      <div style={{
+        position: 'fixed', bottom: 28, right: 28, zIndex: 2000,
+        display: 'flex', flexDirection: 'column', gap: 8,
+      }}>
         {toasts.map((t) => (
-          <ToastItem key={t.id} $type={t.type}>
+          <div key={t.id} className="tm-toast-item" style={{
+            background: t.type === 'error' ? '#2D0A0A' : '#0A1F1A',
+            border: `1px solid ${t.type === 'error' ? 'var(--c-error)' : '#00E676'}`,
+            borderRadius: 6,
+            color: t.type === 'error' ? 'var(--c-error)' : '#00E676',
+            fontFamily: "'Space Mono', monospace",
+            fontSize: 12,
+            padding: '12px 18px',
+            minWidth: 280,
+          }}>
             {t.type === 'error' ? '⚠' : '✓'} {t.message}
-          </ToastItem>
+          </div>
         ))}
-      </ToastWrap>
+      </div>
     </>
   );
 }
