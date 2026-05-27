@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { CLUBE_COLORS } from '../clube/styles/index.js';
+import { CLUBE_COLORS } from '../lib/tokens.js';
 import { ROUTES } from '../lib/routes.js';
 
 export default function HamburgerMenu({
@@ -190,13 +190,7 @@ export default function HamburgerMenu({
 
         <Divider />
 
-        {/* Section 4 — Clube */}
-        <div style={{ padding: "16px 18px" }}>
-          <SectionLabel>CLUBE</SectionLabel>
-          <NavItem icon="💼" label="Dashboard" path={ROUTES.clube.list} accent="#8b5cf6" />
-        </div>
-
-        {/* Section 5 — Admin (conditional) */}
+        {/* Section 4 — Admin (conditional) */}
         {user?.role === "admin" && (
           <>
             <Divider />

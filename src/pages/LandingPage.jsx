@@ -2,12 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 import { useSnapshot } from '../hooks/useSnapshot.js';
-import { hasRole } from '../lib/roles.js';
 import { ROUTES } from '../lib/routes.js';
 
 function getRedirectForRole(role) {
   if (role === 'admin') return ROUTES.admin;
-  if (hasRole(role, 'club_member')) return ROUTES.clube.list;
   return ROUTES.terminal.global;
 }
 

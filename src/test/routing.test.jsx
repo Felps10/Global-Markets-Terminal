@@ -118,24 +118,3 @@ describe('ProtectedRoute — requiredRole={null} skips role check', () => {
   });
 });
 
-describe('ProtectedRoute — club_member role check', () => {
-  it('denies access to user with role "user" when requiredRole="club_member"', () => {
-    renderProtected(mockAuthenticatedUser(), '/clube/123', 'club_member');
-    expect(screen.getByTestId('app-page')).toBeInTheDocument();
-    expect(screen.queryByTestId('protected-page')).not.toBeInTheDocument();
-  });
-
-  it('grants access to user with role "club_member"', () => {
-    renderProtected(
-      mockAuthenticatedUser({ role: 'club_member' }),
-      '/clube/123',
-      'club_member'
-    );
-    expect(screen.getByTestId('protected-page')).toBeInTheDocument();
-  });
-
-  it('grants access to admin when requiredRole="club_member"', () => {
-    renderProtected(mockAuthenticatedAdmin(), '/clube/123', 'club_member');
-    expect(screen.getByTestId('protected-page')).toBeInTheDocument();
-  });
-});

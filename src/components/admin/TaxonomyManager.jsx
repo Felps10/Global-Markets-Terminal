@@ -7,7 +7,7 @@ import SubgroupFormModal   from './SubgroupFormModal.jsx';
 import DeleteGroupModal    from './DeleteGroupModal.jsx';
 import DeleteSubgroupModal from './DeleteSubgroupModal.jsx';
 import AssetFormModal      from './AssetFormModal.jsx';
-import { CLUBE_COLORS } from '../../clube/styles/index.js';
+import { CLUBE_COLORS } from '../../lib/tokens.js';
 
 // ── Scoped styles for animations, focus, and scrollbar ────────────────────────
 function ScopedStyles() {

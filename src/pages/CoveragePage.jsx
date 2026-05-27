@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../lib/routes.js';
-import { CLUBE_COLORS } from '../clube/styles/index.js';
+import { CLUBE_COLORS } from '../lib/tokens.js';
 
 const GLOBAL_COVERAGE = [
   {

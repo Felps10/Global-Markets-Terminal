@@ -3,7 +3,6 @@ import express from 'express';
 import cors    from 'cors';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { supabase, initSchema, seedIfEmpty } from './db.js';
-import { seedClubeDemo } from './seed.js';
 import authRoutes     from './routes/auth.js';
 import groupRoutes    from './routes/groups.js';
 import subgroupRoutes from './routes/subgroups.js';
@@ -13,7 +12,6 @@ import l1Routes       from './routes/l1.js';
 import usersRouter       from './routes/users.js';
 import watchlistRoutes   from './routes/watchlist.js';
 import preferencesRoutes from './routes/preferences.js';
-import clubeRoutes       from './routes/clubes.js';
 import yahooRoutes       from './routes/yahoo.js';
 import snapshotRoutes    from './routes/snapshot.js';
 import quotesRoutes      from './routes/quotes.js';
@@ -76,7 +74,6 @@ app.use('/api/v1/quotes', quotesRoutes);
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/api/v1/health', (_req, res) => res.json({ status: 'ok', ts: Date.now() }));
 
-app.use('/api/v1/clubes', clubeRoutes);
 app.use('/api/v1/brazil', brazilMacroRoutes);
 app.use('/api/v1/alerts', alertsRoutes);
 
@@ -133,8 +130,6 @@ async function start() {
     console.log('│    DELETE /api/v1/watchlist/:type/:target_id         │');
     console.log('│    GET    /api/v1/preferences                        │');
     console.log('│    PUT    /api/v1/preferences                        │');
-    console.log('│    GET    /api/v1/clubes                             │');
-    console.log('│    POST   /api/v1/clubes                             │');
     console.log('│    GET    /api/v1/quotes/live                        │');
     console.log('│    GET    /api/yahoo/v7/finance/quote                │');
     console.log('│    GET    /api/yahoo/v8/finance/chart                │');
@@ -166,10 +161,6 @@ async function start() {
   // Start server-side quote fetcher — consolidates all Yahoo/CoinGecko
   // requests into one periodic fetch per interval (N users = 1 request)
   startQuoteFetcher();
-
-  if (process.env.NODE_ENV !== 'production') {
-    await seedClubeDemo();
-  }
 
   // Graceful shutdown — Railway sends SIGTERM before stopping a deployment
   process.on('SIGTERM', () => {

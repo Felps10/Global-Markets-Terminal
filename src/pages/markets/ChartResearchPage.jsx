@@ -11,7 +11,7 @@ import {
   finnhubNews, finnhubRecommendation,
   hasFmpKey, hasFinnhubKey,
 } from '../../dataServices.js';
-import { CLUBE_COLORS } from '../../clube/styles/index.js';
+import { CLUBE_COLORS } from '../../lib/tokens.js';
 
 const C       = CLUBE_COLORS;
 const BORDER  = C.borderSubtle;

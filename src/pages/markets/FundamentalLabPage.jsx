@@ -5,7 +5,7 @@ import { API_BASE, fmpProfile, fmpRatios, hasFmpKey } from '../../dataServices.j
 import MarketsPageLayout from '../../components/MarketsPageLayout.jsx';
 import { isExhausted } from '../../services/quotaTracker.js';
 import { useWatchlist } from '../../context/WatchlistContext.jsx';
-import { CLUBE_COLORS } from '../../clube/styles/index.js';
+import { CLUBE_COLORS } from '../../lib/tokens.js';
 
 const C       = CLUBE_COLORS;
 const BORDER  = C.borderSubtle;

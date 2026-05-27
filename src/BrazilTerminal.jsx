@@ -9,7 +9,7 @@ import { fetchBrazilMacro } from "./services/brazilDataServices.js";
 import { usePreferences } from './context/PreferencesContext.jsx';
 import { BRAZIL_BLOCKS, getSectionById } from "./data/brazilBlocks.js";
 
-import { CLUBE_COLORS } from './clube/styles/index.js';
+import { CLUBE_COLORS } from './lib/tokens.js';
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const GOLD             = CLUBE_COLORS.accent;

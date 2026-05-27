@@ -17,14 +17,6 @@ export const ROUTES = {
     signals:      '/markets/signals',
   },
   admin:    '/admin',
-  clube: {
-    landing:      '/clube',
-    comoFunciona: '/clube/como-funciona',
-    paraGestores: '/clube/para-gestores',
-    paraMembros:  '/clube/para-membros',
-    contato:      '/clube/contato',
-    list:         '/clubes',
-  },
   auth: {
     login:    '/login',
     register: '/register',

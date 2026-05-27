@@ -22,7 +22,7 @@ import MarketStatusPill, { MARKETS } from './MarketStatusPill.jsx';
 import TickerStrip from './TickerStrip.jsx';
 import MarketsDropdown from './MarketsDropdown.jsx';
 import { useTaxonomy } from '../context/TaxonomyContext.jsx';
-import { CLUBE_COLORS } from '../clube/styles/index.js';
+import { CLUBE_COLORS } from '../lib/tokens.js';
 import { ROUTES } from '../lib/routes.js';
 import { injectStyles, GmtLogo } from './gmtHeaderShared.jsx';
 
@@ -78,9 +78,6 @@ function UserDropdown({ user, onNav, onLogout, onClose }) {
           </span>
         </button>
       )}
-      <button className="gmt-dropdown-item" onClick={() => { onNav?.(ROUTES.clube.list); onClose(); }}>
-        <span>📊</span> Clube
-      </button>
       <button className="gmt-dropdown-item" onClick={() => { onNav?.(ROUTES.terminal.settings); onClose(); }}>
         <span>⚙</span> Settings
       </button>
@@ -291,7 +288,6 @@ export default function GMTHeader({
     if (pathname.startsWith(ROUTES.terminal.news)) return 'news';
     if (pathname.startsWith(ROUTES.terminal.watchlist)) return 'watchlist';
     if (pathname.startsWith(ROUTES.terminal.alerts)) return 'alerts';
-    if (pathname.startsWith('/clube') || pathname.startsWith(ROUTES.clube.list)) return 'clube';
     return activePage;
   }, [pathname, activePage]);
 
@@ -373,22 +369,6 @@ export default function GMTHeader({
           {item.label}
         </button>
       ))}
-      <button
-        className={`gmt-nav-item${derivedActivePage === 'clube' ? ' active' : ''}`}
-        onClick={() => navigate(ROUTES.clube.list)}
-      >
-        Clube
-        {!user && (
-          <span style={{
-            marginLeft: 4,
-            fontSize: 8,
-            color: '#475569',
-            verticalAlign: 'middle',
-          }}>
-            🔒
-          </span>
-        )}
-      </button>
       <div style={{ flex: 1 }} />
       {isTerminalPage && (
         <>

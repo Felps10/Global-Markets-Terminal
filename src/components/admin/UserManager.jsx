@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getUsers, deleteUser, patchUserRole, promoteToManager } from '../../services/userService.js';
+import { getUsers, deleteUser, patchUserRole } from '../../services/userService.js';
 import { ROLE_LABEL, ADMIN_ASSIGNABLE_ROLES } from '../../lib/roles.js';
 import { useAuth } from '../../hooks/useAuth.js';
-import { CLUBE_COLORS } from '../../clube/styles/index.js';
+import { CLUBE_COLORS } from '../../lib/tokens.js';
 
 // ── Scoped styles for animations and scrollbar ────────────────────────────────
 function ScopedStyles() {
@@ -29,8 +29,6 @@ function ScopedStyles() {
 // ── Role badge ────────────────────────────────────────────────────────────────
 const ROLE_BADGE_STYLES = {
   admin:        { background: 'var(--c-accent)', color: '#fff' },
-  club_manager: { background: CLUBE_COLORS.goldMuted,  color: '#1a1a1a' },
-  club_member:  { background: 'rgba(197,160,89,0.3)', color: CLUBE_COLORS.goldMuted },
   user:         { background: 'rgba(255,255,255,0.06)', color: 'var(--c-text-2)' },
 };
 
@@ -179,7 +177,7 @@ function RoleSelector({ user, currentUserId, onSelect }) {
         textTransform: 'uppercase',
       }}
     >
-      {ADMIN_ASSIGNABLE_ROLES.filter((r) => r !== 'admin' && r !== 'club_manager').map((r) => (
+      {ADMIN_ASSIGNABLE_ROLES.filter((r) => r !== 'admin').map((r) => (
         <option key={r} value={r}>{ROLE_LABEL[r]}</option>
       ))}
     </select>
@@ -204,10 +202,6 @@ export default function UserManager() {
   const [promotingUser,  setPromotingUser]  = useState(null); // { id, email, name, currentRole, targetRole }
   const [promoteLoading, setPromoteLoading] = useState(false);
   const [promoteError,   setPromoteError]   = useState(null);
-
-  // Promote-to-manager inline confirmation state
-  const [managerConfirmId,     setManagerConfirmId]     = useState(null); // user id showing confirmation
-  const [managerPromoteLoading, setManagerPromoteLoading] = useState(false);
 
   // Table row hover state
   const [hoveredRowId, setHoveredRowId] = useState(null);
@@ -259,27 +253,6 @@ export default function UserManager() {
       setPromoteError(err.message);
     } finally {
       setPromoteLoading(false);
-    }
-  }
-
-  async function handlePromoteManager(userId) {
-    setManagerPromoteLoading(true);
-    try {
-      const updated = await promoteToManager(userId);
-      setUsers((prev) =>
-        prev.map((u) => (u.id === updated.id ? { ...u, role: updated.role } : u))
-      );
-      push(`${updated.name || updated.email} promoted to Club Manager`);
-      setManagerConfirmId(null);
-    } catch (err) {
-      if (err.message === 'CONFLICT' || err.message.includes('already exists')) {
-        push('A club manager already exists. Demote the current one first.', 'error');
-      } else {
-        push(err.message || 'Failed to promote user', 'error');
-      }
-      setManagerConfirmId(null);
-    } finally {
-      setManagerPromoteLoading(false);
     }
   }
 
@@ -380,72 +353,6 @@ export default function UserManager() {
                     </td>
                     <td style={tdStyle}>{fmtDate(u.created_at)}</td>
                     <td style={{ ...tdStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {u.role !== 'club_manager' && u.role !== 'admin' && !isSelf && (
-                        managerConfirmId === u.id ? (
-                          <span style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 6,
-                            fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 11, color: '#8892A4',
-                          }}>
-                            <span>Set as sole club manager?</span>
-                            <button
-                              disabled={managerPromoteLoading}
-                              onClick={() => handlePromoteManager(u.id)}
-                              style={{
-                                background: 'rgba(59,130,246,0.12)',
-                                border: '1px solid var(--c-accent)',
-                                borderRadius: 3,
-                                color: 'var(--c-accent)',
-                                cursor: managerPromoteLoading ? 'not-allowed' : 'pointer',
-                                fontFamily: "'JetBrains Mono', monospace",
-                                fontSize: 10,
-                                fontWeight: 700,
-                                letterSpacing: '0.06em',
-                                padding: '3px 8px',
-                                opacity: managerPromoteLoading ? 0.5 : 1,
-                              }}
-                            >
-                              {managerPromoteLoading ? 'Saving...' : 'Confirm'}
-                            </button>
-                            <button
-                              disabled={managerPromoteLoading}
-                              onClick={() => setManagerConfirmId(null)}
-                              style={{
-                                background: 'transparent',
-                                border: '1px solid #1E2740',
-                                borderRadius: 3,
-                                color: '#4A5568',
-                                cursor: 'pointer',
-                                fontFamily: "'JetBrains Mono', monospace",
-                                fontSize: 10,
-                                letterSpacing: '0.06em',
-                                padding: '3px 8px',
-                              }}
-                            >
-                              Cancel
-                            </button>
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => setManagerConfirmId(u.id)}
-                            title={`Promote ${u.email} to Club Manager`}
-                            style={{
-                              background: 'transparent',
-                              border: '1px solid #1E2740',
-                              borderRadius: 3,
-                              color: 'var(--c-accent)',
-                              cursor: 'pointer',
-                              fontFamily: "'JetBrains Mono', monospace",
-                              fontSize: 10,
-                              letterSpacing: '0.06em',
-                              padding: '4px 10px',
-                              transition: 'all 0.15s',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            Promote to Manager
-                          </button>
-                        )
-                      )}
                       <DeleteBtnComp
                         disabled={isSelf}
                         title={isSelf ? 'Cannot delete your own account' : `Delete ${u.email}`}

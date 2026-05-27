@@ -22,7 +22,7 @@ import {
 } from '../dataServices.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useAlerts } from '../context/AlertsContext.jsx';
-import { CLUBE_COLORS } from '../clube/styles/index.js';
+import { CLUBE_COLORS } from '../lib/tokens.js';
 
 // ─── Color tokens ─────────────────────────────────────────────────────────────
 const C          = CLUBE_COLORS;

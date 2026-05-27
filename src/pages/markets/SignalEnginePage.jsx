@@ -3,7 +3,7 @@ import MarketsPageLayout from '../../components/MarketsPageLayout.jsx';
 import { useTaxonomy } from '../../context/TaxonomyContext.jsx';
 import { alphaVantageRSI, alphaVantageMACD, hasAlphaVantageKey } from '../../dataServices.js';
 import { quotaTracker, isExhausted } from '../../services/quotaTracker.js';
-import { CLUBE_COLORS } from '../../clube/styles/index.js';
+import { CLUBE_COLORS } from '../../lib/tokens.js';
 
 const C       = CLUBE_COLORS;
 const BORDER  = C.borderSubtle;

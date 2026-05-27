@@ -21,7 +21,6 @@ const MESSAGES = {
   fundamental_lab: 'Laboratório de valuation e métricas — crie uma conta gratuita',
   macro_hub:       'Dashboards macro e calendário econômico — crie uma conta gratuita',
   signal_engine:   'Scanner de sinais técnicos — crie uma conta gratuita',
-  clube:           'Gestão de clube de investimento — crie uma conta gratuita',
   default:         'Crie uma conta gratuita para continuar',
 };
 

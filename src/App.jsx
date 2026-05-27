@@ -28,30 +28,9 @@ const FundamentalLabPage    = React.lazy(() => import('./pages/markets/Fundament
 const MacroHubPage          = React.lazy(() => import('./pages/markets/MacroHubPage.jsx'));
 const SignalEnginePage      = React.lazy(() => import('./pages/markets/SignalEnginePage.jsx'));
 const ChartResearchPage     = React.lazy(() => import('./pages/markets/ChartResearchPage.jsx'));
-const ClubePage             = React.lazy(() => import('./pages/ClubePage.jsx'));
-const ClubeReportPage       = React.lazy(() => import('./pages/ClubeReportPage.jsx'));
-const ClubeMembroPage       = React.lazy(() => import('./pages/ClubeMembroPage.jsx'));
-const ClubeSimuladorPage    = React.lazy(() => import('./pages/ClubeSimuladorPage.jsx'));
-const ClubeGovernancaPage   = React.lazy(() => import('./pages/ClubeGovernancaPage.jsx'));
-const ClubeGovernancaDetailPage     = React.lazy(() => import('./pages/ClubeGovernancaDetailPage.jsx'));
-const ClubeReenquadramentoPage      = React.lazy(() => import('./pages/ClubeReenquadramentoPage.jsx'));
-const ClubeReenquadramentoDetailPage = React.lazy(() => import('./pages/ClubeReenquadramentoDetailPage.jsx'));
-const ClubeCalendarioPage   = React.lazy(() => import('./pages/ClubeCalendarioPage.jsx'));
-const ClubeNavPage          = React.lazy(() => import('./pages/ClubeNavPage.jsx'));
-const ClubeOperacionalPage  = React.lazy(() => import('./pages/ClubeOperacionalPage.jsx'));
-const ClubeCarteiraPage     = React.lazy(() => import('./pages/ClubeCarteiraPage.jsx'));
-const ClubeRiscoPage        = React.lazy(() => import('./pages/ClubeRiscoPage.jsx'));
-const ClubeEstatutoPage     = React.lazy(() => import('./pages/ClubeEstatutoPage.jsx'));
-
-const ClubeListPage         = React.lazy(() => import('./pages/ClubeListPage.jsx'));
 const SettingsPage          = React.lazy(() => import('./pages/SettingsPage.jsx'));
 const TerminalProLandingPage = React.lazy(() => import('./pages/TerminalProLandingPage.jsx'));
 const TerminalMiniPage      = React.lazy(() => import('./pages/TerminalMiniPage.jsx'));
-const ClubeLandingPage      = React.lazy(() => import('./clube/pages/ClubeLandingPage.jsx'));
-const ComoFuncionaPage      = React.lazy(() => import('./clube/pages/ComoFuncionaPage.jsx'));
-const ParaGestoresPage      = React.lazy(() => import('./clube/pages/ParaGestoresPage.jsx'));
-const ParaMembrosPage       = React.lazy(() => import('./clube/pages/ParaMembrosPage.jsx'));
-const ContatoPage           = React.lazy(() => import('./clube/pages/ContatoPage.jsx'));
 const FeaturesPage          = React.lazy(() => import('./pages/FeaturesPage.jsx'));
 const CoveragePage          = React.lazy(() => import('./pages/CoveragePage.jsx'));
 const PricingPage           = React.lazy(() => import('./pages/PricingPage.jsx'));
@@ -87,11 +66,6 @@ function RouteFallback() {
  *   /pricing    PricingPage
  *   /about      AboutPage
  *   /community  CommunityPage
- *   /clube                  ClubeLandingPage    (Clube GMT marketing)
- *   /clube/como-funciona    ComoFuncionaPage    (public)
- *   /clube/para-gestores    ParaGestoresPage    (public)
- *   /clube/para-membros     ParaMembrosPage     (public)
- *   /clube/contato          ContatoPage         (public)
  *
  * PROTECTED routes — guard lives on the LAYOUT or the route itself.
  *
@@ -106,13 +80,10 @@ function RouteFallback() {
  *                  To add a markets sub-page: copy the pattern from an existing
  *                  /markets route and add a ProtectedRoute wrapper.
  *
- *   /clube/:id/*   ProtectedRoute requiredRole={null} or "club_member"
- *                  See individual route definitions below for per-route roles.
- *
  *   /admin         ProtectedRoute requiredRole="admin"  admin only
  *
  * ROLE LADDER (defined in src/lib/roles.js):
- *   user(0) → club_member(1) → club_manager(2) → admin(3)
+ *   user(0) → admin(1)
  *   ProtectedRoute passes if user rank >= required rank.
  *   requiredRole={null} means any authenticated user passes (rank >= 0).
  *
@@ -206,33 +177,6 @@ function AppWithPanel() {
           <Route path="/markets/fundamentals" element={<ProtectedRoute requiredRole={null}><FundamentalLabPage /></ProtectedRoute>} />
           <Route path="/markets/macro"        element={<ProtectedRoute requiredRole={null}><MacroHubPage /></ProtectedRoute>} />
           <Route path="/markets/signals"      element={<ProtectedRoute requiredRole={null}><SignalEnginePage /></ProtectedRoute>} />
-
-          {/* Clube de Investimento */}
-          <Route path="/clubes" element={<ProtectedRoute requiredRole={null}><ClubeListPage /></ProtectedRoute>} />
-
-          {/* Clube GMT — public marketing pages */}
-          <Route path="/clube"               element={<ClubeLandingPage />}  />
-          <Route path="/clube/como-funciona" element={<ComoFuncionaPage />}  />
-          <Route path="/clube/para-gestores" element={<ParaGestoresPage />}  />
-          <Route path="/clube/para-membros"  element={<ParaMembrosPage />}   />
-          <Route path="/clube/contato"       element={<ContatoPage />}       />
-
-          {/* Parameterized clube module routes */}
-          <Route path="/clube/:id" element={<ProtectedRoute requiredRole="club_member" showDenied={true}><ClubePage /></ProtectedRoute>} />
-          <Route path="/clube/:id/membros" element={<ProtectedRoute requiredRole="club_manager"><ClubeMembroPage /></ProtectedRoute>} />
-          <Route path="/clube/:id/simulador" element={<ProtectedRoute requiredRole="club_manager"><ClubeSimuladorPage /></ProtectedRoute>} />
-          <Route path="/clube/:id/report" element={<ProtectedRoute requiredRole="club_member" showDenied={true}><ClubeReportPage /></ProtectedRoute>} />
-          <Route path="/clube/:id/governanca" element={<ProtectedRoute requiredRole="club_member"><ClubeGovernancaPage /></ProtectedRoute>} />
-          <Route path="/clube/:id/governanca/:aid" element={<ProtectedRoute requiredRole="club_member"><ClubeGovernancaDetailPage /></ProtectedRoute>} />
-          <Route path="/clube/:id/reenquadramento" element={<ProtectedRoute requiredRole="club_manager"><ClubeReenquadramentoPage /></ProtectedRoute>} />
-          <Route path="/clube/:id/reenquadramento/:rid" element={<ProtectedRoute requiredRole="club_manager"><ClubeReenquadramentoDetailPage /></ProtectedRoute>} />
-          <Route path="/clube/:id/calendario" element={<ProtectedRoute requiredRole="club_manager" showDenied={true}><ClubeCalendarioPage /></ProtectedRoute>} />
-          <Route path="/clube/:id/nav" element={<ProtectedRoute requiredRole="club_manager" showDenied={true}><ClubeNavPage /></ProtectedRoute>} />
-          <Route path="/clube/:id/tributacao" element={<ProtectedRoute requiredRole="club_manager"><Navigate to="../simulador" replace /></ProtectedRoute>} />
-          <Route path="/clube/:id/operacional" element={<ProtectedRoute requiredRole="club_manager" showDenied={true}><ClubeOperacionalPage /></ProtectedRoute>} />
-          <Route path="/clube/:id/carteira" element={<ProtectedRoute requiredRole="club_manager" showDenied={true}><ClubeCarteiraPage /></ProtectedRoute>} />
-          <Route path="/clube/:id/risco" element={<ProtectedRoute requiredRole="club_manager" showDenied={true}><ClubeRiscoPage /></ProtectedRoute>} />
-          <Route path="/clube/:id/estatuto" element={<ProtectedRoute requiredRole="club_manager" showDenied={true}><ClubeEstatutoPage /></ProtectedRoute>} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
