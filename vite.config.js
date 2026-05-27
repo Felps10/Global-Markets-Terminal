@@ -9,20 +9,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [
-    react({
-      babel: {
-        plugins: [
-          [
-            'babel-plugin-styled-components',
-            {
-              displayName: false,
-              fileName:    false,
-              pure:        true,
-            },
-          ],
-        ],
-      },
-    }),
+    react(),
   ],
   build: {
     sourcemap: false,   // disable in production — reduces bundle size
