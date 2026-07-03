@@ -14,7 +14,7 @@ router.get('/', authenticate, requireAdmin, async (_req, res) => {
     id:              u.id,
     email:           u.email,
     name:            u.user_metadata?.name || '',
-    role:            u.user_metadata?.role || 'user',
+    role:            u.app_metadata?.role || 'user',
     created_at:      u.created_at,
     last_sign_in_at: u.last_sign_in_at || null,
   }));
@@ -36,7 +36,7 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
     return res.status(404).json({ error: 'NOT_FOUND', message: 'User not found' });
   }
 
-  if ((target.user_metadata?.role || 'user') === 'admin') {
+  if ((target.app_metadata?.role || 'user') === 'admin') {
     return res.status(403).json({ error: 'FORBIDDEN', message: 'Cannot delete another admin account' });
   }
 
@@ -68,7 +68,7 @@ router.get('/search', authenticate, requireAdmin, async (req, res) => {
       id:    u.id,
       email: u.email,
       name:  u.user_metadata?.name || '',
-      role:  u.user_metadata?.role || 'user',
+      role:  u.app_metadata?.role || 'user',
     }));
 
   return res.json({ users: matches });
@@ -103,16 +103,19 @@ router.patch('/:id/role', authenticate, requireAdmin, async (req, res) => {
     return res.status(404).json({ error: 'NOT_FOUND', message: 'User not found' });
   }
 
-  if ((target.user_metadata?.role || 'user') === 'admin' && callerRole !== 'admin') {
+  if ((target.app_metadata?.role || 'user') === 'admin' && callerRole !== 'admin') {
     return res.status(403).json({
       error:   'FORBIDDEN',
       message: 'Cannot modify an admin account',
     });
   }
 
+  // Role is authoritative in app_metadata (service-role-only writable).
+  // notification_pending is a UI flag and stays in user_metadata.
   const { data: { user: updated }, error } =
     await supabase.auth.admin.updateUserById(targetId, {
-      user_metadata: { ...target.user_metadata, role, notification_pending: true },
+      app_metadata:  { ...target.app_metadata, role },
+      user_metadata: { ...target.user_metadata, notification_pending: true },
     });
 
   if (error) return res.status(500).json({ error: 'DB_ERROR', message: error.message });
@@ -121,7 +124,7 @@ router.patch('/:id/role', authenticate, requireAdmin, async (req, res) => {
     id:    updated.id,
     email: updated.email,
     name:  updated.user_metadata?.name || '',
-    role:  updated.user_metadata?.role || 'user',
+    role:  updated.app_metadata?.role || 'user',
   });
 });
 

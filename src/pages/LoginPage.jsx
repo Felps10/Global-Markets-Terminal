@@ -55,7 +55,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const data = await login(email, password);
-      const role = data?.user?.user_metadata?.role || 'user';
+      const role = data?.user?.app_metadata?.role || 'user';
       navigate(getRedirectForRole(role), { replace: true });
     } catch (err) {
       setError(err?.message || 'Invalid credentials');

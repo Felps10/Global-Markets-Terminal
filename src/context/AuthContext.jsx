@@ -9,7 +9,9 @@ function mapUser(supabaseUser) {
     id:                   supabaseUser.id,
     email:                supabaseUser.email,
     name:                 supabaseUser.user_metadata?.name || '',
-    role:                 supabaseUser.user_metadata?.role || 'user',
+    // role is authoritative in app_metadata (service-role-only writable); it
+    // rides in the JWT so the client can read it but never forge it.
+    role:                 supabaseUser.app_metadata?.role || 'user',
     notification_pending: !!supabaseUser.user_metadata?.notification_pending,
   };
 }
