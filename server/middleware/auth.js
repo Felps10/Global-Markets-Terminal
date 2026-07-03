@@ -24,7 +24,10 @@ export async function authenticate(req, res, next) {
     id:    user.id,
     email: user.email,
     name:  user.user_metadata?.name || '',
-    role:  user.user_metadata?.role || 'user',
+    // Authoritative role lives in app_metadata — only the service role can write
+    // it. user_metadata is client-writable (supabase.auth.updateUser), so it must
+    // never be trusted for authorization.
+    role:  user.app_metadata?.role || 'user',
   };
 
   next();

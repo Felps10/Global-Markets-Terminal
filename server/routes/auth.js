@@ -43,7 +43,10 @@ router.post('/register', registerLimiter, async (req, res) => {
     email:         email.toLowerCase(),
     password,
     email_confirm: true,
-    user_metadata: { name: trimmedName, role: 'user' },
+    // role is authoritative in app_metadata (service-role-only writable) so a
+    // self-registering user cannot grant themselves elevated access.
+    app_metadata:  { role: 'user' },
+    user_metadata: { name: trimmedName },
   });
 
   if (error) {
@@ -103,7 +106,7 @@ router.post('/login', async (req, res) => {
       id:    data.user.id,
       email: data.user.email,
       name:  data.user.user_metadata?.name || '',
-      role:  data.user.user_metadata?.role || 'user',
+      role:  data.user.app_metadata?.role || 'user',
     },
   });
 });

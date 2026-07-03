@@ -1,9 +1,19 @@
 # GMT — Personas, Roles & User Journeys
 
-> Living document. Update when product decisions change role boundaries,
-> permissions, or onboarding flows.
-> Last updated: 2026-04-07 — updated after GLO-86→88 session (Clube GMT
-> architecture refactor + tab recovery + code quality pass)
+> ⚠️ **SUPERSEDED — describes the pre-extraction app (as of 2026-04-07).**
+> On **2026-05-27** the Clube GMT feature was extracted out of this repo into a
+> standalone app (code preserved under `_transfer/`). Everything below that mentions
+> `club_member` / `club_manager` roles, `MANAGER_ASSIGNABLE(_ROLES)`, the GESTÃO DE
+> MEMBROS panel, cotista/gestor personas & journeys, or `server/routes/clubes.js` no
+> longer exists in **this** application. The live role ladder is now just
+> `user < admin` (`src/lib/roles.js`). This document is retained as reference for the
+> standalone Clube rebuild — see `_transfer/TRANSFER.md`. Do not treat it as an
+> accurate description of the current GMT Terminal.
+>
+> _Original header:_ Living document. Update when product decisions change role
+> boundaries, permissions, or onboarding flows. Last updated: 2026-04-07 — updated
+> after GLO-86→88 session (Clube GMT architecture refactor + tab recovery + code
+> quality pass)
 
 ---
 

@@ -8,9 +8,14 @@ parent workspace CLAUDE.md (life/scheduling context) — this file is purely tec
 ## What this project is
 
 GMT is a real-time financial data platform built by a solo developer (Felipe).
-Two products share one repo:
+It is now a **single product**:
 - **GMT Terminal** — global and Brazil market intelligence dashboard (`src/`)
-- **Clube GMT** — Brazilian investment club (clube de investimento) management (`src/clube/`)
+
+**Clube GMT** (the Brazilian investment-club feature) was **extracted out of this repo
+on 2026-05-27** to become a standalone app. Its code is preserved read-only under
+`_transfer/` (see `_transfer/TRANSFER.md`) and is **not** part of this application.
+Do not wire `_transfer/` code back into `src/` or `server/`, and treat `_transfer/`
+as out of scope for all Terminal work.
 
 ---
 
@@ -18,19 +23,27 @@ Two products share one repo:
 
 - **Plain JavaScript only** — no TypeScript, ever
 - **Inline styles for all layout/color/spacing** — use inline style objects, not CSS
-  classes or new styled-components. Legacy styled-components exist (package is still
-  installed) — do not add more. `className` is permitted only for CSS animations
+  classes or styled-components. styled-components was **fully removed and uninstalled
+  (2026-05-26)** — never reintroduce it. `className` is permitted only for CSS animations
   (`fade-in`, `gmt-section-reveal`, `gmt-group-card`, `gmt-blink`) and print media
-  queries (`no-print`) defined in global stylesheets.
+  queries (`no-print`) defined in global stylesheets. Note: inline styles cannot express
+  `:hover`/`:focus`/`:focus-visible`/media queries — when a component needs those, use a
+  scoped `<style>` block or a class in `index.css`, and make sure inline `style` props
+  don't override the pseudo-class rules (a static inline `border`/`outline` will win over
+  `:focus { border-color }`).
 - **ES modules throughout** — backend uses `import/export`, never `require()`.
   `"type": "module"` is set in package.json.
 - **React 18 + Vite 6 + Express 4 + Supabase (Postgres) + Railway (backend) + Vercel (frontend)**
 - **lightweight-charts v5** — uses `addSeries(SeriesDefinition, opts)`.
   Never use v4's `addCandlestickSeries()` — it does not exist in v5
 - **Color system:**
-  - Gold (`#C5A059`, `#D4B06A`) — Brazil Terminal and Clube GMT only
-  - Blue (`#3b82f6`, `#2563eb`) — Global Terminal and all logged-out pages
-  - Never use gold on global terminal UI or logged-out pages
+  - Blue (`#3b82f6`, `#2563eb`) — Global Terminal and logged-out pages
+  - Gold/amber (`#C5A059`, `#F9C300`) — Brazil context, applied via the
+    `[data-context="brazil"]` accent override in `index.css`
+  - Shared dark-theme tokens live in `src/lib/tokens.js`, exported as `CLUBE_COLORS`
+    for backward compatibility — the **name is legacy** (from the extracted Clube app);
+    the tokens are app-wide, not Clube-specific. Prefer the `--c-*` / `--radius-*` CSS
+    variables in `index.css` where they exist.
 
 ---
 
@@ -102,7 +115,20 @@ Every time a table is created or modified:
    RLS policies (Pattern D). Do not alter them.
 
 5. **Do not recreate `profiles`.** It was dropped in migration 006. User identity
-   and role live in Supabase Auth `user_metadata`.
+   lives in Supabase Auth: `name`/`notification_pending` in `user_metadata`, and the
+   authoritative **`role` in `app_metadata`** (see the security note below).
+
+> 🔒 **SECURITY — role authority lives in `app_metadata`, never `user_metadata`.**
+> `user_metadata` is client-writable (`supabase.auth.updateUser({ data: {...} })`), so
+> it must never gate authorization. The role is read from `app_metadata` (only the
+> service role can write it) in `server/middleware/auth.js`, `server/routes/users.js`,
+> `server/routes/auth.js`, and on the client (`AuthContext.jsx`, `LoginPage.jsx`,
+> `AuthPanel.jsx`). When changing a role, always write `app_metadata` via
+> `supabase.auth.admin.updateUserById(id, { app_metadata: { role } })` — never put
+> `role` back in `user_metadata`. Data model established by migrations
+> `013_role_authority_app_metadata.sql` (backfill app_metadata + single-admin
+> cleanup) and `014_strip_role_from_user_metadata.sql` (drop the dead field). Run 013
+> BEFORE deploying app_metadata code; run 014 AFTER.
 
 ---
 
@@ -137,11 +163,14 @@ crashes. Check every component edit before reporting done.
 
 ## Role system
 
-Single `role` field in Supabase `user_metadata`. Hierarchy defined in
+Single `role` field in Supabase Auth `app_metadata` (service-role-writable only —
+see the security note in the Database rules section). Hierarchy defined in
 `src/lib/roles.js` and `server/lib/roles.js` (single source of truth):
 ```
-user < club_member < club_manager < admin
+user < admin
 ```
+(The `club_member` / `club_manager` roles were removed with the Clube extraction on
+2026-05-27 — `ROLE_RANK` is now `{ user: 0, admin: 1 }`.)
 
 Use `ROLE_RANK` map for comparisons — never string equality checks for roles
 that need hierarchy awareness. `hasRole(userRole, minRole)` is the canonical
@@ -158,14 +187,15 @@ Server middleware: `authenticate` validates the Bearer token and attaches
 |---|---|
 | Auth context | `src/context/AuthContext.jsx` |
 | Taxonomy context | `src/context/TaxonomyContext.jsx` |
-| Brazil UI config (not data) | `src/brazilBlocks.js` |
+| Brazil UI config (not data) | `src/data/brazilBlocks.js` |
 | Express entry | `server/index.js` |
 | Supabase server client | `server/db.js` |
 | Supabase browser client (auth only) | `src/lib/supabase.js` |
 | Auth middleware | `server/middleware/auth.js` |
 | Role rank map | `src/lib/roles.js` + `server/lib/roles.js` |
 | Snapshot cron | `scripts/captureSnapshot.js` |
-| Clube GMT source | `src/clube/` |
+| Shared design tokens | `src/lib/tokens.js` (exported as `CLUBE_COLORS`, legacy name) |
+| Extracted Clube app (out of scope) | `_transfer/` |
 | RLS policy guide | `server/migrations/RLS_POLICY_GUIDE.md` |
 | Migrations | `server/migrations/NNN_description.sql` |
 | Vite config (dev proxies) | `vite.config.js` |
@@ -178,7 +208,7 @@ Things that have caused real bugs in this codebase — never do these:
 
 - Add TypeScript
 - Add CSS classes for layout/color/spacing (use inline style objects)
-- Add new styled-components (legacy ones exist — leave them, don't add more)
+- Reintroduce styled-components (fully removed & uninstalled 2026-05-26 — never add it back)
 - Use `addCandlestickSeries()` — v4 only, does not exist in v5
 - Write `supabase.from()` anywhere in `src/` — data goes through Express
 - Disable RLS on new tables
@@ -186,7 +216,9 @@ Things that have caused real bugs in this codebase — never do these:
 - Recreate `profiles` — intentionally dropped in migration 006
 - Edit `brazilBlocks.js` expecting it to affect data loading
 - Place hooks after early returns
-- Use gold colors on Global Terminal or logged-out pages
+- Use gold colors on Global Terminal (gold is for the `[data-context="brazil"]` context)
+- Read or write `role` from `user_metadata` — it is client-writable; role authority is
+  `app_metadata` only (see the security note under Database rules)
 - Use string equality for role checks that need hierarchy (`user.role === 'admin'`
   is fine for exact admin checks; use `hasRole()` / `ROLE_RANK` for hierarchy)
 - Use `require()` — the project is ES modules (`"type": "module"`)

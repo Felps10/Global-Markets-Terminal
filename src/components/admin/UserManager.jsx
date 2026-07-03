@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { getUsers, deleteUser, patchUserRole } from '../../services/userService.js';
 import { ROLE_LABEL, ADMIN_ASSIGNABLE_ROLES } from '../../lib/roles.js';
 import { useAuth } from '../../hooks/useAuth.js';
-import { CLUBE_COLORS } from '../../lib/tokens.js';
 
 // ── Scoped styles for animations and scrollbar ────────────────────────────────
 function ScopedStyles() {

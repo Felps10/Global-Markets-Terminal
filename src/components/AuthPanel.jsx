@@ -255,7 +255,7 @@ export default function AuthPanel({ isOpen, onClose, featureName, onSuccess }) {
     setSubmitting(true);
     try {
       const data = await login(loginEmail.trim(), loginPassword);
-      identifyUser(data.user?.id || loginEmail, { role: data.user?.user_metadata?.role || 'user', email: loginEmail });
+      identifyUser(data.user?.id || loginEmail, { role: data.user?.app_metadata?.role || 'user', email: loginEmail });
       onSuccess?.();
     } catch (err) {
       setError(err.message || t('auth_panel.error_login'));

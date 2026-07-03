@@ -500,8 +500,10 @@ export const apiClient = {
     } catch (err) {
       // Variable-cost callCount errors must propagate — they are programming bugs, not runtime errors
       if (err.message?.includes("callsPerRequest: 0")) throw err;
-      // Everything else is an unexpected internal error — degrade gracefully
-      console.error(`[ApiClient] Unexpected internal error in call("${apiId}/${endpointId}"):`, err.message);
+      // Everything else is an unexpected internal error — degrade gracefully.
+      // Log the stack (or the raw value for non-Error throws): these are programming
+      // bugs, and the stack — which carries no request payload — is the diagnostic.
+      console.error(`[ApiClient] Unexpected internal error in call("${apiId}/${endpointId}"):`, err?.stack ?? String(err));
       return makeErr(ERROR_TYPES.BAD_REQUEST, `Internal error: ${err.message}`, false);
     }
   },
