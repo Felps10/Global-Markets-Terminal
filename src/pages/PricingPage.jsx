@@ -6,43 +6,34 @@ const MONTHLY_PRO = 499;
 const ANNUAL_PRO  = Math.round(MONTHLY_PRO * 0.8);
 
 const FEATURES_TABLE = [
-  ['Live market dashboard',          true,              true,              true],
-  ['Asset coverage',                 '50 assets',       '269 assets',      '269 assets'],
-  ['Refresh rate',                   '60s',             '30s',             '30s'],
-  ['Card and list view',             true,              true,              true],
-  ['Sort + filter',                  true,              true,              true],
-  ['Market Heatmap',                 false,             true,              true],
-  ['Brazil Terminal',                false,             true,              true],
-  ['Chart Center',                   false,             true,              true],
-  ['Research Terminal',              false,             true,              true],
-  ['Fundamentals Lab',               false,             true,              true],
-  ['Macro Hub',                      false,             true,              true],
-  ['Signal Engine',                  false,             true,              true],
-  ['Data sources',                   '2 sources',       'All 8 sources',   'All 8 sources'],
-  ['Analyst ratings & news',         false,             true,              true],
-  ['Fundamentals (P/E, EPS, TTM)',   false,             true,              true],
-  ['BCB macro data (Brazil)',        false,             true,              true],
-  ['Clube de Investimento access',   false,             false,             true],
-  ['NAV history & AI reports',       false,             false,             true],
-  ['Portfolio compliance tracking',  false,             false,             true],
-  ['CVM regulatory tools',           false,             false,             true],
+  ['Live market dashboard',          true,              true],
+  ['Asset coverage',                 '50 assets',       '269 assets'],
+  ['Refresh rate',                   '60s',             '30s'],
+  ['Card and list view',             true,              true],
+  ['Sort + filter',                  true,              true],
+  ['Market Heatmap',                 false,             true],
+  ['Brazil Terminal',                false,             true],
+  ['Chart Center',                   false,             true],
+  ['Research Terminal',              false,             true],
+  ['Fundamentals Lab',               false,             true],
+  ['Macro Hub',                      false,             true],
+  ['Signal Engine',                  false,             true],
+  ['Data sources',                   '2 sources',       'All 8 sources'],
+  ['Analyst ratings & news',         false,             true],
+  ['Fundamentals (P/E, EPS, TTM)',   false,             true],
+  ['BCB macro data (Brazil)',        false,             true],
 ];
 
 const GROUP_BREAKS = [
   { at: 0,  label: 'Terminal' },
   { at: 5,  label: 'Features' },
   { at: 12, label: 'Data' },
-  { at: 16, label: 'Clube' },
 ];
 
 const FAQS = [
   {
     q: 'What does the Free tier include?',
     a: 'Free gives you live dashboard access to 50 assets with a 60-second refresh rate and the standard card/list view. It\'s enough to follow the markets — but Pro unlocks the full 269-asset universe, 30s refresh, heatmap, Brazil terminal, and all research tools.',
-  },
-  {
-    q: 'What is the Clube de Investimento?',
-    a: 'The Clube is a Brazilian investment club (CVM Instrução 494/11) built into GMT. Club Member tier gives access to NAV tracking, cotista management, portfolio compliance monitoring, and AI-generated reports. Access is by invitation from a club manager.',
   },
   {
     q: 'Is the $499/month price correct?',
@@ -52,10 +43,6 @@ const FAQS = [
     q: 'Can I cancel anytime?',
     a: 'Yes. Monthly plans can be cancelled at any time with no penalties. Annual plans are billed upfront — contact us if you need to discuss early cancellation.',
   },
-  {
-    q: 'How do I get Club Member access?',
-    a: 'Club Member access is by invitation only. A club manager must first invite you to their clube. Once invited, you\'ll receive instructions to link your GMT account. Contact us if you\'re interested in setting up a new clube.',
-  },
 ];
 
 export default function PricingPage() {
@@ -64,7 +51,6 @@ export default function PricingPage() {
   const [openFaq, setOpenFaq] = useState(null);
   const [proCTAHovered, setProCTAHovered] = useState(false);
   const [freeCTAHovered, setFreeCTAHovered] = useState(false);
-  const [clubCTAHovered, setClubCTAHovered] = useState(false);
   const [ctaHover, setCtaHover] = useState(false);
   const [secHover, setSecHover] = useState(false);
 
@@ -155,7 +141,7 @@ export default function PricingPage() {
           <p style={{
             fontSize: 16, fontWeight: 300, color: 'rgba(255,255,255,0.45)',
             marginTop: 0, marginBottom: 0,
-          }}>Three tiers. One terminal. Start free, upgrade when you're ready.</p>
+          }}>Two tiers. One terminal. Start free, upgrade when you're ready.</p>
         </section>
 
         {/* ── TOGGLE + TIER CARDS ───────────────────────────────────────── */}
@@ -215,7 +201,7 @@ export default function PricingPage() {
             {/* Tier cards */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(3, 1fr)',
+              gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
               gap: 24,
             }}>
 
@@ -328,48 +314,6 @@ export default function PricingPage() {
                 >Start Pro</button>
               </div>
 
-              {/* CLUB MEMBER */}
-              <div style={{
-                background: '#040810',
-                border: '1px solid rgba(255,255,255,0.06)',
-                borderRadius: 4, padding: '32px 28px',
-              }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 18, color: 'rgba(255,255,255,0.9)', marginBottom: 8 }}>Club Member</div>
-                <div>
-                  <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 40, color: 'rgba(255,255,255,0.92)' }}>Contact</span>
-                </div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 4, marginBottom: 28 }}>By invitation only. Contact us to discuss.</div>
-                <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', marginBottom: 24 }} />
-
-                {[
-                  'Everything in Pro',
-                  'Clube de Investimento access',
-                  'NAV history + AI commentary',
-                  'Portfolio compliance (CVM 494/11)',
-                  'Cotista management',
-                  'Dedicated support',
-                ].map((f, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10 }}>
-                    <span style={{ color: 'var(--c-accent)', fontSize: 13, flexShrink: 0, marginTop: 1 }}>✓</span>
-                    <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.4 }}>{f}</span>
-                  </div>
-                ))}
-
-                <button
-                  onClick={() => { window.location.href = 'mailto:gmt@globalmarketsterminal.com'; }}
-                  onMouseEnter={() => setClubCTAHovered(true)}
-                  onMouseLeave={() => setClubCTAHovered(false)}
-                  style={{
-                    width: '100%', marginTop: 28, padding: 13,
-                    background: clubCTAHovered ? 'var(--c-accent-muted)' : 'transparent',
-                    border: clubCTAHovered ? '1px solid var(--c-accent)' : '1px solid rgba(59,130,246,0.4)',
-                    color: 'var(--c-accent)',
-                    borderRadius: 4, cursor: 'pointer',
-                    fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, fontWeight: 500,
-                    transition: 'background 150ms, border-color 150ms',
-                  }}
-                >Contact Us</button>
-              </div>
             </div>
           </div>
         </section>
@@ -394,13 +338,12 @@ export default function PricingPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                    {['Feature', 'Free', 'Pro', 'Club Member'].map((h, i) => (
+                    {['Feature', 'Free', 'Pro'].map((h, i) => (
                       <th key={i} style={{
                         padding: '12px 20px',
                         fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 11,
                         fontWeight: 600, letterSpacing: '0.1em',
                         color: h === 'Pro' ? 'var(--c-accent)'
-                          : h === 'Club Member' ? 'rgba(59,130,246,0.6)'
                           : 'rgba(255,255,255,0.35)',
                         textTransform: 'uppercase',
                         textAlign: i === 0 ? 'left' : 'center',
@@ -415,7 +358,7 @@ export default function PricingPage() {
                     return (
                       <tr key={ri}>
                         {group && (
-                          <td colSpan={4} style={{
+                          <td colSpan={3} style={{
                             padding: ri === 0 ? '8px 20px 8px' : '16px 20px 8px',
                             fontSize: 10, fontWeight: 600, letterSpacing: '0.2em',
                             color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase',
@@ -440,11 +383,6 @@ export default function PricingPage() {
                               borderBottom: '1px solid rgba(255,255,255,0.04)',
                               background: ri % 2 === 1 ? 'rgba(255,255,255,0.015)' : 'transparent',
                             }}>{renderCell(row[2], 'pro')}</td>
-                            <td style={{
-                              padding: '12px 20px', textAlign: 'center',
-                              borderBottom: '1px solid rgba(255,255,255,0.04)',
-                              background: ri % 2 === 1 ? 'rgba(255,255,255,0.015)' : 'transparent',
-                            }}>{renderCell(row[3], 'club')}</td>
                           </>
                         )}
                       </tr>

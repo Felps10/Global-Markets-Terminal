@@ -9,7 +9,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CLUBE_COLORS } from '../lib/tokens.js';
 import { ROUTES } from '../lib/routes.js';
 import { injectStyles, GmtLogo, PRODUCTS_ITEMS } from './gmtHeaderShared.jsx';
 

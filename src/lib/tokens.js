@@ -36,6 +36,3 @@ export const CLUBE_COLORS = {
   ctaText:         '#080f1a',
   ctaHover:        '#FFD740',
 };
-
-export const GOLD       = '#C5A059';
-export const GOLD_LIGHT = '#F9C300';

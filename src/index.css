@@ -89,7 +89,8 @@ body {
 
 /* ── Brazil context override ──────────────────────────────────────────────
    Any element with data-context="brazil" swaps the accent family to gold.
-   ClubeShell sets this on its root div — no component changes needed.
+   Set data-context="brazil" on a container's root element to opt its subtree
+   into the gold accent — no per-component changes needed.
    ─────────────────────────────────────────────────────────────────────── */
 [data-context="brazil"] {
   --c-accent:       var(--c-accent-br);        /* #F5C518 */

@@ -41,6 +41,7 @@ const USER_PATHS = [
   ['/app/catalog',             null],
   ['/app/news',                null],
   ['/app/watchlist',           null],
+  ['/app/alerts',              null],
   ['/app/settings',            null],
   ['/markets/chart',           null],
   ['/markets/research',        null],
