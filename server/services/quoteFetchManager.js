@@ -16,7 +16,7 @@
 
 import https from 'https';
 import { ensureSession, getSession, refreshSession, httpsGet } from './yahooSession.js';
-import { YAHOO_SYMBOLS, CRYPTO_IDS } from '../lib/terminalSymbols.js';
+import { resolveLiveSymbols } from '../lib/symbolResolver.js';
 
 // ─── Cache state ─────────────────────────────────────────────────────────────
 
@@ -28,6 +28,11 @@ let cryptoCache = { data: null, ts: 0, error: null };
 const YAHOO_BASE_INTERVAL  = 60_000;   // 60s
 const CRYPTO_BASE_INTERVAL = 120_000;  // 120s
 const MAX_BACKOFF          = 600_000;  // 10 min cap
+
+// Yahoo v7 tolerates ~50 symbols per request comfortably; the full taxonomy is
+// ~185 symbols, so we chunk and merge, with a small gap between batches.
+const YAHOO_CHUNK      = 50;
+const YAHOO_CHUNK_GAP  = 300;  // ms between batches
 
 let yahooFailures  = 0;
 let cryptoFailures = 0;
@@ -41,50 +46,60 @@ function getInterval(base, failures) {
 
 // ─── Yahoo fetch ─────────────────────────────────────────────────────────────
 
+function chunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+// Fetch one batch of symbols. Refreshes the crumb/session once on 401/403.
+// Throws on non-200 so the caller can skip just this batch.
+async function fetchYahooBatch(symbolList) {
+  const mkUrl = (crumb) =>
+    `https://query1.finance.yahoo.com/v7/finance/quote` +
+    `?symbols=${encodeURIComponent(symbolList.join(','))}` +
+    `&crumb=${encodeURIComponent(crumb)}`;
+
+  const s = getSession();
+  let res = await httpsGet(mkUrl(s.crumb), { Cookie: s.cookie, Accept: 'application/json' });
+
+  if (res.status === 401 || res.status === 403) {
+    console.warn(`[quoteFetchManager:yahoo] Crumb rejected (${res.status}) — refreshing session…`);
+    await refreshSession();
+    const s2 = getSession();
+    res = await httpsGet(mkUrl(s2.crumb), { Cookie: s2.cookie, Accept: 'application/json' });
+  }
+
+  if (res.status !== 200) throw new Error(`HTTP ${res.status}`);
+  const json = JSON.parse(res.body);
+  return json?.quoteResponse?.result || [];
+}
+
 async function fetchYahoo() {
   const tag = '[quoteFetchManager:yahoo]';
   try {
     await ensureSession();
-    const s = getSession();
-    const symbols = YAHOO_SYMBOLS.join(',');
-    const url =
-      `https://query1.finance.yahoo.com/v7/finance/quote` +
-      `?symbols=${encodeURIComponent(symbols)}` +
-      `&crumb=${encodeURIComponent(s.crumb)}`;
+    const { yahoo } = await resolveLiveSymbols();
+    const batches = chunk(yahoo, YAHOO_CHUNK);
 
-    let res = await httpsGet(url, {
-      Cookie: s.cookie,
-      Accept: 'application/json',
-    });
-
-    // Crumb expired — refresh once and retry
-    if (res.status === 401 || res.status === 403) {
-      console.warn(`${tag} Crumb rejected (${res.status}) — refreshing session…`);
-      await refreshSession();
-      const s2 = getSession();
-      const url2 =
-        `https://query1.finance.yahoo.com/v7/finance/quote` +
-        `?symbols=${encodeURIComponent(symbols)}` +
-        `&crumb=${encodeURIComponent(s2.crumb)}`;
-      res = await httpsGet(url2, {
-        Cookie: s2.cookie,
-        Accept: 'application/json',
-      });
+    const merged = [];
+    let okBatches = 0;
+    for (const batch of batches) {
+      try {
+        const results = await fetchYahooBatch(batch);
+        if (results.length) { merged.push(...results); okBatches++; }
+      } catch (err) {
+        // One bad batch (rate limit, oversized, poisoned symbol) must not sink the rest.
+        console.error(`${tag} batch of ${batch.length} failed: ${err.message}`);
+      }
+      if (batches.length > 1) await new Promise((r) => setTimeout(r, YAHOO_CHUNK_GAP));
     }
 
-    if (res.status !== 200) {
-      throw new Error(`Yahoo returned HTTP ${res.status}`);
-    }
+    if (okBatches === 0) throw new Error('all Yahoo batches failed');
 
-    const json = JSON.parse(res.body);
-    const results = json?.quoteResponse?.result;
-    if (!results?.length) {
-      throw new Error('Empty quoteResponse from Yahoo');
-    }
-
-    yahooCache = { data: results, ts: Date.now(), error: null };
+    yahooCache = { data: merged, ts: Date.now(), error: null };
     yahooFailures = 0;
-    console.log(`${tag} OK — ${results.length} symbols cached`);
+    console.log(`${tag} OK — ${merged.length} symbols cached (${okBatches}/${batches.length} batches)`);
   } catch (err) {
     yahooFailures++;
     yahooCache.error = err.message;
@@ -110,7 +125,8 @@ function scheduleYahoo() {
 async function fetchCoinGecko() {
   const tag = '[quoteFetchManager:coingecko]';
   try {
-    const ids = Object.values(CRYPTO_IDS).join(',');
+    const { crypto } = await resolveLiveSymbols();
+    const ids = Object.values(crypto).join(',');
     const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`;
 
     const res = await new Promise((resolve, reject) => {
