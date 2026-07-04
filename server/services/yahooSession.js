@@ -14,6 +14,11 @@
 
 import https from 'https';
 
+// Hard ceiling on any single Yahoo request. Without this, a tarpitted/rate-limited
+// connection (Yahoo does this to datacenter IPs) hangs the fetch forever — no error,
+// no backoff, no retry — and the live feed silently rots to the snapshot fallback.
+const REQUEST_TIMEOUT_MS = 12_000;
+
 export const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
@@ -48,6 +53,9 @@ export function httpsGet(url, extraHeaders = {}) {
     });
 
     req.on('error', reject);
+    req.setTimeout(REQUEST_TIMEOUT_MS, () => {
+      req.destroy(new Error(`Yahoo request timed out after ${REQUEST_TIMEOUT_MS}ms`));
+    });
     req.end();
   });
 }
