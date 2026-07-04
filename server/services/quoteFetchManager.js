@@ -28,7 +28,7 @@ let brapiCache  = { data: [], ts: 0 };
 
 // ─── Intervals & backoff ─────────────────────────────────────────────────────
 
-const YAHOO_BASE_INTERVAL  = 60_000;   // 60s
+const YAHOO_BASE_INTERVAL  = 120_000;  // 120s — reduced load; Yahoo rate-limits datacenter IPs
 const CRYPTO_BASE_INTERVAL = 120_000;  // 120s
 const BRAPI_INTERVAL       = 900_000;  // 15 min — B3 fallback (free BRAPI = 15k req/mo)
 const BRAPI_MAX_TICKERS    = 25;       // hard cap so the free budget can't run away
