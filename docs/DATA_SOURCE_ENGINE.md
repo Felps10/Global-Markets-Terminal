@@ -1,6 +1,58 @@
 # Data Source Engine — design spec
 
-Status: **DRAFT for review** · Owner: Felipe · Created 2026-07-04
+Status: **Phase A shipped · provider decision made** · Owner: Felipe · Created 2026-07-04
+
+---
+
+## ▶ CONTINUATION — read this first (updated 2026-07-04)
+
+**Where we are:**
+- **Phase A shipped & deployed** (PR #10): `server/lib/providerRouting.js` (capability
+  matrix, `classify()`, `resolvePrecedence()` seam), `symbolResolver` wired to it, and a
+  server-side BRAPI fallback for B3 tickers Yahoo drops. Global coverage 191→193.
+- **Incident resolved** (PRs #11, #12): Yahoo tarpits/429s Railway's *datacenter IP*
+  (works from residential IPs). `yahooSession.httpsGet` had no timeout → the live feed
+  *hung* on the snapshot fallback after a deploy cleared the cache. Fixed with a
+  bulletproof hard-timeout + slower cadence (60→120s). **Feed is live (183) again** and
+  self-heals now.
+- **Provider decision made** — see `docs/PROVIDER_RESEARCH.md`: **EODHD All-World +
+  BRAPI Pro ≈ $41/mo** (near-real-time). This replaces scraped-Yahoo-as-primary.
+
+**NEXT STEPS (the plan to continue):**
+1. **Felipe subscribes** → EODHD All-World (get `EODHD_API_KEY`) + upgrade BRAPI to Pro.
+   Add BOTH keys to `.env` **and the Railway backend service env** (the server needs them;
+   `VITE_BRAPI_TOKEN` is already used server-side by the snapshot cron).
+2. **Wire EODHD into the engine:**
+   - Add `eodhd` to `PROVIDER_CAPS` (`server/lib/providerRouting.js`):
+     `['equity','index','fx','commodity','etf','b3']`.
+   - New server-side EODHD fetcher in `quoteFetchManager` (batch via `s=` ≤100/req; keep
+     the global refresh **≥3–5 min** for EODHD's 100k-calls/day cap).
+   - Flip `RECOMMENDED_EFFECTIVE`: `b3 → ['brapi','eodhd','yahoo']`; global classes
+     (equity/index/fx/commodity/etf) → `['eodhd','yahoo']`. Yahoo becomes last-resort.
+   - Add a **symbol-format mapper**: BRAPI wants bare `PETR4`; EODHD & Yahoo want `PETR4.SA`.
+   - Promote BRAPI from "fallback for Yahoo-misses" to a real primary B3 fetcher (Pro =
+     20 tickers/req; also covers the Brazil terminal's ~178 B3 symbols — see note below).
+3. **Then resume Phase B** (config table + admin GET/PUT API) and **Phase C** (Settings
+   "Data Sources" UI). Locked decisions: global (admin-set) precedence; server-side
+   normalized `quotes[symbol]` map (deferred from Phase A → build in Phase C where the UI
+   consumes `source`).
+
+**Key operational notes (learned the hard way):**
+- Run the server locally WITH the flag: `node --max-http-header-size=65536 --env-file=.env
+  server/index.js` — else Yahoo fails "Header overflow". Prod uses the flag.
+- Deploy = merge PR → `main` → Railway (backend) + Vercel (frontend) auto-deploy. Verify
+  backend: `curl .../api/v1/quotes/live | jq '.meta.source'` (want `"live"`, ~184 symbols).
+- Check a Supabase table/quote via supabase-js with `.select('*').limit(1)` (PGRST205 if
+  missing) — NOT `{head:true,count:'exact'}` (false-positives).
+- The **Brazil terminal** (`src/BrazilTerminal.jsx` → `fetchB3MarketData`/`brapiQuote`)
+  fetches B3 **client-side, 1 req/ticker from every browser** with the public token —
+  budget risk; moving it onto the server engine + BRAPI Pro is part of step 2.
+- Side-issue (pre-existing, not from this work): `price_alerts` table missing on prod
+  (schema drift; migration 009 likely unapplied) — breaks the Alerts feature; separate fix.
+- Queued chip (`task_91605d5f`): frontend "—" placeholders (drop the `&& marketData[s]`
+  gates in `GlobalMarketsTerminal.jsx` so quote-less assets render instead of hiding).
+
+---
 
 A configurable provider-precedence system for market quotes. Every asset resolves to
 an ordered list of providers ("try BRAPI, then Yahoo"); the server fetches all needed
