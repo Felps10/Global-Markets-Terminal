@@ -44,18 +44,33 @@ export function httpsGet(url, extraHeaders = {}) {
       },
     };
 
+    options.timeout = REQUEST_TIMEOUT_MS; // socket connect/idle timeout
+
+    let settled = false;
+    let hardTimer = null;
+    const settle = (err, val) => {
+      if (settled) return;
+      settled = true;
+      if (hardTimer) clearTimeout(hardTimer);
+      if (err) reject(err); else resolve(val);
+    };
+
     const req = https.request(options, (res) => {
       let body = '';
       res.on('data', (chunk) => (body += chunk));
-      res.on('end', () =>
-        resolve({ status: res.statusCode, headers: res.headers, body })
-      );
+      res.on('end', () => settle(null, { status: res.statusCode, headers: res.headers, body }));
+      res.on('error', settle);
     });
 
-    req.on('error', reject);
-    req.setTimeout(REQUEST_TIMEOUT_MS, () => {
-      req.destroy(new Error(`Yahoo request timed out after ${REQUEST_TIMEOUT_MS}ms`));
-    });
+    req.on('error', settle);
+    req.on('timeout', () => req.destroy(new Error('Yahoo socket timeout')));
+    // Hard backstop: guarantees the promise settles even if no socket event ever
+    // fires (a tarpit that stalls at connect/TLS evades the socket idle timeout).
+    hardTimer = setTimeout(() => {
+      try { req.destroy(); } catch { /* noop */ }
+      settle(new Error(`Yahoo request hard-timeout (${REQUEST_TIMEOUT_MS + 3000}ms)`));
+    }, REQUEST_TIMEOUT_MS + 3000);
+
     req.end();
   });
 }
