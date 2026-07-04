@@ -22,11 +22,16 @@ import { resolveLiveSymbols } from '../lib/symbolResolver.js';
 
 let yahooCache  = { data: null, ts: 0, error: null };
 let cryptoCache = { data: null, ts: 0, error: null };
+// BRAPI fallback: B3 tickers Yahoo didn't return, shaped as Yahoo-like entries and
+// folded into the yahoo feed. Slow cadence + hard cap to respect the free 15k/mo budget.
+let brapiCache  = { data: [], ts: 0 };
 
 // ─── Intervals & backoff ─────────────────────────────────────────────────────
 
 const YAHOO_BASE_INTERVAL  = 60_000;   // 60s
 const CRYPTO_BASE_INTERVAL = 120_000;  // 120s
+const BRAPI_INTERVAL       = 900_000;  // 15 min — B3 fallback (free BRAPI = 15k req/mo)
+const BRAPI_MAX_TICKERS    = 25;       // hard cap so the free budget can't run away
 const MAX_BACKOFF          = 600_000;  // 10 min cap
 
 // Yahoo v7 tolerates ~50 symbols per request comfortably; the full taxonomy is
@@ -38,6 +43,7 @@ let yahooFailures  = 0;
 let cryptoFailures = 0;
 let yahooTimer     = null;
 let cryptoTimer    = null;
+let brapiTimer     = null;
 
 function getInterval(base, failures) {
   if (failures === 0) return base;
@@ -178,6 +184,63 @@ function scheduleCoinGecko() {
   }
 }
 
+// ─── BRAPI fallback (B3 tickers Yahoo missed) ────────────────────────────────
+// Effective/free precedence for B3 is Yahoo-first, BRAPI-fallback. Yahoo `.SA`
+// covers most B3 names; this recovers the few it drops (e.g. JBSS3, EMBR3) using
+// BRAPI's authoritative B3 data. Free BRAPI = 1 ticker/request, so we run slowly
+// (15 min) and only for the misses, capped, to stay inside the 15k/mo budget.
+async function fetchBrapiFallback() {
+  const tag = '[quoteFetchManager:brapi]';
+  try {
+    const token = process.env.VITE_BRAPI_TOKEN;
+    // Need a populated Yahoo cache to know which B3 names actually missed.
+    if (!token || !yahooCache.data || yahooCache.data.length === 0) {
+      brapiTimer = setTimeout(fetchBrapiFallback, 60_000); // retry soon; Yahoo not ready
+      return;
+    }
+    const { b3 } = await resolveLiveSymbols();
+    if (!b3 || b3.length === 0) { brapiCache = { data: [], ts: Date.now() }; scheduleBrapi(); return; }
+
+    const have = new Set(
+      yahooCache.data.filter((q) => q.regularMarketPrice != null).map((q) => q.symbol)
+    );
+    const missing = b3.filter((x) => !have.has(x.yahoo));
+    const toFetch = missing.slice(0, BRAPI_MAX_TICKERS);
+
+    const out = [];
+    for (const m of toFetch) {
+      try {
+        const r = await fetch(
+          `https://brapi.dev/api/quote/${encodeURIComponent(m.brapi)}?token=${encodeURIComponent(token)}`,
+          { signal: AbortSignal.timeout(10_000) }
+        );
+        if (!r.ok) continue;
+        const j = await r.json();
+        const q = j?.results?.[0];
+        if (q?.regularMarketPrice != null) {
+          out.push({
+            symbol: m.display, // key by display symbol so the client matches it
+            regularMarketPrice: q.regularMarketPrice,
+            regularMarketChangePercent: q.regularMarketChangePercent,
+            _source: 'brapi',
+          });
+        }
+      } catch { /* tolerate per-ticker failures */ }
+    }
+
+    brapiCache = { data: out, ts: Date.now() };
+    console.log(`${tag} recovered ${out.length}/${missing.length} B3 tickers Yahoo missed${missing.length > BRAPI_MAX_TICKERS ? ` (capped ${BRAPI_MAX_TICKERS})` : ''}`);
+  } catch (err) {
+    console.error(`${tag} FAIL: ${err.message}`);
+  }
+  scheduleBrapi();
+}
+
+function scheduleBrapi() {
+  if (brapiTimer) clearTimeout(brapiTimer);
+  brapiTimer = setTimeout(fetchBrapiFallback, BRAPI_INTERVAL);
+}
+
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
@@ -185,8 +248,13 @@ function scheduleCoinGecko() {
  * Data may be stale (check .ts) but is the last-known-good value.
  */
 export function getCache() {
+  // Fold the BRAPI fallback (B3 tickers Yahoo missed) into the yahoo feed so the
+  // client renders them with no change. Only when Yahoo has real data.
+  const yahooData = yahooCache.data
+    ? [...yahooCache.data, ...brapiCache.data]
+    : yahooCache.data;
   return {
-    yahoo: { ...yahooCache },
+    yahoo: { ...yahooCache, data: yahooData },
     crypto: { ...cryptoCache },
   };
 }
@@ -196,9 +264,12 @@ export function getCache() {
  */
 export function start() {
   console.log('[quoteFetchManager] Starting periodic fetchers');
-  // Fire both immediately, then they self-schedule
+  // Fire Yahoo + CoinGecko immediately, then they self-schedule.
   fetchYahoo();
   fetchCoinGecko();
+  // BRAPI fallback starts after a short delay so the Yahoo cache is populated first
+  // (it only fetches B3 tickers missing from Yahoo's results).
+  brapiTimer = setTimeout(fetchBrapiFallback, 45_000);
 }
 
 /**
@@ -208,4 +279,5 @@ export function stop() {
   console.log('[quoteFetchManager] Stopping periodic fetchers');
   if (yahooTimer) { clearTimeout(yahooTimer); yahooTimer = null; }
   if (cryptoTimer) { clearTimeout(cryptoTimer); cryptoTimer = null; }
+  if (brapiTimer) { clearTimeout(brapiTimer); brapiTimer = null; }
 }
