@@ -4,7 +4,7 @@ import {
   formatPrice, formatVolume, formatMarketCap,
 } from "./GlobalMarketsTerminal.jsx";
 import { STATIC_ASSETS_MAP } from "./components/gmtConfig.js";
-import { fetchB3MarketData, bcbMacro, awesomeFx } from "./dataServices.js";
+import { fetchB3MarketDataFromServer, bcbMacro, awesomeFx } from "./dataServices.js";
 import { fetchBrazilMacro } from "./services/brazilDataServices.js";
 import { usePreferences } from './context/PreferencesContext.jsx';
 import { BRAZIL_BLOCKS, getSectionById } from "./data/brazilBlocks.js";
@@ -482,7 +482,7 @@ export default function BrazilTerminal() {
   const loadData = useCallback(async () => {
     try {
       const [b3Result, macroSettled, fxSettled] = await Promise.all([
-        fetchB3MarketData(getB3AssetEntries(), { assets: STATIC_ASSETS_MAP, volatility: B3_VOLATILITY }),
+        fetchB3MarketDataFromServer(getB3AssetEntries(), { assets: STATIC_ASSETS_MAP, volatility: B3_VOLATILITY }),
         bcbMacro().then(v => ({ status: "fulfilled", value: v })).catch(e => ({ status: "rejected", reason: e })),
         awesomeFx().then(v => ({ status: "fulfilled", value: v })).catch(e => ({ status: "rejected", reason: e })),
       ]);

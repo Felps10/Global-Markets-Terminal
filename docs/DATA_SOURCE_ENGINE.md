@@ -35,16 +35,27 @@ Status: **Phase A shipped · provider decision made** · Owner: Felipe · Create
   24/7) ≈ **77k/day** — under cap, no market-hours gate needed *while B3 stays off EODHD*.
 
 **NEXT STEPS:**
-1. **Ship Increment 1.** Add `EODHD_API_KEY` to the **Railway backend env** (already in
-   local `.env`) BEFORE merge, else prod deploys with EODHD disabled (safe no-op → Yahoo).
-   Branch + PR (one-concern rule); merge = deploy.
-2. **Increment 2 — B3 → BRAPI-Pro primary (separate PR).** Flip `RECOMMENDED_EFFECTIVE.b3`
-   → `['brapi','eodhd','yahoo']`; add a live BRAPI batch fetcher (Pro = 20 tickers/req,
-   211 B3 names) + wire B3 into the EODHD set as 2nd fallback (`.SA`). **Re-run the daily
-   math**: +211 EODHD B3 symbols pushes 24/7 over 100k → add a market-hours gate OR keep
-   B3 off EODHD (BRAPI+Yahoo only). Also brings the Brazil terminal's client-side per-ticker
-   BRAPI path onto the server engine (`src/BrazilTerminal.jsx` → `fetchB3MarketData`).
-3. **Phase B** (config table + admin GET/PUT API) then **Phase C** (Settings "Data Sources"
+1. **Ship Increment 1** (PR #14, open). Add `EODHD_API_KEY` to the **Railway backend env**
+   (already in local `.env`) BEFORE merge, else prod deploys with EODHD disabled (safe
+   no-op → Yahoo). merge = deploy.
+2. **✅ Increment 2 — Brazil terminal → server engine — CODE DONE + server-verified,
+   PR open (stacked on Inc1's branch).** The Brazil terminal fetched B3 **client-side, one
+   BRAPI request per ticker from every browser** with the public token. Now a single server
+   process fetches all ~191 brazil-view B3 via **BRAPI Pro batch (20/req, 5-min)** + Yahoo
+   `.SA` fallback, exposed at **`GET /api/v1/quotes/brazil`** (keyed map). Files: new
+   `resolveBrazilB3()` in `symbolResolver`; Brazil-B3 fetcher + `getBrazilB3Cache()` in
+   `quoteFetchManager`; `/brazil` route; new `fetchB3MarketDataFromServer()` in
+   `dataServices` (drop-in, same shape, falls back to the old client path on server outage);
+   `BrazilTerminal.jsx` swapped to it. **KEY GOTCHA:** BRAPI rewrites `symbol` to the current
+   ticker after renames (JBSS3→JBSS32); **key by `requestedSymbol`**. Local proof: 168/189
+   displayed covered; the 21 gaps are **stale taxonomy** (delisted/renamed — MRFG3+BRFS3→MBRF3,
+   CPLE6→CPLE3, ARZZ3→AZZA3, etc. — 404 on BOTH BRAPI and Yahoo, so no regression) + 3 indices
+   (IMA-B/IBrX/IEEX, never B3 quote tickers). B3 stays OFF EODHD (would blow the 100k/day cap).
+   *Note: BRAPI token still in the browser bundle for the mini-ticker + client fallback —
+   full token removal is a later hardening step.* Authed-UI render verifies on the Vercel preview.
+3. **Data-hygiene follow-up (separate):** resync stale B3 tickers in the taxonomy + static
+   `src/data/assets.js` (MBRF3, CPLE3, AZZA3; drop indices from `isB3`; drop delisted names).
+4. **Phase B** (config table + admin GET/PUT API) then **Phase C** (Settings "Data Sources"
    UI + the normalized `quotes[symbol]` map with a `source` badge — deferred from Phase A).
 
 **Key operational notes (learned the hard way):**

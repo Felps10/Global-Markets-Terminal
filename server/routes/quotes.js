@@ -14,7 +14,7 @@
  */
 
 import { Router } from 'express';
-import { getCache } from '../services/quoteFetchManager.js';
+import { getCache, getBrazilB3Cache } from '../services/quoteFetchManager.js';
 import { supabase } from '../db.js';
 
 const router = Router();
@@ -94,6 +94,32 @@ router.get('/live', async (req, res) => {
       cryptoAge: cryptoAge !== null ? Math.round(cryptoAge) : null,
       yahooError:  cache.yahoo.error  || null,
       cryptoError: cache.crypto.error || null,
+      ts: now,
+    },
+  });
+});
+
+// GET /api/v1/quotes/brazil — public, no auth.
+// Server-side Brazil-terminal B3 feed (BRAPI Pro primary + Yahoo `.SA` fallback), fetched
+// once per cycle instead of per-browser per-ticker. Returns a keyed map { [sym]: {...} }.
+router.get('/brazil', (_req, res) => {
+  const cache = getBrazilB3Cache();
+  const now = Date.now();
+  const b3 = cache.data || {};
+  const count = Object.keys(b3).length;
+  const age = cache.ts ? now - cache.ts : null;
+
+  let source = 'live';
+  if (count === 0) source = 'empty';            // nothing cached yet → client falls back
+  else if (age !== null && age > STALE_THRESHOLD) source = 'stale';
+
+  return res.json({
+    b3,
+    meta: {
+      source,
+      count,
+      age: age !== null ? Math.round(age) : null,
+      error: cache.error || null,
       ts: now,
     },
   });
