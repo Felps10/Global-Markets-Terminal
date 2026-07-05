@@ -7,35 +7,45 @@ Status: **Phase A shipped · provider decision made** · Owner: Felipe · Create
 ## ▶ CONTINUATION — read this first (updated 2026-07-04)
 
 **Where we are:**
-- **Phase A shipped & deployed** (PR #10): `server/lib/providerRouting.js` (capability
-  matrix, `classify()`, `resolvePrecedence()` seam), `symbolResolver` wired to it, and a
-  server-side BRAPI fallback for B3 tickers Yahoo drops. Global coverage 191→193.
-- **Incident resolved** (PRs #11, #12): Yahoo tarpits/429s Railway's *datacenter IP*
-  (works from residential IPs). `yahooSession.httpsGet` had no timeout → the live feed
-  *hung* on the snapshot fallback after a deploy cleared the cache. Fixed with a
-  bulletproof hard-timeout + slower cadence (60→120s). **Feed is live (183) again** and
-  self-heals now.
-- **Provider decision made** — see `docs/PROVIDER_RESEARCH.md`: **EODHD All-World +
-  BRAPI Pro ≈ $41/mo** (near-real-time). This replaces scraped-Yahoo-as-primary.
+- **Phase A shipped & deployed** (PR #10): `providerRouting.js` (capability matrix,
+  `classify()`, `resolvePrecedence()` seam), `symbolResolver`, server-side BRAPI fallback.
+- **Yahoo incident resolved** (PRs #11, #12): hard-timeout + slower cadence. Feed self-heals.
+- **Provider decision made** (`docs/PROVIDER_RESEARCH.md`): **EODHD All-World + BRAPI Pro
+  ≈ $41/mo**. Both subscribed 2026-07-04; BRAPI Pro verified live on the existing token
+  (multi-ticker batch works — same token carries the upgrade).
+- **✅ Increment 1 — EODHD as PRIMARY for global classes — CODE DONE + verified locally
+  (2026-07-04), not yet committed/deployed.** New pure mapper `server/lib/eodhdSymbols.js`
+  (`yahooToEodhd`, unit-tested) + EODHD fetcher in `quoteFetchManager` (key-gated, batch
+  `s=` ≤20/req, 180s cadence, per-symbol isolation + quarantine on 404, NA-guard) + folded
+  into `getCache()` (Yahoo-shaped, appended last → wins precedence; also serves when Yahoo
+  is down). `RECOMMENDED_EFFECTIVE`: equity/index/fx/etf → `['eodhd','yahoo']`;
+  commodity → `['yahoo']`; **b3 unchanged** (`['yahoo','brapi']`). Local proof: EODHD
+  160/161 symbols, effective feed `{eodhd:160, yahoo:24, brapi:2}`, `meta.source=live`.
+  63 tests pass, build clean.
 
-**NEXT STEPS (the plan to continue):**
-1. **Felipe subscribes** → EODHD All-World (get `EODHD_API_KEY`) + upgrade BRAPI to Pro.
-   Add BOTH keys to `.env` **and the Railway backend service env** (the server needs them;
-   `VITE_BRAPI_TOKEN` is already used server-side by the snapshot cron).
-2. **Wire EODHD into the engine:**
-   - Add `eodhd` to `PROVIDER_CAPS` (`server/lib/providerRouting.js`):
-     `['equity','index','fx','commodity','etf','b3']`.
-   - New server-side EODHD fetcher in `quoteFetchManager` (batch via `s=` ≤100/req; keep
-     the global refresh **≥3–5 min** for EODHD's 100k-calls/day cap).
-   - Flip `RECOMMENDED_EFFECTIVE`: `b3 → ['brapi','eodhd','yahoo']`; global classes
-     (equity/index/fx/commodity/etf) → `['eodhd','yahoo']`. Yahoo becomes last-resort.
-   - Add a **symbol-format mapper**: BRAPI wants bare `PETR4`; EODHD & Yahoo want `PETR4.SA`.
-   - Promote BRAPI from "fallback for Yahoo-misses" to a real primary B3 fetcher (Pro =
-     20 tickers/req; also covers the Brazil terminal's ~178 B3 symbols — see note below).
-3. **Then resume Phase B** (config table + admin GET/PUT API) and **Phase C** (Settings
-   "Data Sources" UI). Locked decisions: global (admin-set) precedence; server-side
-   normalized `quotes[symbol]` map (deferred from Phase A → build in Phase C where the UI
-   consumes `source`).
+**PAID-KEY COVERAGE (verified live 2026-07-04 — authoritative):**
+- equity `.US` ✅ (incl. ADRs TSM/ASML/ARM/LVMUY) · fx `PAIR.FOREX` ✅ · b3 `.SA` ✅
+- indices `^X → X.INDX` ✅ **10/11** (VIX/AXJO/KS11 codes work despite research doubt).
+  **`^FTSE` → FTSE.INDX returns `"NA"`** → row dropped → Yahoo fills. (`UK100.INDX` could
+  be tried later; Yahoo covers it fine for now.)
+- **commodities ❌ EODHD has NO commodities exchange** — `CL/NG/GC/SI.COMM` 404. Mapper
+  returns `null`; commodity stays Yahoo-primary. (ETF proxies GLD/USO rejected: wrong
+  instrument.)
+- Plan: `dailyRateLimit: 100000`, bills 1 call/symbol. 161 global × 480 cycles/day (180s,
+  24/7) ≈ **77k/day** — under cap, no market-hours gate needed *while B3 stays off EODHD*.
+
+**NEXT STEPS:**
+1. **Ship Increment 1.** Add `EODHD_API_KEY` to the **Railway backend env** (already in
+   local `.env`) BEFORE merge, else prod deploys with EODHD disabled (safe no-op → Yahoo).
+   Branch + PR (one-concern rule); merge = deploy.
+2. **Increment 2 — B3 → BRAPI-Pro primary (separate PR).** Flip `RECOMMENDED_EFFECTIVE.b3`
+   → `['brapi','eodhd','yahoo']`; add a live BRAPI batch fetcher (Pro = 20 tickers/req,
+   211 B3 names) + wire B3 into the EODHD set as 2nd fallback (`.SA`). **Re-run the daily
+   math**: +211 EODHD B3 symbols pushes 24/7 over 100k → add a market-hours gate OR keep
+   B3 off EODHD (BRAPI+Yahoo only). Also brings the Brazil terminal's client-side per-ticker
+   BRAPI path onto the server engine (`src/BrazilTerminal.jsx` → `fetchB3MarketData`).
+3. **Phase B** (config table + admin GET/PUT API) then **Phase C** (Settings "Data Sources"
+   UI + the normalized `quotes[symbol]` map with a `source` badge — deferred from Phase A).
 
 **Key operational notes (learned the hard way):**
 - Run the server locally WITH the flag: `node --max-http-header-size=65536 --env-file=.env

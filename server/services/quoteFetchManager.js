@@ -25,6 +25,11 @@ let cryptoCache = { data: null, ts: 0, error: null };
 // BRAPI fallback: B3 tickers Yahoo didn't return, shaped as Yahoo-like entries and
 // folded into the yahoo feed. Slow cadence + hard cap to respect the free 15k/mo budget.
 let brapiCache  = { data: [], ts: 0 };
+// EODHD "All-World" (paid): the PRIMARY feed for global classes (equity/index/fx). Entries
+// are Yahoo-shaped and keyed by the display symbol, folded into the yahoo feed AFTER Yahoo
+// so EODHD wins precedence (parseYahooResults is last-write-wins). Empty when the key is
+// unset or EODHD is unreachable → the feed transparently falls back to Yahoo.
+let eodhdCache  = { data: [], ts: 0, error: null };
 
 // ─── Intervals & backoff ─────────────────────────────────────────────────────
 
@@ -34,6 +39,14 @@ const BRAPI_INTERVAL       = 900_000;  // 15 min — B3 fallback (free BRAPI = 1
 const BRAPI_MAX_TICKERS    = 25;       // hard cap so the free budget can't run away
 const MAX_BACKOFF          = 600_000;  // 10 min cap
 
+// EODHD (paid, 100k calls/day; bills 1 call/symbol). ~161 global symbols at 180s, 24/7 =
+// ~77k calls/day — under the cap with headroom. Do NOT drop below 180s while B3 (211 more)
+// is out of the EODHD set; adding B3 later needs a market-hours gate + re-run of this math.
+const EODHD_BASE_INTERVAL  = 180_000;  // 3 min
+const EODHD_BATCH          = 20;       // symbols/request (path symbol + 19 in s=); doc max ~15-20
+const EODHD_CHUNK_GAP      = 150;      // ms between batches
+const EODHD_TIMEOUT_MS     = 12_000;
+
 // Yahoo v7 tolerates ~50 symbols per request comfortably; the full taxonomy is
 // ~185 symbols, so we chunk and merge, with a small gap between batches.
 const YAHOO_CHUNK      = 50;
@@ -41,9 +54,15 @@ const YAHOO_CHUNK_GAP  = 300;  // ms between batches
 
 let yahooFailures  = 0;
 let cryptoFailures = 0;
+let eodhdFailures  = 0;
 let yahooTimer     = null;
 let cryptoTimer    = null;
 let brapiTimer     = null;
+let eodhdTimer     = null;
+let eodhdKeyWarned = false;
+// EODHD codes that returned a hard 404 (unknown ticker). EODHD fails the WHOLE batch on
+// one bad symbol, so we quarantine confirmed-unknowns to stop them poisoning future batches.
+const eodhdQuarantine = new Set();
 
 function getInterval(base, failures) {
   if (failures === 0) return base;
@@ -241,6 +260,121 @@ function scheduleBrapi() {
   brapiTimer = setTimeout(fetchBrapiFallback, BRAPI_INTERVAL);
 }
 
+// ─── EODHD fetch (primary for global classes) ────────────────────────────────
+// EODHD "All-World" REST live/delayed quotes via API key (no IP blocking, unlike Yahoo).
+// Response row: { code, close, change_p, previousClose, high, low, volume, timestamp }.
+// A single-symbol request returns an object; a batch (`s=`) returns an array.
+
+const isFiniteNum = (v) => typeof v === 'number' && Number.isFinite(v);
+
+// Normalize one EODHD row into a Yahoo-shaped entry keyed by the display symbol, so it
+// folds into the existing feed with no frontend change. Drops "NA"/non-numeric rows
+// (EODHD returns close:"NA" for a known-but-no-data symbol → must fall through to Yahoo).
+function pushEodhdRow(out, row, reverse) {
+  if (!row || !isFiniteNum(row.close)) return;
+  const symbol = reverse.get(row.code);
+  if (!symbol) return; // unknown code — shouldn't happen (we built the request)
+  out.push({
+    symbol,
+    regularMarketPrice: row.close,
+    regularMarketChangePercent: isFiniteNum(row.change_p) ? row.change_p : undefined,
+    regularMarketChange: isFiniteNum(row.change) ? row.change : undefined,
+    regularMarketPreviousClose: isFiniteNum(row.previousClose) ? row.previousClose : undefined,
+    regularMarketDayHigh: isFiniteNum(row.high) ? row.high : undefined,
+    regularMarketDayLow: isFiniteNum(row.low) ? row.low : undefined,
+    regularMarketVolume: isFiniteNum(row.volume) ? row.volume : undefined,
+    _source: 'eodhd',
+  });
+}
+
+// Fetch one batch. First code in the path, the rest in `s=` (additive). Returns an array
+// of rows. Throws on non-200 so the caller can isolate/quarantine a poison ticker.
+async function fetchEodhdBatch(codes) {
+  const [first, ...rest] = codes;
+  const params = new URLSearchParams({ api_token: process.env.EODHD_API_KEY, fmt: 'json' });
+  if (rest.length) params.set('s', rest.join(','));
+  const url = `https://eodhd.com/api/real-time/${encodeURIComponent(first)}?${params.toString()}`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(EODHD_TIMEOUT_MS) });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const json = await r.json();
+  return Array.isArray(json) ? json : [json];
+}
+
+async function fetchEodhd() {
+  const tag = '[quoteFetchManager:eodhd]';
+  if (!process.env.EODHD_API_KEY) {
+    if (!eodhdKeyWarned) {
+      console.warn(`${tag} EODHD_API_KEY not set — EODHD disabled; Yahoo remains primary`);
+      eodhdKeyWarned = true;
+    }
+    scheduleEodhd();
+    return;
+  }
+
+  try {
+    const { eodhd } = await resolveLiveSymbols();
+    if (!eodhd || eodhd.length === 0) {
+      eodhdCache = { data: [], ts: Date.now(), error: null };
+      eodhdFailures = 0;
+      scheduleEodhd();
+      return;
+    }
+
+    // Reverse index (EODHD code → display symbol) + the active, non-quarantined code list.
+    const reverse = new Map();
+    const codes = [];
+    for (const e of eodhd) {
+      reverse.set(e.eodhd, e.display);
+      if (!eodhdQuarantine.has(e.eodhd)) codes.push(e.eodhd);
+    }
+
+    const out = [];
+    let okBatches = 0;
+    const batches = chunk(codes, EODHD_BATCH);
+    for (const batch of batches) {
+      try {
+        for (const row of await fetchEodhdBatch(batch)) pushEodhdRow(out, row, reverse);
+        okBatches++;
+      } catch (err) {
+        // EODHD 404s the WHOLE batch on one unknown ticker. Retry per-symbol to salvage the
+        // good ones and quarantine the culprit(s) so they can't poison the next cycle.
+        console.warn(`${tag} batch of ${batch.length} failed (${err.message}) — isolating`);
+        for (const code of batch) {
+          try {
+            for (const row of await fetchEodhdBatch([code])) pushEodhdRow(out, row, reverse);
+          } catch {
+            eodhdQuarantine.add(code); // confirmed unknown/unreachable → stop requesting it
+          }
+        }
+      }
+      if (batches.length > 1) await new Promise((r) => setTimeout(r, EODHD_CHUNK_GAP));
+    }
+
+    if (okBatches === 0 && out.length === 0 && codes.length > 0) {
+      throw new Error('all EODHD batches failed');
+    }
+
+    eodhdCache = { data: out, ts: Date.now(), error: null };
+    eodhdFailures = 0;
+    console.log(`${tag} OK — ${out.length}/${codes.length} symbols${eodhdQuarantine.size ? ` (${eodhdQuarantine.size} quarantined)` : ''}`);
+  } catch (err) {
+    eodhdFailures++;
+    eodhdCache.error = err.message;
+    console.error(`${tag} FAIL #${eodhdFailures}: ${err.message}`);
+  }
+
+  scheduleEodhd();
+}
+
+function scheduleEodhd() {
+  if (eodhdTimer) clearTimeout(eodhdTimer);
+  const interval = getInterval(EODHD_BASE_INTERVAL, eodhdFailures);
+  eodhdTimer = setTimeout(fetchEodhd, interval);
+  if (eodhdFailures > 0) {
+    console.log(`[quoteFetchManager:eodhd] Next fetch in ${Math.round(interval / 1000)}s (backoff #${eodhdFailures})`);
+  }
+}
+
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
@@ -248,13 +382,23 @@ function scheduleBrapi() {
  * Data may be stale (check .ts) but is the last-known-good value.
  */
 export function getCache() {
-  // Fold the BRAPI fallback (B3 tickers Yahoo missed) into the yahoo feed so the
-  // client renders them with no change. Only when Yahoo has real data.
-  const yahooData = yahooCache.data
-    ? [...yahooCache.data, ...brapiCache.data]
-    : yahooCache.data;
+  // Merge all provider caches into the single "yahoo" array the client already reads.
+  // Order matters: parseYahooResults is last-write-wins, so EODHD is appended LAST to win
+  // precedence for the global classes it serves; BRAPI fills B3 tickers Yahoo missed.
+  // Non-Yahoo sources are served even when Yahoo itself is down (EODHD removes the hard
+  // dependency on Yahoo that used to rot the feed to the snapshot fallback).
+  const parts = [];
+  if (yahooCache.data) parts.push(...yahooCache.data);
+  parts.push(...brapiCache.data);
+  parts.push(...eodhdCache.data);
+  const yahooData = parts.length ? parts : yahooCache.data;
+
+  // Report the freshest source's timestamp so the /quotes/live staleness label reflects
+  // reality when EODHD is carrying the feed and Yahoo is stale/absent.
+  const mergedTs = Math.max(yahooCache.ts || 0, brapiCache.ts || 0, eodhdCache.ts || 0);
+
   return {
-    yahoo: { ...yahooCache, data: yahooData },
+    yahoo: { data: yahooData, ts: mergedTs, error: yahooCache.error },
     crypto: { ...cryptoCache },
   };
 }
@@ -264,9 +408,10 @@ export function getCache() {
  */
 export function start() {
   console.log('[quoteFetchManager] Starting periodic fetchers');
-  // Fire Yahoo + CoinGecko immediately, then they self-schedule.
+  // Fire Yahoo + CoinGecko + EODHD immediately, then they self-schedule.
   fetchYahoo();
   fetchCoinGecko();
+  fetchEodhd(); // primary for global classes; no-ops safely if EODHD_API_KEY is unset
   // BRAPI fallback starts after a short delay so the Yahoo cache is populated first
   // (it only fetches B3 tickers missing from Yahoo's results).
   brapiTimer = setTimeout(fetchBrapiFallback, 45_000);
@@ -280,4 +425,5 @@ export function stop() {
   if (yahooTimer) { clearTimeout(yahooTimer); yahooTimer = null; }
   if (cryptoTimer) { clearTimeout(cryptoTimer); cryptoTimer = null; }
   if (brapiTimer) { clearTimeout(brapiTimer); brapiTimer = null; }
+  if (eodhdTimer) { clearTimeout(eodhdTimer); eodhdTimer = null; }
 }
