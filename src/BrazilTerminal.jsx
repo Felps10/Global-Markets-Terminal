@@ -105,14 +105,20 @@ function IndicatorCard({ symbol, name, value, date, unit, source, category, chan
   );
 }
 
-// ─── UNAVAILABLE SECTION PLACEHOLDER ──────────────────────────────────────────
-function UnavailableSection({ icon, title, description }) {
+// ─── COMING SOON PLACEHOLDER ──────────────────────────────────────────────────
+// One neutral treatment for every not-yet-live section (no accent color, so it
+// reads as "pending" rather than as an active surface).
+function ComingSoon({ section }) {
   return (
-    <div style={{ minHeight: 200, display: "flex", alignItems: "center", justifyContent: "center", border: "1px dashed rgba(249,195,0,0.3)", borderRadius: 8, padding: 48, marginTop: 8 }}>
+    <div style={{ minHeight: 280, display: "flex", alignItems: "center", justifyContent: "center", border: "1px dashed var(--c-border)", borderRadius: 8, padding: 48, marginTop: 8 }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, textAlign: "center" }}>
-        <div style={{ fontSize: 36, opacity: 0.3 }}>{icon || "🔒"}</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, fontWeight: 700, color: "rgba(249,195,0,0.5)", letterSpacing: "1px" }}>{title || "EM BREVE"}</div>
-        <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 11, color: "var(--c-text-3)", lineHeight: 1.6 }}>{description || "Em desenvolvimento"}</div>
+        <div style={{ fontSize: 40, opacity: 0.25 }}>{section?.icon || "📊"}</div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, fontWeight: 700, color: "var(--c-text-2)", letterSpacing: "1px" }}>
+          {(section?.label || "Seção").toUpperCase()}
+        </div>
+        <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: "var(--c-text-3)", lineHeight: 1.6 }}>
+          Em breve
+        </div>
       </div>
     </div>
   );
@@ -169,144 +175,54 @@ function MacroStrip({ macro, extended }) {
   );
 }
 
-// ─── PLACEHOLDER SECTION ──────────────────────────────────────────────────────
-function PlaceholderSection({ section, accentColor }) {
-  return (
-    <div style={{
-      minHeight: 320, display: "flex", alignItems: "center", justifyContent: "center",
-      border: `1px dashed ${accentColor}4D`,
-      borderRadius: 8, padding: 48, marginTop: 8,
-    }}>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, textAlign: "center" }}>
-        <div style={{ fontSize: 48, opacity: 0.25 }}>{section?.icon || "📊"}</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, fontWeight: 700, color: "var(--c-text-2)", letterSpacing: "1px" }}>
-          {section?.label?.toUpperCase() || "SEÇÃO"}
-        </div>
-        <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: "var(--c-text-3)", lineHeight: 1.6 }}>
-          Dados em desenvolvimento · Em breve nesta seção
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── FILTER BAR ───────────────────────────────────────────────────────────────
-function FilterBar({ section, accentColor, getFilter, setFilter, clearFilters, activeFilterCount, activeSector, setActiveSector }) {
+function FilterBar({ section, accentColor, activeSector, setActiveSector }) {
   if (!section) return null;
   const { sectionId, filters = [] } = section;
 
-  const nonSetorActiveCount = activeFilterCount(sectionId);
-  const setorIsFiltered     = sectionId === "acoes-b3" && activeSector !== "all";
-  const hasAnyActive        = nonSetorActiveCount > 0 || setorIsFiltered;
+  // Only the wired `setor` pill on acoes-b3 renders; every other section has no
+  // functional filter, so the bar stays out of the way entirely.
+  const setorFilter = sectionId === "acoes-b3" ? filters.find(f => f.id === "setor") : null;
+  if (!setorFilter) return null;
 
-  const inputStyle = {
-    fontFamily: "'JetBrains Mono', monospace", fontSize: 11,
-    background: "var(--c-surface)", border: "1px solid var(--c-border)",
-    borderRadius: 4, padding: "3px 8px", color: "var(--c-text-2)",
-    width: 64, outline: "none",
-  };
+  const setorIsFiltered = activeSector !== "all";
 
   return (
     <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: 16, padding: "10px 0 14px", borderBottom: "1px solid var(--c-border)", marginBottom: 12 }}>
-      {filters.map(filter => {
-        // ── Setor pill (wired to activeSector)
-        if (filter.id === "setor" && sectionId === "acoes-b3") {
-          return (
-            <div key={filter.id} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: "1px", color: "var(--c-text-3)", textTransform: "uppercase" }}>{filter.label}</span>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                {filter.options.map(opt => {
-                  const sectorVal = opt === "Todos" ? "all" : opt;
-                  const isActive  = activeSector === sectorVal;
-                  return (
-                    <button
-                      key={opt}
-                      onClick={() => setActiveSector(sectorVal)}
-                      style={{
-                        fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700,
-                        padding: "3px 9px", borderRadius: 10, cursor: "pointer", transition: "all 0.15s",
-                        background: isActive ? accentColor + "22" : "transparent",
-                        color:      isActive ? accentColor : "var(--c-text-3)",
-                        border:     isActive ? `1px solid ${accentColor}66` : "1px solid var(--c-border)",
-                      }}
-                    >{opt}</button>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        }
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: "1px", color: "var(--c-text-3)", textTransform: "uppercase" }}>{setorFilter.label}</span>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+          {setorFilter.options.map(opt => {
+            const sectorVal = opt === "Todos" ? "all" : opt;
+            const isActive  = activeSector === sectorVal;
+            return (
+              <button
+                key={opt}
+                onClick={() => setActiveSector(sectorVal)}
+                style={{
+                  fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700,
+                  padding: "3px 9px", borderRadius: 10, cursor: "pointer", transition: "all 0.15s",
+                  background: isActive ? accentColor + "22" : "transparent",
+                  color:      isActive ? accentColor : "var(--c-text-3)",
+                  border:     isActive ? `1px solid ${accentColor}66` : "1px solid var(--c-border)",
+                }}
+              >{opt}</button>
+            );
+          })}
+        </div>
+      </div>
 
-        // ── Pill filter
-        if (filter.type === "pill") {
-          const currentVal = getFilter(sectionId, filter.id);
-          return (
-            <div key={filter.id} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: "1px", color: "var(--c-text-3)", textTransform: "uppercase" }}>{filter.label}</span>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                {filter.options.map(opt => {
-                  const isDefault = opt === filter.options[0];
-                  const isActive  = isDefault ? (currentVal == null) : (currentVal === opt);
-                  return (
-                    <button
-                      key={opt}
-                      onClick={() => setFilter(sectionId, filter.id, isDefault ? null : opt)}
-                      style={{
-                        fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700,
-                        padding: "3px 9px", borderRadius: 10, cursor: "pointer", transition: "all 0.15s",
-                        background: isActive ? accentColor + "22" : "transparent",
-                        color:      isActive ? accentColor : "var(--c-text-3)",
-                        border:     isActive ? `1px solid ${accentColor}66` : "1px solid var(--c-border)",
-                      }}
-                    >{opt}</button>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        }
-
-        // ── Range filter
-        if (filter.type === "range") {
-          const currentVal = getFilter(sectionId, filter.id) || {};
-          return (
-            <div key={filter.id} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: "1px", color: "var(--c-text-3)", textTransform: "uppercase" }}>
-                {filter.label}{filter.unit ? ` (${filter.unit})` : ""}
-              </span>
-              <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                <input
-                  style={inputStyle}
-                  placeholder="min"
-                  value={currentVal.min || ""}
-                  onChange={e => setFilter(sectionId, filter.id, { ...currentVal, min: e.target.value })}
-                />
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "var(--c-text-3)" }}>—</span>
-                <input
-                  style={inputStyle}
-                  placeholder="max"
-                  value={currentVal.max || ""}
-                  onChange={e => setFilter(sectionId, filter.id, { ...currentVal, max: e.target.value })}
-                />
-              </div>
-            </div>
-          );
-        }
-
-        return null;
-      })}
-
-      {hasAnyActive && (
+      {setorIsFiltered && (
         <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end", paddingBottom: 2 }}>
           <button
-            onClick={() => { clearFilters(sectionId); setActiveSector("all"); }}
+            onClick={() => setActiveSector("all")}
             style={{
               fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700,
               letterSpacing: "0.5px", color: "var(--c-error)", background: "transparent",
               border: "none", cursor: "pointer", padding: "3px 0", textDecoration: "underline",
               transition: "opacity 0.15s",
             }}
-          >Limpar filtros</button>
+          >Limpar filtro</button>
         </div>
       )}
     </div>
@@ -428,10 +344,9 @@ export default function BrazilTerminal() {
   const [expandedCards,   setExpandedCards]   = useState(new Set());
   const [selectedAsset,   setSelectedAsset]   = useState(null);
 
-  // ── New block/section/filter state ──────────────────────────────────────────
+  // ── New block/section state ─────────────────────────────────────────────────
   const [activeBlock,   setActiveBlock]   = useState("mercado");
   const [activeSection, setActiveSection] = useState("acoes-b3");
-  const [activeFilters, setActiveFilters] = useState({});
 
   // ── Extended macro data from backend endpoint ──────────────────────────────
   const [brazilMacroData, setBrazilMacroData] = useState(null);
@@ -445,26 +360,6 @@ export default function BrazilTerminal() {
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
-
-  // ── Filter helpers ───────────────────────────────────────────────────────────
-  const getFilter = useCallback((sectionId, filterId) =>
-    activeFilters[sectionId]?.[filterId] ?? null,
-  [activeFilters]);
-
-  const setFilter = useCallback((sectionId, filterId, value) =>
-    setActiveFilters(prev => ({
-      ...prev,
-      [sectionId]: { ...(prev[sectionId] || {}), [filterId]: value },
-    })),
-  []);
-
-  const clearFilters = useCallback((sectionId) =>
-    setActiveFilters(prev => { const next = { ...prev }; delete next[sectionId]; return next; }),
-  []);
-
-  const activeFilterCount = useCallback((sectionId) =>
-    Object.keys(activeFilters[sectionId] || {}).length,
-  [activeFilters]);
 
   // ── Block navigation ─────────────────────────────────────────────────────────
   const handleBlockChange = useCallback((blockId) => {
@@ -717,14 +612,11 @@ export default function BrazilTerminal() {
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
         {BRAZIL_BLOCKS.find(b => b.blockId === activeBlock)?.sections.map(section => {
           const isActive = activeSection === section.sectionId;
-          const count    = activeFilterCount(section.sectionId) +
-            (section.sectionId === "acoes-b3" && activeSector !== "all" ? 1 : 0);
           return (
             <button
               key={section.sectionId}
               onClick={() => setActiveSection(section.sectionId)}
               style={{
-                position: "relative",
                 fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, fontWeight: 600,
                 padding: "5px 14px", borderRadius: 6, cursor: "pointer",
                 transition: "all 0.15s ease",
@@ -734,28 +626,15 @@ export default function BrazilTerminal() {
               }}
             >
               {section.icon} {section.label}
-              {count > 0 && (
-                <span style={{
-                  position: "absolute", top: -5, right: -5,
-                  width: 14, height: 14, borderRadius: "50%",
-                  background: GOLD, color: "#080f1a",
-                  fontFamily: "'JetBrains Mono', monospace", fontSize: 8, fontWeight: 700,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>{count}</span>
-              )}
             </button>
           );
         })}
       </div>
 
-      {/* ── FILTER BAR ── */}
+      {/* ── FILTER BAR (setor only) ── */}
       <FilterBar
         section={currentSection}
         accentColor={accentColor}
-        getFilter={getFilter}
-        setFilter={setFilter}
-        clearFilters={clearFilters}
-        activeFilterCount={activeFilterCount}
         activeSector={activeSector}
         setActiveSector={setActiveSector}
       />
@@ -822,12 +701,6 @@ export default function BrazilTerminal() {
             })}
           </div>
         </div>
-
-      ) : activeSection === "credito" ? (
-        <UnavailableSection icon="🏦" title="EM BREVE" description="Dados via ANBIMA · Em desenvolvimento" />
-
-      ) : activeSection === "titulos-publicos" ? (
-        <UnavailableSection icon="🧾" title="EM BREVE" description="Dados via Tesouro Nacional · Em desenvolvimento" />
 
       ) : activeSection === "macro-brasil" ? (
         <div style={{ marginTop: 8 }}>
@@ -917,7 +790,7 @@ export default function BrazilTerminal() {
         </div>
 
       ) : activeSection !== "acoes-b3" ? (
-        <PlaceholderSection section={currentSection} accentColor={accentColor} />
+        <ComingSoon section={currentSection} />
 
       ) : (
         <>
