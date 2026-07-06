@@ -34,11 +34,19 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
   : ['http://localhost:5173', 'http://localhost:3000'];
 
+// Vercel gives each PR/commit deploy a dynamic hashed origin that can't be
+// enumerated in ALLOWED_ORIGINS (e.g.
+// https://global-markets-terminal-git-<branch>-<hash>-felps10s-projects.vercel.app).
+// Allow this project's own preview URLs by pattern — the project prefix and the
+// `felps10s-projects` team slug are locked in, so no third-party site can match.
+const VERCEL_PREVIEW_RE = /^https:\/\/global-markets-terminal-[a-z0-9-]+-felps10s-projects\.vercel\.app$/;
+
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (curl, Postman, server-to-server)
     if (!origin) return callback(null, true);
     if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    if (VERCEL_PREVIEW_RE.test(origin)) return callback(null, true);
     callback(new Error(`CORS: origin ${origin} not allowed`));
   },
   credentials: true,
