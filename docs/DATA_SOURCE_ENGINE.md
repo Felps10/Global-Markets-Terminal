@@ -35,28 +35,27 @@ Status: **Phase A shipped · provider decision made** · Owner: Felipe · Create
   24/7) ≈ **77k/day** — under cap, no market-hours gate needed *while B3 stays off EODHD*.
 
 **NEXT STEPS:**
-1. **Ship Increment 1** (PR #14, open). Add `EODHD_API_KEY` to the **Railway backend env**
-   (already in local `.env`) BEFORE merge, else prod deploys with EODHD disabled (safe
-   no-op → Yahoo). merge = deploy.
-2. **✅ Increment 2 — Brazil terminal → server engine — CODE DONE + server-verified,
-   PR open (stacked on Inc1's branch).** The Brazil terminal fetched B3 **client-side, one
-   BRAPI request per ticker from every browser** with the public token. Now a single server
-   process fetches all ~191 brazil-view B3 via **BRAPI Pro batch (20/req, 5-min)** + Yahoo
-   `.SA` fallback, exposed at **`GET /api/v1/quotes/brazil`** (keyed map). Files: new
-   `resolveBrazilB3()` in `symbolResolver`; Brazil-B3 fetcher + `getBrazilB3Cache()` in
-   `quoteFetchManager`; `/brazil` route; new `fetchB3MarketDataFromServer()` in
-   `dataServices` (drop-in, same shape, falls back to the old client path on server outage);
-   `BrazilTerminal.jsx` swapped to it. **KEY GOTCHA:** BRAPI rewrites `symbol` to the current
-   ticker after renames (JBSS3→JBSS32); **key by `requestedSymbol`**. Local proof: 168/189
-   displayed covered; the 21 gaps are **stale taxonomy** (delisted/renamed — MRFG3+BRFS3→MBRF3,
-   CPLE6→CPLE3, ARZZ3→AZZA3, etc. — 404 on BOTH BRAPI and Yahoo, so no regression) + 3 indices
-   (IMA-B/IBrX/IEEX, never B3 quote tickers). B3 stays OFF EODHD (would blow the 100k/day cap).
-   *Note: BRAPI token still in the browser bundle for the mini-ticker + client fallback —
-   full token removal is a later hardening step.* Authed-UI render verifies on the Vercel preview.
-3. **Data-hygiene follow-up (separate):** resync stale B3 tickers in the taxonomy + static
-   `src/data/assets.js` (MBRF3, CPLE3, AZZA3; drop indices from `isB3`; drop delisted names).
-4. **Phase B** (config table + admin GET/PUT API) then **Phase C** (Settings "Data Sources"
-   UI + the normalized `quotes[symbol]` map with a `source` badge — deferred from Phase A).
+1. **✅ Increment 1 (EODHD global) — MERGED (#14) + LIVE.** Verified in prod:
+   `/quotes/live` = `{eodhd:160}`, `source=live`. `EODHD_API_KEY` set in Railway.
+2. **✅ Increment 2 (Brazil terminal → server) — MERGED (#15) + LIVE.** `/quotes/brazil`
+   serves B3 via BRAPI Pro server-side. **GOTCHA:** BRAPI rewrites `symbol` after renames
+   (JBSS3→JBSS32) → key by `requestedSymbol`. **Gotcha 2:** `VITE_BRAPI_TOKEN` is build-time
+   for the frontend bundle; the Railway backend needs it as a RUNTIME var too (was missing;
+   Felipe added it → feed populated). Any new server-side use of a `VITE_*` var needs it in
+   Railway runtime.
+3. **✅ B3 taxonomy resync — MERGED (#16, migration 015).** Stale tickers refreshed
+   (MBRF3, CPLE3, AZZA3…; indices dropped from `isB3`).
+4. **✅ Phase B (config store + API) — CODE DONE, PR open.** `data_source_config` singleton
+   table (migration **016**, RLS Pattern A — service-role only), `dataSourceConfigSchema.js`
+   (pure validate/normalize, unit-tested) + `dataSourceConfig.js` (load/save, cached, safe
+   fallback to recommended if the table is absent), `GET`/`PUT /api/v1/config/data-sources`
+   (`requireAdmin`), and `symbolResolver` now passes the config as `overrides` to
+   `resolvePrecedence` (also selects `subgroup_id`/`group_id`). Config controls the primary
+   axis (EODHD-vs-Yahoo fetch-set membership). **Migration 016 must be run in Supabase**
+   (code is safe without it — falls back to recommended). Full PUT round-trip + a live
+   precedence flip verify after 016 runs (needs an admin token).
+5. **Phase C — Settings "Data Sources" UI** + the full per-symbol normalized `quotes[symbol]`
+   merge (honor complete ordering beyond the EODHD axis) + a `source` badge.
 
 **Key operational notes (learned the hard way):**
 - Run the server locally WITH the flag: `node --max-http-header-size=65536 --env-file=.env

@@ -19,12 +19,18 @@ import { supabase } from '../db.js';
 import { YAHOO_SYMBOLS, CRYPTO_IDS } from './terminalSymbols.js';
 import { classify, parseMeta, resolvePrecedence } from './providerRouting.js';
 import { yahooToEodhd } from './eodhdSymbols.js';
+import { loadConfig } from './dataSourceConfig.js';
 
 // Taxonomy changes rarely; re-resolve at most every 5 minutes.
 const TTL = 5 * 60_000;
 
 let _cache = { ts: 0, yahoo: null, crypto: null };
 let _brazilCache = { ts: 0, brazilB3: null };
+
+/** Force the next resolveLiveSymbols() to re-resolve (e.g. after a config change). */
+export function invalidate() {
+  _cache = { ts: 0, yahoo: null, crypto: null };
+}
 
 /**
  * @returns {Promise<{ yahoo: string[], crypto: Record<string,string> }>}
@@ -33,9 +39,13 @@ export async function resolveLiveSymbols() {
   if (_cache.ts && Date.now() - _cache.ts < TTL && _cache.yahoo) return _cache;
 
   try {
+    // Admin overrides (Phase B) layered onto the recommended defaults per asset.
+    // Empty/missing config → recommended defaults (loadConfig is safe-by-default).
+    const overrides = await loadConfig();
+
     const { data, error } = await supabase
       .from('assets')
-      .select('symbol, meta, exchange')
+      .select('symbol, meta, exchange, subgroup_id, group_id')
       .eq('active', true)
       .eq('terminal_view', 'global');
 
@@ -65,10 +75,12 @@ export async function resolveLiveSymbols() {
       }
       if (yform) yahoo.add(yform); // Yahoo stays the universal fallback fetch set
 
-      // EODHD primary set: assets whose effective precedence leads with EODHD
-      // (global equity/index/fx today; B3 joins in the next increment). Keyed by the
-      // display symbol so results fold back into the feed with no frontend change.
-      if (resolvePrecedence(a)[0] === 'eodhd') {
+      // EODHD primary set: assets whose effective precedence leads with EODHD.
+      // resolvePrecedence honors the admin config (subgroup → group → global) on top of
+      // the recommended defaults, so demoting EODHD for a subgroup drops those assets
+      // from the EODHD fetch set → Yahoo carries them. Keyed by display symbol so results
+      // fold back into the feed with no frontend change.
+      if (resolvePrecedence(a, overrides)[0] === 'eodhd') {
         const ecode = yahooToEodhd(yform, meta);
         if (ecode) eodhd.push({ display: a.symbol, eodhd: ecode });
       }
