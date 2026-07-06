@@ -965,6 +965,58 @@ export async function fetchB3MarketData(b3Assets, { assets, volatility }) {
   return {};
 }
 
+/**
+ * Fetch B3 market data from the SERVER-side Brazil feed (GET /api/v1/quotes/brazil).
+ * The server fetches all B3 names once per cycle via BRAPI Pro (+ Yahoo `.SA` fallback),
+ * so browsers no longer hit BRAPI one-request-per-ticker with the public token. Falls back
+ * to the client-side path if the server feed is empty/unreachable, so the terminal degrades
+ * gracefully instead of going blank.
+ *
+ * Returns the SAME shape as fetchB3MarketData so callers are drop-in compatible.
+ *
+ * @param {Array<[string, Object]>} b3Assets - Object.entries(ASSETS).filter(([,a]) => a.isB3)
+ * @param {{ assets: Object, volatility: Object }} maps
+ * @returns {Promise<Record<string, Object>>}
+ */
+export async function fetchB3MarketDataFromServer(b3Assets, { assets, volatility }) {
+  if (b3Assets.length === 0) return {};
+
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/quotes/brazil`, { signal: AbortSignal.timeout(12000) });
+    if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
+    const json = await res.json();
+    const b3 = json?.b3;
+    if (b3 && Object.keys(b3).length > 0) {
+      const result = {};
+      for (const [sym] of b3Assets) {
+        const q = b3[sym];
+        if (!q || q.price == null) continue;
+        const prevClose = q.prevClose || q.price;
+        result[sym] = {
+          price:            q.price,
+          change:           q.change ?? (q.price - prevClose),
+          changePct:        q.changePct ?? ((q.price - prevClose) / prevClose * 100),
+          prevClose,
+          high:             q.high || q.price,
+          low:              q.low || q.price,
+          volume:           q.volume ?? null,
+          marketCap:        q.marketCap ?? null,
+          fiftyTwoWeekHigh: q.fiftyTwoWeekHigh ?? null,
+          fiftyTwoWeekLow:  q.fiftyTwoWeekLow ?? null,
+          sparkline:        generateSparkline(prevClose, (volatility.brasil || 0.018) * 0.3),
+          source:           q.source || 'brapi',
+        };
+      }
+      if (Object.keys(result).length >= 5) return result;
+    }
+  } catch (err) {
+    console.warn('[B3 server feed] unavailable — falling back to client fetch:', err?.message);
+  }
+
+  // Resilience fallback: original client-side path (BRAPI per-ticker → Yahoo `.SA`).
+  return fetchB3MarketData(b3Assets, { assets, volatility });
+}
+
 // ─── YAHOO CHART DATA (GMT-2: extracted + migrated from GlobalMarketsTerminal.jsx) ──────────────
 
 /**

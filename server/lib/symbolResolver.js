@@ -24,6 +24,7 @@ import { yahooToEodhd } from './eodhdSymbols.js';
 const TTL = 5 * 60_000;
 
 let _cache = { ts: 0, yahoo: null, crypto: null };
+let _brazilCache = { ts: 0, brazilB3: null };
 
 /**
  * @returns {Promise<{ yahoo: string[], crypto: Record<string,string> }>}
@@ -84,5 +85,44 @@ export async function resolveLiveSymbols() {
     // Cache the fallback briefly so a persistent DB outage doesn't hammer Supabase.
     _cache = { ts: Date.now(), yahoo: [...YAHOO_SYMBOLS], crypto: { ...CRYPTO_IDS }, b3: [], eodhd: [] };
     return _cache;
+  }
+}
+
+/**
+ * Resolve the Brazil-terminal B3 universe (terminal_view='brazil') from the taxonomy.
+ * Powers the server-side Brazil B3 feed (BRAPI Pro primary + Yahoo `.SA` fallback) that
+ * replaces the old per-browser, per-ticker client-side BRAPI path.
+ *
+ * @returns {Promise<{ ts: number, brazilB3: Array<{display,yahoo,brapi}> }>}
+ *   display = bare ticker the frontend keys on (e.g. 'PETR4');
+ *   yahoo   = `.SA` form for the Yahoo fallback; brapi = bare form for BRAPI.
+ */
+export async function resolveBrazilB3() {
+  if (_brazilCache.ts && Date.now() - _brazilCache.ts < TTL && _brazilCache.brazilB3) return _brazilCache;
+
+  try {
+    const { data, error } = await supabase
+      .from('assets')
+      .select('symbol, meta, exchange, terminal_view')
+      .eq('active', true)
+      .eq('terminal_view', 'brazil');
+
+    if (error) throw new Error(error.message);
+
+    const brazilB3 = [];
+    for (const a of data || []) {
+      if (classify(a) !== 'b3') continue; // brazil view also holds macro/fx — B3 only here
+      const meta = parseMeta(a.meta);
+      const ySym = meta.yahooSymbol || `${a.symbol}.SA`;
+      brazilB3.push({ display: a.symbol, yahoo: ySym, brapi: ySym.replace(/\.SA$/, '') });
+    }
+
+    _brazilCache = { ts: Date.now(), brazilB3 };
+    return _brazilCache;
+  } catch (err) {
+    console.error('[symbolResolver] brazil B3 resolve failed:', err.message);
+    // Keep the last-known-good set (or empty) and don't hammer Supabase on a persistent outage.
+    _brazilCache = { ts: Date.now(), brazilB3: _brazilCache.brazilB3 || [] };
+    return _brazilCache;
   }
 }

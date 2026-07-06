@@ -16,7 +16,7 @@
 
 import https from 'https';
 import { ensureSession, getSession, refreshSession, httpsGet } from './yahooSession.js';
-import { resolveLiveSymbols } from '../lib/symbolResolver.js';
+import { resolveLiveSymbols, resolveBrazilB3 } from '../lib/symbolResolver.js';
 
 // ─── Cache state ─────────────────────────────────────────────────────────────
 
@@ -30,6 +30,10 @@ let brapiCache  = { data: [], ts: 0 };
 // so EODHD wins precedence (parseYahooResults is last-write-wins). Empty when the key is
 // unset or EODHD is unreachable → the feed transparently falls back to Yahoo.
 let eodhdCache  = { data: [], ts: 0, error: null };
+// Brazil-terminal B3 feed (paid BRAPI Pro primary + Yahoo `.SA` fallback). Keyed map
+// { [bareSymbol]: {price, change, changePct, prevClose, high, low, volume, ...} } served by
+// GET /api/v1/quotes/brazil. Replaces the old per-browser, per-ticker client-side BRAPI path.
+let brazilB3Cache = { data: {}, ts: 0, error: null };
 
 // ─── Intervals & backoff ─────────────────────────────────────────────────────
 
@@ -47,6 +51,14 @@ const EODHD_BATCH          = 20;       // symbols/request (path symbol + 19 in s
 const EODHD_CHUNK_GAP      = 150;      // ms between batches
 const EODHD_TIMEOUT_MS     = 12_000;
 
+// Brazil B3 feed (BRAPI Pro: 20 tickers/req, 500k/mo). ~191 names ÷ 20 = 10 req/cycle;
+// at 300s, 24/7 = ~86k req/mo — well under 500k. BRAPI Pro is ~5-min fresh, so ≤5-min cadence
+// gains nothing. Yahoo `.SA` covers the few tickers BRAPI drops.
+const BRAZIL_B3_INTERVAL   = 300_000;  // 5 min
+const BRAPI_BATCH          = 20;       // tickers per BRAPI Pro request
+const BRAZIL_B3_GAP        = 200;      // ms between batches
+const BRAPI_TIMEOUT_MS     = 12_000;
+
 // Yahoo v7 tolerates ~50 symbols per request comfortably; the full taxonomy is
 // ~185 symbols, so we chunk and merge, with a small gap between batches.
 const YAHOO_CHUNK      = 50;
@@ -55,11 +67,14 @@ const YAHOO_CHUNK_GAP  = 300;  // ms between batches
 let yahooFailures  = 0;
 let cryptoFailures = 0;
 let eodhdFailures  = 0;
+let brazilFailures = 0;
 let yahooTimer     = null;
 let cryptoTimer    = null;
 let brapiTimer     = null;
 let eodhdTimer     = null;
+let brazilTimer    = null;
 let eodhdKeyWarned = false;
+let brazilTokenWarned = false;
 // EODHD codes that returned a hard 404 (unknown ticker). EODHD fails the WHOLE batch on
 // one bad symbol, so we quarantine confirmed-unknowns to stop them poisoning future batches.
 const eodhdQuarantine = new Set();
@@ -375,6 +390,137 @@ function scheduleEodhd() {
   }
 }
 
+// ─── Brazil B3 feed (BRAPI Pro primary + Yahoo .SA fallback) ──────────────────
+// Serves the Brazil terminal's ~191 B3 names from ONE server process (BRAPI Pro, 20/req,
+// every 5 min) instead of every browser firing one request per ticker with the public
+// token. Yahoo `.SA` backfills any ticker BRAPI drops. Exposed via GET /api/v1/quotes/brazil.
+
+// BRAPI mirrors Yahoo v7 field names (regularMarket*), so one normalizer serves both.
+function normalizeB3Quote(q, source) {
+  const price = q.regularMarketPrice;
+  if (!isFiniteNum(price)) return null;
+  const prevClose = isFiniteNum(q.regularMarketPreviousClose) ? q.regularMarketPreviousClose : price;
+  return {
+    price,
+    change:           isFiniteNum(q.regularMarketChange) ? q.regularMarketChange : (price - prevClose),
+    changePct:        isFiniteNum(q.regularMarketChangePercent)
+                        ? q.regularMarketChangePercent
+                        : (prevClose ? ((price - prevClose) / prevClose) * 100 : 0),
+    prevClose,
+    high:             isFiniteNum(q.regularMarketDayHigh) ? q.regularMarketDayHigh : price,
+    low:              isFiniteNum(q.regularMarketDayLow) ? q.regularMarketDayLow : price,
+    volume:           isFiniteNum(q.regularMarketVolume) ? q.regularMarketVolume : null,
+    marketCap:        q.marketCap || null,
+    fiftyTwoWeekHigh: q.fiftyTwoWeekHigh || null,
+    fiftyTwoWeekLow:  q.fiftyTwoWeekLow || null,
+    longName:         q.longName || q.shortName || null,
+    currency:         q.currency || 'BRL',
+    source,
+  };
+}
+
+// One BRAPI batch (≤20 tickers). Throws on non-200 so a bad batch doesn't sink the rest.
+async function fetchBrapiBatch(tickers, token) {
+  const url = `https://brapi.dev/api/quote/${tickers.map(encodeURIComponent).join(',')}` +
+    `?token=${encodeURIComponent(token)}`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(BRAPI_TIMEOUT_MS) });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const json = await r.json();
+  return json?.results || [];
+}
+
+async function fetchBrazilB3() {
+  const tag = '[quoteFetchManager:brazil-b3]';
+  const token = process.env.VITE_BRAPI_TOKEN;
+  if (!token) {
+    if (!brazilTokenWarned) {
+      console.warn(`${tag} VITE_BRAPI_TOKEN not set — Brazil B3 feed disabled`);
+      brazilTokenWarned = true;
+    }
+    scheduleBrazilB3();
+    return;
+  }
+
+  try {
+    const { brazilB3 } = await resolveBrazilB3();
+    if (!brazilB3 || brazilB3.length === 0) {
+      brazilB3Cache = { data: {}, ts: Date.now(), error: null };
+      brazilFailures = 0;
+      scheduleBrazilB3();
+      return;
+    }
+
+    const map = {};
+    const displayByBrapi = new Map(brazilB3.map((x) => [x.brapi, x.display]));
+    let okBatches = 0;
+
+    // Primary: BRAPI Pro batches. Key by `requestedSymbol` (the ticker we asked for) —
+    // BRAPI rewrites `symbol` to the CURRENT ticker after renames/reorgs (e.g. JBSS3→JBSS32,
+    // EMBR3→EMBJ3), so keying by `symbol` would drop renamed names under garbage keys.
+    for (const batch of chunk(brazilB3.map((x) => x.brapi), BRAPI_BATCH)) {
+      try {
+        for (const q of await fetchBrapiBatch(batch, token)) {
+          const reqSym = q.requestedSymbol || q.symbol;
+          const display = displayByBrapi.get(reqSym) || reqSym;
+          const entry = normalizeB3Quote(q, 'brapi');
+          if (entry) map[display] = entry;
+        }
+        okBatches++;
+      } catch (err) {
+        console.error(`${tag} BRAPI batch of ${batch.length} failed: ${err.message}`);
+      }
+      await new Promise((r) => setTimeout(r, BRAZIL_B3_GAP));
+    }
+
+    // Fallback: Yahoo `.SA` for the tickers BRAPI didn't return.
+    const misses = brazilB3.filter((x) => !map[x.display]);
+    if (misses.length) {
+      const missDisplays = new Set(misses.map((m) => m.display));
+      try {
+        await ensureSession();
+        for (const batch of chunk(misses.map((x) => x.yahoo), YAHOO_CHUNK)) {
+          try {
+            for (const q of await fetchYahooBatch(batch)) {
+              const display = (q.symbol || '').replace(/\.SA$/, '');
+              if (!missDisplays.has(display)) continue;
+              const entry = normalizeB3Quote(q, 'yahoo-sa');
+              if (entry) map[display] = entry;
+            }
+          } catch (err) {
+            console.error(`${tag} Yahoo .SA fallback batch failed: ${err.message}`);
+          }
+          await new Promise((r) => setTimeout(r, YAHOO_CHUNK_GAP));
+        }
+      } catch (err) {
+        console.error(`${tag} Yahoo .SA fallback session failed: ${err.message}`);
+      }
+    }
+
+    if (okBatches === 0 && Object.keys(map).length === 0) {
+      throw new Error('all BRAPI batches failed and Yahoo fallback empty');
+    }
+
+    brazilB3Cache = { data: map, ts: Date.now(), error: null };
+    brazilFailures = 0;
+    console.log(`${tag} OK — ${Object.keys(map).length}/${brazilB3.length} B3 names cached`);
+  } catch (err) {
+    brazilFailures++;
+    brazilB3Cache.error = err.message; // keep last-known-good data
+    console.error(`${tag} FAIL #${brazilFailures}: ${err.message}`);
+  }
+
+  scheduleBrazilB3();
+}
+
+function scheduleBrazilB3() {
+  if (brazilTimer) clearTimeout(brazilTimer);
+  const interval = getInterval(BRAZIL_B3_INTERVAL, brazilFailures);
+  brazilTimer = setTimeout(fetchBrazilB3, interval);
+  if (brazilFailures > 0) {
+    console.log(`[quoteFetchManager:brazil-b3] Next fetch in ${Math.round(interval / 1000)}s (backoff #${brazilFailures})`);
+  }
+}
+
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
@@ -404,6 +550,14 @@ export function getCache() {
 }
 
 /**
+ * Returns the Brazil-terminal B3 cache: a keyed map { [bareSymbol]: {price, changePct, ...} }.
+ * Consumed by GET /api/v1/quotes/brazil. Data may be stale (check .ts).
+ */
+export function getBrazilB3Cache() {
+  return { ...brazilB3Cache };
+}
+
+/**
  * Start periodic fetching. Call once at server boot.
  */
 export function start() {
@@ -412,6 +566,7 @@ export function start() {
   fetchYahoo();
   fetchCoinGecko();
   fetchEodhd(); // primary for global classes; no-ops safely if EODHD_API_KEY is unset
+  fetchBrazilB3(); // Brazil-terminal B3 feed; no-ops safely if VITE_BRAPI_TOKEN is unset
   // BRAPI fallback starts after a short delay so the Yahoo cache is populated first
   // (it only fetches B3 tickers missing from Yahoo's results).
   brapiTimer = setTimeout(fetchBrapiFallback, 45_000);
@@ -426,4 +581,5 @@ export function stop() {
   if (cryptoTimer) { clearTimeout(cryptoTimer); cryptoTimer = null; }
   if (brapiTimer) { clearTimeout(brapiTimer); brapiTimer = null; }
   if (eodhdTimer) { clearTimeout(eodhdTimer); eodhdTimer = null; }
+  if (brazilTimer) { clearTimeout(brazilTimer); brazilTimer = null; }
 }
