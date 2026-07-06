@@ -33,6 +33,15 @@ export function invalidate() {
 }
 
 /**
+ * The last-resolved routing plan (sync; no re-resolve). Used by buildQuotesMap to build
+ * the normalized quotes[symbol] map inside the synchronous getCache(). Empty until the
+ * first resolveLiveSymbols() completes (the fetchers call it within seconds of boot).
+ */
+export function getCachedPlan() {
+  return _cache.plan || [];
+}
+
+/**
  * @returns {Promise<{ yahoo: string[], crypto: Record<string,string> }>}
  */
 export async function resolveLiveSymbols() {
@@ -56,12 +65,20 @@ export async function resolveLiveSymbols() {
     const crypto = {};
     const b3 = [];    // B3 assets: {display, yahoo, brapi} — enables the BRAPI fallback
     const eodhd = []; // EODHD-primary assets: {display, eodhd} — the paid global feed
+    const plan = [];  // per-display-symbol routing for the normalized quotes map (Phase C):
+                      // { display, precedence, yahooKey?, cgId? } — buildQuotesMap walks it.
 
     for (const a of data) {
       const meta = parseMeta(a.meta);
       const cls = classify(a); // routing authority (server/lib/providerRouting.js)
+      // Config-honored, capability-filtered order (subgroup → group → global → recommended).
+      const precedence = resolvePrecedence(a, overrides);
+
       if (cls === 'crypto') {
-        if (meta.cgId) crypto[a.symbol] = meta.cgId;
+        if (meta.cgId) {
+          crypto[a.symbol] = meta.cgId;
+          plan.push({ display: a.symbol, precedence, cgId: meta.cgId });
+        }
         continue;
       }
 
@@ -75,27 +92,26 @@ export async function resolveLiveSymbols() {
       }
       if (yform) yahoo.add(yform); // Yahoo stays the universal fallback fetch set
 
-      // EODHD primary set: assets whose effective precedence leads with EODHD.
-      // resolvePrecedence honors the admin config (subgroup → group → global) on top of
-      // the recommended defaults, so demoting EODHD for a subgroup drops those assets
-      // from the EODHD fetch set → Yahoo carries them. Keyed by display symbol so results
-      // fold back into the feed with no frontend change.
-      if (resolvePrecedence(a, overrides)[0] === 'eodhd') {
+      // EODHD primary set: assets whose effective precedence leads with EODHD. Demoting
+      // EODHD for a subgroup drops those assets from the EODHD fetch set → Yahoo carries them.
+      if (precedence[0] === 'eodhd') {
         const ecode = yahooToEodhd(yform, meta);
         if (ecode) eodhd.push({ display: a.symbol, eodhd: ecode });
       }
+
+      plan.push({ display: a.symbol, precedence, yahooKey: yform });
     }
 
     // Floor: the known-good static set is always covered.
     for (const s of YAHOO_SYMBOLS) yahoo.add(s);
     for (const [sym, id] of Object.entries(CRYPTO_IDS)) if (!crypto[sym]) crypto[sym] = id;
 
-    _cache = { ts: Date.now(), yahoo: [...yahoo], crypto, b3, eodhd };
+    _cache = { ts: Date.now(), yahoo: [...yahoo], crypto, b3, eodhd, plan };
     return _cache;
   } catch (err) {
     console.error('[symbolResolver] DB resolve failed — using static fallback:', err.message);
     // Cache the fallback briefly so a persistent DB outage doesn't hammer Supabase.
-    _cache = { ts: Date.now(), yahoo: [...YAHOO_SYMBOLS], crypto: { ...CRYPTO_IDS }, b3: [], eodhd: [] };
+    _cache = { ts: Date.now(), yahoo: [...YAHOO_SYMBOLS], crypto: { ...CRYPTO_IDS }, b3: [], eodhd: [], plan: [] };
     return _cache;
   }
 }

@@ -815,6 +815,53 @@ export function parseYahooResults(results, prevData, assets, volatility) {
 }
 
 /**
+ * Build marketData from the server's normalized quotes[symbol] map (Data Source Engine
+ * Phase C). One code path for every asset class (equity/index/fx/commodity/B3/crypto) —
+ * the server already resolved provider precedence per symbol and tagged each with `source`.
+ * Sparklines are still generated client-side (the server sends prices, not sparklines).
+ *
+ * @param {Record<string,{price,changePct,prevClose,source,...}>} quotes
+ * @param {Object|null} prevData - Previous snapshot for sparkline rolling
+ * @param {Object} assets - the active asset map (filters + supplies `.cat` for volatility)
+ * @param {Object} volatility - per-category volatility for the sparkline seed
+ * @returns {Record<string, Object>} same shape as parseYahooResults, plus `source`
+ */
+export function parseQuotesMap(quotes, prevData, assets, volatility) {
+  const data = {};
+  for (const [sym, q] of Object.entries(quotes || {})) {
+    if (!assets[sym] || q == null || q.price == null) continue;
+
+    // prevClose comes through for yahoo/eodhd/brapi; crypto lacks it → reconstruct from changePct.
+    const prevClose = q.prevClose ?? (q.changePct != null ? q.price / (1 + q.changePct / 100) : q.price);
+
+    const prevSparkline = prevData?.[sym]?.sparkline;
+    let sparkline;
+    if (prevSparkline && prevSparkline.length >= 30) {
+      sparkline = [...prevSparkline.slice(1), q.price];
+    } else {
+      sparkline = generateSparkline(prevClose, (volatility[assets[sym].cat] || 0.02) * 0.3);
+      sparkline[sparkline.length - 1] = q.price;
+    }
+
+    data[sym] = {
+      price:            q.price,
+      change:           prevClose != null ? q.price - prevClose : null,
+      changePct:        q.changePct ?? null,
+      prevClose,
+      high:             q.high ?? null,
+      low:              q.low ?? null,
+      volume:           q.volume ?? null,
+      marketCap:        q.marketCap ?? null,
+      fiftyTwoWeekHigh: q.fiftyTwoWeekHigh ?? null,
+      fiftyTwoWeekLow:  q.fiftyTwoWeekLow ?? null,
+      sparkline,
+      source:           q.source || null,
+    };
+  }
+  return data;
+}
+
+/**
  * Fetch equity/index/fx market data from Yahoo Finance with corsproxy/allorigins fallbacks,
  * then fall back to Finnhub for key equity symbols.
  *

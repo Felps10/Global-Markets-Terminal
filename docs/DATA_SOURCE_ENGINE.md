@@ -54,8 +54,22 @@ Status: **Phase A shipped · provider decision made** · Owner: Felipe · Create
    axis (EODHD-vs-Yahoo fetch-set membership). **Migration 016 must be run in Supabase**
    (code is safe without it — falls back to recommended). Full PUT round-trip + a live
    precedence flip verify after 016 runs (needs an admin token).
-5. **Phase C — Settings "Data Sources" UI** + the full per-symbol normalized `quotes[symbol]`
-   merge (honor complete ordering beyond the EODHD axis) + a `source` badge.
+5. **✅ Phase C — CODE DONE, PR open (stacked on Phase B).** (a) **Normalized merge:**
+   `symbolResolver` builds a per-symbol routing `plan` (config-honored precedence + lookup
+   keys); `buildQuotesMap` in `quoteFetchManager` walks each plan entry's precedence over the
+   RAW provider caches and takes the first with a usable price, tagging `source`; exposed as
+   `quotes` on `/quotes/live` (additive — yahoo/crypto arrays kept for backward compat).
+   Verified: 191 symbols, `{eodhd:160, yahoo:23, coingecko:8}`, every spot-check honors
+   precedence; round-trip proved a config override flips a subgroup's source. (b) **Settings
+   UI:** new admin "Data Sources" tab (`AdminPanel`) + `DataSourcesManager` (edit global/
+   group/subgroup overrides — add/reorder/clear provider chips) + `dataSourceService`. (c)
+   **Frontend consume + badge:** `parseQuotesMap` in `dataServices`; `GlobalMarketsTerminal`
+   reads `live.quotes` (legacy yahoo/crypto path kept as fallback); `SourceBadge` now shows
+   the LIVE `data.source` per card (added `eodhd` label/color). 71 tests pass, build clean.
+   Authed UI (admin panel + terminal badges) verifies on the Vercel preview.
+6. **Backlog / future:** live FMP/Finnhub fetchers (Phase D); per-subgroup capability-hiding
+   in the Settings UI (currently offers all providers, server filters); EODHD real-time lacks
+   52-week highs (null for eodhd-sourced symbols; Yahoo has them).
 
 **Key operational notes (learned the hard way):**
 - Run the server locally WITH the flag: `node --max-http-header-size=65536 --env-file=.env

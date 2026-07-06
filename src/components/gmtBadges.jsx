@@ -26,7 +26,7 @@ export function ExchangeBadge({ exchange, style: extra }) {
 }
 
 export function SourceBadge({ source, style: extra }) {
-  const labels = { yahoo: "Yahoo", finnhub: "Finnhub", alphaVantage: "Alpha Vantage", fred: "FRED", coingecko: "CoinGecko", fmp: "FMP", brapi: "BRAPI", bcb: "BCB", awesomeapi: "AwesomeAPI" };
+  const labels = { eodhd: "EODHD", yahoo: "Yahoo", finnhub: "Finnhub", alphaVantage: "Alpha Vantage", fred: "FRED", coingecko: "CoinGecko", fmp: "FMP", brapi: "BRAPI", bcb: "BCB", awesomeapi: "AwesomeAPI" };
   const color = SOURCE_COLORS[source] || "#9E9E9E";
   return (
     <span style={{
