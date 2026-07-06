@@ -1,12 +1,15 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
-  AssetCard, AssetRow, ListColumnHeader, Sparkline,
-  formatPrice, formatVolume, formatMarketCap,
+  AssetCard, AssetRow, ListColumnHeader,
 } from "./GlobalMarketsTerminal.jsx";
-import { STATIC_ASSETS_MAP } from "./components/gmtConfig.js";
+import { STATIC_ASSETS_MAP, DENSITY_CONFIG } from "./components/gmtConfig.js";
+import AssetDetailDrawer from "./components/AssetDetailDrawer.jsx";
+import CommandBar from "./components/CommandBar.jsx";
+import GroupSummaryCard from "./components/GroupSummaryCard.jsx";
 import { fetchB3MarketDataFromServer, bcbMacro, awesomeFx } from "./dataServices.js";
 import { fetchBrazilMacro } from "./services/brazilDataServices.js";
 import { usePreferences } from './context/PreferencesContext.jsx';
+import { useWatchlist } from './context/WatchlistContext.jsx';
 import { BRAZIL_BLOCKS, getSectionById } from "./data/brazilBlocks.js";
 
 import { CLUBE_COLORS } from './lib/tokens.js';
@@ -54,13 +57,6 @@ function getB3AssetEntries() {
   }
   return _b3AssetEntriesCache;
 }
-
-// ─── SORT OPTIONS ─────────────────────────────────────────────────────────────
-const SORT_OPTS = [
-  { key: "alpha",   label: "A–Z",     defaultDir: "asc"  },
-  { key: "gainers", label: "Gainers", defaultDir: "desc" },
-  { key: "losers",  label: "Losers",  defaultDir: "asc"  },
-];
 
 // ─── FOOTER TEXT MAP ──────────────────────────────────────────────────────────
 const FOOTER_SECTION_TEXT = {
@@ -175,160 +171,21 @@ function MacroStrip({ macro, extended }) {
   );
 }
 
-// ─── FILTER BAR ───────────────────────────────────────────────────────────────
-function FilterBar({ section, accentColor, activeSector, setActiveSector }) {
-  if (!section) return null;
-  const { sectionId, filters = [] } = section;
-
-  // Only the wired `setor` pill on acoes-b3 renders; every other section has no
-  // functional filter, so the bar stays out of the way entirely.
-  const setorFilter = sectionId === "acoes-b3" ? filters.find(f => f.id === "setor") : null;
-  if (!setorFilter) return null;
-
-  const setorIsFiltered = activeSector !== "all";
-
-  return (
-    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: 16, padding: "10px 0 14px", borderBottom: "1px solid var(--c-border)", marginBottom: 12 }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: "1px", color: "var(--c-text-3)", textTransform: "uppercase" }}>{setorFilter.label}</span>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-          {setorFilter.options.map(opt => {
-            const sectorVal = opt === "Todos" ? "all" : opt;
-            const isActive  = activeSector === sectorVal;
-            return (
-              <button
-                key={opt}
-                onClick={() => setActiveSector(sectorVal)}
-                style={{
-                  fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700,
-                  padding: "3px 9px", borderRadius: 10, cursor: "pointer", transition: "all 0.15s",
-                  background: isActive ? accentColor + "22" : "transparent",
-                  color:      isActive ? accentColor : "var(--c-text-3)",
-                  border:     isActive ? `1px solid ${accentColor}66` : "1px solid var(--c-border)",
-                }}
-              >{opt}</button>
-            );
-          })}
-        </div>
-      </div>
-
-      {setorIsFiltered && (
-        <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end", paddingBottom: 2 }}>
-          <button
-            onClick={() => setActiveSector("all")}
-            style={{
-              fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700,
-              letterSpacing: "0.5px", color: "var(--c-error)", background: "transparent",
-              border: "none", cursor: "pointer", padding: "3px 0", textDecoration: "underline",
-              transition: "opacity 0.15s",
-            }}
-          >Limpar filtro</button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── BRAZIL DETAIL PANEL ─────────────────────────────────────────────────────
-function BrazilDetailPanel({ symbol, data, onClose }) {
-  const asset = STATIC_ASSETS_MAP[symbol];
-  useEffect(() => {
-    const handler = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
-  if (!asset || !data) return null;
-  const positive    = (data.changePct ?? 0) >= 0;
-  const color       = positive ? "#00E676" : "var(--c-error)";
-  const sign        = positive ? "+" : "";
-  const weekHighPct = data.fiftyTwoWeekHigh && data.price
-    ? ((data.price - data.fiftyTwoWeekLow) / (data.fiftyTwoWeekHigh - (data.fiftyTwoWeekLow || 0))) * 100
-    : null;
-  return (
-    <>
-      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 300 }} />
-      <div style={{
-        position: "fixed", top: 0, right: 0, bottom: 0,
-        width: "min(480px, 100vw)",
-        background: "var(--c-panel)", borderLeft: "1px solid var(--c-border)",
-        zIndex: 301, overflowY: "auto",
-        animation: "slideInRight 0.3s cubic-bezier(0.4,0,0.2,1)",
-      }}>
-        <div style={{ padding: "20px 20px 0", borderBottom: "1px solid var(--c-border)", paddingBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 22, fontWeight: 700, color: "var(--c-text)", letterSpacing: "0.5px" }}>{symbol}</span>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, fontWeight: 700, letterSpacing: "0.8px", color: "#080f1a", background: GOLD, borderRadius: 3, padding: "2px 6px" }}>B3</span>
-              </div>
-              <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, color: "var(--c-text-2)" }}>{asset.name}</div>
-            </div>
-            <button
-              onClick={onClose}
-              style={{ background: "transparent", border: "1px solid var(--c-border)", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontFamily: "'JetBrains Mono', monospace", fontSize: 14, color: "var(--c-text-3)", transition: "all 0.15s ease" }}
-              onMouseEnter={e => { e.target.style.color = "#ff6b6b"; e.target.style.borderColor = "#ff6b6b"; }}
-              onMouseLeave={e => { e.target.style.color = "var(--c-text-3)"; e.target.style.borderColor = "var(--c-border)"; }}
-            >✕</button>
-          </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 28, fontWeight: 700, color }}>{formatPrice(symbol, data.price)}</span>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, fontWeight: 600, color, background: color + "18", border: `1px solid ${color}30`, borderRadius: 4, padding: "2px 8px" }}>
-              {positive ? "▲" : "▼"} {sign}{data.changePct != null ? data.changePct.toFixed(2) : "—"}%
-            </span>
-            {data.change != null && (
-              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: color + "99" }}>
-                {sign}{data.change.toFixed(2)}
-              </span>
-            )}
-          </div>
-        </div>
-        <div style={{ padding: 20 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-            {[
-              { label: "OPEN",     value: formatPrice(symbol, data.prevClose) },
-              { label: "HIGH",     value: formatPrice(symbol, data.high) },
-              { label: "LOW",      value: formatPrice(symbol, data.low) },
-              { label: "VOLUME",   value: formatVolume(data.volume) },
-              { label: "MKT CAP",  value: data.marketCap ? "R$ " + (data.marketCap >= 1e9 ? (data.marketCap / 1e9).toFixed(1) + "B" : data.marketCap >= 1e6 ? (data.marketCap / 1e6).toFixed(1) + "M" : data.marketCap.toLocaleString()) : "—" },
-              { label: "EXCHANGE", value: asset.exchange || "B3" },
-            ].map(item => (
-              <div key={item.label} style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 6, padding: "10px 12px" }}>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "var(--c-text-3)", letterSpacing: "1px", marginBottom: 4 }}>{item.label}</div>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, fontWeight: 600, color: "var(--c-text)" }}>{item.value}</div>
-              </div>
-            ))}
-          </div>
-          {data.sparkline && data.sparkline.length > 1 && (
-            <div style={{ marginBottom: 20, background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 6, padding: 12 }}>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "var(--c-text-3)", letterSpacing: "1px", marginBottom: 8 }}>TREND (30 POINTS)</div>
-              <Sparkline data={data.sparkline} positive={positive} width={400} height={80} />
-            </div>
-          )}
-          {data.fiftyTwoWeekHigh != null && data.fiftyTwoWeekLow != null && (
-            <div style={{ marginBottom: 20, background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 6, padding: 12 }}>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "var(--c-text-3)", letterSpacing: "1px", marginBottom: 8 }}>52-WEEK RANGE</div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--c-error)" }}>{formatPrice(symbol, data.fiftyTwoWeekLow)}</span>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--c-text-2)" }}>{formatPrice(symbol, data.price)}</span>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#00E676" }}>{formatPrice(symbol, data.fiftyTwoWeekHigh)}</span>
-              </div>
-              <div style={{ height: 4, background: "var(--c-border)", borderRadius: 2, overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, weekHighPct ?? 50))}%`, background: `linear-gradient(90deg,var(--c-error),${GOLD},#00E676)`, borderRadius: 2 }} />
-              </div>
-            </div>
-          )}
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "var(--c-text-3)", letterSpacing: "0.5px", paddingTop: 12, borderTop: "1px solid var(--c-border)" }}>
-            DATA VIA BRAPI · YAHOO FINANCE (.SA)
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
+// Brazil-scoped collapse key — must NOT collide with the Global terminal's
+// "collapsedGroups" (Global keys on subgroup ids, Brazil on sector names; a
+// shared key would corrupt Global's collapsed state).
+const COLLAPSE_KEY = "collapsedGroupsBrazil";
+
+// All Brazil assets trade on B3, so the CommandBar exchange filter is inert
+// (the EXCHANGE tab hides itself when allExchanges is empty). Stable refs.
+const EMPTY_EXCHANGES = new Set();
+const EMPTY_LIST = [];
+const NOOP = () => {};
+
 export default function BrazilTerminal() {
   const { prefs } = usePreferences();
+  const { isPinned } = useWatchlist();
   const refreshInterval = (prefs.refreshInterval || 30) * 1000;
 
   // ── Existing state ───────────────────────────────────────────────────────────
@@ -336,11 +193,16 @@ export default function BrazilTerminal() {
   const [macroData,       setMacroData]       = useState(null);
   const [loading,         setLoading]         = useState(true);
   const [lastUpdate,      setLastUpdate]      = useState(null);
-  const [viewMode,        setViewMode]        = useState("cards");
-  const [sortMode,        setSortMode]        = useState("default");
-  const [sortDir,         setSortDir]         = useState("asc");
-  const [activeSector,  setActiveSector]  = useState("all");
-  const [collapsedGroups, setCollapsedGroups] = useState({});
+  const [viewMode,        setViewMode]        = useState("cards");   // "cards" | "list" (adapted to grid/list at the CommandBar)
+  const [sortMode,        setSortMode]        = useState("alpha");   // "alpha" | "return"
+  const [sortDir,         setSortDir]         = useState("asc");     // "asc" | "desc"
+  const [activeFilter,    setActiveFilter]    = useState("all");     // "all" | "watchlist" | <sector name>
+  const [cardDensity,     setCardDensity]     = useState("compact"); // "compact" | "comfortable" | "spacious"
+  const [flatExpand,      setFlatExpand]      = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem(COLLAPSE_KEY)) || {}; }
+    catch { return {}; }
+  });
   const [expandedCards,   setExpandedCards]   = useState(new Set());
   const [selectedAsset,   setSelectedAsset]   = useState(null);
 
@@ -439,19 +301,27 @@ export default function BrazilTerminal() {
 
   // ── Toggle helpers ───────────────────────────────────────────────────────────
   const toggleGroup = useCallback((id) => {
-    setCollapsedGroups(prev => ({ ...prev, [id]: !prev[id] }));
+    setCollapsedGroups(prev => {
+      const next = { ...prev, [id]: !prev[id] };
+      sessionStorage.setItem(COLLAPSE_KEY, JSON.stringify(next));
+      return next;
+    });
   }, []);
 
   const collapseAll = useCallback(() => {
+    setFlatExpand(false);
+    setExpandedCards(new Set());
     const next = {};
     brazilEquitySectors.forEach(sg => { next[sg.id] = true; });
     setCollapsedGroups(next);
-    setExpandedCards(new Set());
+    sessionStorage.setItem(COLLAPSE_KEY, JSON.stringify(next));
   }, [brazilEquitySectors]);
 
   const expandAll = useCallback(() => {
+    setFlatExpand(true);
     setCollapsedGroups({});
     setExpandedCards(new Set());
+    sessionStorage.setItem(COLLAPSE_KEY, JSON.stringify({}));
   }, []);
 
   const toggleCard = useCallback((id) => {
@@ -462,21 +332,11 @@ export default function BrazilTerminal() {
     });
   }, []);
 
-  // ── Sort toggle ──────────────────────────────────────────────────────────────
-  const handleSortClick = useCallback((opt) => {
-    if (sortMode !== opt.key) {
-      setSortMode(opt.key);
-      setSortDir(opt.defaultDir);
-    } else {
-      setSortDir(d => d === "asc" ? "desc" : "asc");
-    }
-  }, [sortMode]);
-
   // ── Derived state ────────────────────────────────────────────────────────────
   const visibleSectors = useMemo(() => {
-    if (activeSector === "all") return brazilEquitySectors;
-    return brazilEquitySectors.filter(sg => sg.sector === activeSector);
-  }, [activeSector, brazilEquitySectors]);
+    if (activeFilter === "all" || activeFilter === "watchlist") return brazilEquitySectors;
+    return brazilEquitySectors.filter(sg => sg.sector === activeFilter);
+  }, [activeFilter, brazilEquitySectors]);
 
   const allCollapsed = useMemo(() =>
     visibleSectors.length > 0 && visibleSectors.every(sg => collapsedGroups[sg.id]),
@@ -484,10 +344,10 @@ export default function BrazilTerminal() {
 
   const sortedSymbols = useCallback((symbols) => {
     const arr = [...symbols];
-    if (sortMode === "default") return arr;
     if (sortMode === "alpha") {
       return arr.sort((a, b) => sortDir === "asc" ? a.localeCompare(b) : b.localeCompare(a));
     }
+    // "return" — sort by daily % change
     return arr.sort((a, b) => {
       const pA = b3Data?.[a]?.changePct ?? 0;
       const pB = b3Data?.[b]?.changePct ?? 0;
@@ -503,25 +363,58 @@ export default function BrazilTerminal() {
     return { count: syms.length, avgPct, totalMcap };
   }, [b3Data]);
 
-  const getSortLabel = (opt) => {
-    if (sortMode !== opt.key) return opt.label;
-    if (opt.key === "alpha") return sortDir === "asc" ? "A→Z" : "Z→A";
-    return sortDir === "desc" ? `${opt.label} ▲` : `${opt.label} ▼`;
-  };
+  // Symbols for a sector group — consumed by the shared GroupSummaryCard.
+  const getGroupSymbols = useCallback((secId) => {
+    const sg = brazilEquitySectors.find(s => s.id === secId);
+    return sg ? sg.tickers.filter(s => b3Data?.[s]) : [];
+  }, [brazilEquitySectors, b3Data]);
+
+  // Watchlist flat view — all pinned B3 equities that have data.
+  const watchlistFlatSymbols = useMemo(() => {
+    if (activeFilter !== "watchlist") return null;
+    return brazilEquitySectors
+      .flatMap(sg => sg.tickers)
+      .filter(s => b3Data?.[s] && isPinned('asset', s));
+  }, [activeFilter, brazilEquitySectors, b3Data, isPinned]);
+
+  // ── Market Pulse + Top Movers over the currently-visible set ────────────────
+  const pulseSymbols = useMemo(() => {
+    if (activeFilter === "watchlist") return watchlistFlatSymbols || [];
+    return visibleSectors.flatMap(sg => sg.tickers).filter(s => b3Data?.[s]);
+  }, [activeFilter, watchlistFlatSymbols, visibleSectors, b3Data]);
+
+  const { sentiment, rising, falling, avgChange, topMovers } = useMemo(() => {
+    const pcts = pulseSymbols
+      .map(s => b3Data?.[s]?.changePct)
+      .filter(n => typeof n === 'number' && !isNaN(n));
+    const avg = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : 0;
+    const movers = pulseSymbols
+      .filter(s => typeof b3Data?.[s]?.changePct === 'number' && !isNaN(b3Data[s].changePct))
+      .sort((a, b) => Math.abs(b3Data[b].changePct) - Math.abs(b3Data[a].changePct))
+      .slice(0, 6)
+      .map(s => ({ symbol: s, changePct: b3Data[s].changePct ?? 0 }));
+    return {
+      sentiment: avg > 0.3 ? "BULLISH" : avg < -0.3 ? "BEARISH" : "MIXED",
+      rising:  pcts.filter(p => p > 0).length,
+      falling: pcts.filter(p => p < 0).length,
+      avgChange: avg,
+      topMovers: movers,
+    };
+  }, [pulseSymbols, b3Data]);
+
+  // Sectors expressed as CommandBar "subgroups" — the setor filter is the one
+  // Brazil-specific control surfaced through the shared bar.
+  const sectorSubgroups = useMemo(() =>
+    brazilEquitySectors.map(sg => ({ id: sg.id, group_id: "br-mercado", display_name: sg.label })),
+  [brazilEquitySectors]);
 
   const totalTickers = brazilEquitySectors.reduce((n, sg) => n + sg.tickers.length, 0);
 
+  // Active density config (grid min-width / gap), shared with the Global terminal.
+  const dc = DENSITY_CONFIG[cardDensity] || DENSITY_CONFIG.compact;
+
   // ── Active section lookup ────────────────────────────────────────────────────
   const currentSection = getSectionById(activeSection);
-
-  // ── Style helpers ────────────────────────────────────────────────────────────
-  const btnBase = {
-    fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700,
-    letterSpacing: "0.8px", padding: "4px 10px", borderRadius: 4,
-    cursor: "pointer", transition: "all 0.15s ease", background: "transparent",
-    color: "var(--c-text-2)", border: "1px solid var(--c-border)",
-  };
-  const btnActive = { background: accentColor, color: "#080f1a", border: `1px solid ${accentColor}` };
 
   // ─────────────────────────────────────────────────────────────────────────────
   // LOADING STATE
@@ -567,14 +460,13 @@ export default function BrazilTerminal() {
   return (
     <div className="fade-in" data-context="brazil" style={{ paddingTop: 16 }}>
 
-      {/* Detail panel */}
-      {selectedAsset && b3Data?.[selectedAsset] && (
-        <BrazilDetailPanel
-          symbol={selectedAsset}
-          data={b3Data[selectedAsset]}
-          onClose={() => setSelectedAsset(null)}
-        />
-      )}
+      {/* Detail drawer — shared with the Global terminal (self-fetches quote +
+          chart; B3 tickers resolve via taxonomy meta.isB3 → Yahoo `.SA`). */}
+      <AssetDetailDrawer
+        symbol={selectedAsset}
+        onClose={() => setSelectedAsset(null)}
+        onSymbolChange={setSelectedAsset}
+      />
 
       {/* ── BLOCK TABS ── */}
       <div style={{
@@ -631,49 +523,35 @@ export default function BrazilTerminal() {
         })}
       </div>
 
-      {/* ── FILTER BAR (setor only) ── */}
-      <FilterBar
-        section={currentSection}
-        accentColor={accentColor}
-        activeSector={activeSector}
-        setActiveSector={setActiveSector}
-      />
-
-      {/* ── CONTROLS BAR — only for acoes-b3 ── */}
+      {/* ── COMMAND BAR (Ações B3 view) — shared with the Global terminal ── */}
       {activeSection === "acoes-b3" && (
         <div style={{ marginBottom: 16 }}>
-          {/* Row: sort + collapse/expand + view toggle */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-            {/* Sort buttons */}
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "var(--c-text-3)", letterSpacing: "1px", marginRight: 2 }}>SORT:</span>
-              {SORT_OPTS.map(opt => (
-                <button
-                  key={opt.key}
-                  onClick={() => handleSortClick(opt)}
-                  style={{ ...btnBase, ...(sortMode === opt.key ? btnActive : {}) }}
-                >
-                  {getSortLabel(opt)}
-                </button>
-              ))}
-            </div>
-            {/* Collapse/expand + view toggle */}
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <button onClick={collapseAll} style={btnBase}>▲ Collapse all</button>
-              <button onClick={expandAll}   style={btnBase}>▼ Expand all</button>
-              <div style={{ width: 1, height: 14, background: "rgba(51,65,85,0.5)", margin: "0 4px" }} />
-              <button
-                onClick={() => setViewMode("cards")}
-                style={{ ...btnBase, ...(viewMode === "cards" ? btnActive : {}), padding: "4px 8px" }}
-                title="Card grid"
-              >⊞</button>
-              <button
-                onClick={() => setViewMode("list")}
-                style={{ ...btnBase, ...(viewMode === "list" ? btnActive : {}), padding: "4px 8px" }}
-                title="List view"
-              >☰</button>
-            </div>
-          </div>
+          <CommandBar
+            sentiment={sentiment}
+            risingCount={rising}
+            fallingCount={falling}
+            avgChange={avgChange}
+            topMovers={topMovers}
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
+            sortMode={sortMode}
+            sortDir={sortDir}
+            onSortChange={(mode, dir) => { setSortMode(mode); setSortDir(dir); }}
+            activeExchanges={EMPTY_EXCHANGES}
+            allExchanges={EMPTY_LIST}
+            onExchangeToggle={NOOP}
+            onExchangeReset={NOOP}
+            viewMode={viewMode === "cards" ? "grid" : "list"}
+            onViewChange={(mode) => setViewMode(mode === "grid" ? "cards" : "list")}
+            onDensityChange={setCardDensity}
+            cardDensity={cardDensity}
+            onCollapseAll={collapseAll}
+            onExpandAll={expandAll}
+            flatExpand={flatExpand}
+            onRefresh={loadData}
+            groups={EMPTY_LIST}
+            subgroups={sectorSubgroups}
+          />
         </div>
       )}
 
@@ -827,7 +705,30 @@ export default function BrazilTerminal() {
             </div>
           )}
 
-          {allCollapsed && viewMode === "list" ? (
+          {watchlistFlatSymbols ? (
+        /* ── WATCHLIST FLAT VIEW ── */
+        watchlistFlatSymbols.length === 0 ? (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 0", gap: 12, textAlign: "center" }}>
+            <span style={{ fontSize: 32, opacity: 0.25 }}>★</span>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "var(--c-text-3)", letterSpacing: "0.08em" }}>
+              Nenhum ativo fixado — clique ★ em qualquer ativo
+            </span>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${dc.assetGridMin}px, 1fr))`, gap: dc.assetGap, padding: "12px 0" }}>
+            {sortedSymbols(watchlistFlatSymbols).map(sym => (
+              <AssetCard key={sym} symbol={sym} data={b3Data[sym]} onClick={() => setSelectedAsset(sym)} density={cardDensity} />
+            ))}
+          </div>
+        )
+      ) : flatExpand ? (
+        /* ── FLAT EXPAND — one continuous grid, no group headers ── */
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${dc.assetGridMin}px, 1fr))`, gap: dc.assetGap, padding: "12px 0" }}>
+          {sortedSymbols(visibleSectors.flatMap(sg => sg.tickers).filter(s => b3Data?.[s])).map(sym => (
+            <AssetCard key={sym} symbol={sym} data={b3Data[sym]} onClick={() => setSelectedAsset(sym)} density={cardDensity} />
+          ))}
+        </div>
+      ) : allCollapsed && viewMode === "list" ? (
         /* ── MODE B: COLLAPSED LIST MODE ── */
         <div style={{ marginTop: 8, border: "1px solid var(--c-border)", borderRadius: 8, overflow: "hidden" }}>
           {visibleSectors.map(sg => {
@@ -894,61 +795,25 @@ export default function BrazilTerminal() {
 
       ) : allCollapsed ? (
         /* ── MODE A: COLLAPSED CARD GRID MODE ── */
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8, padding: "12px 0" }}>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${dc.gridMin}px, 1fr))`, gap: dc.gap, padding: "12px 0" }}>
           {visibleSectors.map(sg => {
             const stats   = getSectorStats(sg);
             if (stats.count === 0) return null;
             const isOpen  = expandedCards.has(sg.id);
 
             if (!isOpen) {
-              const avg       = stats.avgPct;
-              const accentClr = avg > 0 ? "#00d4aa" : avg < 0 ? "#ff6b6b" : "#2a4a6a";
-              const pctColor  = avg > 0 ? "#00d4aa" : avg < 0 ? "#ff6b6b" : "#3d6080";
-              const pctLabel  = avg > 0 ? `▲ +${avg.toFixed(2)}%` : avg < 0 ? `▼ ${avg.toFixed(2)}%` : "— 0.00%";
-              const barWidth  = Math.min(Math.abs(avg) / 5 * 100, 100);
-              const fmtMcap   = (mc) => {
-                if (!mc) return "—";
-                if (mc >= 1e9) return "R$ " + (mc / 1e9).toFixed(1) + "B";
-                if (mc >= 1e6) return "R$ " + (mc / 1e6).toFixed(1) + "M";
-                return "R$ " + mc.toLocaleString();
-              };
               return (
-                <div
+                <GroupSummaryCard
                   key={sg.id}
-                  className="gmt-group-card"
-                  onClick={() => toggleCard(sg.id)}
-                  style={{
-                    position: "relative", overflow: "hidden",
-                    background: "#0b1623", border: "0.5px solid #1a2f4a", borderRadius: 4,
-                    cursor: "pointer", transition: "border-color 120ms ease, background 120ms ease",
-                    padding: "14px 16px",
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = "#2a4a6a"; e.currentTarget.style.background = "#0d1929"; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = "#1a2f4a"; e.currentTarget.style.background = "#0b1623"; }}
-                >
-                  <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 2.5, background: accentClr, borderRadius: "4px 0 0 4px" }} />
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: 14, lineHeight: 1 }}>{sg.icon}</span>
-                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700, color: pctColor }}>{pctLabel}</span>
-                  </div>
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", color: "#c8d8e8", marginTop: 10, marginBottom: 10 }}>
-                    {sg.label.toUpperCase()}
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, letterSpacing: "0.08em", color: "#2a4a6a" }}>ATIVOS</span>
-                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "#4a7fa5" }}>{stats.count}</span>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, letterSpacing: "0.08em", color: "#2a4a6a" }}>MKT CAP</span>
-                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "#4a7fa5" }}>{fmtMcap(stats.totalMcap)}</span>
-                    </div>
-                  </div>
-                  <div style={{ background: "#1a2f4a", borderRadius: 1, height: 2, width: "100%", marginTop: 10 }}>
-                    <div style={{ height: 2, borderRadius: 1, width: `${barWidth}%`, background: accentClr, transition: "width 0.3s ease" }} />
-                  </div>
-                  <span className="gmt-expand-hint" style={{ position: "absolute", bottom: 8, right: 10, fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: "#1a3050", letterSpacing: "0.06em", opacity: 0, transition: "opacity 150ms ease", pointerEvents: "none" }}>EXPAND ▾</span>
-                </div>
+                  catKey={sg.id}
+                  cat={{ icon: sg.icon, label: sg.label }}
+                  layout="grid"
+                  density={cardDensity}
+                  onExpand={() => toggleCard(sg.id)}
+                  getGroupSymbols={getGroupSymbols}
+                  marketData={b3Data}
+                  assets={STATIC_ASSETS_MAP}
+                />
               );
             }
 
@@ -970,8 +835,8 @@ export default function BrazilTerminal() {
                 <div style={{ paddingTop: 38 }}>
                   {viewMode === "list" && <ListColumnHeader />}
                   {viewMode === "cards" ? (
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
-                      {syms.map(sym => <AssetCard key={sym} symbol={sym} data={b3Data[sym]} onClick={() => setSelectedAsset(sym)} />)}
+                    <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${dc.assetGridMin}px, 1fr))`, gap: dc.assetGap }}>
+                      {syms.map(sym => <AssetCard key={sym} symbol={sym} data={b3Data[sym]} onClick={() => setSelectedAsset(sym)} density={cardDensity} />)}
                     </div>
                   ) : (
                     <div style={{ border: "1px solid var(--c-border)", borderRadius: 8, overflow: "hidden" }}>
@@ -998,35 +863,16 @@ export default function BrazilTerminal() {
             return (
               <div key={sg.id} className="section-animate" style={{ marginBottom: isCollapsed ? 8 : 24, animationDelay: `${idx * 0.08}s` }}>
                 {isCollapsed ? (
-                  /* Collapsed row */
-                  <div
-                    onClick={() => toggleGroup(sg.id)}
-                    style={{
-                      position: "relative", overflow: "hidden",
-                      background: "#0b1623", border: "0.5px solid #1a2f4a", borderRadius: 4,
-                      display: "flex", alignItems: "center", gap: 16, padding: "12px 16px 14px",
-                      cursor: "pointer", transition: "border-color 120ms ease, background 120ms ease",
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = "#2a4a6a"; e.currentTarget.style.background = "#0d1929"; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = "#1a2f4a"; e.currentTarget.style.background = "#0b1623"; }}
-                  >
-                    <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 2.5, background: avgPct >= 0 ? "#00d4aa" : "#ff6b6b", borderRadius: "4px 0 0 4px" }} />
-                    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 2, background: "#1a2f4a" }}>
-                      <div style={{ height: 2, width: `${Math.min(Math.abs(avgPct) / 5 * 100, 100)}%`, background: avgPct >= 0 ? "#00d4aa" : "#ff6b6b", borderRadius: 1 }} />
-                    </div>
-                    <span style={{ fontSize: 14, lineHeight: 1, flexShrink: 0 }}>{sg.icon}</span>
-                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", color: "#c8d8e8", flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {sg.label.toUpperCase()}
-                    </span>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", flexShrink: 0 }}>
-                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, letterSpacing: "0.08em", color: "#2a4a6a" }}>ATIVOS</span>
-                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "#4a7fa5" }}>{syms.length}</span>
-                    </div>
-                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700, color: avgPct >= 0 ? "#00d4aa" : "#ff6b6b", flexShrink: 0 }}>
-                      {avgPct >= 0 ? `▲ +${avgPct.toFixed(2)}%` : `▼ ${avgPct.toFixed(2)}%`}
-                    </span>
-                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, color: "#1a3050", letterSpacing: "0.06em", flexShrink: 0 }}>EXPAND ▾</span>
-                  </div>
+                  <GroupSummaryCard
+                    catKey={sg.id}
+                    cat={{ icon: sg.icon, label: sg.label }}
+                    layout="row"
+                    density={cardDensity}
+                    onExpand={() => toggleGroup(sg.id)}
+                    getGroupSymbols={getGroupSymbols}
+                    marketData={b3Data}
+                    assets={STATIC_ASSETS_MAP}
+                  />
                 ) : (
                   <>
                     {/* Section header */}

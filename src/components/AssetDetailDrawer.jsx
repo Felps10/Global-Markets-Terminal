@@ -130,13 +130,14 @@ function fmtVol(v) {
   if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`;
   return String(n);
 }
-function fmtLarge(v) {
+function fmtLarge(v, cur = '$') {
   const n = Number(v);
   if (!isFinite(n)) return '—';
-  if (n >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
-  if (n >= 1e9)  return `$${(n / 1e9).toFixed(2)}B`;
-  if (n >= 1e6)  return `$${(n / 1e6).toFixed(2)}M`;
-  return `$${n.toLocaleString('en-US')}`;
+  const p = cur === '$' ? '$' : `${cur} `;
+  if (n >= 1e12) return `${p}${(n / 1e12).toFixed(2)}T`;
+  if (n >= 1e9)  return `${p}${(n / 1e9).toFixed(2)}B`;
+  if (n >= 1e6)  return `${p}${(n / 1e6).toFixed(2)}M`;
+  return `${p}${n.toLocaleString('en-US')}`;
 }
 function fmtNum(v, d = 2) {
   const n = Number(v);
@@ -394,6 +395,12 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
   })();
   const isEquity = EQUITY_TYPES.has(assetInfo?.type);
 
+  // B3 (Brazilian) tickers need a Yahoo `.SA` suffix for both the single-quote
+  // fetch and the OHLCV chart. Scoped to isB3 so Global symbols are untouched.
+  const isB3        = !!assetMeta.isB3;
+  const quoteSymbol = isB3 ? (assetMeta.yahooSymbol || `${currentSymbol}.SA`) : currentSymbol;
+  const currency    = isB3 ? 'R$' : '$';
+
   // ── Data states ───────────────────────────────────────────────────────────
   const [quoteData,   setQuoteData]   = useState(null);
   const [profileData, setProfileData] = useState(null);
@@ -485,12 +492,12 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
     setNewsData(null);
     setLoadingQuote(true);
 
-    fetchAssetQuote(currentSymbol)
+    fetchAssetQuote(quoteSymbol)
       .then(d  => { if (!cancelled) { setQuoteData(d); setLoadingQuote(false); } })
       .catch(() => { if (!cancelled) setLoadingQuote(false); });
 
     return () => { cancelled = true; };
-  }, [currentSymbol]);
+  }, [currentSymbol, quoteSymbol]);
 
   // ── Reset view state when symbol changes ─────────────────────────────────
   const [activeTab, setActiveTab] = useState('overview');
@@ -540,7 +547,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
   // ── Chart data loader ─────────────────────────────────────────────────────
   const effectiveInterval = chartInterval || INTERVAL_OPTIONS[timeframe]?.default || '1d';
 
-  const loadChart = useCallback(async (sym, tf, iv) => {
+  const loadChart = useCallback(async (sym, tf, iv, symIsB3) => {
     const cacheKey = `${sym}:${tf}:${iv}`;
     activeSymTfRef.current = cacheKey;
 
@@ -556,7 +563,8 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
     setChartPoints(null);
 
     try {
-      const candles = await fetchYahooOHLCV(sym, tf, { interval: iv });
+      // fetchYahooOHLCV appends `.SA` only when the passed assets map flags isB3.
+      const candles = await fetchYahooOHLCV(sym, tf, { interval: iv, assets: symIsB3 ? { [sym]: { isB3: true } } : undefined });
       chartCacheRef.current[cacheKey] = candles;
       if (activeSymTfRef.current === cacheKey) setChartPoints(candles);
     } catch (err) {
@@ -568,8 +576,8 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
   }, []);
 
   useEffect(() => {
-    if (currentSymbol) loadChart(currentSymbol, timeframe, effectiveInterval);
-  }, [currentSymbol, timeframe, effectiveInterval, loadChart]);
+    if (currentSymbol) loadChart(currentSymbol, timeframe, effectiveInterval, isB3);
+  }, [currentSymbol, timeframe, effectiveInterval, isB3, loadChart]);
 
   // ── Chart: create chart instance when container mounts ───────────────────
   // expanded is in deps because toggling switches conditional branches, which
@@ -734,7 +742,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
             display: 'flex', gap: 16, flexWrap: 'wrap',
           }}>
             {quoteData.volume    != null && <span>VOL {fmtVol(quoteData.volume)}</span>}
-            {quoteData.marketCap != null && <span>MCAP {fmtLarge(quoteData.marketCap)}</span>}
+            {quoteData.marketCap != null && <span>MCAP {fmtLarge(quoteData.marketCap, currency)}</span>}
             {quoteData.timestamp && (
               <span>
                 {new Date(quoteData.timestamp * 1000).toLocaleTimeString('en-US', {
@@ -765,7 +773,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
             <SidebarRow label="Day High"  value={fmtPrice(quoteData.dayHigh)}  valueColor={GREEN} />
             <SidebarRow label="52W High"  value={fmtPrice(quoteData.w52High)}  valueColor={GREEN} />
             <SidebarRow label="Volume"    value={fmtVol(quoteData.volume)} />
-            <SidebarRow label="Mkt Cap"   value={fmtLarge(quoteData.marketCap)} />
+            <SidebarRow label="Mkt Cap"   value={fmtLarge(quoteData.marketCap, currency)} />
           </div>
           <div>
             <SidebarRow label="Prev Close" value={fmtPrice(quoteData.prevClose)} />
@@ -926,7 +934,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
                 { label: '52W HIGH', value: fmtPrice(quoteData?.w52High), color: GREEN },
                 { label: '52W LOW',  value: fmtPrice(quoteData?.w52Low),  color: RED },
                 { label: 'VOLUME',   value: fmtVol(quoteData?.volume) },
-                { label: 'MKT CAP',  value: fmtLarge(quoteData?.marketCap) },
+                { label: 'MKT CAP',  value: fmtLarge(quoteData?.marketCap, currency) },
               ].map((item, i) => (
                 <div key={i} style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
