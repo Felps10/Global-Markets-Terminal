@@ -35,6 +35,26 @@ let eodhdCache  = { data: [], ts: 0, error: null };
 // GET /api/v1/quotes/brazil. Replaces the old per-browser, per-ticker client-side BRAPI path.
 let brazilB3Cache = { data: {}, ts: 0, error: null };
 
+// ─── Per-provider fetch health ───────────────────────────────────────────────
+// Records the outcome of each fetch cycle so the client Data Catalog can show REAL
+// server-measured health for the server-side providers (EODHD, BRAPI Pro) that the
+// browser cannot probe directly. Exposed read-only via getFetchStats() → /quotes/status.
+const STAT_HISTORY_MAX = 10;
+const fetchStats = {
+  eodhd:     { ok: null, ms: null, ts: 0, count: 0, expected: 0, error: null, history: [] },
+  yahoo:     { ok: null, ms: null, ts: 0, count: 0, expected: 0, error: null, history: [] },
+  brapi:     { ok: null, ms: null, ts: 0, count: 0, expected: 0, error: null, history: [] },
+  coingecko: { ok: null, ms: null, ts: 0, count: 0, expected: 0, error: null, history: [] },
+};
+
+function recordStat(provider, { ok, ms = null, count = 0, expected = 0, error = null }) {
+  const s = fetchStats[provider];
+  if (!s) return;
+  s.ok = ok; s.ms = ms; s.ts = Date.now(); s.count = count; s.expected = expected; s.error = error;
+  s.history.push(!!ok);
+  if (s.history.length > STAT_HISTORY_MAX) s.history.shift();
+}
+
 // ─── Intervals & backoff ─────────────────────────────────────────────────────
 
 const YAHOO_BASE_INTERVAL  = 120_000;  // 120s — reduced load; Yahoo rate-limits datacenter IPs
@@ -117,14 +137,19 @@ async function fetchYahooBatch(symbolList) {
 
 async function fetchYahoo() {
   const tag = '[quoteFetchManager:yahoo]';
+  const t0 = Date.now();
+  let expected = 0;
   try {
     await ensureSession();
     const { yahoo } = await resolveLiveSymbols();
+    expected = yahoo.length;
     const batches = chunk(yahoo, YAHOO_CHUNK);
 
     const merged = [];
     let okBatches = 0;
+    let reqMs = 0, reqN = 0;   // sum/count of actual request round-trips (excludes rate-limit sleeps)
     for (const batch of batches) {
+      const bt = Date.now();
       try {
         const results = await fetchYahooBatch(batch);
         if (results.length) { merged.push(...results); okBatches++; }
@@ -132,6 +157,7 @@ async function fetchYahoo() {
         // One bad batch (rate limit, oversized, poisoned symbol) must not sink the rest.
         console.error(`${tag} batch of ${batch.length} failed: ${err.message}`);
       }
+      reqMs += Date.now() - bt; reqN++;
       if (batches.length > 1) await new Promise((r) => setTimeout(r, YAHOO_CHUNK_GAP));
     }
 
@@ -139,10 +165,12 @@ async function fetchYahoo() {
 
     yahooCache = { data: merged, ts: Date.now(), error: null };
     yahooFailures = 0;
+    recordStat('yahoo', { ok: true, ms: reqN ? Math.round(reqMs / reqN) : null, count: merged.length, expected });
     console.log(`${tag} OK — ${merged.length} symbols cached (${okBatches}/${batches.length} batches)`);
   } catch (err) {
     yahooFailures++;
     yahooCache.error = err.message;
+    recordStat('yahoo', { ok: false, ms: Date.now() - t0, expected, error: err.message });
     // Keep existing data (last-known-good) — only update error + don't clear data
     console.error(`${tag} FAIL #${yahooFailures}: ${err.message}`);
   }
@@ -164,8 +192,11 @@ function scheduleYahoo() {
 
 async function fetchCoinGecko() {
   const tag = '[quoteFetchManager:coingecko]';
+  const t0 = Date.now();
+  let expected = 0;
   try {
     const { crypto } = await resolveLiveSymbols();
+    expected = Object.keys(crypto).length;
     const ids = Object.values(crypto).join(',');
     const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`;
 
@@ -199,10 +230,12 @@ async function fetchCoinGecko() {
     const json = JSON.parse(res.body);
     cryptoCache = { data: json, ts: Date.now(), error: null };
     cryptoFailures = 0;
+    recordStat('coingecko', { ok: true, ms: Date.now() - t0, count: Object.keys(json).length, expected });
     console.log(`${tag} OK — ${Object.keys(json).length} coins cached`);
   } catch (err) {
     cryptoFailures++;
     cryptoCache.error = err.message;
+    recordStat('coingecko', { ok: false, ms: Date.now() - t0, expected, error: err.message });
     console.error(`${tag} FAIL #${cryptoFailures}: ${err.message}`);
   }
 
@@ -317,11 +350,13 @@ async function fetchEodhdBatch(codes) {
 
 async function fetchEodhd() {
   const tag = '[quoteFetchManager:eodhd]';
+  const t0 = Date.now();
   if (!process.env.EODHD_API_KEY) {
     if (!eodhdKeyWarned) {
       console.warn(`${tag} EODHD_API_KEY not set — EODHD disabled; Yahoo remains primary`);
       eodhdKeyWarned = true;
     }
+    recordStat('eodhd', { ok: false, ms: null, error: 'EODHD_API_KEY not set' });
     scheduleEodhd();
     return;
   }
@@ -331,6 +366,7 @@ async function fetchEodhd() {
     if (!eodhd || eodhd.length === 0) {
       eodhdCache = { data: [], ts: Date.now(), error: null };
       eodhdFailures = 0;
+      recordStat('eodhd', { ok: true, ms: Date.now() - t0, count: 0, expected: 0 });
       scheduleEodhd();
       return;
     }
@@ -345,8 +381,10 @@ async function fetchEodhd() {
 
     const out = [];
     let okBatches = 0;
+    let reqMs = 0, reqN = 0;   // sum/count of actual request round-trips (excludes rate-limit sleeps)
     const batches = chunk(codes, EODHD_BATCH);
     for (const batch of batches) {
+      const bt = Date.now();
       try {
         for (const row of await fetchEodhdBatch(batch)) pushEodhdRow(out, row, reverse);
         okBatches++;
@@ -362,6 +400,7 @@ async function fetchEodhd() {
           }
         }
       }
+      reqMs += Date.now() - bt; reqN++;
       if (batches.length > 1) await new Promise((r) => setTimeout(r, EODHD_CHUNK_GAP));
     }
 
@@ -371,10 +410,12 @@ async function fetchEodhd() {
 
     eodhdCache = { data: out, ts: Date.now(), error: null };
     eodhdFailures = 0;
+    recordStat('eodhd', { ok: true, ms: reqN ? Math.round(reqMs / reqN) : null, count: out.length, expected: codes.length });
     console.log(`${tag} OK — ${out.length}/${codes.length} symbols${eodhdQuarantine.size ? ` (${eodhdQuarantine.size} quarantined)` : ''}`);
   } catch (err) {
     eodhdFailures++;
     eodhdCache.error = err.message;
+    recordStat('eodhd', { ok: false, ms: Date.now() - t0, error: err.message });
     console.error(`${tag} FAIL #${eodhdFailures}: ${err.message}`);
   }
 
@@ -431,12 +472,14 @@ async function fetchBrapiBatch(tickers, token) {
 
 async function fetchBrazilB3() {
   const tag = '[quoteFetchManager:brazil-b3]';
+  const t0 = Date.now();
   const token = process.env.VITE_BRAPI_TOKEN;
   if (!token) {
     if (!brazilTokenWarned) {
       console.warn(`${tag} VITE_BRAPI_TOKEN not set — Brazil B3 feed disabled`);
       brazilTokenWarned = true;
     }
+    recordStat('brapi', { ok: false, ms: null, error: 'VITE_BRAPI_TOKEN not set' });
     scheduleBrazilB3();
     return;
   }
@@ -446,6 +489,7 @@ async function fetchBrazilB3() {
     if (!brazilB3 || brazilB3.length === 0) {
       brazilB3Cache = { data: {}, ts: Date.now(), error: null };
       brazilFailures = 0;
+      recordStat('brapi', { ok: true, ms: Date.now() - t0, count: 0, expected: 0 });
       scheduleBrazilB3();
       return;
     }
@@ -453,11 +497,13 @@ async function fetchBrazilB3() {
     const map = {};
     const displayByBrapi = new Map(brazilB3.map((x) => [x.brapi, x.display]));
     let okBatches = 0;
+    let reqMs = 0, reqN = 0;   // BRAPI Pro request round-trips (primary path; excludes sleeps)
 
     // Primary: BRAPI Pro batches. Key by `requestedSymbol` (the ticker we asked for) —
     // BRAPI rewrites `symbol` to the CURRENT ticker after renames/reorgs (e.g. JBSS3→JBSS32,
     // EMBR3→EMBJ3), so keying by `symbol` would drop renamed names under garbage keys.
     for (const batch of chunk(brazilB3.map((x) => x.brapi), BRAPI_BATCH)) {
+      const bt = Date.now();
       try {
         for (const q of await fetchBrapiBatch(batch, token)) {
           const reqSym = q.requestedSymbol || q.symbol;
@@ -469,6 +515,7 @@ async function fetchBrazilB3() {
       } catch (err) {
         console.error(`${tag} BRAPI batch of ${batch.length} failed: ${err.message}`);
       }
+      reqMs += Date.now() - bt; reqN++;
       await new Promise((r) => setTimeout(r, BRAZIL_B3_GAP));
     }
 
@@ -502,10 +549,12 @@ async function fetchBrazilB3() {
 
     brazilB3Cache = { data: map, ts: Date.now(), error: null };
     brazilFailures = 0;
+    recordStat('brapi', { ok: true, ms: reqN ? Math.round(reqMs / reqN) : null, count: Object.keys(map).length, expected: brazilB3.length });
     console.log(`${tag} OK — ${Object.keys(map).length}/${brazilB3.length} B3 names cached`);
   } catch (err) {
     brazilFailures++;
     brazilB3Cache.error = err.message; // keep last-known-good data
+    recordStat('brapi', { ok: false, ms: Date.now() - t0, error: err.message });
     console.error(`${tag} FAIL #${brazilFailures}: ${err.message}`);
   }
 
@@ -609,6 +658,17 @@ export function getCache() {
  */
 export function getBrazilB3Cache() {
   return { ...brazilB3Cache };
+}
+
+/**
+ * Per-provider fetch health for the server-side quote engine. Read-only snapshot of the
+ * last fetch cycle for each provider: { ok, ms, ts, count, expected, error, history[] }.
+ * Consumed by GET /api/v1/quotes/status → the Data Catalog's server-side source cards.
+ */
+export function getFetchStats() {
+  const out = {};
+  for (const [k, v] of Object.entries(fetchStats)) out[k] = { ...v, history: [...v.history] };
+  return out;
 }
 
 /**

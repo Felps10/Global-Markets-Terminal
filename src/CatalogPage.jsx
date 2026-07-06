@@ -53,6 +53,7 @@ class PanelErrorBoundary extends Component {
 // ─── SOURCE CONFIG ───────────────────────────────────────────────────────────
 
 const SOURCE_COLORS = {
+  eodhd:        "#4F46E5",
   yahoo:        "#7B1FA2",
   finnhub:      "#00BCD4",
   alphaVantage: "#FF9100",
@@ -65,6 +66,7 @@ const SOURCE_COLORS = {
 };
 
 const SOURCE_LABELS = {
+  eodhd:        "EODHD",
   yahoo:        "Yahoo Finance",
   finnhub:      "Finnhub",
   alphaVantage: "Alpha Vantage",
@@ -76,17 +78,28 @@ const SOURCE_LABELS = {
   awesomeapi:   "AwesomeAPI",
 };
 
-const ALL_SOURCES = ["yahoo", "finnhub", "alphaVantage", "fred", "coingecko", "fmp", "brapi", "bcb", "awesomeapi"];
+const ALL_SOURCES = ["eodhd", "yahoo", "finnhub", "alphaVantage", "fred", "coingecko", "fmp", "brapi", "bcb", "awesomeapi"];
 
 const SOURCE_META = {
+  eodhd: {
+    rateLimit: "100k calls/day (plan)", rateLimitMax: null, rateLimitPer: null,
+    coverage: "Global equities, indices, FX & ETFs", freshness: "~15–20 min delayed",
+    assetClasses: ["Equities", "Indices", "Forex", "ETFs"], geo: "Global · server-side",
+    docUrl: "https://eodhd.com/financial-apis",
+    healthEndpoint: "server-side · /api/v1/quotes/live",
+    note: "PRIMARY global quote provider (All-World). Fetched server-side by the quote engine and merged ahead of Yahoo. API-key authenticated — no IP blocking. Does not cover commodities (Yahoo serves those). Health is measured on the backend, not client-probed.",
+    fallbackSuggestion: "Yahoo Finance",
+    serverSide: true,
+    tier: "paid",
+  },
   yahoo: {
     rateLimit: "Unlimited (proxy)", rateLimitMax: null, rateLimitPer: null,
-    coverage: "US & global equities, indices, FX", freshness: "Real-time",
-    assetClasses: ["Equities", "Indices", "Forex"], geo: "Global",
+    coverage: "Fallback for global quotes · primary for commodities & charts", freshness: "~15 min delayed",
+    assetClasses: ["Equities", "Indices", "Forex", "Commodities"], geo: "Global",
     docUrl: "https://finance.yahoo.com",
     healthEndpoint: "/proxy/yahoo/v7/finance/quote?symbols=AAPL",
-    note: "Unofficial scraping-based source — may break without notice",
-    fallbackSuggestion: "Finnhub for equity quotes, FMP for fundamentals",
+    note: "Unofficial scraping-based source — now the FALLBACK behind EODHD for global quotes, but still the primary source for commodities (=F) and historical charts. No API key; may break without notice.",
+    fallbackSuggestion: "EODHD is the primary; Yahoo backfills what EODHD does not return",
   },
   finnhub: {
     rateLimit: "60 calls/min", rateLimitMax: getApiDef('finnhub')?.limits.perMinute ?? 60, rateLimitPer: "minute",
@@ -134,14 +147,16 @@ const SOURCE_META = {
     note: null, fallbackSuggestion: null,
   },
   brapi: {
-    rateLimit: "Free tier", rateLimitMax: null, rateLimitPer: null,
-    coverage: "Brazil B3 equities", freshness: "Real-time",
-    assetClasses: ["Equities", "Fundamentals"], geo: "Brazil",
+    rateLimit: "Pro · 20 tickers/req · 5-min", rateLimitMax: null, rateLimitPer: null,
+    coverage: "Brazil B3 equities, FIIs & ETFs", freshness: "~5 min (Pro)",
+    assetClasses: ["Equities", "FIIs", "ETFs"], geo: "Brazil",
     docUrl: "https://brapi.dev/docs",
     keyRegistrationUrl: "https://brapi.dev",
-    healthEndpoint: "/proxy/brapi/quote/PETR4",
-    note: "Primary source for Brazilian B3 stock quotes and fundamentals",
+    healthEndpoint: "server-side · /api/v1/quotes/brazil",
+    note: "PRIMARY source for Brazil B3. Served server-side via BRAPI Pro (batch 20/req, 5-min) with a Yahoo .SA fallback; a client path also exists for the Terminal Mini ticker. Health here reflects the server BRAPI Pro feed.",
     fallbackSuggestion: "Yahoo Finance with .SA suffix",
+    serverSide: true,
+    tier: "paid",
   },
   bcb: {
     rateLimit: "Unlimited", rateLimitMax: null, rateLimitPer: null,
@@ -165,130 +180,82 @@ const SOURCE_META = {
   },
 };
 
-// ─── SOURCE DETAIL DATA (mock — replace fields with real API calls later) ────
-// Each entry maps a source key to extended metadata shown in the detail drawer.
+// ─── SOURCE DETAIL DATA ──────────────────────────────────────────────────────
+// Honest descriptive metadata shown in the source detail drawer. Uptime %, latency,
+// null/duplicate rates and incident logs were previously hard-coded mock values and
+// have been removed — the drawer now shows only live reachability checks run from the
+// browser (see healthPing / getHealthHistory). Reinstate real metrics only when a
+// health/observability backend is wired.
 const SOURCE_DETAIL_DATA = {
+  eodhd: {
+    description: "EODHD (EOD Historical Data — All-World plan) is the primary global quote provider, fetched server-side by the quote engine and merged ahead of Yahoo. It covers global equities (incl. ADRs), indices, FX pairs and ETFs via API-key authentication, so it is not subject to the IP blocking that affected scraped Yahoo. Quotes are ~15–20 min delayed, which is acceptable for a monitoring terminal. It does not cover commodities — Yahoo remains primary there.",
+    type: "HTTP REST API (server-side)", owner: "EOD Historical Data Ltd.", domain: "Global Market Data",
+    tags: ["Primary", "Equities", "Indices", "Forex", "ETFs", "Server-side"],
+    endpoint: "eodhd.com/api → GET /api/v1/quotes/live", authType: "API Key (server-side, EODHD_API_KEY)",
+    refreshCadence: "~180s server cycle (batch ≤20 symbols/req)", lastSuccessfulSync: "Managed server-side",
+  },
   yahoo: {
-    description: "Yahoo Finance is an unofficial, scraping-based market data source accessed via a local Express proxy server. It provides real-time equity prices, volume, day change, market cap, 52-week ranges, and historical OHLC data for US and global equities, major indices, and FX pairs. Because it has no official API contract, the response schema may change without notice.",
-    type: "HTTP REST (Unofficial / Proxy)", owner: "Yahoo Finance (Verizon Media)", domain: "Market Data",
-    tags: ["Equities", "Indices", "Forex", "Real-time", "Charts", "Unofficial"],
-    endpoint: "http://localhost:3001 → finance.yahoo.com", authType: "None (proxy tunnels requests)",
-    refreshCadence: "Every 30s on page load", lastSuccessfulSync: "Continuous (30s interval)",
-    uptime7d: 94.2, uptime30d: 91.8, avgLatencyMs: 380,
-    nullRate: 2.1, duplicateRate: 0.0, schemaDriftEvents: 4, failedSyncAttempts: 12,
-    dataVolumeGB: null, downstreamDeps: 14, upstreamSources: 0, downstreamConsumers: 6,
-    incidents: [
-      { date: "2025-02-18", type: "Schema Change", description: "Yahoo changed v7 response structure for pre/post-market fields — regularMarketChangePercent key renamed.", severity: "medium", resolved: true },
-      { date: "2025-01-30", type: "Downtime", description: "Proxy returned 429 Too Many Requests for ~40 minutes, affecting all equity cards.", severity: "high", resolved: true },
-      { date: "2025-01-12", type: "Latency Spike", description: "Average response time exceeded 2,000ms for ~2 hours during US market open.", severity: "low", resolved: true },
-      { date: "2024-12-10", type: "Schema Change", description: "v8 chart endpoint changed interval param naming — sparkline data temporarily broken.", severity: "medium", resolved: true },
-    ],
+    description: "Yahoo Finance is an unofficial, scraping-based market data source accessed via an Express proxy. It is now the FALLBACK behind EODHD for global equities, indices and FX, but remains the PRIMARY source for commodities (=F) and for historical OHLC charts. Because it has no official API contract, the response schema may change without notice, and datacenter IPs can be rate-limited — the reason the paid EODHD/BRAPI migration happened.",
+    type: "HTTP REST (Unofficial / Proxy)", owner: "Yahoo Finance", domain: "Market Data",
+    tags: ["Fallback", "Commodities", "Charts", "Unofficial"],
+    endpoint: "server engine + /proxy/yahoo → finance.yahoo.com", authType: "None (proxy tunnels requests)",
+    refreshCadence: "~120s server cycle; charts on demand", lastSuccessfulSync: "Continuous (server cycle)",
   },
   finnhub: {
-    description: "Finnhub is a professional-grade market data REST API providing real-time US equity quotes, analyst consensus recommendations, company news, insider sentiment, and earnings calendars. It serves as the primary fallback for Yahoo Finance quote failures and is the sole source for analyst and news data in the detail panel. API key required.",
+    description: "Finnhub is a professional-grade market data REST API. In this app it is the source for analyst consensus recommendations and company news in the detail panel (on demand), and a legacy equity-quote fallback. It is not part of the live quote precedence engine. API key required.",
     type: "HTTP REST API", owner: "Finnhub.io", domain: "Market Data / Sentiment",
-    tags: ["Equities", "Sentiment", "News", "Real-time", "Analyst", "Fallback"],
-    endpoint: "https://finnhub.io/api/v1 (via Vite proxy)", authType: "API Key (query param: token=...)",
+    tags: ["Sentiment", "News", "Analyst", "On-demand"],
+    endpoint: "https://finnhub.io/api/v1 (via proxy)", authType: "API Key (query param: token=...)",
     refreshCadence: "On demand; queue limited to 1 req/sec", lastSuccessfulSync: "On demand",
-    uptime7d: 99.2, uptime30d: 99.0, avgLatencyMs: 220,
-    nullRate: 0.8, duplicateRate: 0.0, schemaDriftEvents: 0, failedSyncAttempts: 3,
-    dataVolumeGB: null, downstreamDeps: 6, upstreamSources: 0, downstreamConsumers: 3,
-    incidents: [
-      { date: "2025-01-22", type: "Rate Limit", description: "Concurrent panel opens exhausted 60 calls/min limit — subsequent requests queued for 60s.", severity: "low", resolved: true },
-      { date: "2024-11-05", type: "Auth Failure", description: "Stale API key returned 401 — resolved by key rotation.", severity: "high", resolved: true },
-    ],
   },
   alphaVantage: {
-    description: "Alpha Vantage provides US equity technical indicators including RSI, MACD, Bollinger Bands, and moving averages with a 25-call daily quota on the free tier. To preserve this strict quota, it is never called automatically on page load — all calls are triggered explicitly by user actions in the detail panel. Results are cached in sessionStorage for 24 hours.",
+    description: "Alpha Vantage provides US equity technical indicators including RSI, MACD, Bollinger Bands, and moving averages with a 25-call daily quota on the free tier. To preserve this strict quota, it is never called automatically on page load — all calls are triggered explicitly by user actions. Results are cached in sessionStorage for 24 hours.",
     type: "HTTP REST API", owner: "Alpha Vantage Inc.", domain: "Technical Indicators",
     tags: ["Technicals", "RSI", "MACD", "On-demand", "Cached"],
-    endpoint: "https://www.alphavantage.co/query (via Vite proxy)", authType: "API Key (query param: apikey=...)",
+    endpoint: "https://www.alphavantage.co/query (via proxy)", authType: "API Key (query param: apikey=...)",
     refreshCadence: "On demand only — never auto-called", lastSuccessfulSync: "Session cached (24h TTL)",
-    uptime7d: 99.8, uptime30d: 99.5, avgLatencyMs: 1150,
-    nullRate: 0.2, duplicateRate: 0.0, schemaDriftEvents: 0, failedSyncAttempts: 1,
-    dataVolumeGB: null, downstreamDeps: 2, upstreamSources: 0, downstreamConsumers: 1,
-    incidents: [
-      { date: "2024-10-14", type: "Rate Limit", description: "Daily 25-call limit exhausted during testing — all subsequent technical indicator requests returned 429 until midnight UTC.", severity: "medium", resolved: true },
-    ],
   },
   fred: {
-    description: "The Federal Reserve Economic Data (FRED) API is maintained by the St. Louis Fed and provides thousands of US macroeconomic time series — including CPI, GDP, Federal Funds Rate, unemployment, Treasury yields, mortgage rates, and consumer sentiment. It is the most reliable source in this stack, with unlimited access and official government uptime guarantees.",
+    description: "The Federal Reserve Economic Data (FRED) API is maintained by the St. Louis Fed and provides thousands of US macroeconomic time series — including CPI, GDP, Federal Funds Rate, unemployment, Treasury yields, mortgage rates, and consumer sentiment. Free with an API key and effectively unlimited for dashboard use.",
     type: "HTTP REST API (Government)", owner: "Federal Reserve Bank of St. Louis", domain: "Macroeconomics",
-    tags: ["Macro", "US", "CPI", "GDP", "Interest Rates", "Official", "Unlimited"],
-    endpoint: "https://api.stlouisfed.org/fred (via Vite proxy)", authType: "API Key (query param: api_key=...)",
-    refreshCadence: "Hourly sessionStorage cache", lastSuccessfulSync: "Within last hour",
-    uptime7d: 99.9, uptime30d: 99.9, avgLatencyMs: 175,
-    nullRate: 0.0, duplicateRate: 0.0, schemaDriftEvents: 0, failedSyncAttempts: 0,
-    dataVolumeGB: null, downstreamDeps: 5, upstreamSources: 0, downstreamConsumers: 4,
-    incidents: [],
+    tags: ["Macro", "US", "CPI", "GDP", "Interest Rates", "Official"],
+    endpoint: "https://api.stlouisfed.org/fred (via proxy)", authType: "API Key (query param: api_key=...)",
+    refreshCadence: "Hourly sessionStorage cache", lastSuccessfulSync: "On demand (cached)",
   },
   coingecko: {
-    description: "CoinGecko is the leading public cryptocurrency data API, providing real-time prices, 24h changes, market caps, and trading volumes for the top cryptocurrencies. No API key is required on the free tier. The dashboard tracks Bitcoin, Ethereum, and Solana, with 2-minute caching to stay within the 30 calls/min free limit. Also used for trending coins data.",
+    description: "CoinGecko is the leading public cryptocurrency data API, providing real-time prices, 24h changes, market caps, and trading volumes for the top cryptocurrencies. No API key is required on the free tier. The engine tracks Bitcoin, Ethereum, and Solana, with caching to stay within the 30 calls/min free limit.",
     type: "HTTP REST API (Public)", owner: "CoinGecko Pte. Ltd.", domain: "Cryptocurrency",
-    tags: ["Crypto", "Real-time", "No Auth", "Market Cap", "Volume", "Trending"],
-    endpoint: "https://api.coingecko.com/api/v3 (via Vite proxy)", authType: "None (public endpoint)",
-    refreshCadence: "2-minute cache for prices; 5-minute for trending", lastSuccessfulSync: "Within last 2 min",
-    uptime7d: 97.1, uptime30d: 96.5, avgLatencyMs: 450,
-    nullRate: 0.5, duplicateRate: 0.0, schemaDriftEvents: 1, failedSyncAttempts: 5,
-    dataVolumeGB: null, downstreamDeps: 3, upstreamSources: 0, downstreamConsumers: 1,
-    incidents: [
-      { date: "2025-02-03", type: "Rate Limit", description: "CoinGecko free tier temporarily reduced to 10 calls/min — crypto cards showed stale data for ~20 minutes.", severity: "medium", resolved: true },
-      { date: "2025-01-09", type: "Latency Spike", description: "CoinGecko API averaged 3,200ms response time during high traffic following crypto market volatility.", severity: "low", resolved: true },
-    ],
+    tags: ["Crypto", "Primary", "No Auth", "Market Cap", "Volume"],
+    endpoint: "https://api.coingecko.com/api/v3 (via proxy)", authType: "None (public endpoint)",
+    refreshCadence: "~120s server cycle; 2-min cache", lastSuccessfulSync: "Continuous (server cycle)",
   },
   fmp: {
-    description: "Financial Modeling Prep (FMP) provides comprehensive US equity fundamentals including P/E ratio, EPS, profit margin, debt/equity, ROE, beta, dividend yield, and DCF valuations. It is the primary source for all fundamentals data in the asset detail panel. With 250 free calls/day, it is used on-demand only (when the user opens the detail panel) and for a background batch profile call at startup.",
+    description: "Financial Modeling Prep (FMP) provides US equity fundamentals including P/E ratio, EPS, profit margin, debt/equity, ROE, beta, dividend yield, and DCF valuations. It is the source for fundamentals in the asset detail panel. With 250 free calls/day it is used on-demand (detail panel open) plus a background batch profile call at startup.",
     type: "HTTP REST API", owner: "Financial Modeling Prep", domain: "Fundamentals / Valuation",
-    tags: ["Fundamentals", "P/E", "EPS", "DCF", "Dividends", "Valuation"],
-    endpoint: "https://financialmodelingprep.com/stable (via Vite proxy)", authType: "API Key (query param: apikey=...)",
+    tags: ["Fundamentals", "P/E", "EPS", "DCF", "Dividends", "On-demand"],
+    endpoint: "https://financialmodelingprep.com/stable (via proxy)", authType: "API Key (query param: apikey=...)",
     refreshCadence: "On demand (panel open) + 1 batch call on page load", lastSuccessfulSync: "On demand",
-    uptime7d: 98.5, uptime30d: 98.2, avgLatencyMs: 320,
-    nullRate: 3.2, duplicateRate: 0.1, schemaDriftEvents: 1, failedSyncAttempts: 4,
-    dataVolumeGB: null, downstreamDeps: 8, upstreamSources: 0, downstreamConsumers: 2,
-    incidents: [
-      { date: "2025-02-11", type: "Schema Change", description: "FMP /stable/profile endpoint renamed marketCapTTM field — dividend yield calculation broke for 6 hours.", severity: "medium", resolved: true },
-      { date: "2024-12-18", type: "Rate Limit", description: "250 daily calls exhausted by end of afternoon — fundamentals panel returned empty for remainder of trading day.", severity: "high", resolved: true },
-    ],
   },
   brapi: {
-    description: "BRAPI (Brazilian API) is the primary source for B3 (Bovespa) equity data, providing real-time prices in BRL, day change percentages, and trading volumes for all tracked Brazilian stocks. It is the first choice for B3 data, with Yahoo Finance (.SA suffix) used as fallback. A BRAPI token is required for higher rate limits.",
+    description: "BRAPI is the primary source for B3 (Bovespa) equity data — prices in BRL, day change and volume. Primary B3 quotes are now fetched server-side via BRAPI Pro (batch 20 tickers/req, ~5-min) with a Yahoo .SA fallback for tickers BRAPI drops. The client-side path shown here is the secondary fallback plus the Terminal Mini ticker. A BRAPI Pro token is used.",
     type: "HTTP REST API", owner: "BRAPI (Community)", domain: "Brazil — B3 Equities",
-    tags: ["Brasil", "B3", "Equities", "BRL", "Real-time"],
-    endpoint: "https://brapi.dev/api (via Vite proxy)", authType: "Bearer Token (query param: token=...)",
-    refreshCadence: "Every 30s on page load (with Yahoo fallback)", lastSuccessfulSync: "Continuous (30s interval)",
-    uptime7d: 96.8, uptime30d: 95.1, avgLatencyMs: 290,
-    nullRate: 1.8, duplicateRate: 0.0, schemaDriftEvents: 0, failedSyncAttempts: 7,
-    dataVolumeGB: null, downstreamDeps: 3, upstreamSources: 0, downstreamConsumers: 1,
-    incidents: [
-      { date: "2025-02-20", type: "Downtime", description: "BRAPI returned 503 Service Unavailable outside Brazilian market hours — Yahoo .SA fallback activated.", severity: "low", resolved: true },
-      { date: "2025-01-14", type: "Latency Spike", description: "Response time exceeded 2,000ms for 30 minutes at B3 market open — rate of B3 card updates reduced.", severity: "low", resolved: true },
-    ],
+    tags: ["Primary", "Brasil", "B3", "FIIs", "ETFs"],
+    endpoint: "brapi.dev/api → GET /api/v1/quotes/brazil", authType: "Bearer Token (VITE_BRAPI_TOKEN)",
+    refreshCadence: "~5-min server cycle (Pro batch)", lastSuccessfulSync: "Managed server-side",
   },
   bcb: {
-    description: "The Banco Central do Brasil (BCB) Open Data API is the official source for Brazilian macroeconomic indicators, including the SELIC base interest rate, IPCA inflation index, and CDI interbank rate. Access is completely free with no API key required. Data is sourced from the BCB's SGS (Sistema Gerenciador de Séries Temporais) time series platform.",
+    description: "The Banco Central do Brasil (BCB) Open Data API is the official source for Brazilian macro indicators — SELIC base rate, IPCA inflation, and CDI interbank rate. Free, no API key required. Data comes from the BCB SGS (Sistema Gerenciador de Séries Temporais) platform.",
     type: "HTTP REST API (Government)", owner: "Banco Central do Brasil", domain: "Brazilian Macro",
-    tags: ["Brasil", "Macro", "SELIC", "IPCA", "CDI", "Official", "No Auth"],
-    endpoint: "https://api.bcb.gov.br (via Vite proxy)", authType: "None (public government endpoint)",
-    refreshCadence: "1-hour sessionStorage cache", lastSuccessfulSync: "Within last hour",
-    uptime7d: 99.5, uptime30d: 99.3, avgLatencyMs: 420,
-    nullRate: 0.0, duplicateRate: 0.0, schemaDriftEvents: 0, failedSyncAttempts: 1,
-    dataVolumeGB: null, downstreamDeps: 3, upstreamSources: 0, downstreamConsumers: 1,
-    incidents: [
-      { date: "2024-11-20", type: "Downtime", description: "BCB API returned timeout errors for ~15 minutes during scheduled government maintenance window.", severity: "low", resolved: true },
-    ],
+    tags: ["Brasil", "Macro", "SELIC", "IPCA", "CDI", "Official"],
+    endpoint: "https://api.bcb.gov.br → GET /api/v1/brazil/macro", authType: "None (public government endpoint)",
+    refreshCadence: "1-hour cache", lastSuccessfulSync: "On demand (cached)",
   },
   awesomeapi: {
-    description: "AwesomeAPI is a free, keyless Brazilian currency exchange rate API providing real-time USD/BRL and EUR/BRL rates with bid/ask spreads and 24h percentage change. It serves as the data source for the USD/BRL macro context banner in the Brazil Equities group. Provider-side responses are cached for 1 minute; the dashboard adds a 15-minute sessionStorage cache on top.",
+    description: "AwesomeAPI is a free, keyless Brazilian FX rate API providing USD/BRL and EUR/BRL rates with bid/ask spreads and 24h change. It powers the USD/BRL macro context banner in the Brazil Equities group. Provider-side responses are cached for 1 minute; the app adds a 15-minute cache on top.",
     type: "HTTP REST API (Public)", owner: "AwesomeAPI (Community)", domain: "FX / Currency",
-    tags: ["Brasil", "FX", "USD/BRL", "EUR/BRL", "No Auth", "Real-time"],
-    endpoint: "https://economia.awesomeapi.com.br (via Vite proxy)", authType: "None (public endpoint)",
-    refreshCadence: "15-minute sessionStorage cache", lastSuccessfulSync: "Within last 15 min",
-    uptime7d: 98.0, uptime30d: 97.5, avgLatencyMs: 185,
-    nullRate: 0.0, duplicateRate: 0.0, schemaDriftEvents: 0, failedSyncAttempts: 2,
-    dataVolumeGB: null, downstreamDeps: 1, upstreamSources: 0, downstreamConsumers: 1,
-    incidents: [
-      { date: "2025-01-05", type: "Latency Spike", description: "AwesomeAPI returned 1,800ms responses for ~1 hour, causing USD/BRL banner to show stale cached data.", severity: "low", resolved: true },
-    ],
+    tags: ["Brasil", "FX", "USD/BRL", "EUR/BRL", "No Auth"],
+    endpoint: "https://economia.awesomeapi.com.br → GET /api/v1/brazil/macro", authType: "None (public endpoint)",
+    refreshCadence: "15-minute cache", lastSuccessfulSync: "On demand (cached)",
   },
 };
 
@@ -298,12 +265,12 @@ const CATALOG = [
   {
     category: "Market Data", icon: "📈",
     items: [
-      { name: "Real-time Price", source: "yahoo", fallback: "finnhub", rateLimit: "Proxy: unlimited / Finnhub: 60/min", frequency: "Real-time (30s poll)", coverage: "Global equities, indices, FX", status: "active", description: "Current market price for all tracked assets, polled every 30 seconds via Yahoo Finance with Finnhub as fallback for US equities.", groups: ["All equity groups", "Indices", "FX"], component: "Dashboard cards, Detail panel", endpoint: "/v7/finance/quote?symbols=...", fetchMode: "Page load" },
-      { name: "Daily Volume", source: "yahoo", fallback: null, rateLimit: "Proxy: unlimited", frequency: "Real-time (30s poll)", coverage: "Equities and indices", status: "active", description: "Trading volume for the current session, updated with each price refresh.", groups: ["All equity groups", "Indices"], component: "Dashboard cards", endpoint: "/v7/finance/quote", fetchMode: "Page load" },
-      { name: "Day Change (%)", source: "yahoo", fallback: "finnhub", rateLimit: "Proxy: unlimited", frequency: "Real-time (30s poll)", coverage: "All tracked assets", status: "active", description: "Percentage change from previous close, drives heat bars and sentiment indicators.", groups: ["All groups"], component: "Dashboard cards, Sentiment bar, Top movers", endpoint: "/v7/finance/quote", fetchMode: "Page load" },
-      { name: "Market Capitalization", source: "yahoo", fallback: "fmp", rateLimit: "Proxy: unlimited / FMP: 250/day", frequency: "Real-time", coverage: "US equities", status: "active", description: "Total market value of outstanding shares.", groups: ["All equity groups"], component: "Detail panel", endpoint: "/v7/finance/quote", fetchMode: "Page load" },
-      { name: "52-Week High / Low", source: "yahoo", fallback: null, rateLimit: "Proxy: unlimited", frequency: "Real-time", coverage: "Equities and indices", status: "active", description: "Highest and lowest prices in the past 52 weeks.", groups: ["All equity groups", "Indices"], component: "Detail panel", endpoint: "/v7/finance/quote", fetchMode: "Page load" },
-      { name: "Historical Price Chart", source: "yahoo", fallback: null, rateLimit: "Proxy: unlimited", frequency: "On demand (per tab)", coverage: "All tracked assets", status: "active", description: "Historical OHLC data for 9 timeframes (1D to MAX) rendered as area charts in the detail panel.", groups: ["All groups"], component: "Detail panel chart", endpoint: "/v8/finance/chart/{symbol}?range=...&interval=...", fetchMode: "On demand" },
+      { name: "Real-time Price", source: "eodhd", fallback: "yahoo", rateLimit: "EODHD 100k/day (server) · Yahoo fallback", frequency: "~15–20 min delayed (server merge)", coverage: "Global equities, indices, FX, ETFs", status: "active", description: "Current market price for all tracked assets, served by the server-side quote engine: EODHD is primary and Yahoo backfills anything EODHD does not return (and remains primary for commodities).", groups: ["All equity groups", "Indices", "FX"], component: "Dashboard cards, Detail panel", endpoint: "server: /api/v1/quotes/live (EODHD → Yahoo)", fetchMode: "Server cycle" },
+      { name: "Daily Volume", source: "eodhd", fallback: "yahoo", rateLimit: "EODHD (server) · Yahoo fallback", frequency: "~15–20 min delayed (server merge)", coverage: "Equities and indices", status: "active", description: "Trading volume for the current session, from the same merged live quote (EODHD primary, Yahoo fallback).", groups: ["All equity groups", "Indices"], component: "Dashboard cards", endpoint: "server: /api/v1/quotes/live", fetchMode: "Server cycle" },
+      { name: "Day Change (%)", source: "eodhd", fallback: "yahoo", rateLimit: "EODHD (server) · Yahoo fallback", frequency: "~15–20 min delayed (server merge)", coverage: "All tracked assets", status: "active", description: "Percentage change from previous close, drives heat bars and sentiment indicators. From the merged live quote (EODHD primary, Yahoo fallback).", groups: ["All groups"], component: "Dashboard cards, Sentiment bar, Top movers", endpoint: "server: /api/v1/quotes/live", fetchMode: "Server cycle" },
+      { name: "Market Capitalization", source: "yahoo", fallback: "fmp", rateLimit: "Yahoo quote / FMP: 250/day", frequency: "On page load", coverage: "US equities", status: "active", description: "Total market value of outstanding shares. Not carried by EODHD live quotes — sourced from the Yahoo quote (or FMP fundamentals).", groups: ["All equity groups"], component: "Detail panel", endpoint: "/v7/finance/quote", fetchMode: "Page load" },
+      { name: "52-Week High / Low", source: "yahoo", fallback: null, rateLimit: "Yahoo quote", frequency: "On page load", coverage: "Equities and indices", status: "active", description: "Highest and lowest prices in the past 52 weeks. Sourced from the Yahoo quote (not part of the EODHD live quote).", groups: ["All equity groups", "Indices"], component: "Detail panel", endpoint: "/v7/finance/quote", fetchMode: "Page load" },
+      { name: "Historical Price Chart", source: "yahoo", fallback: null, rateLimit: "Yahoo v8 chart", frequency: "On demand (per tab)", coverage: "All tracked assets", status: "active", description: "Historical OHLC data for 9 timeframes (1D to MAX) rendered as area charts. Yahoo v8 chart — separate from the quote engine.", groups: ["All groups"], component: "Detail panel chart", endpoint: "/v8/finance/chart/{symbol}?range=...&interval=...", fetchMode: "On demand" },
       { name: "Intraday Sparkline", source: "yahoo", fallback: null, rateLimit: "Proxy: unlimited", frequency: "Derived from live data", coverage: "All tracked assets", status: "active", description: "Rolling 30-point sparkline derived from live price updates.", groups: ["All groups"], component: "Dashboard cards", endpoint: "Derived", fetchMode: "Computed" },
     ],
   },
@@ -363,9 +330,9 @@ const CATALOG = [
   {
     category: "Brazil Equities", icon: "🇧🇷",
     items: [
-      { name: "B3 Real-time Price", source: "brapi", fallback: "yahoo", rateLimit: "Free tier", frequency: "Real-time (30s poll)", coverage: "Brazil B3 equities", status: "active", description: "Current market price in BRL for all tracked B3 assets via BRAPI, with Yahoo Finance (.SA suffix) as fallback.", groups: ["Brazil Equities"], component: "Dashboard cards, Detail panel", endpoint: "/quote/{tickers}?token=...", fetchMode: "Page load" },
-      { name: "B3 Day Change (%)", source: "brapi", fallback: "yahoo", rateLimit: "Free tier", frequency: "Real-time (30s poll)", coverage: "Brazil B3 equities", status: "active", description: "Percentage change from previous close for B3 stocks.", groups: ["Brazil Equities"], component: "Dashboard cards", endpoint: "/quote/{tickers}", fetchMode: "Page load" },
-      { name: "B3 Volume", source: "brapi", fallback: "yahoo", rateLimit: "Free tier", frequency: "Real-time (30s poll)", coverage: "Brazil B3 equities", status: "active", description: "Trading volume for B3 stocks in the current session.", groups: ["Brazil Equities"], component: "Dashboard cards", endpoint: "/quote/{tickers}", fetchMode: "Page load" },
+      { name: "B3 Real-time Price", source: "brapi", fallback: "yahoo", rateLimit: "BRAPI Pro · 20/req · 5-min (server)", frequency: "~5 min (server cycle)", coverage: "Brazil B3 equities, FIIs & ETFs", status: "active", description: "Current market price in BRL for all tracked B3 assets, fetched server-side via BRAPI Pro (batch 20/req) with Yahoo Finance (.SA suffix) as fallback. EODHD is not used for B3 (budget).", groups: ["Brazil Equities"], component: "Dashboard cards, Detail panel", endpoint: "server: /api/v1/quotes/brazil (BRAPI Pro → Yahoo .SA)", fetchMode: "Server cycle" },
+      { name: "B3 Day Change (%)", source: "brapi", fallback: "yahoo", rateLimit: "BRAPI Pro · 5-min (server)", frequency: "~5 min (server cycle)", coverage: "Brazil B3 equities", status: "active", description: "Percentage change from previous close for B3 stocks, from the server BRAPI Pro feed (Yahoo .SA fallback).", groups: ["Brazil Equities"], component: "Dashboard cards", endpoint: "server: /api/v1/quotes/brazil", fetchMode: "Server cycle" },
+      { name: "B3 Volume", source: "brapi", fallback: "yahoo", rateLimit: "BRAPI Pro · 5-min (server)", frequency: "~5 min (server cycle)", coverage: "Brazil B3 equities", status: "active", description: "Trading volume for B3 stocks in the current session, from the server BRAPI Pro feed (Yahoo .SA fallback).", groups: ["Brazil Equities"], component: "Dashboard cards", endpoint: "server: /api/v1/quotes/brazil", fetchMode: "Server cycle" },
       { name: "SELIC Rate", source: "bcb", fallback: null, rateLimit: "Unlimited — no key", frequency: "1-hour cache", coverage: "Brazil", status: "active", description: "Brazilian base interest rate (equivalent to Fed Funds Rate), from BCB SGS series 432.", groups: ["Brazil Equities"], component: "Group macro banner", endpoint: "/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json", fetchMode: "Cached" },
       { name: "IPCA (Inflation)", source: "bcb", fallback: null, rateLimit: "Unlimited — no key", frequency: "1-hour cache", coverage: "Brazil", status: "active", description: "Brazilian inflation index (equivalent to CPI), from BCB SGS series 433.", groups: ["Brazil Equities"], component: "Group macro banner", endpoint: "/dados/serie/bcdata.sgs.433/dados/ultimos/1?formato=json", fetchMode: "Cached" },
       { name: "CDI Rate", source: "bcb", fallback: null, rateLimit: "Unlimited — no key", frequency: "1-hour cache", coverage: "Brazil", status: "active", description: "CDI (Certificado de Depósito Interbancário) rate, from BCB SGS series 4389.", groups: ["Brazil Equities"], component: "Group macro banner", endpoint: "/dados/serie/bcdata.sgs.4389/dados/ultimos/1?formato=json", fetchMode: "Cached" },
@@ -375,21 +342,21 @@ const CATALOG = [
 ];
 
 const ASSET_GROUPS = [
-  { name: "Aerospace & Defense",  icon: "🛡",  assetCount: "5 tickers",          assignment: "Manual ticker list",                    sources: ["yahoo", "finnhub", "fmp"],               macroBanner: null },
-  { name: "Brazil Equities",      icon: "🇧🇷", assetCount: "17 tickers",         assignment: "Manual ticker list",                    sources: ["brapi", "bcb", "awesomeapi"],             macroBanner: "SELIC, IPCA, CDI (BCB) + USD/BRL (AwesomeAPI)" },
-  { name: "Clean Energy",         icon: "🔋",  assetCount: "5 + cross-listed",   assignment: "Manual + cross-list from Technology",   sources: ["yahoo", "finnhub", "fmp", "fred"],       macroBanner: "10Y Treasury Yield (FRED)" },
-  { name: "Consumer",             icon: "🛒",  assetCount: "5 + cross-listed",   assignment: "Manual + cross-list from Technology",   sources: ["yahoo", "finnhub", "fmp", "fred"],       macroBanner: "Consumer Sentiment (FRED)" },
+  { name: "Aerospace & Defense",  icon: "🛡",  assetCount: "5 tickers",          assignment: "Manual ticker list",                    sources: ["eodhd", "yahoo", "finnhub", "fmp"],      macroBanner: null },
+  { name: "Brazil Equities",      icon: "🇧🇷", assetCount: "17 tickers",         assignment: "Manual ticker list",                    sources: ["brapi", "yahoo", "bcb", "awesomeapi"],    macroBanner: "SELIC, IPCA, CDI (BCB) + USD/BRL (AwesomeAPI)" },
+  { name: "Clean Energy",         icon: "🔋",  assetCount: "5 + cross-listed",   assignment: "Manual + cross-list from Technology",   sources: ["eodhd", "yahoo", "finnhub", "fmp", "fred"], macroBanner: "10Y Treasury Yield (FRED)" },
+  { name: "Consumer",             icon: "🛒",  assetCount: "5 + cross-listed",   assignment: "Manual + cross-list from Technology",   sources: ["eodhd", "yahoo", "finnhub", "fmp", "fred"], macroBanner: "Consumer Sentiment (FRED)" },
   { name: "Crypto",               icon: "🪙",  assetCount: "3 coins",            assignment: "CoinGecko price data exclusively",      sources: ["coingecko"],                             macroBanner: null },
-  { name: "Dividend Income",      icon: "💰",  assetCount: "Dynamic",            assignment: "FMP dividend yield > 3%",               sources: ["yahoo", "fmp"],                          macroBanner: null },
-  { name: "Emerging Markets",     icon: "🌍",  assetCount: "4 ETFs",             assignment: "Manual ETF list",                       sources: ["yahoo", "finnhub"],                      macroBanner: null },
-  { name: "Oil & Gas",            icon: "🛢",  assetCount: "8 tickers",          assignment: "Manual ticker list",                    sources: ["yahoo", "finnhub", "fmp"],               macroBanner: null },
-  { name: "Financials",           icon: "🏦",  assetCount: "8 tickers",          assignment: "Manual ticker list",                    sources: ["yahoo", "finnhub", "fmp", "fred"],       macroBanner: "Fed Funds Rate (FRED)" },
-  { name: "Foreign Exchange",     icon: "💱",  assetCount: "8 pairs",            assignment: "Manual ticker list",                    sources: ["yahoo"],                                 macroBanner: null },
-  { name: "Global Indices",       icon: "🌐",  assetCount: "8 indices",          assignment: "Manual ticker list",                    sources: ["yahoo"],                                 macroBanner: null },
-  { name: "Health Care",          icon: "💊",  assetCount: "6 tickers",          assignment: "Manual ticker list",                    sources: ["yahoo", "finnhub", "fmp"],               macroBanner: null },
-  { name: "Real Estate",          icon: "🏢",  assetCount: "4 tickers",          assignment: "Manual ticker list",                    sources: ["yahoo", "finnhub", "fmp", "fred"],       macroBanner: "30-Year Mortgage Rate (FRED)" },
-  { name: "Semiconductors",       icon: "🔬",  assetCount: "6 + cross-listed",   assignment: "Manual + cross-list from Technology",   sources: ["yahoo", "finnhub", "fmp"],               macroBanner: null },
-  { name: "Technology",           icon: "⚡",  assetCount: "8 tickers",          assignment: "Manual ticker list",                    sources: ["yahoo", "finnhub", "fmp"],               macroBanner: null },
+  { name: "Dividend Income",      icon: "💰",  assetCount: "Dynamic",            assignment: "FMP dividend yield > 3%",               sources: ["eodhd", "yahoo", "fmp"],                 macroBanner: null },
+  { name: "Emerging Markets",     icon: "🌍",  assetCount: "4 ETFs",             assignment: "Manual ETF list",                       sources: ["eodhd", "yahoo", "finnhub"],             macroBanner: null },
+  { name: "Oil & Gas",            icon: "🛢",  assetCount: "8 tickers",          assignment: "Manual ticker list",                    sources: ["eodhd", "yahoo", "finnhub", "fmp"],      macroBanner: null },
+  { name: "Financials",           icon: "🏦",  assetCount: "8 tickers",          assignment: "Manual ticker list",                    sources: ["eodhd", "yahoo", "finnhub", "fmp", "fred"], macroBanner: "Fed Funds Rate (FRED)" },
+  { name: "Foreign Exchange",     icon: "💱",  assetCount: "8 pairs",            assignment: "Manual ticker list",                    sources: ["eodhd", "yahoo"],                        macroBanner: null },
+  { name: "Global Indices",       icon: "🌐",  assetCount: "8 indices",          assignment: "Manual ticker list",                    sources: ["eodhd", "yahoo"],                        macroBanner: null },
+  { name: "Health Care",          icon: "💊",  assetCount: "6 tickers",          assignment: "Manual ticker list",                    sources: ["eodhd", "yahoo", "finnhub", "fmp"],      macroBanner: null },
+  { name: "Real Estate",          icon: "🏢",  assetCount: "4 tickers",          assignment: "Manual ticker list",                    sources: ["eodhd", "yahoo", "finnhub", "fmp", "fred"], macroBanner: "30-Year Mortgage Rate (FRED)" },
+  { name: "Semiconductors",       icon: "🔬",  assetCount: "6 + cross-listed",   assignment: "Manual + cross-list from Technology",   sources: ["eodhd", "yahoo", "finnhub", "fmp"],      macroBanner: null },
+  { name: "Technology",           icon: "⚡",  assetCount: "8 tickers",          assignment: "Manual ticker list",                    sources: ["eodhd", "yahoo", "finnhub", "fmp"],      macroBanner: null },
 ];
 
 const STATUS_BADGE = {
@@ -398,6 +365,25 @@ const STATUS_BADGE = {
   outage:        { label: "OUTAGE",       color: "var(--c-error)", bg: "rgba(255,82,82,0.1)",  border: "rgba(255,82,82,0.3)" },
   "rate-limited":{ label: "RATE LIMITED", color: "#FF9800", bg: "rgba(255,152,0,0.1)",  border: "rgba(255,152,0,0.3)" },
 };
+
+// Small header badges that classify a source along two independent axes:
+//   tier   → PAID subscription (EODHD, BRAPI Pro today; a future paid FMP flips here)
+//   locus  → SERVER-SIDE (fetched by the backend engine, health measured there, not in-browser)
+function ProBadge() {
+  return (
+    <span style={{ fontFamily: mono, fontSize: 8, fontWeight: 700, letterSpacing: "0.6px", color: "#fff", background: "#7c3aed", border: "1px solid #8b5cf6", borderRadius: 3, padding: "2px 6px", whiteSpace: "nowrap" }}>
+      ★ PRO
+    </span>
+  );
+}
+
+function ServerSideChip() {
+  return (
+    <span style={{ fontFamily: mono, fontSize: 8, fontWeight: 700, letterSpacing: "0.6px", color: "var(--c-text-3)", background: "transparent", border: "1px solid var(--c-border)", borderRadius: 3, padding: "2px 6px", whiteSpace: "nowrap" }}>
+      SERVER-SIDE
+    </span>
+  );
+}
 
 const ITEM_STATUS_STYLES = {
   active:    { label: "ACTIVE",    color: "#00E676", bg: "rgba(0,230,118,0.1)",  border: "rgba(0,230,118,0.3)" },
@@ -506,12 +492,6 @@ function TimeAgo({ timestamp }) {
 
 // ─── SOURCE DETAIL PANEL ─────────────────────────────────────────────────────
 
-const SEVERITY_STYLES = {
-  high:   { color: "var(--c-error)", bg: "rgba(255,82,82,0.1)",   border: "rgba(255,82,82,0.25)" },
-  medium: { color: "#FFD740", bg: "rgba(255,215,64,0.1)",  border: "rgba(255,215,64,0.25)" },
-  low:    { color: "#00BCD4", bg: "rgba(0,188,212,0.1)",   border: "rgba(0,188,212,0.25)" },
-};
-
 function DetailSection({ title, children }) {
   return (
     <div style={{ marginBottom: 20 }}>
@@ -547,61 +527,17 @@ function StatCard({ label, value, valueColor, sub }) {
   );
 }
 
-function UptimeBar({ pct }) {
-  if (pct == null) return <span style={{ fontFamily: mono, fontSize: 11, color: "var(--c-text-3)" }}>—</span>;
-  const color = pct >= 99 ? "#00E676" : pct >= 95 ? "#FFD740" : "var(--c-error)";
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <div style={{ flex: 1, height: 5, background: "var(--c-border)", borderRadius: 3, overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 3 }} />
-      </div>
-      <span style={{ fontFamily: mono, fontSize: 11, fontWeight: 700, color, minWidth: 42, textAlign: "right" }}>{pct}%</span>
-    </div>
-  );
-}
-
-function IncidentRow({ incident }) {
-  const sev = SEVERITY_STYLES[incident.severity] || SEVERITY_STYLES.low;
-  return (
-    <div style={{
-      background: sev.bg, border: `1px solid ${sev.border}`, borderRadius: 6,
-      padding: "10px 12px", marginBottom: 7,
-    }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <span style={{
-            fontFamily: mono, fontSize: 9, fontWeight: 700, letterSpacing: "0.5px",
-            color: sev.color, background: sev.bg, border: `1px solid ${sev.border}`,
-            borderRadius: 3, padding: "2px 7px",
-          }}>
-            {incident.type.toUpperCase()}
-          </span>
-          <span style={{
-            fontFamily: mono, fontSize: 9, letterSpacing: "0.5px",
-            color: incident.resolved ? "#00E676" : "#FFD740",
-          }}>
-            {incident.resolved ? "✓ Resolved" : "⚠ Open"}
-          </span>
-        </div>
-        <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)" }}>{incident.date}</span>
-      </div>
-      <div style={{ fontFamily: sans, fontSize: 11, color: "var(--c-text-2)", lineHeight: 1.5 }}>
-        {incident.description}
-      </div>
-    </div>
-  );
-}
-
 function SourceDetailPanel({ source, health, onClose }) {
   const meta    = SOURCE_META[source];
   const detail  = SOURCE_DETAIL_DATA[source];
   const color   = SOURCE_COLORS[source];
   const label   = SOURCE_LABELS[source];
-  const history = getHealthHistory(source);
-  const successCount = history.filter(Boolean).length;
-  const totalChecks  = history.length;
   const configured   = getSourceStatus()[source];
   const isConfigured = configured?.hasKey || !configured?.keyRequired;
+  const serverSide   = meta.serverSide || configured?.serverSide;
+  const history      = health?.serverHistory ?? getHealthHistory(source);
+  const successCount = history.filter(Boolean).length;
+  const totalChecks  = history.length;
   const statusKey    = health?.status || (isConfigured ? "operational" : "outage");
 
   return (
@@ -623,6 +559,8 @@ function SourceDetailPanel({ source, health, onClose }) {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <StatusBadge status={statusKey} />
+              {meta.tier === "paid" && <ProBadge />}
+              {serverSide && <ServerSideChip />}
               <TimeAgo timestamp={health?.timestamp} />
               {health?.responseTime != null && (
                 <span style={{
@@ -713,81 +651,46 @@ function SourceDetailPanel({ source, health, onClose }) {
           )}
         </DetailSection>
 
-        {/* Health Metrics */}
-        <DetailSection title="Health Metrics">
-          <div style={{ marginBottom: 10 }}>
-            <div style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "0.5px", marginBottom: 5 }}>UPTIME — 7 DAYS</div>
-            <UptimeBar pct={detail.uptime7d} />
-          </div>
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "0.5px", marginBottom: 5 }}>UPTIME — 30 DAYS</div>
-            <UptimeBar pct={detail.uptime30d} />
-          </div>
+        {/* Health — live reachability checks only (historical uptime/incidents were mock and removed) */}
+        <DetailSection title={serverSide ? "Health — Server Fetch" : "Health — Live Checks"}>
           <StatGrid>
             <StatCard
-              label="AVG LATENCY"
-              value={health?.responseTime != null ? `${health.responseTime}ms` : detail.avgLatencyMs ? `~${detail.avgLatencyMs}ms` : "—"}
+              label={serverSide ? "FETCH LATENCY" : "AVG LATENCY"}
+              value={health?.responseTime != null ? `${health.responseTime}ms` : "—"}
+              sub={serverSide ? "backend → provider" : null}
               valueColor={
-                (health?.responseTime ?? detail.avgLatencyMs) > 3000 ? "var(--c-error)" :
-                (health?.responseTime ?? detail.avgLatencyMs) > 1000 ? "#FFD740" : "#00E676"
+                health?.responseTime == null ? undefined :
+                health.responseTime > 3000 ? "var(--c-error)" :
+                health.responseTime > 1000 ? "#FFD740" : "#00E676"
               }
             />
             <StatCard
-              label="SUCCESS RATE"
+              label={serverSide ? "FETCH SUCCESS" : "SUCCESS RATE"}
               value={totalChecks > 0 ? `${Math.round(successCount / totalChecks * 100)}%` : "—"}
-              sub={totalChecks > 0 ? `${successCount}/${totalChecks} checks` : null}
+              sub={totalChecks > 0 ? `${successCount}/${totalChecks} ${serverSide ? "cycles" : "checks"}` : (serverSide ? "no cycles yet" : "no checks yet")}
               valueColor={totalChecks > 0 ? (successCount / totalChecks >= 0.9 ? "#00E676" : "#FFD740") : undefined}
             />
-            <StatCard label="NULL RATE"       value={detail.nullRate != null ? `${detail.nullRate}%` : "—"} />
-            <StatCard label="DUPLICATE RATE"  value={detail.duplicateRate != null ? `${detail.duplicateRate}%` : "—"} />
-            <StatCard label="SCHEMA DRIFTS"   value={detail.schemaDriftEvents} sub="last 30 days"
-              valueColor={detail.schemaDriftEvents > 2 ? "#FFD740" : undefined} />
-            <StatCard label="FAILED SYNCS"    value={detail.failedSyncAttempts} sub="last 30 days"
-              valueColor={detail.failedSyncAttempts > 5 ? "var(--c-error)" : detail.failedSyncAttempts > 2 ? "#FFD740" : undefined} />
-            <StatCard label="DOWNSTREAM DEPS" value={detail.downstreamDeps} sub="data points" />
-            <StatCard label="DATA VOLUME"     value={detail.dataVolumeGB != null ? `${detail.dataVolumeGB} GB` : "—"} />
           </StatGrid>
+
+          {serverSide && health?.rawValue && (
+            <div style={{ marginTop: 8, display: "grid", gap: 4 }}>
+              <MetricRow label="LAST FETCH COVERAGE" value={`${health.rawValue} symbols`} />
+            </div>
+          )}
 
           {totalChecks > 0 && (
             <div style={{ marginTop: 12 }}>
               <div style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "0.5px", marginBottom: 6 }}>
-                RECENT CHECKS ({totalChecks})
+                {serverSide ? `RECENT FETCH CYCLES (${totalChecks})` : `RECENT CHECKS (${totalChecks})`}
               </div>
               <SuccessRateDots history={history} />
             </div>
           )}
-        </DetailSection>
 
-        {/* Recent Incidents */}
-        <DetailSection title={`Recent Incidents (${detail.incidents.length})`}>
-          {detail.incidents.length === 0 ? (
-            <div style={{
-              padding: "14px 12px", background: "rgba(0,230,118,0.06)",
-              border: "1px solid rgba(0,230,118,0.2)", borderRadius: 6, textAlign: "center",
-            }}>
-              <div style={{ fontFamily: mono, fontSize: 11, color: "#00E676" }}>No incidents recorded</div>
-              <div style={{ fontFamily: sans, fontSize: 11, color: "var(--c-text-3)", marginTop: 4 }}>
-                This source has a clean operational history.
-              </div>
-            </div>
-          ) : (
-            detail.incidents.map((incident, i) => <IncidentRow key={i} incident={incident} />)
-          )}
-        </DetailSection>
-
-        {/* Lineage */}
-        <DetailSection title="Lineage & Usage">
-          <div style={{ display: "grid", gap: 4, marginBottom: 12 }}>
-            <MetricRow label="UPSTREAM SOURCES"      value={detail.upstreamSources} />
-            <MetricRow label="DOWNSTREAM CONSUMERS"  value={detail.downstreamConsumers} />
-            <MetricRow label="DOWNSTREAM DATA POINTS" value={detail.downstreamDeps} />
-          </div>
-          <div style={{
-            fontFamily: sans, fontSize: 11, color: "var(--c-text-3)", lineHeight: 1.5,
-            background: "var(--c-surface)", border: "1px solid var(--c-border)",
-            borderRadius: 6, padding: "10px 12px",
-          }}>
-            Full data lineage graph coming soon — connect a lineage backend to populate this section.
+          <div style={{ fontFamily: sans, fontSize: 10, color: "var(--c-text-3)", marginTop: 12, lineHeight: 1.45 }}>
+            {serverSide
+              ? "Measured at the backend quote engine — the browser can't reach this provider directly, so latency and success reflect the engine's own fetch cycles. Historical uptime percentiles are not yet instrumented."
+              : "Only live reachability checks from your browser are shown. Historical uptime, latency percentiles and incident history are not yet instrumented."}
           </div>
         </DetailSection>
 
@@ -820,12 +723,15 @@ function SourceHealthCard({ source, health, usage, onRefresh, onSelect }) {
   const [hovered, setHovered] = useState(false);
   const meta = SOURCE_META[source];
   const color = SOURCE_COLORS[source];
-  const history = getHealthHistory(source);
-  const successCount = history.filter(Boolean).length;
-  const totalChecks = history.length;
   const configured = getSourceStatus()[source];
   const isConfigured = configured?.hasKey || !configured?.keyRequired;
   const checking = health?.checking;
+  const serverSide = meta.serverSide || configured?.serverSide;
+  // Server-side providers carry their own rolling fetch history from the engine; client
+  // providers accumulate history from browser pings in sessionStorage.
+  const history = health?.serverHistory ?? getHealthHistory(source);
+  const successCount = history.filter(Boolean).length;
+  const totalChecks = history.length;
 
   const statusKey = health?.status || (isConfigured ? "operational" : "outage");
 
@@ -861,11 +767,15 @@ function SourceHealthCard({ source, health, usage, onRefresh, onSelect }) {
               {SOURCE_LABELS[source]}
             </span>
           </div>
-          <StatusBadge status={statusKey} />
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <StatusBadge status={statusKey} />
+            {meta.tier === "paid" && <ProBadge />}
+            {serverSide && <ServerSideChip />}
+          </div>
         </div>
         <button
           onClick={() => onRefresh(source)}
-          title="Refresh health check"
+          title={serverSide ? "Refresh (re-reads backend fetch status)" : "Refresh health check"}
           style={{
             background: "transparent", border: `1px solid var(--c-border)`, borderRadius: 6,
             cursor: "pointer", padding: "5px 8px", color: "var(--c-text-3)", fontSize: 12,
@@ -878,29 +788,34 @@ function SourceHealthCard({ source, health, usage, onRefresh, onSelect }) {
         </button>
       </div>
 
-      {/* Response time + last checked */}
+      {/* Response time + last checked (server-side cards show the backend fetch latency) */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-        {health?.responseTime != null ? (
-          <span style={{ fontFamily: mono, fontSize: 18, fontWeight: 700, color: health.responseTime > 3000 ? "var(--c-error)" : health.responseTime > 1000 ? "#FFD740" : "var(--c-text)" }}>
-            {health.responseTime}ms
-          </span>
-        ) : (
-          <span style={{ fontFamily: mono, fontSize: 14, color: "var(--c-text-3)" }}>—</span>
-        )}
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+          {health?.responseTime != null ? (
+            <span style={{ fontFamily: mono, fontSize: 18, fontWeight: 700, color: health.responseTime > 3000 ? "var(--c-error)" : health.responseTime > 1000 ? "#FFD740" : "var(--c-text)" }}>
+              {health.responseTime}ms
+            </span>
+          ) : (
+            <span style={{ fontFamily: mono, fontSize: 14, color: "var(--c-text-3)" }}>—</span>
+          )}
+          {serverSide && <span style={{ fontFamily: mono, fontSize: 8, color: "var(--c-text-3)", letterSpacing: "0.3px" }}>backend fetch</span>}
+        </div>
         <TimeAgo timestamp={health?.timestamp} />
       </div>
 
       {/* Success rate */}
       <div style={{ marginBottom: 10 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-          <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "0.5px" }}>SUCCESS RATE</span>
+          <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "0.5px" }}>
+            {serverSide ? "FETCH SUCCESS" : "SUCCESS RATE"}
+          </span>
           {totalChecks > 0 && <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-2)" }}>{successCount}/{totalChecks}</span>}
         </div>
         <SuccessRateDots history={history} />
       </div>
 
       {/* Error / missing key message */}
-      {!isConfigured && (
+      {!serverSide && !isConfigured && (
         <div style={{ background: "rgba(255,215,64,0.08)", border: "1px solid rgba(255,215,64,0.25)", borderRadius: 4, padding: "8px 10px", marginBottom: 10 }}>
           <div style={{ fontFamily: mono, fontSize: 9, color: "#FFD740", marginBottom: 4, fontWeight: 600 }}>API key not configured</div>
           {meta.keyRegistrationUrl && (
@@ -1073,6 +988,11 @@ function DataPointPanel({ item, sourceHealth, onClose }) {
   const itemName = item?.name;
   useEffect(() => {
     if (!itemSource) return;
+    // Server-side sources (EODHD) have no client proxy to sample — don't fake a probe.
+    if (SOURCE_META[itemSource]?.serverSide) {
+      setSampleData({ status: "serverside", data: null, error: null });
+      return;
+    }
     let cancelled = false;
     setSampleData({ status: "loading", data: null, error: null });
     (async () => {
@@ -1093,7 +1013,7 @@ function DataPointPanel({ item, sourceHealth, onClose }) {
   const meta = SOURCE_META[item.source];
   const color = SOURCE_COLORS[item.source];
   const health = sourceHealth?.[item.source];
-  const history = getHealthHistory(item.source);
+  const history = health?.serverHistory ?? getHealthHistory(item.source);
   const successCount = history.filter(Boolean).length;
   const avgTime = health?.responseTime || 0;
 
@@ -1190,6 +1110,17 @@ function DataPointPanel({ item, sourceHealth, onClose }) {
                   <span style={{ fontFamily: mono, fontSize: 10, color: "var(--c-text-3)" }}>Fetching sample...</span>
                 </div>
               )}
+              {sampleData.status === "serverside" && (
+                <div style={{ fontFamily: sans, fontSize: 11, color: "var(--c-text-2)", lineHeight: 1.5 }}>
+                  This data point is served by the backend quote engine, so it can’t be sampled directly
+                  from the browser. The engine fetches {SOURCE_LABELS[item.source]} server-side
+                  {item.fallback ? ` (with ${SOURCE_LABELS[item.fallback]} as an automatic fallback)` : ""} and
+                  the live value renders on the dashboard. The Brazil B3 feed already tags each symbol with its
+                  resolved{" "}
+                  <span style={{ fontFamily: mono, color: "var(--c-text-3)" }}>source</span>; the global feed
+                  will expose the same tagging in a later pass.
+                </div>
+              )}
               {sampleData.status === "ok" && sampleData.data && (
                 <div style={{ display: "grid", gap: 6 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -1199,7 +1130,7 @@ function DataPointPanel({ item, sourceHealth, onClose }) {
                     </span>
                   </div>
                   <MetricRow label="RESPONSE TIME" value={`${sampleData.data.responseTime}ms`} valueColor={sampleData.data.responseTime > 2000 ? "#FFD740" : "#00E676"} />
-                  <MetricRow label="TIMESTAMP" value={new Date(sampleData.data.timestamp).toLocaleTimeString("en-US", { hour12: false, fractionalSecondDigits: 0 })} />
+                  <MetricRow label="TIMESTAMP" value={sampleData.data.timestamp ? new Date(sampleData.data.timestamp).toLocaleTimeString("en-US", { hour12: false }) : "—"} />
                   <MetricRow label="SAMPLE TICKER" value={item.source === "coingecko" ? "ping" : item.source === "fred" ? "DGS10" : "AAPL"} />
                 </div>
               )}
@@ -1643,6 +1574,47 @@ function QuotaDashboard() {
         })}
       </div>
 
+      {/* ── Server-side quote engine (not client-quota-tracked) ── */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontFamily: mono, fontSize: 10, color: "var(--c-text-3)", letterSpacing: "1.5px", marginBottom: 4 }}>
+          SERVER-SIDE QUOTE ENGINE
+        </div>
+        <div style={{ fontFamily: sans, fontSize: 11, color: "var(--c-text-3)", marginBottom: 10, lineHeight: 1.4 }}>
+          Primary live quotes are fetched once by the backend and shared across all users — so their
+          usage is managed server-side and is <strong>not</strong> counted by the client quota tracker above.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+          {[
+            { id: "eodhd", role: "Primary · global equities, indices, FX, ETFs", plan: "All-World plan", budget: "≈100k calls/day", cadence: "~180s cycle · batch ≤20/req", endpoint: "/api/v1/quotes/live" },
+            { id: "brapi", role: "Primary · Brazil B3 (equities, FIIs, ETFs)", plan: "BRAPI Pro", budget: "500k calls/month", cadence: "~5-min cycle · batch 20/req", endpoint: "/api/v1/quotes/brazil" },
+          ].map(feed => {
+            const c = SOURCE_COLORS[feed.id];
+            return (
+              <div key={feed.id} style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 8, padding: "12px 14px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: c, display: "inline-block", flexShrink: 0 }} />
+                    <span style={{ fontFamily: mono, fontSize: 12, fontWeight: 700, color: "var(--c-text-1)" }}>{SOURCE_LABELS[feed.id]}</span>
+                  </div>
+                  <span style={{ fontFamily: mono, fontSize: 8, fontWeight: 700, letterSpacing: "0.6px", color: c, background: c + "18", border: `1px solid ${c}40`, borderRadius: 3, padding: "2px 7px" }}>
+                    {feed.plan}
+                  </span>
+                </div>
+                <div style={{ fontFamily: sans, fontSize: 11, color: "var(--c-text-2)", lineHeight: 1.4, marginBottom: 8 }}>{feed.role}</div>
+                <div style={{ display: "grid", gap: 3 }}>
+                  <MetricRow label="BUDGET" value={feed.budget} />
+                  <MetricRow label="CADENCE" value={feed.cadence} />
+                  <MetricRow label="ENDPOINT" value={feed.endpoint} />
+                </div>
+                <div style={{ fontFamily: mono, fontSize: 8, color: "var(--c-text-3)", letterSpacing: "0.4px", marginTop: 8 }}>
+                  MANAGED SERVER-SIDE · NOT CLIENT-TRACKED
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* ── Section 3: Session log table ── */}
       <div style={{ marginBottom: 16 }}>
         <button
@@ -1818,13 +1790,35 @@ export default function CatalogPage() {
       <div style={{ padding: "24px 0 20px", borderBottom: "1px solid var(--c-border)" }}>
         <div style={{ fontSize: 26, fontWeight: 700, color: "var(--c-text)", letterSpacing: "-0.5px" }}>Data Catalog</div>
         <div style={{ fontFamily: sans, fontSize: 13, color: "var(--c-text-2)", marginTop: 4 }}>
-          Source health, data coverage, and reliability for every data point
+          How every data point is sourced — providers, precedence, coverage and live reachability
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 12, fontFamily: mono, fontSize: 11 }}>
+          <span style={{ color: "var(--c-text-3)" }}>{ALL_SOURCES.length} sources</span>
           <span style={{ color: "var(--c-text-3)" }}>{totalPoints} data points</span>
           <span style={{ color: "#00E676" }}>{totalActive} active</span>
           <span style={{ color: "#FFD740" }}>{totalPlanned} planned</span>
           {issueCount > 0 && <span style={{ color: "var(--c-error)" }}>{issueCount} issues</span>}
+        </div>
+
+        {/* How quotes are sourced — the live precedence, stated plainly */}
+        <div style={{ marginTop: 16, background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 8, padding: "12px 14px" }}>
+          <div style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "1.5px", marginBottom: 8 }}>HOW LIVE QUOTES ARE SOURCED</div>
+          <div style={{ display: "grid", gap: 6, fontFamily: sans, fontSize: 12, color: "var(--c-text-2)", lineHeight: 1.5 }}>
+            <div>
+              <SourceBadge source="eodhd" /> <span style={{ color: "var(--c-text-3)" }}>→</span> <SourceBadge source="yahoo" />
+              {"  "}Global equities, indices, FX &amp; ETFs — <strong>EODHD primary</strong>, Yahoo fallback. Fetched server-side and merged into one quote per symbol.
+            </div>
+            <div>
+              <SourceBadge source="brapi" /> <span style={{ color: "var(--c-text-3)" }}>→</span> <SourceBadge source="yahoo" />
+              {"  "}Brazil B3 — <strong>BRAPI Pro primary</strong> (batch 20/req, ~5-min), Yahoo <code style={{ fontFamily: mono }}>.SA</code> fallback. EODHD is not used for B3 (budget).
+            </div>
+            <div>
+              <SourceBadge source="coingecko" />{"  "}Crypto (BTC / ETH / SOL). <SourceBadge source="yahoo" style={{ marginLeft: 8 }} /> also remains <strong>primary for commodities</strong> and historical charts.
+            </div>
+            <div style={{ color: "var(--c-text-3)", fontSize: 11 }}>
+              On-demand fundamentals, technicals, news &amp; macro use FMP, Finnhub, Alpha Vantage, FRED, BCB &amp; AwesomeAPI directly from the browser.
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1866,7 +1860,7 @@ export default function CatalogPage() {
             <div>
               <div style={{ fontFamily: mono, fontSize: 10, color: "var(--c-error)", fontWeight: 700, letterSpacing: "0.5px" }}>YAHOO FINANCE UNAVAILABLE</div>
               <div style={{ fontFamily: sans, fontSize: 11, color: "var(--c-text-3)", marginTop: 2 }}>
-                Yahoo is an unofficial API and may break without notice. Finnhub and FMP are available as alternatives for equity data.
+                Yahoo is an unofficial API and may break without notice. EODHD is now the primary source for global quotes, so live prices continue; Yahoo-only data (commodities, historical charts, market cap, 52-week ranges) may be affected.
               </div>
             </div>
           </div>
@@ -1993,7 +1987,7 @@ export default function CatalogPage() {
 
       {/* ── FOOTER ── */}
       <div style={{ borderTop: "1px solid var(--c-border)", paddingTop: 14, marginTop: 32, fontFamily: mono, fontSize: 10, color: "var(--c-text-3)", letterSpacing: "0.5px" }}>
-        9 SOURCES · {totalPoints} DATA POINTS · {totalActive} ACTIVE · {totalPlanned} PLANNED · {ASSET_GROUPS.length} GROUPS
+        {ALL_SOURCES.length} SOURCES · {totalPoints} DATA POINTS · {totalActive} ACTIVE · {totalPlanned} PLANNED · {ASSET_GROUPS.length} GROUPS
       </div>
 
       {/* ── DATA POINT SLIDE-IN PANEL ── */}
