@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
-  AssetCard, AssetRow, ListColumnHeader, Sparkline,
-  formatPrice, formatVolume, formatMarketCap,
+  AssetCard, AssetRow, ListColumnHeader,
 } from "./GlobalMarketsTerminal.jsx";
 import { STATIC_ASSETS_MAP } from "./components/gmtConfig.js";
+import AssetDetailDrawer from "./components/AssetDetailDrawer.jsx";
 import { fetchB3MarketDataFromServer, bcbMacro, awesomeFx } from "./dataServices.js";
 import { fetchBrazilMacro } from "./services/brazilDataServices.js";
 import { usePreferences } from './context/PreferencesContext.jsx';
@@ -226,103 +226,6 @@ function FilterBar({ section, accentColor, activeSector, setActiveSector }) {
         </div>
       )}
     </div>
-  );
-}
-
-// ─── BRAZIL DETAIL PANEL ─────────────────────────────────────────────────────
-function BrazilDetailPanel({ symbol, data, onClose }) {
-  const asset = STATIC_ASSETS_MAP[symbol];
-  useEffect(() => {
-    const handler = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
-  if (!asset || !data) return null;
-  const positive    = (data.changePct ?? 0) >= 0;
-  const color       = positive ? "#00E676" : "var(--c-error)";
-  const sign        = positive ? "+" : "";
-  const weekHighPct = data.fiftyTwoWeekHigh && data.price
-    ? ((data.price - data.fiftyTwoWeekLow) / (data.fiftyTwoWeekHigh - (data.fiftyTwoWeekLow || 0))) * 100
-    : null;
-  return (
-    <>
-      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 300 }} />
-      <div style={{
-        position: "fixed", top: 0, right: 0, bottom: 0,
-        width: "min(480px, 100vw)",
-        background: "var(--c-panel)", borderLeft: "1px solid var(--c-border)",
-        zIndex: 301, overflowY: "auto",
-        animation: "slideInRight 0.3s cubic-bezier(0.4,0,0.2,1)",
-      }}>
-        <div style={{ padding: "20px 20px 0", borderBottom: "1px solid var(--c-border)", paddingBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 22, fontWeight: 700, color: "var(--c-text)", letterSpacing: "0.5px" }}>{symbol}</span>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, fontWeight: 700, letterSpacing: "0.8px", color: "#080f1a", background: GOLD, borderRadius: 3, padding: "2px 6px" }}>B3</span>
-              </div>
-              <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 13, color: "var(--c-text-2)" }}>{asset.name}</div>
-            </div>
-            <button
-              onClick={onClose}
-              style={{ background: "transparent", border: "1px solid var(--c-border)", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontFamily: "'JetBrains Mono', monospace", fontSize: 14, color: "var(--c-text-3)", transition: "all 0.15s ease" }}
-              onMouseEnter={e => { e.target.style.color = "#ff6b6b"; e.target.style.borderColor = "#ff6b6b"; }}
-              onMouseLeave={e => { e.target.style.color = "var(--c-text-3)"; e.target.style.borderColor = "var(--c-border)"; }}
-            >✕</button>
-          </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 28, fontWeight: 700, color }}>{formatPrice(symbol, data.price)}</span>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, fontWeight: 600, color, background: color + "18", border: `1px solid ${color}30`, borderRadius: 4, padding: "2px 8px" }}>
-              {positive ? "▲" : "▼"} {sign}{data.changePct != null ? data.changePct.toFixed(2) : "—"}%
-            </span>
-            {data.change != null && (
-              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: color + "99" }}>
-                {sign}{data.change.toFixed(2)}
-              </span>
-            )}
-          </div>
-        </div>
-        <div style={{ padding: 20 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-            {[
-              { label: "OPEN",     value: formatPrice(symbol, data.prevClose) },
-              { label: "HIGH",     value: formatPrice(symbol, data.high) },
-              { label: "LOW",      value: formatPrice(symbol, data.low) },
-              { label: "VOLUME",   value: formatVolume(data.volume) },
-              { label: "MKT CAP",  value: data.marketCap ? "R$ " + (data.marketCap >= 1e9 ? (data.marketCap / 1e9).toFixed(1) + "B" : data.marketCap >= 1e6 ? (data.marketCap / 1e6).toFixed(1) + "M" : data.marketCap.toLocaleString()) : "—" },
-              { label: "EXCHANGE", value: asset.exchange || "B3" },
-            ].map(item => (
-              <div key={item.label} style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 6, padding: "10px 12px" }}>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "var(--c-text-3)", letterSpacing: "1px", marginBottom: 4 }}>{item.label}</div>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, fontWeight: 600, color: "var(--c-text)" }}>{item.value}</div>
-              </div>
-            ))}
-          </div>
-          {data.sparkline && data.sparkline.length > 1 && (
-            <div style={{ marginBottom: 20, background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 6, padding: 12 }}>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "var(--c-text-3)", letterSpacing: "1px", marginBottom: 8 }}>TREND (30 POINTS)</div>
-              <Sparkline data={data.sparkline} positive={positive} width={400} height={80} />
-            </div>
-          )}
-          {data.fiftyTwoWeekHigh != null && data.fiftyTwoWeekLow != null && (
-            <div style={{ marginBottom: 20, background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 6, padding: 12 }}>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "var(--c-text-3)", letterSpacing: "1px", marginBottom: 8 }}>52-WEEK RANGE</div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--c-error)" }}>{formatPrice(symbol, data.fiftyTwoWeekLow)}</span>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--c-text-2)" }}>{formatPrice(symbol, data.price)}</span>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#00E676" }}>{formatPrice(symbol, data.fiftyTwoWeekHigh)}</span>
-              </div>
-              <div style={{ height: 4, background: "var(--c-border)", borderRadius: 2, overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, weekHighPct ?? 50))}%`, background: `linear-gradient(90deg,var(--c-error),${GOLD},#00E676)`, borderRadius: 2 }} />
-              </div>
-            </div>
-          )}
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: "var(--c-text-3)", letterSpacing: "0.5px", paddingTop: 12, borderTop: "1px solid var(--c-border)" }}>
-            DATA VIA BRAPI · YAHOO FINANCE (.SA)
-          </div>
-        </div>
-      </div>
-    </>
   );
 }
 
@@ -567,14 +470,13 @@ export default function BrazilTerminal() {
   return (
     <div className="fade-in" data-context="brazil" style={{ paddingTop: 16 }}>
 
-      {/* Detail panel */}
-      {selectedAsset && b3Data?.[selectedAsset] && (
-        <BrazilDetailPanel
-          symbol={selectedAsset}
-          data={b3Data[selectedAsset]}
-          onClose={() => setSelectedAsset(null)}
-        />
-      )}
+      {/* Detail drawer — shared with the Global terminal (self-fetches quote +
+          chart; B3 tickers resolve via taxonomy meta.isB3 → Yahoo `.SA`). */}
+      <AssetDetailDrawer
+        symbol={selectedAsset}
+        onClose={() => setSelectedAsset(null)}
+        onSymbolChange={setSelectedAsset}
+      />
 
       {/* ── BLOCK TABS ── */}
       <div style={{
