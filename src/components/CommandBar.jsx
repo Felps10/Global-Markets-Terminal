@@ -496,13 +496,15 @@ export default function CommandBar({
           open={openPanel === 'sort'}
           onClick={() => togglePanel('sort')}
         />
-        <TabBtn
-          label="EXCHANGE"
-          preview={exchPreview}
-          open={openPanel === 'exchange'}
-          onClick={() => togglePanel('exchange')}
-          disabled={viewMode === 'list'}
-        />
+        {(allExchanges?.length > 0) && (
+          <TabBtn
+            label="EXCHANGE"
+            preview={exchPreview}
+            open={openPanel === 'exchange'}
+            onClick={() => togglePanel('exchange')}
+            disabled={viewMode === 'list'}
+          />
+        )}
 
         {/* SPACER */}
         <div style={{ flex: 1 }} />
