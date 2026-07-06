@@ -7,7 +7,7 @@ import AssetDetailDrawer from "./components/AssetDetailDrawer.jsx";
 import CommandBar from "./components/CommandBar.jsx";
 import GroupSummaryCard from "./components/GroupSummaryCard.jsx";
 import { fetchB3MarketDataFromServer, bcbMacro, awesomeFx } from "./dataServices.js";
-import { fetchBrazilMacro } from "./services/brazilDataServices.js";
+import { fetchBrazilMacro, fetchBrazilTitulos } from "./services/brazilDataServices.js";
 import { usePreferences } from './context/PreferencesContext.jsx';
 import { useWatchlist } from './context/WatchlistContext.jsx';
 import { BRAZIL_BLOCKS, getSectionById } from "./data/brazilBlocks.js";
@@ -242,6 +242,11 @@ export default function BrazilTerminal() {
   const [brazilMacroData, setBrazilMacroData] = useState(null);
   const [macroLoading,    setMacroLoading]    = useState(false);
 
+  // ── Tesouro Direto bonds (lazy — only fetched when the tab is opened) ───────
+  const [titulosData,    setTitulosData]    = useState(null);
+  const [titulosLoading, setTitulosLoading] = useState(false);
+  const [titulosError,   setTitulosError]   = useState(false);
+
   const prevDataRef = useRef(null);
   const intervalRef = useRef(null);
   const mountedRef  = useRef(true);
@@ -318,6 +323,31 @@ export default function BrazilTerminal() {
     const interval = setInterval(fetchMacro, 5 * 60 * 1000); /* macro refresh: 5 min */
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
+
+  // ── Tesouro Direto: fetch once, lazily, the first time the tab is opened.
+  // The server warms a 14MB CSV in the background, so a cold cache replies
+  // { warming: true } — retry every 8s (≤ ~80s) until the bonds are ready. ─────
+  useEffect(() => {
+    if (activeSection !== "titulos-publicos" || titulosData) return;
+    let cancelled = false;
+    let attempts = 0;
+    setTitulosLoading(true);
+    setTitulosError(false);
+    const attempt = async () => {
+      attempts++;
+      try {
+        const d = await fetchBrazilTitulos();
+        if (cancelled) return;
+        if (d?.titulos?.length > 0) { setTitulosData(d); setTitulosLoading(false); return; }
+        if (d?.warming && attempts < 10) { setTimeout(() => { if (!cancelled) attempt(); }, 8000); return; }
+        setTitulosError(true); setTitulosLoading(false);
+      } catch {
+        if (!cancelled) { setTitulosError(true); setTitulosLoading(false); }
+      }
+    };
+    attempt();
+    return () => { cancelled = true; };
+  }, [activeSection, titulosData]);
 
   // ── Derive the active grid section's groups from the static map ──────────────
   // Ações → sectors, FIIs → fund type, ETFs → class. Same shape either way, so
@@ -738,6 +768,57 @@ export default function BrazilTerminal() {
               </div>
             );
           })}
+        </div>
+
+      ) : activeSection === "titulos-publicos" ? (
+        /* ── TÍTULOS PÚBLICOS — Tesouro Direto (latest snapshot) ── */
+        <div style={{ marginTop: 8 }}>
+          {titulosLoading && !titulosData && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "40px 0", justifyContent: "center" }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: GOLD, animation: "pulse 1.2s ease-in-out infinite" }} />
+              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "var(--c-text-3)" }}>Carregando Tesouro Direto…</span>
+            </div>
+          )}
+          {titulosError && !titulosData && (
+            <ComingSoon section={currentSection} />
+          )}
+          {titulosData?.titulos?.length > 0 && (() => {
+            const groups = {};
+            titulosData.titulos.forEach(t => { (groups[t.tipo] = groups[t.tipo] || []).push(t); });
+            const fmtVenc = iso => { const [y, m, d] = (iso || "").split("-"); return d ? `${d}/${m}/${y}` : "—"; };
+            const fmtPct  = n => n == null ? "—" : n.toFixed(2).replace(".", ",") + "%";
+            const fmtPU   = n => n == null ? "—" : "R$ " + n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const cols    = "1fr auto auto";
+            return (
+              <>
+                {Object.entries(groups).map(([tipo, rows]) => (
+                  <div key={tipo} style={{ marginBottom: 20 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, paddingLeft: 12, borderLeft: `3px solid ${GOLD}` }}>
+                      <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: "0.3px", color: "var(--c-text)" }}>{tipo}</span>
+                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)" }}>({rows.length})</span>
+                    </div>
+                    <div style={{ border: "1px solid var(--c-border)", borderRadius: 8, overflow: "hidden" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: cols, gap: 16, padding: "6px 16px", background: "var(--c-surface)", borderBottom: "1px solid var(--c-border)" }}>
+                        {["VENCIMENTO", "TAXA A.A.", "PREÇO UNITÁRIO"].map((h, i) => (
+                          <span key={h} style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: "0.5px", color: "var(--c-text-3)", textAlign: i === 0 ? "left" : "right" }}>{h}</span>
+                        ))}
+                      </div>
+                      {rows.map(t => (
+                        <div key={t.vencimento} style={{ display: "grid", gridTemplateColumns: cols, gap: 16, padding: "9px 16px", borderBottom: "1px solid var(--c-border)", alignItems: "center" }}>
+                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "var(--c-text)" }}>{fmtVenc(t.vencimento)}</span>
+                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700, color: GOLD, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtPct(t.taxaCompra ?? t.taxaVenda)}</span>
+                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "var(--c-text-2)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtPU(t.puCompra ?? t.puVenda)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", letterSpacing: "0.5px", marginTop: 4 }}>
+                  {titulosData.count} títulos · data-base {fmtVenc(titulosData.dataBase)} · FONTE: TESOURO DIRETO
+                </div>
+              </>
+            );
+          })()}
         </div>
 
       ) : !B3_GRID_SECTIONS.has(activeSection) ? (

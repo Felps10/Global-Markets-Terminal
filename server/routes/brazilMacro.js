@@ -4,6 +4,7 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.js';
 import { fetchBCBMacro, fetchBRLRates } from '../services/bcbService.js';
+import { getTesouroTitulos } from '../services/tesouroService.js';
 
 const router = Router();
 
@@ -40,6 +41,25 @@ router.get('/macro', authenticate, async (_req, res) => {
     timestamp: new Date().toISOString(),
     errors,
   });
+});
+
+// GET /titulos — Tesouro Direto bonds (latest snapshot; warmed in the background,
+// served stale-while-revalidating, so this almost never blocks on the download).
+router.get('/titulos', authenticate, async (_req, res) => {
+  try {
+    const data = await getTesouroTitulos();
+    if (!data || !data.titulos?.length) {
+      // Cold start still downloading the 14MB CSV — tell the client to retry.
+      return res.status(202).json({ warming: true, titulos: [], timestamp: new Date().toISOString() });
+    }
+    res.json({ ...data, timestamp: new Date().toISOString() });
+  } catch (err) {
+    res.status(502).json({
+      error: 'TESOURO_UNAVAILABLE',
+      message: err?.message || 'Failed to fetch Tesouro Direto data',
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 export default router;

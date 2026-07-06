@@ -43,3 +43,21 @@ export async function fetchBrazilMacro() {
     return null;
   }
 }
+
+/**
+ * Fetch Tesouro Direto public bonds from the backend endpoint
+ * (server/routes/brazilMacro.js → tesouroService.js).
+ *
+ * Returns { titulos: [...], dataBase, count, timestamp } or null on failure.
+ */
+export async function fetchBrazilTitulos() {
+  const base = import.meta.env.VITE_API_URL || '';
+  const headers = await authHeaders();
+  try {
+    const res = await fetch(`${base}/api/v1/brazil/titulos`, { headers });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
