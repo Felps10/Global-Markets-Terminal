@@ -4,10 +4,12 @@ import { useAuth } from '../hooks/useAuth.js';
 import { ROUTES } from '../lib/routes.js';
 import TaxonomyManager from '../components/admin/TaxonomyManager.jsx';
 import UserManager     from '../components/admin/UserManager.jsx';
+import DataSourcesManager from '../components/admin/DataSourcesManager.jsx';
 
 const TABS = [
-  { id: 'taxonomy', label: 'Taxonomy' },
-  { id: 'users',    label: 'Users'    },
+  { id: 'taxonomy',     label: 'Taxonomy'     },
+  { id: 'users',        label: 'Users'        },
+  { id: 'data-sources', label: 'Data Sources' },
 ];
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -111,8 +113,9 @@ export default function AdminPanel() {
       <div role="tabpanel" style={{
         flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0,
       }}>
-        {activeTab === 'taxonomy' && <TaxonomyManager />}
-        {activeTab === 'users'    && <UserManager />}
+        {activeTab === 'taxonomy'     && <TaxonomyManager />}
+        {activeTab === 'users'        && <UserManager />}
+        {activeTab === 'data-sources' && <DataSourcesManager />}
       </div>
     </div>
   );

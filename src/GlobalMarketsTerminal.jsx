@@ -16,6 +16,7 @@ import {
   fetchLiveQuotes,
   fetchSnapshotFallback,
   parseYahooResults,
+  parseQuotesMap,
 } from "./dataServices.js";
 import {
   STATIC_CATEGORIES, STATIC_ASSETS_MAP, EXCHANGE_COLORS, SOURCE_COLORS,
@@ -287,8 +288,13 @@ export function AssetCard({ symbol, data, onClick, groupLabel, density = "compac
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 5 }}>
             <ExchangeBadge exchange={asset.exchange} />
-            {asset.isCrypto && <SourceBadge source="coingecko" />}
-            {asset.isB3 && <SourceBadge source="brapi" />}
+            {/* Live provider that actually served this quote (Data Source Engine).
+                Falls back to the static per-type guess on the legacy path (no data.source). */}
+            {data.source
+              ? <SourceBadge source={data.source} />
+              : asset.isCrypto ? <SourceBadge source="coingecko" />
+              : asset.isB3     ? <SourceBadge source="brapi" />
+              : null}
             <CrossListBadge symbol={symbol} />
             {groupLabel && (
               <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: dc.assetBadgeSize, padding: "1px 5px", borderRadius: 2, background: "#0a0f1a", color: "#2a4a6a", border: "0.5px solid #1a2f4a" }}>
@@ -579,15 +585,22 @@ export default function GlobalMarketsTerminal() {
 
       // ── Tier 1: Server-side cached quotes (1 request for all data) ──
       const live = await fetchLiveQuotes();
-      if (live?.yahoo?.length) {
-        // Parse Yahoo results with sparkline rolling (same as direct fetch)
+      const usingQuotes = live?.quotes && Object.keys(live.quotes).length > 0;
+      if (usingQuotes) {
+        // Phase C: the server's normalized quotes[symbol] map — one path for every class,
+        // with the winning provider tagged as `source` (drives the per-card source badge).
+        merged = parseQuotesMap(live.quotes, prevDataRef.current, currentAssets, VOLATILITY);
+        source = live.meta?.source || 'live';
+      } else if (live?.yahoo?.length) {
+        // Legacy path (kept for the snapshot fallback + backward compat).
         const yahooData = parseYahooResults(
           live.yahoo, prevDataRef.current, currentAssets, VOLATILITY
         );
         merged = { ...yahooData };
         source = live.meta?.source || 'live';
       }
-      if (live?.crypto && Object.keys(live.crypto).length > 0) {
+      // Legacy crypto merge — only when NOT using the quotes map (which already includes crypto).
+      if (!usingQuotes && live?.crypto && Object.keys(live.crypto).length > 0) {
         // Parse CoinGecko data into market data shape
         const cryptoAssets = Object.entries(currentAssets).filter(([, a]) => a.isCrypto);
         for (const [sym, asset] of cryptoAssets) {

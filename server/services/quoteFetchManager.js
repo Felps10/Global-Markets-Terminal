@@ -16,7 +16,7 @@
 
 import https from 'https';
 import { ensureSession, getSession, refreshSession, httpsGet } from './yahooSession.js';
-import { resolveLiveSymbols, resolveBrazilB3 } from '../lib/symbolResolver.js';
+import { resolveLiveSymbols, resolveBrazilB3, getCachedPlan } from '../lib/symbolResolver.js';
 
 // ─── Cache state ─────────────────────────────────────────────────────────────
 
@@ -524,8 +524,61 @@ function scheduleBrazilB3() {
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
- * Returns the current cache state for both Yahoo and CoinGecko.
- * Data may be stale (check .ts) but is the last-known-good value.
+ * Build the normalized quotes[symbol] map (Phase C): for every planned asset, walk its
+ * config-honored precedence and take the first provider that returned a usable price,
+ * tagging the winner as `source`. This is what makes the admin precedence config fully
+ * effective (beyond the EODHD fetch-set axis) and lets the UI show a per-card source badge.
+ *
+ * Reads the RAW provider caches (yahoo/eodhd/brapi are separate here; getCache only folds
+ * them into the legacy array). BRAPI + Yahoo + EODHD all use Yahoo v7 `regularMarket*`
+ * field names; CoinGecko is mapped into the same shape.
+ */
+function buildQuotesMap(plan) {
+  const quotes = {};
+  if (!plan || plan.length === 0) return quotes;
+
+  const yahooIdx = new Map();
+  for (const q of yahooCache.data || []) if (q && q.symbol != null) yahooIdx.set(q.symbol, q);
+  const eodhdIdx = new Map();
+  for (const q of eodhdCache.data || []) if (q && q.symbol != null) eodhdIdx.set(q.symbol, q);
+  const brapiIdx = new Map();
+  for (const q of brapiCache.data || []) if (q && q.symbol != null) brapiIdx.set(q.symbol, q);
+  const cryptoData = cryptoCache.data || {};
+
+  for (const p of plan) {
+    for (const provider of p.precedence) {
+      let raw = null;
+      if (provider === 'eodhd') raw = eodhdIdx.get(p.display);
+      else if (provider === 'yahoo') raw = yahooIdx.get(p.yahooKey);
+      else if (provider === 'brapi') raw = brapiIdx.get(p.display);
+      else if (provider === 'coingecko') {
+        const c = p.cgId ? cryptoData[p.cgId] : null;
+        if (c && isFiniteNum(c.usd)) raw = { regularMarketPrice: c.usd, regularMarketChangePercent: c.usd_24h_change };
+      }
+      if (raw && isFiniteNum(raw.regularMarketPrice)) {
+        quotes[p.display] = {
+          price:     raw.regularMarketPrice,
+          changePct: isFiniteNum(raw.regularMarketChangePercent) ? raw.regularMarketChangePercent : null,
+          prevClose: isFiniteNum(raw.regularMarketPreviousClose) ? raw.regularMarketPreviousClose : null,
+          high:      isFiniteNum(raw.regularMarketDayHigh) ? raw.regularMarketDayHigh : null,
+          low:       isFiniteNum(raw.regularMarketDayLow) ? raw.regularMarketDayLow : null,
+          volume:    isFiniteNum(raw.regularMarketVolume) ? raw.regularMarketVolume : null,
+          marketCap: isFiniteNum(raw.marketCap) ? raw.marketCap : null,
+          fiftyTwoWeekHigh: isFiniteNum(raw.fiftyTwoWeekHigh) ? raw.fiftyTwoWeekHigh : null,
+          fiftyTwoWeekLow:  isFiniteNum(raw.fiftyTwoWeekLow) ? raw.fiftyTwoWeekLow : null,
+          source:    provider,
+        };
+        break;
+      }
+    }
+  }
+  return quotes;
+}
+
+/**
+ * Returns the current cache state for Yahoo + CoinGecko (legacy arrays, kept for backward
+ * compat) plus the normalized `quotes[symbol]` map (Phase C — the source of truth going
+ * forward). Data may be stale (check .ts) but is the last-known-good value.
  */
 export function getCache() {
   // Merge all provider caches into the single "yahoo" array the client already reads.
@@ -546,6 +599,7 @@ export function getCache() {
   return {
     yahoo: { data: yahooData, ts: mergedTs, error: yahooCache.error },
     crypto: { ...cryptoCache },
+    quotes: buildQuotesMap(getCachedPlan()),
   };
 }
 

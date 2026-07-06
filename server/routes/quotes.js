@@ -86,6 +86,11 @@ router.get('/live', async (req, res) => {
   }
 
   return res.json({
+    // Normalized per-symbol map (Phase C): { [display]: {price, changePct, source, ...} }.
+    // Source of truth going forward; the yahoo/crypto arrays below stay for backward compat.
+    // Empty on the snapshot fallback path (built from the live caches) — clients then read
+    // the yahoo array as before.
+    quotes: cache.quotes || {},
     yahoo:  yahoo  || [],
     crypto: crypto || {},
     meta: {

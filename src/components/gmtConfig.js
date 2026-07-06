@@ -50,6 +50,7 @@ export const EXCHANGE_COLORS = {
 };
 
 export const SOURCE_COLORS = {
+  eodhd:        "#4C6EF5",
   yahoo:        "#7B1FA2",
   finnhub:      "#00BCD4",
   alphaVantage: "#FF9100",
