@@ -528,25 +528,26 @@ export const API_REGISTRY = {
     name: "BRAPI (Brazilian B3 Equities)",
     baseUrl: "https://brapi.dev/api",
     proxyPath: "/proxy/brapi",
-    currentTier: "Free",
-    // ⚠ UNKNOWN LIMIT: BRAPI does not publish explicit rate limits for the free tier.
-    // 100 calls/day is used as a conservative safe assumption. Monitor for 429s.
-    limits: { perMinute: null, perDay: 100, perMonth: null },
+    currentTier: "Pro",
+    // Pro plan: 20 tickers/request, 500k calls/month, 5-min data.
+    limits: { perMinute: null, perDay: null, perMonth: 500_000 },
     costPerCall: null,
     upgradeUrl: "https://brapi.dev",
     notes:
-      "⚠ Rate limits not officially documented. Safe assumption: 100 calls/day. " +
-      "Supports comma-separated tickers in a single batch call. " +
-      "30s cache + 30s polling interval means at most 1 actual API call per 30s.",
+      "Pro plan (500k calls/month, 20 tickers/request). NOTE: primary B3 quotes are now " +
+      "fetched SERVER-SIDE by the quote engine (GET /api/v1/quotes/brazil, BRAPI Pro batch + " +
+      "Yahoo .SA fallback). This client-side path is only the secondary fallback and the " +
+      "Terminal Mini ticker. Same VITE_BRAPI_TOKEN gates both paths.",
     tierOptions: [
       {
-        name: "Free (current)",
+        name: "Pro (current)",
         perMinute: null,
-        perDay: 100,
-        perMonth: null,
-        costPerMonth: 0,
+        perDay: null,
+        perMonth: 500_000,
+        costPerMonth: 21,
         notes:
-          "Assumed limit — not officially documented. If 429s appear, this number needs updating.",
+          "20 tickers/request, 5-min data. Comfortably covers the full B3 universe server-side; " +
+          "client-side fallback usage is negligible against this budget.",
       },
     ],
     endpoints: [
@@ -555,10 +556,10 @@ export const API_REGISTRY = {
         path: "/quote/{tickers}",
         callsPerRequest: 1,
         callsNote:
-          "1 call for all B3 tickers comma-separated in a single request (~14 B3 stocks). " +
-          "Polled every 30s alongside Yahoo market data.",
+          "Client fallback / Terminal Mini only. 1 call for comma-separated tickers. " +
+          "Primary B3 quotes are served server-side via /api/v1/quotes/brazil.",
         cacheTTL: 30,
-        priority: "critical",
+        priority: "high",
         canDefer: false,
         canBatch: true,
       },

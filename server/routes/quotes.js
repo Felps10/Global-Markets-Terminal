@@ -14,7 +14,7 @@
  */
 
 import { Router } from 'express';
-import { getCache, getBrazilB3Cache } from '../services/quoteFetchManager.js';
+import { getCache, getBrazilB3Cache, getFetchStats } from '../services/quoteFetchManager.js';
 import { supabase } from '../db.js';
 
 const router = Router();
@@ -123,6 +123,14 @@ router.get('/brazil', (_req, res) => {
       ts: now,
     },
   });
+});
+
+// GET /api/v1/quotes/status — public, no auth.
+// Per-provider health of the server-side quote engine (EODHD, Yahoo, BRAPI Pro, CoinGecko):
+// last-fetch latency, ok/fail, symbol count, timestamp and a rolling success history. Powers
+// the Data Catalog's server-side source cards (which the browser cannot probe directly).
+router.get('/status', (_req, res) => {
+  return res.json({ providers: getFetchStats(), ts: Date.now() });
 });
 
 export default router;

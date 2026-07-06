@@ -1192,7 +1192,37 @@ export function pushHealthHistory(source, success) {
 //   2. Trigger deferred/backpressure logic on the very function used to detect outages
 //   3. Cache results that must always be fresh to reflect real-time status
 // healthPing calls are tracked via trackApiCall() for display only — not quota-managed.
+// Server-side providers (fetched only by the backend quote engine, not probe-able from the
+// browser). Maps the Catalog source id → its key in GET /api/v1/quotes/status.
+const SERVER_SIDE_HEALTH = { eodhd: "eodhd", brapi: "brapi" };
+
 export async function healthPing(source) {
+  // Server-side providers: read REAL fetch health (latency, ok/fail, coverage, rolling
+  // history) from the engine's /quotes/status endpoint instead of a browser probe.
+  const statusKey = SERVER_SIDE_HEALTH[source];
+  if (statusKey) {
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/quotes/status`, { signal: AbortSignal.timeout(10000) });
+      if (!res.ok) {
+        return { status: "degraded", responseTime: null, error: `status HTTP ${res.status}`, timestamp: Date.now(), rawValue: null, serverSide: true };
+      }
+      const p = (await res.json())?.providers?.[statusKey];
+      if (!p || !p.ts || p.ok === null) {
+        return { status: "degraded", responseTime: null, error: "no server fetch recorded yet", timestamp: Date.now(), rawValue: null, serverSide: true };
+      }
+      return {
+        status: p.ok ? "operational" : "outage",
+        responseTime: p.ms,                                        // real server-side fetch latency
+        error: p.ok ? null : (p.error || "last server fetch failed"),
+        timestamp: p.ts,                                           // last server fetch time
+        rawValue: p.expected ? `${p.count}/${p.expected}` : `${p.count}`,
+        serverSide: true,
+        serverHistory: Array.isArray(p.history) ? p.history : undefined,
+      };
+    } catch (err) {
+      return { status: "outage", responseTime: null, error: err.message, timestamp: Date.now(), rawValue: null, serverSide: true };
+    }
+  }
   const endpoints = {
     yahoo:        `${API_BASE}/proxy/yahoo/v7/finance/quote?symbols=AAPL`,
     finnhub:      FINNHUB_KEY ? `${API_BASE}/proxy/finnhub/quote?symbol=AAPL&token=${FINNHUB_KEY}` : null,
@@ -1247,13 +1277,16 @@ export async function healthPing(source) {
 
 export function getSourceStatus() {
   return {
+    // EODHD key lives server-side (EODHD_API_KEY, no VITE_ prefix), so the browser can't
+    // read it. It is the primary global provider; flagged serverSide for the UI.
+    eodhd:       { active: true,  keyRequired: true,  hasKey: true, serverSide: true },
     yahoo:       { active: true,  keyRequired: false, hasKey: true },
     finnhub:     { active: !!FINNHUB_KEY, keyRequired: true, hasKey: !!FINNHUB_KEY },
     alphaVantage:{ active: !!AV_KEY,      keyRequired: true, hasKey: !!AV_KEY },
     fred:        { active: !!FRED_KEY,    keyRequired: true, hasKey: !!FRED_KEY },
     coingecko:   { active: true,  keyRequired: false, hasKey: true },
     fmp:         { active: !!FMP_KEY,     keyRequired: true, hasKey: !!FMP_KEY },
-    brapi:       { active: !!BRAPI_TOKEN,  keyRequired: true, hasKey: !!BRAPI_TOKEN },
+    brapi:       { active: !!BRAPI_TOKEN,  keyRequired: true, hasKey: !!BRAPI_TOKEN, serverSide: true },
     bcb:         { active: true,  keyRequired: false, hasKey: true },
     awesomeapi:  { active: true,  keyRequired: false, hasKey: true },
   };
