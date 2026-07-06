@@ -47,6 +47,34 @@ const SECTOR_META = {
   "Outros":       { label: "Outros Setores",         icon: "📎"  },
 };
 
+// FII group taxonomy — the `sector` field on `type:"fii"` rows.
+const FII_GROUP_ORDER = ["Tijolo", "Papel", "Híbrido", "FOF"];
+const FII_GROUP_META = {
+  "Tijolo":  { label: "Tijolo",  icon: "🧱" },
+  "Papel":   { label: "Papel",   icon: "📄" },
+  "Híbrido": { label: "Híbrido", icon: "🔀" },
+  "FOF":     { label: "FOF",     icon: "🗂" },
+};
+
+// ETF group taxonomy — the `sector` field on `type:"etf-br"` rows.
+const ETF_GROUP_ORDER = ["Renda Variável", "Internacional", "Renda Fixa"];
+const ETF_GROUP_META = {
+  "Renda Variável": { label: "Renda Variável", icon: "📈" },
+  "Internacional":  { label: "Internacional",  icon: "🌎" },
+  "Renda Fixa":     { label: "Renda Fixa",     icon: "🏦" },
+};
+
+// Which asset-grid sections exist and how to group each from STATIC_ASSETS_MAP.
+// (All of these already flow through the server B3 feed — they were unrendered
+// only because the grouping was hard-scoped to equity-br.)
+const B3_SECTION_CONFIG = {
+  "acoes-b3": { type: "equity-br", order: SECTOR_ORDER,    meta: SECTOR_META },
+  "fiis":     { type: "fii",       order: FII_GROUP_ORDER, meta: FII_GROUP_META },
+  "etfs":     { type: "etf-br",    order: ETF_GROUP_ORDER, meta: ETF_GROUP_META },
+};
+// Sections that render as the shared CommandBar + grouped asset grid.
+const B3_GRID_SECTIONS = new Set(Object.keys(B3_SECTION_CONFIG));
+
 // Computed once — STATIC_ASSETS_MAP is immutable after module init.
 // Was previously a function called on every data refresh; memoized to avoid
 // repeated O(n) filter over the full asset map.
@@ -223,12 +251,19 @@ export default function BrazilTerminal() {
     return () => { mountedRef.current = false; };
   }, []);
 
-  // ── Block navigation ─────────────────────────────────────────────────────────
+  // ── Section / block navigation ───────────────────────────────────────────────
+  // Reset the sector filter when the section changes — each grid section has its
+  // own group taxonomy (equity sectors vs FII types vs ETF classes).
+  const handleSectionChange = useCallback((sectionId) => {
+    setActiveSection(sectionId);
+    setActiveFilter("all");
+  }, []);
+
   const handleBlockChange = useCallback((blockId) => {
     setActiveBlock(blockId);
     const block = BRAZIL_BLOCKS.find(b => b.blockId === blockId);
-    if (block) setActiveSection(block.sections[0].sectionId);
-  }, []);
+    if (block) handleSectionChange(block.sections[0].sectionId);
+  }, [handleSectionChange]);
 
   // ── Active accent color ──────────────────────────────────────────────────────
   const accentColor = useMemo(() =>
@@ -284,20 +319,31 @@ export default function BrazilTerminal() {
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
-  // ── Derive equity sectors from static map ────────────────────────────────────
+  // ── Derive the active grid section's groups from the static map ──────────────
+  // Ações → sectors, FIIs → fund type, ETFs → class. Same shape either way, so
+  // the whole CommandBar + grouped-grid render below is section-agnostic.
   const brazilEquitySectors = useMemo(() => {
+    const cfg = B3_SECTION_CONFIG[activeSection];
+    if (!cfg) return [];
     const map = {};
     Object.entries(STATIC_ASSETS_MAP).forEach(([sym, a]) => {
-      if (!a.isB3 || a.type !== "equity-br") return;
-      const sec = a.sector;
-      if (!sec || !SECTOR_META[sec]) return;
-      if (!map[sec]) map[sec] = [];
-      map[sec].push(sym);
+      if (!a.isB3 || a.type !== cfg.type) return;
+      const g = a.sector;
+      if (!g || !cfg.meta[g]) return;
+      if (!map[g]) map[g] = [];
+      map[g].push(sym);
     });
-    return SECTOR_ORDER
-      .filter(s => map[s])
-      .map(s => ({ id: s, sector: s, ...SECTOR_META[s], tickers: map[s] }));
-  }, []);
+    return cfg.order
+      .filter(g => map[g])
+      .map(g => ({ id: g, sector: g, ...cfg.meta[g], tickers: map[g] }));
+  }, [activeSection]);
+
+  // ── Índices & Benchmarks — read-only benchmark values (^BVSP, IFIX) ─────────
+  const brazilIndices = useMemo(() =>
+    Object.entries(STATIC_ASSETS_MAP)
+      .filter(([, a]) => a.isB3 && a.type === "index-br")
+      .map(([sym, a]) => ({ symbol: sym, name: a.name, display: a.meta?.display || sym })),
+  []);
 
   // ── Toggle helpers ───────────────────────────────────────────────────────────
   const toggleGroup = useCallback((id) => {
@@ -507,7 +553,7 @@ export default function BrazilTerminal() {
           return (
             <button
               key={section.sectionId}
-              onClick={() => setActiveSection(section.sectionId)}
+              onClick={() => handleSectionChange(section.sectionId)}
               style={{
                 fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, fontWeight: 600,
                 padding: "5px 14px", borderRadius: 6, cursor: "pointer",
@@ -523,8 +569,8 @@ export default function BrazilTerminal() {
         })}
       </div>
 
-      {/* ── COMMAND BAR (Ações B3 view) — shared with the Global terminal ── */}
-      {activeSection === "acoes-b3" && (
+      {/* ── COMMAND BAR (asset-grid sections) — shared with the Global terminal ── */}
+      {B3_GRID_SECTIONS.has(activeSection) && (
         <div style={{ marginBottom: 16 }}>
           <CommandBar
             sentiment={sentiment}
@@ -667,7 +713,34 @@ export default function BrazilTerminal() {
           </div>
         </div>
 
-      ) : activeSection !== "acoes-b3" ? (
+      ) : activeSection === "indices-benchmarks" ? (
+        /* ── ÍNDICES & BENCHMARKS — read-only benchmark values ── */
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12, padding: "12px 0" }}>
+          {brazilIndices.map(ix => {
+            const d = b3Data?.[ix.symbol];
+            const pct = d?.changePct;
+            const positive = (pct ?? 0) >= 0;
+            const clr = pct == null ? "var(--c-text-3)" : positive ? "#00E676" : "var(--c-error)";
+            return (
+              <div key={ix.symbol} style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 8, padding: "14px 16px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700, color: GOLD, letterSpacing: "0.5px" }}>{ix.display}</span>
+                  {pct != null && (
+                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 700, color: clr }}>
+                      {positive ? "▲ +" : "▼ "}{pct.toFixed(2)}%
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 22, fontWeight: 700, color: "var(--c-text)", fontVariantNumeric: "tabular-nums" }}>
+                  {d?.price != null ? d.price.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : "—"}
+                </div>
+                <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 11, color: "var(--c-text-3)", marginTop: 4 }}>{ix.name}</div>
+              </div>
+            );
+          })}
+        </div>
+
+      ) : !B3_GRID_SECTIONS.has(activeSection) ? (
         <ComingSoon section={currentSection} />
 
       ) : (
@@ -923,8 +996,8 @@ export default function BrazilTerminal() {
       <div style={{ borderTop: "1px solid var(--c-border)", paddingTop: 14, marginTop: 24, display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 8 }}>
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", letterSpacing: "0.5px" }}>FONTE: BRAPI · BCB · AWESOMEAPI</div>
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", letterSpacing: "0.5px" }}>
-          {activeSection === "acoes-b3"
-            ? `${totalTickers} ATIVOS · ${brazilEquitySectors.length} SETORES · B3 / BOVESPA`
+          {B3_GRID_SECTIONS.has(activeSection)
+            ? `${totalTickers} ATIVOS · ${brazilEquitySectors.length} GRUPOS · B3 / BOVESPA`
             : (FOOTER_SECTION_TEXT[activeSection] || "B3 / BOVESPA")}
           {lastUpdate ? ` · ${lastUpdate.toLocaleTimeString()}` : ""}
         </div>
