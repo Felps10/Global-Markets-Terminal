@@ -11,6 +11,10 @@
 // What each provider is CAPABLE of serving. The Settings UI (Phase C) uses this
 // to avoid offering impossible choices; the resolver uses it to filter orders.
 export const PROVIDER_CAPS = {
+  // EODHD "All-World": global equities/ETFs/ADRs (.US), indices (.INDX), FX (.FOREX),
+  // and B3 (.SA). NOT commodities — EODHD has no commodities/futures exchange (verified
+  // live 2026-07-04: CL/NG/GC/SI `.COMM` 404). Its capability list therefore omits it.
+  eodhd:     ['equity', 'index', 'fx', 'etf', 'b3'],
   yahoo:     ['equity', 'index', 'fx', 'commodity', 'etf', 'b3'],
   brapi:     ['b3'],
   coingecko: ['crypto'],
@@ -36,24 +40,27 @@ export function classify(asset) {
 
 // Recommended precedence per class. Two views:
 //   IDEAL   — the "recommended" order shown in Settings (best data source first).
-//   EFFECTIVE — what we actually run for free today (hybrid): Yahoo-first for B3,
-//               BRAPI only as a fallback, because BRAPI free = 1 ticker/request.
-// Flipping B3 to BRAPI-first later is a config change once a paid plan is added.
+//   EFFECTIVE — what we actually run right now.
+// After the EODHD "All-World" + BRAPI Pro subscription (2026-07-04), EODHD is the
+// primary for global classes (paid API key → no Yahoo datacenter-IP blocking), Yahoo
+// is last-resort fallback. B3's primary stays Yahoo for now — flipping B3 to
+// BRAPI-Pro-primary (+ EODHD `.SA` fallback) is the next increment (a config change
+// here + adding B3 to the EODHD/BRAPI fetch sets).
 export const RECOMMENDED_IDEAL = {
   crypto:     ['coingecko'],
-  b3:         ['brapi', 'yahoo'],
+  b3:         ['brapi', 'eodhd', 'yahoo'],  // BRAPI Pro is freshest for B3 (~5min native)
   'br-macro': ['bcb'],
   'br-fx':    ['bcb', 'yahoo'],
-  index:      ['yahoo'],
-  fx:         ['yahoo'],
-  commodity:  ['yahoo'],
-  etf:        ['yahoo'],
-  equity:     ['yahoo'],
+  index:      ['eodhd', 'yahoo'],
+  fx:         ['eodhd', 'yahoo'],
+  commodity:  ['yahoo'],                     // EODHD has no commodities exchange
+  etf:        ['eodhd', 'yahoo'],
+  equity:     ['eodhd', 'yahoo'],
 };
 
 export const RECOMMENDED_EFFECTIVE = {
   ...RECOMMENDED_IDEAL,
-  b3: ['yahoo', 'brapi'], // hybrid/free default
+  b3: ['yahoo', 'brapi'], // B3 unchanged this increment (BRAPI-Pro-primary is the next one)
 };
 
 /**

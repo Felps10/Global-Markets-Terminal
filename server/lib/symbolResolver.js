@@ -17,7 +17,8 @@
 
 import { supabase } from '../db.js';
 import { YAHOO_SYMBOLS, CRYPTO_IDS } from './terminalSymbols.js';
-import { classify, parseMeta } from './providerRouting.js';
+import { classify, parseMeta, resolvePrecedence } from './providerRouting.js';
+import { yahooToEodhd } from './eodhdSymbols.js';
 
 // Taxonomy changes rarely; re-resolve at most every 5 minutes.
 const TTL = 5 * 60_000;
@@ -42,19 +43,33 @@ export async function resolveLiveSymbols() {
 
     const yahoo = new Set();
     const crypto = {};
-    const b3 = []; // B3 assets: {display, yahoo, brapi} — enables the BRAPI fallback
+    const b3 = [];    // B3 assets: {display, yahoo, brapi} — enables the BRAPI fallback
+    const eodhd = []; // EODHD-primary assets: {display, eodhd} — the paid global feed
 
     for (const a of data) {
       const meta = parseMeta(a.meta);
       const cls = classify(a); // routing authority (server/lib/providerRouting.js)
       if (cls === 'crypto') {
         if (meta.cgId) crypto[a.symbol] = meta.cgId;
-      } else if (cls === 'b3') {
-        const ySym = meta.yahooSymbol || `${a.symbol}.SA`;
-        yahoo.add(ySym); // Yahoo is primary in the effective/free precedence
-        b3.push({ display: a.symbol, yahoo: ySym, brapi: ySym.replace(/\.SA$/, '') });
-      } else if (a.symbol) {
-        yahoo.add(a.symbol);
+        continue;
+      }
+
+      // Yahoo-formatted symbol — the display/fallback key the frontend matches on.
+      let yform;
+      if (cls === 'b3') {
+        yform = meta.yahooSymbol || `${a.symbol}.SA`;
+        b3.push({ display: a.symbol, yahoo: yform, brapi: yform.replace(/\.SA$/, '') });
+      } else {
+        yform = a.symbol;
+      }
+      if (yform) yahoo.add(yform); // Yahoo stays the universal fallback fetch set
+
+      // EODHD primary set: assets whose effective precedence leads with EODHD
+      // (global equity/index/fx today; B3 joins in the next increment). Keyed by the
+      // display symbol so results fold back into the feed with no frontend change.
+      if (resolvePrecedence(a)[0] === 'eodhd') {
+        const ecode = yahooToEodhd(yform, meta);
+        if (ecode) eodhd.push({ display: a.symbol, eodhd: ecode });
       }
     }
 
@@ -62,12 +77,12 @@ export async function resolveLiveSymbols() {
     for (const s of YAHOO_SYMBOLS) yahoo.add(s);
     for (const [sym, id] of Object.entries(CRYPTO_IDS)) if (!crypto[sym]) crypto[sym] = id;
 
-    _cache = { ts: Date.now(), yahoo: [...yahoo], crypto, b3 };
+    _cache = { ts: Date.now(), yahoo: [...yahoo], crypto, b3, eodhd };
     return _cache;
   } catch (err) {
     console.error('[symbolResolver] DB resolve failed — using static fallback:', err.message);
     // Cache the fallback briefly so a persistent DB outage doesn't hammer Supabase.
-    _cache = { ts: Date.now(), yahoo: [...YAHOO_SYMBOLS], crypto: { ...CRYPTO_IDS }, b3: [] };
+    _cache = { ts: Date.now(), yahoo: [...YAHOO_SYMBOLS], crypto: { ...CRYPTO_IDS }, b3: [], eodhd: [] };
     return _cache;
   }
 }
