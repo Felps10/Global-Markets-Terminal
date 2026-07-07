@@ -425,24 +425,34 @@ export const API_REGISTRY = {
     name: "Financial Modeling Prep",
     baseUrl: "https://financialmodelingprep.com/stable",
     proxyPath: "/proxy/fmp",
-    currentTier: "Free",
-    limits: { perMinute: null, perDay: 250, perMonth: null },
-    throttleMs: 1000, // free tier rate limit
+    currentTier: "Premium",
+    limits: { perMinute: 750, perDay: null, perMonth: null },
+    throttleMs: 100, // Premium: 750/min ceiling; light client spacing (10/sec ≪ cap)
     costPerCall: null,
     upgradeUrl: "https://site.financialmodelingprep.com/developer/docs/pricing",
     notes:
-      "Free tier: 250 calls/day. All requests serialized through queue (1 req/sec). " +
+      "Premium ($59/mo) via the /stable API: 750 calls/min, no daily cap. " +
       "429 handled with exponential backoff (1s→2s→4s→8s, max 30s, respects Retry-After). " +
-      "Profile cache 24hr, ratios/DCF 6hr to preserve daily budget.",
+      "Profile cache 24hr, ratios/DCF/key-metrics 6hr.",
     tierOptions: [
       {
-        name: "Free (current)",
+        name: "Premium (current)",
+        perDay: null,
+        perMinute: 750,
+        perMonth: null,
+        costPerMonth: 59,
+        notes:
+          "750 calls/min, no daily cap. Real-time US equities/FX + fundamentals, analyst, " +
+          "technicals, calendars. The licensed primary for the quote engine.",
+      },
+      {
+        name: "Free",
         perDay: 250,
         perMinute: null,
         perMonth: null,
         costPerMonth: 0,
         notes:
-          "Tight budget. fmpBatchProfile × 80 equity symbols = 80 calls in one run. " +
+          "Tight budget (250/day). fmpBatchProfile × 80 equity symbols = 80 calls in one run. " +
           "24hr cache means batch runs only once per session day.",
       },
       {

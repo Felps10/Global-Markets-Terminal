@@ -16,15 +16,17 @@ import { quotaTracker } from '../quotaTracker.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** localStorage key for FMP's per-day counter (mirrors quotaTracker internals) */
-function fmpDayKey() {
+/** localStorage key for an API's per-day counter (mirrors quotaTracker internals) */
+function dayKey(apiId) {
   const today = new Date().toISOString().slice(0, 10);
-  return `quota:daily:${today}:fmp`;
+  return `quota:daily:${today}:${apiId}`;
 }
 
-/** Set FMP per-day used counter directly in localStorage */
-function setFmpUsed(count) {
-  localStorage.setItem(fmpDayKey(), String(count));
+/** Set an API's per-day used counter directly in localStorage.
+ *  The per-day quota tests use alphaVantage (25/day) — FMP is now Premium (750/min,
+ *  no daily cap), so it can no longer back a per-day exhaustion scenario. */
+function setDayUsed(apiId, count) {
+  localStorage.setItem(dayKey(apiId), String(count));
 }
 
 /** A simple fetcher that returns a fixed payload and records how many times it was called */
@@ -38,9 +40,11 @@ function makeFetcher(payload = { ok: true }, callLog = { count: 0 }) {
 // Reset FMP and BRAPI counters after each test
 afterEach(() => {
   quotaTracker.resetCounters('fmp');
+  quotaTracker.resetCounters('alphaVantage');
   quotaTracker.resetCounters('brapi');
   quotaTracker.resetCounters('bcb');
   apiClient.clearDeferredQueue('fmp');
+  apiClient.clearDeferredQueue('alphaVantage');
   apiClient.clearDeferredQueue('brapi');
   vi.restoreAllMocks();
 });
@@ -49,20 +53,20 @@ afterEach(() => {
 
 describe('Test 1 — Quota exhaustion simulation', () => {
   it('allows calls within quota, blocks calls when quota is exhausted', async () => {
-    // FMP limit = 250/day. Set to 249 used (1 remaining).
-    setFmpUsed(249);
+    // AlphaVantage limit = 25/day. Set to 24 used (1 remaining).
+    setDayUsed('alphaVantage', 24);
 
     const callLog = { count: 0 };
     const fetcher = makeFetcher({ company: 'ACME' }, callLog);
 
-    // Call 1: 249 used + 1 cost = 250 total, exactly at limit → should succeed
-    const res1 = await apiClient.call('fmp', 'profile', { symbol: 'ACME' }, { fetcher });
+    // Call 1: 24 used + 1 cost = 25 total, exactly at limit → should succeed
+    const res1 = await apiClient.call('alphaVantage', 'rsi', { symbol: 'ACME' }, { fetcher });
     expect(res1.error).toBeNull();
     expect(res1.data).toEqual({ company: 'ACME' });
     expect(callLog.count).toBe(1);
 
-    // Call 2: 250 used + 1 cost = 251 > 250 → must be blocked with QuotaExhausted
-    const res2 = await apiClient.call('fmp', 'ratiosTTM', { symbol: 'ACME' }, { fetcher });
+    // Call 2: 25 used + 1 cost = 26 > 25 → must be blocked with QuotaExhausted
+    const res2 = await apiClient.call('alphaVantage', 'macd', { symbol: 'ACME' }, { fetcher });
     expect(res2.error).not.toBeNull();
     expect(res2.error.type).toBe('QuotaExhausted');
     expect(res2.data).toBeNull();
@@ -76,22 +80,22 @@ describe('Test 1 — Quota exhaustion simulation', () => {
 
 describe('Test 2 — Page refresh mid-day', () => {
   it('per-day quota counter survives a simulated page refresh via localStorage', () => {
-    // Simulate 50 calls having been recorded before this "page load"
-    setFmpUsed(50);
+    // Simulate 5 calls having been recorded before this "page load" (AlphaVantage: 25/day)
+    setDayUsed('alphaVantage', 5);
 
     // After a page refresh quotaTracker reads from localStorage on first canCall() / getRemainingQuota()
-    const status = quotaTracker.getRemainingQuota('fmp');
+    const status = quotaTracker.getRemainingQuota('alphaVantage');
 
-    expect(status.perDayUsed).toBe(50);
-    expect(status.perDayRemaining).toBe(200); // 250 - 50
+    expect(status.perDayUsed).toBe(5);
+    expect(status.perDayRemaining).toBe(20); // 25 - 5
     expect(status.health).toBe('healthy');   // 80% remaining → healthy
   });
 
   it('canCall returns false after simulated refresh with exhausted per-day counter', () => {
     // Simulate a full day's quota already spent
-    setFmpUsed(250);
+    setDayUsed('alphaVantage', 25);
 
-    const allowed = quotaTracker.canCall('fmp', 'profile', 1);
+    const allowed = quotaTracker.canCall('alphaVantage', 'rsi', 1);
     expect(allowed).toBe(false);
   });
 });
@@ -142,15 +146,15 @@ describe('Test 3 — Cache deduplication', () => {
 
 describe('Test 4 — Deferred queue drain', () => {
   it('defers canDefer:true calls when quota is critical, then drains after recovery', async () => {
-    // FMP profile has canDefer: true, priority: high.
-    // Set FMP to "critical" health: 5–20% remaining. 90% used = 225/250 → 10% remaining → critical.
-    setFmpUsed(225);
+    // AlphaVantage rsi has canDefer: true.
+    // Set AlphaVantage to "critical" health: 5–20% remaining. 22/25 used → 12% remaining → critical.
+    setDayUsed('alphaVantage', 22);
 
     const callLog = { count: 0 };
     const fetcher = makeFetcher({ sector: 'Tech' }, callLog);
 
     // Call should be deferred (not executed yet)
-    const deferredRes = await apiClient.call('fmp', 'profile', { symbol: 'TSLA' }, { fetcher });
+    const deferredRes = await apiClient.call('alphaVantage', 'rsi', { symbol: 'TSLA' }, { fetcher });
     expect(deferredRes.deferred).toBe(true);
     expect(deferredRes.data).toBeNull();
     expect(callLog.count).toBe(0); // fetcher was NOT called
@@ -158,8 +162,8 @@ describe('Test 4 — Deferred queue drain', () => {
     // Deferred queue should have 1 item
     expect(apiClient.getTotalDeferredCount()).toBe(1);
 
-    // Simulate quota recovery: reset FMP counters → health returns to "healthy"
-    quotaTracker.resetCounters('fmp');
+    // Simulate quota recovery: reset AlphaVantage counters → health returns to "healthy"
+    quotaTracker.resetCounters('alphaVantage');
 
     // Manually drain the deferred queue
     await apiClient.drainDeferredQueues();
@@ -171,7 +175,7 @@ describe('Test 4 — Deferred queue drain', () => {
     expect(apiClient.getTotalDeferredCount()).toBe(0);
 
     // The drained call's result should now be in cache — a fresh call returns it without hitting fetcher
-    const cachedRes = await apiClient.call('fmp', 'profile', { symbol: 'TSLA' }, { fetcher });
+    const cachedRes = await apiClient.call('alphaVantage', 'rsi', { symbol: 'TSLA' }, { fetcher });
     expect(cachedRes.fromCache).toBe(true);
     expect(cachedRes.data).toEqual({ sector: 'Tech' });
     expect(callLog.count).toBe(1); // fetcher still called exactly once total
