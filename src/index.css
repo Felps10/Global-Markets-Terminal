@@ -36,6 +36,10 @@ body {
   --c-error:       #FF5252;
   --c-error-dim:   rgba(255, 82, 82, 0.12);
 
+  /* Positive / up states */
+  --c-up:          #00E676;
+  --c-up-dim:      rgba(0, 230, 118, 0.12);
+
   /* Accent — Brazil / Clube context (overrides --c-accent in data-context="brazil") */
   --c-accent-br:       #F5C518;
   --c-accent-br-dim:   rgba(245,197,24,0.12);
@@ -73,6 +77,10 @@ body {
   /* Error states */
   --c-error:       #FF5252;
   --c-error-dim:   rgba(255, 82, 82, 0.12);
+
+  /* Positive / up states */
+  --c-up:          #00A860;
+  --c-up-dim:      rgba(0, 168, 96, 0.12);
 
   /* Accent — Brazil / Clube context */
   --c-accent-br:       #F5C518;
