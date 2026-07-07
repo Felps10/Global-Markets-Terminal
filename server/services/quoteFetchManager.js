@@ -624,6 +624,25 @@ function buildQuotesMap(plan) {
   return quotes;
 }
 
+// Memoized wrapper around buildQuotesMap. buildQuotesMap re-indexes every provider cache
+// into Maps and walks the full ~185-asset plan; its inputs only change when a fetcher writes
+// a new cache (every 120–300s) or the plan is re-resolved. Without this, every /quotes/live
+// request rebuilds the map from scratch. Recompute only when any provider cache timestamp
+// moves (crypto INCLUDED — it feeds buildQuotesMap but is excluded from getCache's mergedTs)
+// or the plan reference changes (getCachedPlan returns a stable ref until invalidate()).
+let _quotesMemo = { key: null, plan: null, result: null };
+
+function getQuotesMap() {
+  const plan = getCachedPlan();
+  const key = `${yahooCache.ts}|${eodhdCache.ts}|${brapiCache.ts}|${cryptoCache.ts}`;
+  if (_quotesMemo.result && _quotesMemo.key === key && _quotesMemo.plan === plan) {
+    return _quotesMemo.result;
+  }
+  const result = buildQuotesMap(plan);
+  _quotesMemo = { key, plan, result };
+  return result;
+}
+
 /**
  * Returns the current cache state for Yahoo + CoinGecko (legacy arrays, kept for backward
  * compat) plus the normalized `quotes[symbol]` map (Phase C — the source of truth going
@@ -648,7 +667,7 @@ export function getCache() {
   return {
     yahoo: { data: yahooData, ts: mergedTs, error: yahooCache.error },
     crypto: { ...cryptoCache },
-    quotes: buildQuotesMap(getCachedPlan()),
+    quotes: getQuotesMap(),
   };
 }
 

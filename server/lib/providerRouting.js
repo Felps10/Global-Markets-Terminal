@@ -24,6 +24,13 @@ export const PROVIDER_CAPS = {
   finnhub:   ['equity'],
 };
 
+// fmp/finnhub are declared in PROVIDER_CAPS for forward-compat (so the Settings UI can
+// offer them) but have NO fetch branch yet in quoteFetchManager.buildQuotesMap. Without
+// this guard, a DB override naming one for a class it "can" serve would pass the capability
+// filter and then silently blank the asset (nothing actually fetches it). Strip them from
+// resolved precedence until they're wired (Phase D), then delete them from this set.
+const UNWIRED_PROVIDERS = new Set(['fmp', 'finnhub']);
+
 // Classify a taxonomy asset into a data class from fields we've validated in prod
 // (exchange / meta / symbol format).
 export function classify(asset) {
@@ -77,8 +84,8 @@ export function resolvePrecedence(asset, overrides = null) {
     overrides?.global ??
     RECOMMENDED_EFFECTIVE[cls] ??
     ['yahoo'];
-  // keep only providers that can actually serve this class
-  order = order.filter((p) => PROVIDER_CAPS[p]?.includes(cls));
+  // keep only providers that can actually serve this class AND are wired to a fetcher
+  order = order.filter((p) => PROVIDER_CAPS[p]?.includes(cls) && !UNWIRED_PROVIDERS.has(p));
   if (order.length === 0) order = RECOMMENDED_EFFECTIVE[cls] ?? ['yahoo'];
   return order;
 }
