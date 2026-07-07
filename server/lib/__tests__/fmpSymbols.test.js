@@ -22,10 +22,21 @@ describe('yahooToFmp', () => {
     expect(yahooToFmp('^N225')).toBeNull();
   });
 
-  it('returns null for equities/FX in Stage 1 (EODHD stays primary)', () => {
-    expect(yahooToFmp('AAPL')).toBeNull();
-    expect(yahooToFmp('EURUSD=X')).toBeNull();
+  it('maps US equities/ETFs/ADRs to the bare ticker (FMP-primary, Stage 2)', () => {
+    expect(yahooToFmp('AAPL')).toBe('AAPL');
+    expect(yahooToFmp('TSM')).toBe('TSM');   // ADR
+    expect(yahooToFmp('EWZ')).toBe('EWZ');   // ETF
+  });
+
+  it('maps FX PAIR=X to the bare pair', () => {
+    expect(yahooToFmp('EURUSD=X')).toBe('EURUSD');
+    expect(yahooToFmp('USDJPY=X')).toBe('USDJPY');
+    expect(yahooToFmp('NZDUSD=X')).toBe('NZDUSD');
+  });
+
+  it('returns null for B3 (.SA) — BRAPI Pro stays primary', () => {
     expect(yahooToFmp('PETR4.SA')).toBeNull();
+    expect(yahooToFmp('VALE3.SA')).toBeNull();
   });
 
   it('honors an explicit meta.fmpSymbol override', () => {

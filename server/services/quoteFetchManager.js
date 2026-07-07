@@ -69,18 +69,22 @@ const BRAPI_INTERVAL       = 900_000;  // 15 min — B3 fallback (free BRAPI = 1
 const BRAPI_MAX_TICKERS    = 25;       // hard cap so the free budget can't run away
 const MAX_BACKOFF          = 600_000;  // 10 min cap
 
-// EODHD (paid, 100k calls/day; bills 1 call/symbol). ~161 global symbols at 180s, 24/7 =
-// ~77k calls/day — under the cap with headroom. Do NOT drop below 180s while B3 (211 more)
-// is out of the EODHD set; adding B3 later needs a market-hours gate + re-run of this math.
-const EODHD_BASE_INTERVAL  = 180_000;  // 3 min
+// EODHD (paid, 100k calls/day; bills 1 call/symbol). Since Stage 2, FMP is PRIMARY for
+// equities/FX (real-time) and EODHD is their WARM FALLBACK + primary for indices, so EODHD
+// runs slower: ~161 symbols at 300s, 24/7 = ~46k calls/day (was ~77k at 180s) — frees budget
+// and stops redundant per-symbol billing for data FMP already serves fresh (5-min index
+// cadence is well within the 15-min tolerance).
+const EODHD_BASE_INTERVAL  = 300_000;  // 5 min (fallback + index cadence)
 const EODHD_BATCH          = 20;       // symbols/request (path symbol + 19 in s=); doc max ~15-20
 const EODHD_CHUNK_GAP      = 150;      // ms between batches
 const EODHD_TIMEOUT_MS     = 12_000;
 
-// FMP "Premium" (paid, /stable API; 1 call/request, 750/min, no daily cap). Stage 1 fetches
-// only ~3 symbols (GCUSD/SIUSD via batch-quote + ^FTSE via single quote), so 120s is ample.
-const FMP_BASE_INTERVAL    = 120_000;  // 2 min
-const FMP_BATCH            = 50;       // symbols per /stable/batch-quote (Stage 1 fits in 1)
+// FMP "Premium" (paid, /stable API; 1 call/request, 750/min, no daily cap, 50GB/30d). Since
+// Stage 2, FMP is PRIMARY for equities/FX + gold/silver (batch-quote) + ^FTSE (single quote):
+// ~153 symbols in ~2 batches + 1 single ≈ 3 calls/60s ≈ 4.3k calls/day, ~2GB/30d — trivial vs
+// the limits. Drives the real-time equity/FX feed, so it polls faster than EODHD.
+const FMP_BASE_INTERVAL    = 60_000;   // 1 min
+const FMP_BATCH            = 100;      // symbols per /stable/batch-quote (verified ~120 in 1 call)
 const FMP_CHUNK_GAP        = 150;      // ms between batches
 const FMP_TIMEOUT_MS       = 12_000;
 
