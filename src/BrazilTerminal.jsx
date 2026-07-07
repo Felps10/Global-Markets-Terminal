@@ -10,7 +10,7 @@ import { fetchB3MarketDataFromServer, bcbMacro, awesomeFx } from "./dataServices
 import { fetchBrazilMacro, fetchBrazilTitulos } from "./services/brazilDataServices.js";
 import { usePreferences } from './context/PreferencesContext.jsx';
 import { useWatchlist } from './context/WatchlistContext.jsx';
-import { BRAZIL_BLOCKS, getSectionById } from "./data/brazilBlocks.js";
+import { BRAZIL_NAV_SECTIONS, getSectionById } from "./data/brazilBlocks.js";
 
 import { CLUBE_COLORS } from './lib/tokens.js';
 
@@ -91,35 +91,31 @@ const FOOTER_SECTION_TEXT = {
   "fiis":               "FIIs · B3 / BOVESPA",
   "etfs":               "ETFs · B3 / BOVESPA",
   "indices-benchmarks": "ÍNDICES & BENCHMARKS",
-  "juros":              "JUROS · BCB",
   "credito":            "CRÉDITO · B3",
   "titulos-publicos":   "TÍTULOS PÚBLICOS · TESOURO DIRETO",
-  "macro-brasil":       "MACRO · BCB / IBGE",
-  "cambio-liquidez":    "CÂMBIO · AWESOMEAPI",
+  "macro-brasil":       "MACRO BRASIL · BCB / IBGE / AWESOMEAPI",
 };
 
 // ─── INDICATOR CARD ───────────────────────────────────────────────────────────
 function IndicatorCard({ symbol, name, value, date, unit, source, category, changePct }) {
   const hasValue = value != null;
-  const sourceColors = { BCB: { color: "#003087", bg: "rgba(0,48,135,0.18)", border: "rgba(0,48,135,0.28)" }, AwesomeAPI: { color: "#FF6B00", bg: "rgba(255,107,0,0.18)", border: "rgba(255,107,0,0.28)" } };
-  const sc = sourceColors[source] || sourceColors.BCB;
   const fmtValue = hasValue
     ? (unit === "R$" ? "R$ " + Number(value).toFixed(2) : unit === "%" ? Number(value).toFixed(2) + "%" : unit === "R$ bi" ? "R$ " + Number(value).toFixed(1) + " bi" : Number(value).toFixed(2))
     : null;
   return (
-    <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: "14px 16px", minWidth: 180, flex: 1 }}>
+    <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: "var(--radius-lg)", padding: "14px 16px", minWidth: 180, flex: 1 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
         <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700, color: GOLD, letterSpacing: "0.5px" }}>{symbol}</span>
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, fontWeight: 700, letterSpacing: "0.5px", color: sc.color, background: sc.bg, border: `1px solid ${sc.border}`, borderRadius: 3, padding: "1px 6px" }}>{source}</span>
+        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, fontWeight: 700, letterSpacing: "0.5px", color: "var(--c-accent-data)", background: "var(--c-accent-data-dim)", border: "1px solid var(--c-accent-data-dim)", borderRadius: 3, padding: "1px 6px" }}>{source}</span>
       </div>
       <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 11, color: "var(--c-text-3)", marginBottom: 8, lineHeight: 1.3 }}>{name}</div>
       {hasValue ? (
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 20, fontWeight: 700, color: GOLD, marginBottom: 4 }}>{fmtValue}</div>
       ) : (
-        <div style={{ width: 40, height: 20, borderRadius: 3, background: "rgba(249,195,0,0.15)", marginBottom: 4 }} className="gmt-blink" />
+        <div style={{ width: 40, height: 20, borderRadius: 3, background: "var(--c-accent-br-dim)", marginBottom: 4 }} className="gmt-blink" />
       )}
       {changePct != null && (
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, color: changePct >= 0 ? "#00E676" : "var(--c-error)", marginBottom: 4 }}>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, color: changePct >= 0 ? "var(--c-up)" : "var(--c-error)", marginBottom: 4 }}>
           {changePct >= 0 ? "+" : ""}{changePct.toFixed(2)}%
         </div>
       )}
@@ -148,48 +144,35 @@ function ComingSoon({ section }) {
   );
 }
 
-// ─── BCB MACRO STRIP ──────────────────────────────────────────────────────────
-function MacroStrip({ macro, extended }) {
-  if (!macro) {
-    return (
-      <div style={{
-        display: "flex", alignItems: "center", gap: 8,
-        background: "rgba(21,101,192,0.08)", border: "1px solid rgba(21,101,192,0.2)",
-        borderRadius: 8, padding: "8px 14px", marginBottom: 16,
-      }}>
-        <div style={{ width: 6, height: 6, borderRadius: "50%", background: GOLD, animation: "pulse 1.2s ease-in-out infinite" }} />
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)" }}>
-          Loading macro data...
-        </span>
-      </div>
-    );
-  }
+// ─── MACRO HEADLINE RAIL ──────────────────────────────────────────────────────
+// Slim, always-visible glance of the four headline rates; clicking opens the
+// full Macro Brasil tab. Replaces the old duplicate MacroStrip.
+function MacroRail({ macro, onOpen }) {
   const items = [
-    { label: "SELIC",   value: macro.selic   != null ? macro.selic   + "%" : "—" },
-    { label: "IPCA",    value: macro.ipca    != null ? macro.ipca    + "%" : "—" },
-    { label: "CDI",     value: macro.cdi     != null ? macro.cdi     + "%" : "—" },
-    { label: "USD/BRL", value: macro.usdBrl  != null ? "R$ " + Number(macro.usdBrl).toFixed(2) : "—", pct: macro.usdBrlPct },
+    { label: "SELIC",   value: macro?.selic  != null ? macro.selic + "%" : "—" },
+    { label: "IPCA",    value: macro?.ipca   != null ? macro.ipca + "%" : "—" },
+    { label: "CDI",     value: macro?.cdi    != null ? macro.cdi + "%" : "—" },
+    { label: "USD/BRL", value: macro?.usdBrl != null ? "R$ " + Number(macro.usdBrl).toFixed(2) : "—", pct: macro?.usdBrlPct },
   ];
-  if (extended?.fx?.['EUR-BRL']?.value != null) {
-    items.push({ label: "EUR/BRL", value: "R$ " + Number(extended.fx['EUR-BRL'].value).toFixed(2), pct: extended.fx['EUR-BRL'].changePct });
-  }
-  if (extended?.fx?.['GBP-BRL']?.value != null) {
-    items.push({ label: "GBP/BRL", value: "R$ " + Number(extended.fx['GBP-BRL'].value).toFixed(2), pct: extended.fx['GBP-BRL'].changePct });
-  }
   return (
-    <div style={{
-      display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16,
-      background: "rgba(21,101,192,0.08)", border: "1px solid rgba(21,101,192,0.2)",
-      borderRadius: 8, padding: "8px 16px", marginBottom: 12,
-    }}>
-      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, fontWeight: 700, letterSpacing: "0.5px", color: "#003087", background: "rgba(0,48,135,0.18)", border: "1px solid rgba(0,48,135,0.28)", borderRadius: 3, padding: "1px 6px" }}>BCB</span>
-      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 8, fontWeight: 700, letterSpacing: "0.5px", color: "#FF6B00", background: "rgba(255,107,0,0.18)", border: "1px solid rgba(255,107,0,0.28)", borderRadius: 3, padding: "1px 6px" }}>AwesomeAPI</span>
+    <div
+      onClick={onOpen}
+      title="Ver Macro Brasil"
+      style={{
+        display: "flex", flexWrap: "wrap", alignItems: "center", gap: 18,
+        background: "var(--c-surface)", border: "1px solid var(--c-border)",
+        borderRadius: "var(--radius-lg)", padding: "8px 16px", marginBottom: 12,
+        cursor: "pointer", transition: "border-color 0.15s ease",
+      }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = GOLD + "55"; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--c-border)"; }}
+    >
       {items.map(it => (
-        <span key={it.label} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)" }}>{it.label}:</span>
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 20, fontWeight: 600, color: it.value === "—" ? "var(--c-text-3)" : GOLD, fontVariantNumeric: "tabular-nums" }}>{it.value}</span>
+        <span key={it.label} style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: "0.5px", color: "var(--c-text-3)" }}>{it.label}</span>
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 15, fontWeight: 700, color: it.value === "—" ? "var(--c-text-3)" : GOLD, fontVariantNumeric: "tabular-nums" }}>{it.value}</span>
           {it.pct != null && (
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: it.pct >= 0 ? "#00E676" : "var(--c-error)" }}>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700, color: it.pct >= 0 ? "var(--c-up)" : "var(--c-error)" }}>
               {it.pct >= 0 ? "+" : ""}{it.pct.toFixed(2)}%
             </span>
           )}
@@ -198,6 +181,20 @@ function MacroStrip({ macro, extended }) {
     </div>
   );
 }
+
+// ─── MACRO BRASIL — consolidated sub-areas (one scroll, each indicator once) ───
+const MACRO_AREAS = [
+  { label: "Juros",                 src: "bcb", unit: "%",  syms: ["CDI", "SELIC", "SELIC-META", "SELIC-EFET"] },
+  { label: "Inflação",              src: "bcb", unit: "%",  syms: ["IPCA", "IGP-M", "INPC"] },
+  { label: "Atividade",             src: "bcb", unit: "%",  syms: ["IBC-Br", "PIB-REAL", "PIB-NOM", "PROD-IND", "VENDAS-VAR"] },
+  { label: "Emprego",               src: "bcb", unit: "%",  syms: ["DESEMPREGO"] },
+  { label: "Fiscal",                src: "bcb", unit: "%",  syms: ["RES-PRIM", "DIVIDA-PUB"] },
+  { label: "Externo",               src: "bcb", unit: "%",  syms: ["RESERVAS"] },
+  { label: "Expectativas",          src: "bcb", unit: "%",  syms: ["FOCUS-IPCA"] },
+  { label: "Crédito",               src: "bcb", unit: "%",  syms: ["INAD"] },
+  { label: "Câmbio",                src: "fx",  unit: "R$", syms: ["USD-BRL", "EUR-BRL", "GBP-BRL"] },
+  { label: "Liquidez & Referência", src: "bcb", unit: "R$", syms: ["PTAX", "M2"] },
+];
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 // Brazil-scoped collapse key — must NOT collide with the Global terminal's
@@ -234,8 +231,7 @@ export default function BrazilTerminal() {
   const [expandedCards,   setExpandedCards]   = useState(new Set());
   const [selectedAsset,   setSelectedAsset]   = useState(null);
 
-  // ── New block/section state ─────────────────────────────────────────────────
-  const [activeBlock,   setActiveBlock]   = useState("mercado");
+  // ── Active section (single-level nav) ────────────────────────────────────────
   const [activeSection, setActiveSection] = useState("acoes-b3");
 
   // ── Extended macro data from backend endpoint ──────────────────────────────
@@ -264,16 +260,8 @@ export default function BrazilTerminal() {
     setActiveFilter("all");
   }, []);
 
-  const handleBlockChange = useCallback((blockId) => {
-    setActiveBlock(blockId);
-    const block = BRAZIL_BLOCKS.find(b => b.blockId === blockId);
-    if (block) handleSectionChange(block.sections[0].sectionId);
-  }, [handleSectionChange]);
-
-  // ── Active accent color ──────────────────────────────────────────────────────
-  const accentColor = useMemo(() =>
-    BRAZIL_BLOCKS.find(b => b.blockId === activeBlock)?.accentColor || GOLD,
-  [activeBlock]);
+  // ── Active accent color — single Brazil gold (blocks retired) ────────────────
+  const accentColor = GOLD;
 
   // ── Data fetching ────────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
@@ -544,41 +532,9 @@ export default function BrazilTerminal() {
         onSymbolChange={setSelectedAsset}
       />
 
-      {/* ── BLOCK TABS ── */}
-      <div style={{
-        display: "flex", alignItems: "flex-end", gap: 0,
-        borderBottom: "1px solid var(--c-border)", marginBottom: 14,
-      }}>
-        {BRAZIL_BLOCKS.map(block => {
-          const isActive = activeBlock === block.blockId;
-          return (
-            <button
-              key={block.blockId}
-              onClick={() => handleBlockChange(block.blockId)}
-              style={{
-                fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 700,
-                letterSpacing: "1.2px", padding: "10px 18px",
-                cursor: "pointer", background: "transparent", outline: "none",
-                border: "none", borderBottom: isActive ? `2px solid ${block.accentColor}` : "2px solid transparent",
-                color: isActive ? block.accentColor : "var(--c-text-3)",
-                transition: "all 0.15s ease",
-                marginBottom: -1,
-              }}
-              onMouseEnter={e => { if (!isActive) e.currentTarget.style.color = "var(--c-text-2)"; }}
-              onMouseLeave={e => { if (!isActive) e.currentTarget.style.color = "var(--c-text-3)"; }}
-            >
-              {block.icon} {block.label.toUpperCase()}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ── BCB MACRO STRIP ── */}
-      <MacroStrip macro={macroData} extended={brazilMacroData} />
-
-      {/* ── SECTION TABS ── */}
+      {/* ── SECTION NAV (single level, flat) ── */}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
-        {BRAZIL_BLOCKS.find(b => b.blockId === activeBlock)?.sections.map(section => {
+        {BRAZIL_NAV_SECTIONS.map(section => {
           const isActive = activeSection === section.sectionId;
           return (
             <button
@@ -598,6 +554,9 @@ export default function BrazilTerminal() {
           );
         })}
       </div>
+
+      {/* ── MACRO HEADLINE RAIL (always visible; opens Macro Brasil) ── */}
+      <MacroRail macro={macroData} onOpen={() => handleSectionChange("macro-brasil")} />
 
       {/* ── COMMAND BAR (asset-grid sections) — shared with the Global terminal ── */}
       {B3_GRID_SECTIONS.has(activeSection) && (
@@ -632,115 +591,38 @@ export default function BrazilTerminal() {
       )}
 
       {/* ── CONTENT AREA ── */}
-      {activeSection === "juros" ? (
-        <div style={{ marginTop: 8 }}>
-          {macroLoading && !brazilMacroData && (
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", marginBottom: 12 }}>Carregando dados BCB...</div>
-          )}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-            {['CDI', 'SELIC', 'SELIC-META', 'SELIC-EFET'].map(sym => {
-              const d = brazilMacroData?.bcb?.[sym];
-              return (
-                <IndicatorCard
-                  key={sym}
-                  symbol={sym}
-                  name={d?.name || sym}
-                  value={d?.value ?? null}
-                  date={d?.date || null}
-                  unit="%"
-                  source="BCB"
-                  category={d?.category || "Juros"}
-                />
-              );
-            })}
-          </div>
-        </div>
-
-      ) : activeSection === "macro-brasil" ? (
+      {activeSection === "macro-brasil" ? (
+        /* ── MACRO BRASIL — Juros · Inflação · Atividade · … · Câmbio · Liquidez (one scroll) ── */
         <div style={{ marginTop: 8 }}>
           {macroLoading && !brazilMacroData && (
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", marginBottom: 12 }}>Carregando indicadores macro...</div>
           )}
-          {[
-            { cat: "Inflação",     syms: ["IPCA", "IGP-M", "INPC"] },
-            { cat: "Atividade",    syms: ["IBC-Br", "PIB-REAL", "PIB-NOM", "PROD-IND", "VENDAS-VAR"] },
-            { cat: "Emprego",      syms: ["DESEMPREGO"] },
-            { cat: "Fiscal",       syms: ["RES-PRIM", "DIVIDA-PUB"] },
-            { cat: "Externo",      syms: ["RESERVAS"] },
-            { cat: "Expectativas", syms: ["FOCUS-IPCA"] },
-            { cat: "Crédito",      syms: ["INAD"] },
-          ].map(group => (
-            <div key={group.cat} style={{ marginBottom: 20 }}>
+          {MACRO_AREAS.map(area => (
+            <div key={area.label} style={{ marginBottom: 20 }}>
               <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: "1px", color: "var(--c-text-3)", textTransform: "uppercase", marginBottom: 8 }}>
-                {group.cat}
+                {area.label}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-                {group.syms.map(sym => {
-                  const d = brazilMacroData?.bcb?.[sym];
+                {area.syms.map(sym => {
+                  const isFx = area.src === "fx";
+                  const d = isFx ? brazilMacroData?.fx?.[sym] : brazilMacroData?.bcb?.[sym];
                   return (
                     <IndicatorCard
                       key={sym}
                       symbol={sym}
-                      name={d?.name || sym}
+                      name={isFx ? sym.replace("-", "/") : (d?.name || sym)}
                       value={d?.value ?? null}
-                      date={d?.date || null}
-                      unit="%"
-                      source="BCB"
-                      category={group.cat}
+                      date={isFx ? null : (d?.date || null)}
+                      unit={sym === "M2" ? "R$ bi" : area.unit}
+                      source={isFx ? "AwesomeAPI" : "BCB"}
+                      category={area.label}
+                      changePct={isFx ? (d?.changePct ?? null) : null}
                     />
                   );
                 })}
               </div>
             </div>
           ))}
-        </div>
-
-      ) : activeSection === "cambio-liquidez" ? (
-        <div style={{ marginTop: 8 }}>
-          {macroLoading && !brazilMacroData && (
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--c-text-3)", marginBottom: 12 }}>Carregando câmbio...</div>
-          )}
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: "1px", color: "var(--c-text-3)", textTransform: "uppercase", marginBottom: 8 }}>
-            CÂMBIO
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
-            {['USD-BRL', 'EUR-BRL', 'GBP-BRL'].map(sym => {
-              const d = brazilMacroData?.fx?.[sym];
-              return (
-                <IndicatorCard
-                  key={sym}
-                  symbol={sym}
-                  name={sym.replace('-', '/')}
-                  value={d?.value ?? null}
-                  date={null}
-                  unit="R$"
-                  source="AwesomeAPI"
-                  category="Câmbio"
-                  changePct={d?.changePct ?? null}
-                />
-              );
-            })}
-          </div>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: "1px", color: "var(--c-text-3)", textTransform: "uppercase", marginBottom: 8 }}>
-            LIQUIDEZ & REFERÊNCIA
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-            {['PTAX', 'M2'].map(sym => {
-              const d = brazilMacroData?.bcb?.[sym];
-              return (
-                <IndicatorCard
-                  key={sym}
-                  symbol={sym}
-                  name={d?.name || sym}
-                  value={d?.value ?? null}
-                  date={d?.date || null}
-                  unit={sym === 'M2' ? 'R$ bi' : 'R$'}
-                  source="BCB"
-                  category={d?.category || "Liquidez"}
-                />
-              );
-            })}
-          </div>
         </div>
 
       ) : activeSection === "indices-benchmarks" ? (

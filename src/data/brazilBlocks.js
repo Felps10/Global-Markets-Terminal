@@ -135,3 +135,18 @@ export const ALL_BRAZIL_SECTIONS = BRAZIL_BLOCKS.flatMap(b =>
 
 // Look up a section (with block context) by sectionId
 export const getSectionById = (id) => ALL_BRAZIL_SECTIONS.find(s => s.sectionId === id);
+
+// ─── FLAT SINGLE-LEVEL NAV ────────────────────────────────────────────────────
+// The two-level block nav was retired: one row of tabs. The three macro sections
+// (juros / macro-brasil / cambio-liquidez) collapse into one "Macro Brasil" entry
+// (rendered as sub-areas in a single scroll). Working sections come before the
+// coming-soon one.
+export const BRAZIL_NAV_SECTIONS = [
+  getSectionById("acoes-b3"),
+  getSectionById("fiis"),
+  getSectionById("etfs"),
+  getSectionById("indices-benchmarks"),
+  getSectionById("titulos-publicos"),
+  getSectionById("credito"),
+  { sectionId: "macro-brasil", label: "Macro Brasil", icon: "📊" },
+];
