@@ -19,10 +19,10 @@ export const PROVIDER_CAPS = {
   brapi:     ['b3'],
   coingecko: ['crypto'],
   bcb:       ['br-macro', 'br-fx'],
-  // FMP "Premium" (paid, /stable API). Stage 1 serves the gaps EODHD can't: gold/silver
-  // futures (GCUSD/SIUSD) + the FTSE 100 index (^FTSE, which EODHD returns "NA" for).
-  // Broadens to equity/fx in Stage 2 (flip to FMP-primary).
-  fmp:       ['commodity', 'index'],
+  // FMP "Premium" (paid, /stable API). PRIMARY for equities/ETFs + FX (real-time + fundamentals,
+  // Stage 2) and gap-filler for gold/silver futures + the ^FTSE index (Stage 1). EODHD stays the
+  // equity/FX fallback and the primary for the other indices (FMP gates 5/12 EU/Asia indices).
+  fmp:       ['equity', 'etf', 'fx', 'commodity', 'index'],
   finnhub:   ['equity'], // wired later (proxy-only today)
 };
 
@@ -61,10 +61,10 @@ export const RECOMMENDED_IDEAL = {
   'br-macro': ['bcb'],
   'br-fx':    ['bcb', 'yahoo'],
   index:      ['eodhd', 'fmp', 'yahoo'],     // EODHD primary; FMP fills ^FTSE (EODHD returns "NA")
-  fx:         ['eodhd', 'yahoo'],
+  fx:         ['fmp', 'eodhd', 'yahoo'],     // FMP real-time; EODHD (~1min) fallback
   commodity:  ['fmp', 'yahoo'],              // FMP Premium gold/silver; CL/NG gated → USO/UNG ETF proxies
-  etf:        ['eodhd', 'yahoo'],
-  equity:     ['eodhd', 'yahoo'],
+  etf:        ['fmp', 'eodhd', 'yahoo'],     // (etf folds into equity via classify; kept consistent)
+  equity:     ['fmp', 'eodhd', 'yahoo'],     // FMP real-time + fundamentals; EODHD (15min) warm fallback
 };
 
 export const RECOMMENDED_EFFECTIVE = {

@@ -94,9 +94,11 @@ export async function resolveLiveSymbols() {
       }
       if (yform) yahoo.add(yform); // Yahoo stays the universal fallback fetch set
 
-      // EODHD primary set: assets whose effective precedence leads with EODHD. Demoting
-      // EODHD for a subgroup drops those assets from the EODHD fetch set → Yahoo carries them.
-      if (precedence[0] === 'eodhd') {
+      // EODHD fetch set: any asset whose precedence INCLUDES eodhd (primary OR fallback).
+      // Since Stage 2, equities/FX have FMP first and EODHD second — keeping them in this set
+      // (via includes, not [0]) gives a WARM fallback cache so FMP is never a hard dependency.
+      // EODHD stays primary for indices. (It runs at a slower cadence now — see EODHD_BASE_INTERVAL.)
+      if (precedence.includes('eodhd')) {
         const ecode = yahooToEodhd(yform, meta);
         if (ecode) eodhd.push({ display: a.symbol, eodhd: ecode });
       }
