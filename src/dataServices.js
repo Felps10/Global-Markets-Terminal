@@ -513,6 +513,7 @@ export async function fmpRatios(symbol) {
       return {
         // Existing fields (keep — other consumers depend on them)
         peRatio:              r.priceToEarningsRatioTTM ?? r.peRatioTTM,
+        eps:                  r.netIncomePerShareTTM ?? null, // /stable/profile no longer carries eps
         debtEquity:           r.debtToEquityRatioTTM ?? r.debtEquityRatioTTM,
         roe:                  r.returnOnEquityTTM ?? null,
         profitMargin:         r.netProfitMarginTTM,
@@ -521,23 +522,47 @@ export async function fmpRatios(symbol) {
         priceToBook:          r.priceToBookRatioTTM ?? null,
         priceToSales:         r.priceToSalesRatioTTM ?? null,
         evToEbitda:           r.enterpriseValueMultipleTTM ?? null,
-        priceToFreeCashFlow:  r.priceToFreeCashFlowsRatioTTM ?? null,
-        // Profitability
+        priceToFreeCashFlow:  r.priceToFreeCashFlowRatioTTM ?? r.priceToFreeCashFlowsRatioTTM ?? null,
+        // Profitability (ROA/ROE are not in /stable/ratios-ttm — see fmpKeyMetrics)
         roa:                  r.returnOnAssetsTTM ?? null,
         grossMargin:          r.grossProfitMarginTTM ?? null,
         operatingMargin:      r.operatingProfitMarginTTM ?? null,
         // Leverage
-        debtToAssets:         r.totalDebtToTotalAssetsTTM ?? r.debtToAssetsTTM ?? null,
-        interestCoverage:     r.interestCoverageTTM ?? null,
+        debtToAssets:         r.debtToAssetsRatioTTM ?? r.totalDebtToTotalAssetsTTM ?? r.debtToAssetsTTM ?? null,
+        interestCoverage:     r.interestCoverageRatioTTM ?? r.interestCoverageTTM ?? null,
         quickRatio:           r.quickRatioTTM ?? null,
         // Dividend
         dividendYield:        r.dividendYieldTTM ?? r.dividendYieldPercentageTTM ?? null,
-        payoutRatio:          r.payoutRatioTTM ?? null,
+        payoutRatio:          r.dividendPayoutRatioTTM ?? r.payoutRatioTTM ?? null,
       };
     },
   });
   if (response.deferred) return null;
   return response.data ?? null;
+}
+
+// Return-on-capital metrics. ROE/ROA are NOT in /stable/ratios-ttm (they moved to
+// key-metrics-ttm in the /stable API) — so the Fundamental Lab's ROE was silently null
+// until this was wired. Cached 6hr like the other slow-moving fundamentals.
+export async function fmpKeyMetrics(symbol) {
+  if (!FMP_KEY) return null;
+  const cacheKey = `fmp:keymetrics:${symbol}`;
+  const cached = cacheGet(cacheKey);
+  if (cached) return cached;
+  const data = await fmpFetch(
+    `${API_BASE}/proxy/fmp/key-metrics-ttm?symbol=${encodeURIComponent(symbol)}&apikey=${FMP_KEY}`
+  );
+  if (data && !data._rateLimited && Array.isArray(data) && data.length > 0) {
+    const r = data[0];
+    const out = {
+      roe:  r.returnOnEquityTTM ?? null,
+      roa:  r.returnOnAssetsTTM ?? null,
+      roic: r.returnOnInvestedCapitalTTM ?? null,
+    };
+    cacheSet(cacheKey, out, 21_600_000); // 6hr
+    return out;
+  }
+  return null;
 }
 
 // DORMANT (D-6) — exported for future panel use; not called by any active UI path.

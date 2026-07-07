@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTaxonomy } from '../../context/TaxonomyContext.jsx';
-import { API_BASE, fmpProfile, fmpRatios, hasFmpKey } from '../../dataServices.js';
+import { API_BASE, fmpProfile, fmpRatios, fmpKeyMetrics, hasFmpKey } from '../../dataServices.js';
 import MarketsPageLayout from '../../components/MarketsPageLayout.jsx';
 import { isExhausted } from '../../services/quotaTracker.js';
 import { useWatchlist } from '../../context/WatchlistContext.jsx';
@@ -66,13 +66,30 @@ function fmtPrice(v) {
 
 // ─── METRICS ─────────────────────────────────────────────────────────────────
 const METRICS = [
+  // Valuation
   { key: 'pe',           label: 'P/E Ratio',    fmt: v => fmtNum(v, 1),   src: 'fmp',   thresholds: { low: 15,  high: 35 } },
   { key: 'eps',          label: 'EPS (TTM)',     fmt: v => (v != null && !isNaN(Number(v))) ? `$${fmtNum(v, 2)}` : '—', src: 'fmp', thresholds: null },
+  { key: 'priceToBook',  label: 'P/B Ratio',     fmt: v => fmtNum(v, 2),   src: 'fmp',   thresholds: null },
+  { key: 'priceToSales', label: 'P/S Ratio',     fmt: v => fmtNum(v, 2),   src: 'fmp',   thresholds: null },
+  { key: 'evToEbitda',   label: 'EV / EBITDA',   fmt: v => fmtNum(v, 1),   src: 'fmp',   thresholds: null },
+  { key: 'priceToFreeCashFlow', label: 'P / FCF', fmt: v => fmtNum(v, 1),  src: 'fmp',   thresholds: null },
+  // Profitability
   { key: 'roe',          label: 'ROE',           fmt: fmtPct,              src: 'fmp',   thresholds: { low: 15,  high: 30, higherBetter: true } },
-  { key: 'debtEquity',   label: 'Debt / Equity', fmt: v => fmtNum(v, 2),   src: 'fmp',   thresholds: { low: 0.5, high: 2 } },
+  { key: 'roa',          label: 'ROA',           fmt: fmtPct,              src: 'fmp',   thresholds: { low: 5,   high: 15, higherBetter: true } },
   { key: 'netMargin',    label: 'Net Margin',    fmt: fmtPct,              src: 'fmp',   thresholds: { low: 0,   high: 20, higherBetter: true } },
+  { key: 'grossMargin',  label: 'Gross Margin',  fmt: fmtPct,              src: 'fmp',   thresholds: { low: 20,  high: 50, higherBetter: true } },
+  { key: 'operatingMargin', label: 'Operating Margin', fmt: fmtPct,        src: 'fmp',   thresholds: { low: 10,  high: 25, higherBetter: true } },
+  // Leverage & liquidity
+  { key: 'debtEquity',   label: 'Debt / Equity', fmt: v => fmtNum(v, 2),   src: 'fmp',   thresholds: { low: 0.5, high: 2 } },
+  { key: 'debtToAssets', label: 'Debt / Assets', fmt: v => fmtNum(v, 2),   src: 'fmp',   thresholds: { low: 0.3, high: 0.6 } },
+  { key: 'interestCoverage', label: 'Interest Coverage', fmt: v => fmtNum(v, 1), src: 'fmp', thresholds: null },
   { key: 'currentRatio', label: 'Current Ratio', fmt: v => fmtNum(v, 2),   src: 'fmp',   thresholds: { low: 1,   high: 3,  higherBetter: true } },
-  { key: 'marketCap',    label: 'Market Cap',    fmt: fmtLarge,            src: 'yahoo', thresholds: null },
+  { key: 'quickRatio',   label: 'Quick Ratio',   fmt: v => fmtNum(v, 2),   src: 'fmp',   thresholds: { low: 1,   high: 3,  higherBetter: true } },
+  // Dividend
+  { key: 'dividendYield', label: 'Dividend Yield', fmt: fmtPct,            src: 'fmp',   thresholds: null },
+  { key: 'payoutRatio',  label: 'Payout Ratio',  fmt: fmtPct,              src: 'fmp',   thresholds: null },
+  // Market
+  { key: 'marketCap',    label: 'Market Cap',    fmt: fmtLarge,            src: 'fmp',   thresholds: null },
   { key: 'price',        label: 'Price',         fmt: fmtPrice,            src: 'yahoo', thresholds: null },
   { key: 'changePct',    label: 'Daily Change',  fmt: v => (v != null && !isNaN(Number(v))) ? `${Number(v) >= 0 ? '+' : ''}${fmtNum(v, 2)}%` : '—', src: 'yahoo', thresholds: null },
   { key: 'volume',       label: 'Volume',        fmt: fmtVol,              src: 'yahoo', thresholds: null },
@@ -87,7 +104,8 @@ function getCellColors(key, value) {
   const { low, high, higherBetter } = m.thresholds;
   let v = Number(value);
   // Normalize decimal-form percentages to percentage form for threshold comparison
-  if (key === 'roe' || key === 'netMargin') v = Math.abs(v) <= 2 ? v * 100 : v;
+  const PCT_KEYS = new Set(['roe', 'roa', 'netMargin', 'grossMargin', 'operatingMargin', 'dividendYield', 'payoutRatio']);
+  if (PCT_KEYS.has(key)) v = Math.abs(v) <= 2 ? v * 100 : v;
   if (higherBetter) {
     if (v > high) return { color: GREEN, background: 'rgba(0,230,118,0.08)' };
     if (v < low)  return { color: RED,   background: 'rgba(255,82,82,0.08)' };
@@ -376,7 +394,6 @@ export default function FundamentalLabPage() {
           price:     q.regularMarketPrice         ?? null,
           changePct: q.regularMarketChangePercent ?? null,
           volume:    q.regularMarketVolume        ?? null,
-          marketCap: q.marketCap                  ?? null,
           loadingYahoo: false,
         },
       }));
@@ -392,23 +409,40 @@ export default function FundamentalLabPage() {
       return;
     }
     try {
-      const [profileRes, ratiosRes] = await Promise.allSettled([
+      const [profileRes, ratiosRes, keyMetricsRes] = await Promise.allSettled([
         fmpProfile(symbol),
         fmpRatios(symbol),
+        fmpKeyMetrics(symbol),
       ]);
-      const profile = profileRes.status === 'fulfilled' ? profileRes.value : null;
-      const ratios  = ratiosRes.status  === 'fulfilled' ? ratiosRes.value  : null;
+      const profile    = profileRes.status    === 'fulfilled' ? profileRes.value    : null;
+      const ratios     = ratiosRes.status     === 'fulfilled' ? ratiosRes.value     : null;
+      const keyMetrics = keyMetricsRes.status === 'fulfilled' ? keyMetricsRes.value : null;
       setAssetData(prev => ({
         ...prev,
         [symbol]: {
           ...prev[symbol],
-          // fmpRatios returns peRatio (not pe) and profitMargin (not netMargin)
+          // fmpRatios returns peRatio (not pe) and profitMargin (not netMargin).
+          // ROE/ROA live in key-metrics-ttm, not ratios-ttm, on the /stable API.
           pe:           ratios?.peRatio     ?? profile?.pe ?? null,
-          eps:          profile?.eps        ?? null,
-          roe:          ratios?.roe         ?? null,
+          eps:          profile?.eps        ?? ratios?.eps ?? null,
+          roe:          keyMetrics?.roe     ?? ratios?.roe ?? null,
+          roa:          keyMetrics?.roa     ?? ratios?.roa ?? null,
           debtEquity:   ratios?.debtEquity  ?? null,
           netMargin:    ratios?.profitMargin ?? null,
+          grossMargin:  ratios?.grossMargin ?? null,
+          operatingMargin: ratios?.operatingMargin ?? null,
           currentRatio: ratios?.currentRatio ?? null,
+          quickRatio:   ratios?.quickRatio ?? null,
+          debtToAssets: ratios?.debtToAssets ?? null,
+          interestCoverage: ratios?.interestCoverage ?? null,
+          priceToBook:  ratios?.priceToBook ?? null,
+          priceToSales: ratios?.priceToSales ?? null,
+          evToEbitda:   ratios?.evToEbitda ?? null,
+          priceToFreeCashFlow: ratios?.priceToFreeCashFlow ?? null,
+          dividendYield: ratios?.dividendYield ?? null,
+          payoutRatio:  ratios?.payoutRatio ?? null,
+          // marketCap now comes from FMP profile (Yahoo v7 is blocked on Railway IPs).
+          marketCap:    profile?.marketCap ?? prev[symbol]?.marketCap ?? null,
           loadingFmp:   false,
         },
       }));
