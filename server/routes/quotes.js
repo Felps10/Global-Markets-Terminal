@@ -19,14 +19,22 @@ import { supabase } from '../db.js';
 
 const router = Router();
 
-// Maximum age (ms) before data is considered "stale" in the response meta
-const STALE_THRESHOLD = 120_000; // 2 min
+// Maximum age (ms) before data is considered "stale" in the response meta.
+// Must sit ABOVE the slowest primary fetch cadence, or a perfectly healthy feed
+// self-labels "stale" for part of every normal cycle: the global feed (EODHD)
+// refreshes every 180s, and the Brazil B3 feed every 300s.
+const STALE_THRESHOLD = 300_000;        // 5 min — global feed (EODHD ~180s cadence)
+const BRAZIL_STALE_THRESHOLD = 420_000; // 7 min — B3 feed cadence is 300s, so allow margin
 
 router.get('/live', async (req, res) => {
   const cache = getCache();
   const now = Date.now();
 
-  const yahooAge  = cache.yahoo.ts  ? now - cache.yahoo.ts  : null;
+  // NB: cache.yahoo.ts is the FRESHEST of the merged global providers
+  // (max of the eodhd/brapi/yahoo timestamps), not Yahoo's alone — so this age
+  // reflects the whole global feed. Surfaced as meta.feedAge below; do NOT read
+  // it as Yahoo's health (that's meta.yahooError).
+  const feedAge   = cache.yahoo.ts  ? now - cache.yahoo.ts  : null;
   const cryptoAge = cache.crypto.ts ? now - cache.crypto.ts : null;
 
   // Determine data source label
@@ -34,12 +42,19 @@ router.get('/live', async (req, res) => {
   let yahoo  = cache.yahoo.data;
   let crypto = cache.crypto.data;
 
-  if (yahoo && yahooAge > STALE_THRESHOLD) {
+  // A fresh-but-empty array ([] with a recent ts) must NOT count as usable data.
+  const hasGlobal = Array.isArray(yahoo) ? yahoo.length > 0 : Boolean(yahoo);
+
+  // Stale if the global feed OR the crypto feed has aged past the threshold.
+  // (Previously only the global feed's age was checked, so a stale CoinGecko
+  // feed silently reported 'live'.)
+  if ((hasGlobal && feedAge > STALE_THRESHOLD) ||
+      (crypto && cryptoAge !== null && cryptoAge > STALE_THRESHOLD)) {
     source = 'stale';
   }
 
-  // If no Yahoo cache at all, fall back to snapshot
-  if (!yahoo) {
+  // If the global feed is missing OR empty, fall back to snapshot.
+  if (!hasGlobal) {
     try {
       const { data: snap, error } = await supabase
         .from('market_snapshot')
@@ -95,7 +110,7 @@ router.get('/live', async (req, res) => {
     crypto: crypto || {},
     meta: {
       source,
-      yahooAge:  yahooAge  !== null ? Math.round(yahooAge)  : null,
+      feedAge:   feedAge   !== null ? Math.round(feedAge)   : null,
       cryptoAge: cryptoAge !== null ? Math.round(cryptoAge) : null,
       yahooError:  cache.yahoo.error  || null,
       cryptoError: cache.crypto.error || null,
@@ -116,7 +131,7 @@ router.get('/brazil', (_req, res) => {
 
   let source = 'live';
   if (count === 0) source = 'empty';            // nothing cached yet → client falls back
-  else if (age !== null && age > STALE_THRESHOLD) source = 'stale';
+  else if (age !== null && age > BRAZIL_STALE_THRESHOLD) source = 'stale';
 
   return res.json({
     b3,
