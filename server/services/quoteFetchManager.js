@@ -17,6 +17,7 @@
 import https from 'https';
 import { ensureSession, getSession, refreshSession, httpsGet } from './yahooSession.js';
 import { resolveLiveSymbols, resolveBrazilB3, getCachedPlan } from '../lib/symbolResolver.js';
+import { isFmpSingleQuote } from '../lib/fmpSymbols.js';
 
 // ─── Cache state ─────────────────────────────────────────────────────────────
 
@@ -30,6 +31,10 @@ let brapiCache  = { data: [], ts: 0 };
 // so EODHD wins precedence (parseYahooResults is last-write-wins). Empty when the key is
 // unset or EODHD is unreachable → the feed transparently falls back to Yahoo.
 let eodhdCache  = { data: [], ts: 0, error: null };
+// FMP "Premium" (paid, /stable API): Stage-1 gap-filler. Yahoo-shaped entries keyed by the
+// display symbol for the classes EODHD can't serve — gold/silver futures (GCUSD/SIUSD) and
+// the FTSE 100 index (^FTSE). Empty when FMP_KEY is unset → those symbols stay dark/on Yahoo.
+let fmpCache    = { data: [], ts: 0, error: null };
 // Brazil-terminal B3 feed (paid BRAPI Pro primary + Yahoo `.SA` fallback). Keyed map
 // { [bareSymbol]: {price, change, changePct, prevClose, high, low, volume, ...} } served by
 // GET /api/v1/quotes/brazil. Replaces the old per-browser, per-ticker client-side BRAPI path.
@@ -42,6 +47,7 @@ let brazilB3Cache = { data: {}, ts: 0, error: null };
 const STAT_HISTORY_MAX = 10;
 const fetchStats = {
   eodhd:     { ok: null, ms: null, ts: 0, count: 0, expected: 0, error: null, history: [] },
+  fmp:       { ok: null, ms: null, ts: 0, count: 0, expected: 0, error: null, history: [] },
   yahoo:     { ok: null, ms: null, ts: 0, count: 0, expected: 0, error: null, history: [] },
   brapi:     { ok: null, ms: null, ts: 0, count: 0, expected: 0, error: null, history: [] },
   coingecko: { ok: null, ms: null, ts: 0, count: 0, expected: 0, error: null, history: [] },
@@ -71,6 +77,13 @@ const EODHD_BATCH          = 20;       // symbols/request (path symbol + 19 in s
 const EODHD_CHUNK_GAP      = 150;      // ms between batches
 const EODHD_TIMEOUT_MS     = 12_000;
 
+// FMP "Premium" (paid, /stable API; 1 call/request, 750/min, no daily cap). Stage 1 fetches
+// only ~3 symbols (GCUSD/SIUSD via batch-quote + ^FTSE via single quote), so 120s is ample.
+const FMP_BASE_INTERVAL    = 120_000;  // 2 min
+const FMP_BATCH            = 50;       // symbols per /stable/batch-quote (Stage 1 fits in 1)
+const FMP_CHUNK_GAP        = 150;      // ms between batches
+const FMP_TIMEOUT_MS       = 12_000;
+
 // Brazil B3 feed (BRAPI Pro: 20 tickers/req, 500k/mo). ~191 names ÷ 20 = 10 req/cycle;
 // at 300s, 24/7 = ~86k req/mo — well under 500k. BRAPI Pro is ~5-min fresh, so ≤5-min cadence
 // gains nothing. Yahoo `.SA` covers the few tickers BRAPI drops.
@@ -87,17 +100,23 @@ const YAHOO_CHUNK_GAP  = 300;  // ms between batches
 let yahooFailures  = 0;
 let cryptoFailures = 0;
 let eodhdFailures  = 0;
+let fmpFailures    = 0;
 let brazilFailures = 0;
 let yahooTimer     = null;
 let cryptoTimer    = null;
 let brapiTimer     = null;
 let eodhdTimer     = null;
+let fmpTimer       = null;
 let brazilTimer    = null;
 let eodhdKeyWarned = false;
+let fmpKeyWarned   = false;
 let brazilTokenWarned = false;
 // EODHD codes that returned a hard 404 (unknown ticker). EODHD fails the WHOLE batch on
 // one bad symbol, so we quarantine confirmed-unknowns to stop them poisoning future batches.
 const eodhdQuarantine = new Set();
+// FMP codes that returned a hard error (e.g. a symbol gated above Premium → 402). FMP's
+// batch endpoint also fails the whole batch on one bad symbol, so quarantine confirmed-bad.
+const fmpQuarantine = new Set();
 
 function getInterval(base, failures) {
   if (failures === 0) return base;
@@ -431,6 +450,150 @@ function scheduleEodhd() {
   }
 }
 
+// ─── FMP fetch (Stage-1 gap-filler: gold/silver futures + ^FTSE) ──────────────
+// FMP "Premium" via the /stable API (legacy /api/v3 is dead → 403). Commodities go through
+// /stable/batch-quote (1 call, many symbols); indices (^…) go through /stable/quote, since
+// batch-quote 402s index symbols. Rows are normalized to the Yahoo shape keyed by the
+// display symbol, so they fold into the quotes map with no frontend change.
+
+// FMP /stable quote + batch-quote share field names: { symbol, price, changePercentage,
+// change, previousClose, dayHigh, dayLow, volume, marketCap, yearHigh, yearLow, ... }.
+function pushFmpRow(out, row, reverse) {
+  if (!row || !isFiniteNum(row.price)) return;
+  const symbol = reverse.get(row.symbol);
+  if (!symbol) return; // unknown code — shouldn't happen (we built the request)
+  out.push({
+    symbol,
+    regularMarketPrice: row.price,
+    regularMarketChangePercent: isFiniteNum(row.changePercentage) ? row.changePercentage : undefined,
+    regularMarketChange: isFiniteNum(row.change) ? row.change : undefined,
+    regularMarketPreviousClose: isFiniteNum(row.previousClose) ? row.previousClose : undefined,
+    regularMarketDayHigh: isFiniteNum(row.dayHigh) ? row.dayHigh : undefined,
+    regularMarketDayLow: isFiniteNum(row.dayLow) ? row.dayLow : undefined,
+    regularMarketVolume: isFiniteNum(row.volume) ? row.volume : undefined,
+    marketCap: isFiniteNum(row.marketCap) && row.marketCap > 0 ? row.marketCap : undefined, // 0 for indices
+    fiftyTwoWeekHigh: isFiniteNum(row.yearHigh) ? row.yearHigh : undefined,
+    fiftyTwoWeekLow: isFiniteNum(row.yearLow) ? row.yearLow : undefined,
+    _source: 'fmp',
+  });
+}
+
+async function fetchFmpBatch(codes) {
+  const params = new URLSearchParams({ symbols: codes.join(','), apikey: process.env.FMP_KEY });
+  const url = `https://financialmodelingprep.com/stable/batch-quote?${params.toString()}`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(FMP_TIMEOUT_MS) });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const json = await r.json();
+  return Array.isArray(json) ? json : [json];
+}
+
+async function fetchFmpSingle(code) {
+  const params = new URLSearchParams({ symbol: code, apikey: process.env.FMP_KEY });
+  const url = `https://financialmodelingprep.com/stable/quote?${params.toString()}`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(FMP_TIMEOUT_MS) });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const json = await r.json();
+  return Array.isArray(json) ? json : [json];
+}
+
+async function fetchFmp() {
+  const tag = '[quoteFetchManager:fmp]';
+  const t0 = Date.now();
+  if (!process.env.FMP_KEY) {
+    if (!fmpKeyWarned) {
+      console.warn(`${tag} FMP_KEY not set — FMP disabled; gold/silver + ^FTSE stay on Yahoo/dark`);
+      fmpKeyWarned = true;
+    }
+    recordStat('fmp', { ok: false, ms: null, error: 'FMP_KEY not set' });
+    scheduleFmp();
+    return;
+  }
+
+  try {
+    const { fmp } = await resolveLiveSymbols();
+    if (!fmp || fmp.length === 0) {
+      fmpCache = { data: [], ts: Date.now(), error: null };
+      fmpFailures = 0;
+      recordStat('fmp', { ok: true, ms: Date.now() - t0, count: 0, expected: 0 });
+      scheduleFmp();
+      return;
+    }
+
+    // Reverse index (FMP code → display) + active, non-quarantined codes split by endpoint:
+    // indices (^…) → single /quote, everything else → batch-quote.
+    const reverse = new Map();
+    const batchCodes = [];
+    const singleCodes = [];
+    for (const f of fmp) {
+      reverse.set(f.fmp, f.display);
+      if (fmpQuarantine.has(f.fmp)) continue;
+      (isFmpSingleQuote(f.fmp) ? singleCodes : batchCodes).push(f.fmp);
+    }
+
+    const out = [];
+    let okReqs = 0;
+    let reqMs = 0, reqN = 0;
+
+    for (const batch of chunk(batchCodes, FMP_BATCH)) {
+      const bt = Date.now();
+      try {
+        for (const row of await fetchFmpBatch(batch)) pushFmpRow(out, row, reverse);
+        okReqs++;
+      } catch (err) {
+        // FMP fails the whole batch on one bad symbol → isolate per-symbol + quarantine.
+        console.warn(`${tag} batch of ${batch.length} failed (${err.message}) — isolating`);
+        for (const code of batch) {
+          try {
+            for (const row of await fetchFmpBatch([code])) pushFmpRow(out, row, reverse);
+            okReqs++;
+          } catch {
+            fmpQuarantine.add(code);
+          }
+        }
+      }
+      reqMs += Date.now() - bt; reqN++;
+      if (batchCodes.length > FMP_BATCH) await new Promise((r) => setTimeout(r, FMP_CHUNK_GAP));
+    }
+
+    for (const code of singleCodes) {
+      const bt = Date.now();
+      try {
+        for (const row of await fetchFmpSingle(code)) pushFmpRow(out, row, reverse);
+        okReqs++;
+      } catch {
+        fmpQuarantine.add(code);
+      }
+      reqMs += Date.now() - bt; reqN++;
+    }
+
+    const attempted = batchCodes.length + singleCodes.length;
+    if (okReqs === 0 && out.length === 0 && attempted > 0) {
+      throw new Error('all FMP requests failed');
+    }
+
+    fmpCache = { data: out, ts: Date.now(), error: null };
+    fmpFailures = 0;
+    recordStat('fmp', { ok: true, ms: reqN ? Math.round(reqMs / reqN) : null, count: out.length, expected: attempted });
+    console.log(`${tag} OK — ${out.length}/${attempted} symbols${fmpQuarantine.size ? ` (${fmpQuarantine.size} quarantined)` : ''}`);
+  } catch (err) {
+    fmpFailures++;
+    fmpCache.error = err.message;
+    recordStat('fmp', { ok: false, ms: Date.now() - t0, error: err.message });
+    console.error(`${tag} FAIL #${fmpFailures}: ${err.message}`);
+  }
+
+  scheduleFmp();
+}
+
+function scheduleFmp() {
+  if (fmpTimer) clearTimeout(fmpTimer);
+  const interval = getInterval(FMP_BASE_INTERVAL, fmpFailures);
+  fmpTimer = setTimeout(fetchFmp, interval);
+  if (fmpFailures > 0) {
+    console.log(`[quoteFetchManager:fmp] Next fetch in ${Math.round(interval / 1000)}s (backoff #${fmpFailures})`);
+  }
+}
+
 // ─── Brazil B3 feed (BRAPI Pro primary + Yahoo .SA fallback) ──────────────────
 // Serves the Brazil terminal's ~191 B3 names from ONE server process (BRAPI Pro, 20/req,
 // every 5 min) instead of every browser firing one request per ticker with the public
@@ -592,6 +755,8 @@ function buildQuotesMap(plan) {
   for (const q of eodhdCache.data || []) if (q && q.symbol != null) eodhdIdx.set(q.symbol, q);
   const brapiIdx = new Map();
   for (const q of brapiCache.data || []) if (q && q.symbol != null) brapiIdx.set(q.symbol, q);
+  const fmpIdx = new Map();
+  for (const q of fmpCache.data || []) if (q && q.symbol != null) fmpIdx.set(q.symbol, q);
   const cryptoData = cryptoCache.data || {};
 
   for (const p of plan) {
@@ -600,6 +765,7 @@ function buildQuotesMap(plan) {
       if (provider === 'eodhd') raw = eodhdIdx.get(p.display);
       else if (provider === 'yahoo') raw = yahooIdx.get(p.yahooKey);
       else if (provider === 'brapi') raw = brapiIdx.get(p.display);
+      else if (provider === 'fmp') raw = fmpIdx.get(p.display);
       else if (provider === 'coingecko') {
         const c = p.cgId ? cryptoData[p.cgId] : null;
         if (c && isFiniteNum(c.usd)) raw = { regularMarketPrice: c.usd, regularMarketChangePercent: c.usd_24h_change };
@@ -628,13 +794,13 @@ function buildQuotesMap(plan) {
 // into Maps and walks the full ~185-asset plan; its inputs only change when a fetcher writes
 // a new cache (every 120–300s) or the plan is re-resolved. Without this, every /quotes/live
 // request rebuilds the map from scratch. Recompute only when any provider cache timestamp
-// moves (crypto INCLUDED — it feeds buildQuotesMap but is excluded from getCache's mergedTs)
-// or the plan reference changes (getCachedPlan returns a stable ref until invalidate()).
+// moves (crypto + fmp INCLUDED — they feed buildQuotesMap but crypto/fmp are excluded from
+// getCache's mergedTs) or the plan reference changes (getCachedPlan returns a stable ref).
 let _quotesMemo = { key: null, plan: null, result: null };
 
 function getQuotesMap() {
   const plan = getCachedPlan();
-  const key = `${yahooCache.ts}|${eodhdCache.ts}|${brapiCache.ts}|${cryptoCache.ts}`;
+  const key = `${yahooCache.ts}|${eodhdCache.ts}|${brapiCache.ts}|${cryptoCache.ts}|${fmpCache.ts}`;
   if (_quotesMemo.result && _quotesMemo.key === key && _quotesMemo.plan === plan) {
     return _quotesMemo.result;
   }
@@ -658,11 +824,12 @@ export function getCache() {
   if (yahooCache.data) parts.push(...yahooCache.data);
   parts.push(...brapiCache.data);
   parts.push(...eodhdCache.data);
+  parts.push(...fmpCache.data);
   const yahooData = parts.length ? parts : yahooCache.data;
 
   // Report the freshest source's timestamp so the /quotes/live staleness label reflects
-  // reality when EODHD is carrying the feed and Yahoo is stale/absent.
-  const mergedTs = Math.max(yahooCache.ts || 0, brapiCache.ts || 0, eodhdCache.ts || 0);
+  // reality when EODHD/FMP are carrying the feed and Yahoo is stale/absent.
+  const mergedTs = Math.max(yahooCache.ts || 0, brapiCache.ts || 0, eodhdCache.ts || 0, fmpCache.ts || 0);
 
   return {
     yahoo: { data: yahooData, ts: mergedTs, error: yahooCache.error },
@@ -699,6 +866,7 @@ export function start() {
   fetchYahoo();
   fetchCoinGecko();
   fetchEodhd(); // primary for global classes; no-ops safely if EODHD_API_KEY is unset
+  fetchFmp();   // gap-filler (gold/silver + ^FTSE); no-ops safely if FMP_KEY is unset
   fetchBrazilB3(); // Brazil-terminal B3 feed; no-ops safely if VITE_BRAPI_TOKEN is unset
   // BRAPI fallback starts after a short delay so the Yahoo cache is populated first
   // (it only fetches B3 tickers missing from Yahoo's results).
@@ -714,5 +882,6 @@ export function stop() {
   if (cryptoTimer) { clearTimeout(cryptoTimer); cryptoTimer = null; }
   if (brapiTimer) { clearTimeout(brapiTimer); brapiTimer = null; }
   if (eodhdTimer) { clearTimeout(eodhdTimer); eodhdTimer = null; }
+  if (fmpTimer) { clearTimeout(fmpTimer); fmpTimer = null; }
   if (brazilTimer) { clearTimeout(brazilTimer); brazilTimer = null; }
 }

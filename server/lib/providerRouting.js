@@ -19,17 +19,19 @@ export const PROVIDER_CAPS = {
   brapi:     ['b3'],
   coingecko: ['crypto'],
   bcb:       ['br-macro', 'br-fx'],
-  // wired later (proxy-only today):
-  fmp:       ['equity'],
-  finnhub:   ['equity'],
+  // FMP "Premium" (paid, /stable API). Stage 1 serves the gaps EODHD can't: gold/silver
+  // futures (GCUSD/SIUSD) + the FTSE 100 index (^FTSE, which EODHD returns "NA" for).
+  // Broadens to equity/fx in Stage 2 (flip to FMP-primary).
+  fmp:       ['commodity', 'index'],
+  finnhub:   ['equity'], // wired later (proxy-only today)
 };
 
-// fmp/finnhub are declared in PROVIDER_CAPS for forward-compat (so the Settings UI can
-// offer them) but have NO fetch branch yet in quoteFetchManager.buildQuotesMap. Without
-// this guard, a DB override naming one for a class it "can" serve would pass the capability
-// filter and then silently blank the asset (nothing actually fetches it). Strip them from
-// resolved precedence until they're wired (Phase D), then delete them from this set.
-const UNWIRED_PROVIDERS = new Set(['fmp', 'finnhub']);
+// finnhub is declared in PROVIDER_CAPS for forward-compat (so the Settings UI can offer it)
+// but has NO fetch branch yet in quoteFetchManager.buildQuotesMap. Without this guard, a DB
+// override naming it for a class it "can" serve would pass the capability filter and then
+// silently blank the asset (nothing actually fetches it). Strip it from resolved precedence
+// until it's wired, then delete it from this set. (fmp was wired in Stage 1.)
+const UNWIRED_PROVIDERS = new Set(['finnhub']);
 
 // Classify a taxonomy asset into a data class from fields we've validated in prod
 // (exchange / meta / symbol format).
@@ -58,9 +60,9 @@ export const RECOMMENDED_IDEAL = {
   b3:         ['brapi', 'eodhd', 'yahoo'],  // BRAPI Pro is freshest for B3 (~5min native)
   'br-macro': ['bcb'],
   'br-fx':    ['bcb', 'yahoo'],
-  index:      ['eodhd', 'yahoo'],
+  index:      ['eodhd', 'fmp', 'yahoo'],     // EODHD primary; FMP fills ^FTSE (EODHD returns "NA")
   fx:         ['eodhd', 'yahoo'],
-  commodity:  ['yahoo'],                     // EODHD has no commodities exchange
+  commodity:  ['fmp', 'yahoo'],              // FMP Premium gold/silver; CL/NG gated → USO/UNG ETF proxies
   etf:        ['eodhd', 'yahoo'],
   equity:     ['eodhd', 'yahoo'],
 };
