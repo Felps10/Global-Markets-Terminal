@@ -632,7 +632,7 @@ export default function BrazilTerminal() {
             const d = b3Data?.[ix.symbol];
             const pct = d?.changePct;
             const positive = (pct ?? 0) >= 0;
-            const clr = pct == null ? "var(--c-text-3)" : positive ? "#00E676" : "var(--c-error)";
+            const clr = pct == null ? "var(--c-text-3)" : positive ? "var(--c-up)" : "var(--c-error)";
             return (
               <div key={ix.symbol} style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 8, padding: "14px 16px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
@@ -771,7 +771,7 @@ export default function BrazilTerminal() {
             const stats    = getSectorStats(sg);
             if (stats.count === 0) return null;
             const isOpen   = expandedCards.has(sg.id);
-            const pctColor = stats.avgPct > 0 ? "#00E676" : stats.avgPct < 0 ? "var(--c-error)" : "var(--c-text-3)";
+            const pctColor = stats.avgPct > 0 ? "var(--c-up)" : stats.avgPct < 0 ? "var(--c-error)" : "var(--c-text-3)";
             const pctSign  = stats.avgPct > 0 ? "+" : stats.avgPct < 0 ? "−" : "";
             const pctArrow = stats.avgPct > 0 ? "↑" : stats.avgPct < 0 ? "↓" : "";
             const syms     = isOpen ? sortedSymbols(sg.tickers.filter(s => b3Data[s])) : null;
@@ -782,7 +782,7 @@ export default function BrazilTerminal() {
                   style={{
                     display: "flex", alignItems: "center",
                     height: 40, padding: "0 16px",
-                    borderLeft: `3px solid ${isOpen ? accentColor : (stats.avgPct >= 0 ? "#00E676" : "var(--c-error)")}`,
+                    borderLeft: `3px solid ${isOpen ? accentColor : (stats.avgPct >= 0 ? "var(--c-up)" : "var(--c-error)")}`,
                     cursor: "pointer", transition: "background 0.15s ease", userSelect: "none",
                   }}
                   onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
@@ -894,7 +894,7 @@ export default function BrazilTerminal() {
             if (syms.length === 0) return null;
             const pcts       = syms.map(s => b3Data[s]?.changePct ?? 0);
             const avgPct     = pcts.reduce((a, b) => a + b, 0) / pcts.length;
-            const avgClr     = avgPct >= 0 ? "#00E676" : "var(--c-error)";
+            const avgClr     = avgPct >= 0 ? "var(--c-up)" : "var(--c-error)";
             const isCollapsed = collapsedGroups[sg.id];
             return (
               <div key={sg.id} className="section-animate" style={{ marginBottom: isCollapsed ? 8 : 24, animationDelay: `${idx * 0.08}s` }}>
