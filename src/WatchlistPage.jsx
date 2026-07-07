@@ -15,6 +15,24 @@ function fmt(symbol, price, assets) {
   return "$" + price.toFixed(4);
 }
 
+// Compact market-cap formatter — T/B/M with the asset's currency prefix.
+function fmtCap(symbol, cap, assets) {
+  if (cap == null || !(cap > 0)) return "—";
+  const unit = assets?.[symbol]?.isB3 ? "R$" : "$";
+  if (cap >= 1e12) return unit + (cap / 1e12).toFixed(2) + "T";
+  if (cap >= 1e9)  return unit + (cap / 1e9).toFixed(1) + "B";
+  if (cap >= 1e6)  return unit + (cap / 1e6).toFixed(0) + "M";
+  return unit + Math.round(cap).toLocaleString();
+}
+
+// 52-week low–high range, using the asset's price precision.
+function fmt52w(symbol, low, high, assets) {
+  if (low == null || high == null) return "—";
+  const d = assets?.[symbol]?.cat === "fx" ? 4 : 2;
+  const n = (v) => (v >= 1000 ? Math.round(v).toLocaleString() : v.toFixed(d));
+  return n(low) + "–" + n(high);
+}
+
 // ─── Shared row for an individual asset ───────────────────────────────────────
 function AssetWatchRow({ symbol, marketData, assets, onUnpin }) {
   const asset   = assets?.[symbol];
@@ -60,6 +78,24 @@ function AssetWatchRow({ symbol, marketData, assets, onUnpin }) {
         color: pctColor, minWidth: 72, textAlign: "right",
       }}>
         {pct != null ? arrow + (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%" : "—"}
+      </span>
+
+      {/* Market cap */}
+      <span style={{
+        fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 600,
+        color: "#94a3b8", minWidth: 84, textAlign: "right",
+        fontVariantNumeric: "tabular-nums",
+      }}>
+        {fmtCap(symbol, live?.marketCap, assets)}
+      </span>
+
+      {/* 52-week range */}
+      <span style={{
+        fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 500,
+        color: "#64748b", minWidth: 100, textAlign: "right",
+        fontVariantNumeric: "tabular-nums",
+      }}>
+        {fmt52w(symbol, live?.fiftyTwoWeekLow, live?.fiftyTwoWeekHigh, assets)}
       </span>
 
       {/* Unpin */}
@@ -158,11 +194,11 @@ export default function WatchlistPage({ watchlistItems: propItems, assets: propA
             display: "flex", gap: 12, padding: "7px 20px",
             borderBottom: "1px solid rgba(51,65,85,0.3)",
           }}>
-            {["SYMBOL", "NAME", "PRICE", "CHANGE", ""].map((h, i) => (
+            {["SYMBOL", "NAME", "PRICE", "CHANGE", "MKT CAP", "52W RANGE", ""].map((h, i) => (
               <span key={i} style={{
                 fontFamily: "'JetBrains Mono', monospace", fontSize: 8,
                 color: "#334155", letterSpacing: "1.5px",
-                flex: i === 1 ? 1 : i === 0 ? "0 0 68px" : i === 2 ? "0 0 90px" : i === 3 ? "0 0 72px" : "0 0 24px",
+                flex: i === 1 ? 1 : i === 0 ? "0 0 68px" : i === 2 ? "0 0 90px" : i === 3 ? "0 0 72px" : i === 4 ? "0 0 84px" : i === 5 ? "0 0 100px" : "0 0 24px",
                 textAlign: i >= 2 ? "right" : "left",
               }}>{h}</span>
             ))}
