@@ -19,6 +19,7 @@ import { supabase } from '../db.js';
 import { YAHOO_SYMBOLS, CRYPTO_IDS } from './terminalSymbols.js';
 import { classify, parseMeta, resolvePrecedence } from './providerRouting.js';
 import { yahooToEodhd } from './eodhdSymbols.js';
+import { yahooToFmp } from './fmpSymbols.js';
 import { loadConfig } from './dataSourceConfig.js';
 
 // Taxonomy changes rarely; re-resolve at most every 5 minutes.
@@ -65,6 +66,7 @@ export async function resolveLiveSymbols() {
     const crypto = {};
     const b3 = [];    // B3 assets: {display, yahoo, brapi} — enables the BRAPI fallback
     const eodhd = []; // EODHD-primary assets: {display, eodhd} — the paid global feed
+    const fmp = [];   // FMP assets: {display, fmp} — gap-filler (gold/silver + ^FTSE) in Stage 1
     const plan = [];  // per-display-symbol routing for the normalized quotes map (Phase C):
                       // { display, precedence, yahooKey?, cgId? } — buildQuotesMap walks it.
 
@@ -99,6 +101,14 @@ export async function resolveLiveSymbols() {
         if (ecode) eodhd.push({ display: a.symbol, eodhd: ecode });
       }
 
+      // FMP set: any asset whose precedence INCLUDES fmp (primary OR fallback) — so a
+      // fallback like ^FTSE (index eodhd→fmp→yahoo) is still fetched. Mapper-gated: only
+      // symbols FMP actually serves on Premium (gold/silver, ^FTSE) return a code.
+      if (precedence.includes('fmp')) {
+        const fcode = yahooToFmp(yform, meta);
+        if (fcode) fmp.push({ display: a.symbol, fmp: fcode });
+      }
+
       plan.push({ display: a.symbol, precedence, yahooKey: yform });
     }
 
@@ -106,12 +116,12 @@ export async function resolveLiveSymbols() {
     for (const s of YAHOO_SYMBOLS) yahoo.add(s);
     for (const [sym, id] of Object.entries(CRYPTO_IDS)) if (!crypto[sym]) crypto[sym] = id;
 
-    _cache = { ts: Date.now(), yahoo: [...yahoo], crypto, b3, eodhd, plan };
+    _cache = { ts: Date.now(), yahoo: [...yahoo], crypto, b3, eodhd, fmp, plan };
     return _cache;
   } catch (err) {
     console.error('[symbolResolver] DB resolve failed — using static fallback:', err.message);
     // Cache the fallback briefly so a persistent DB outage doesn't hammer Supabase.
-    _cache = { ts: Date.now(), yahoo: [...YAHOO_SYMBOLS], crypto: { ...CRYPTO_IDS }, b3: [], eodhd: [], plan: [] };
+    _cache = { ts: Date.now(), yahoo: [...YAHOO_SYMBOLS], crypto: { ...CRYPTO_IDS }, b3: [], eodhd: [], fmp: [], plan: [] };
     return _cache;
   }
 }
