@@ -478,6 +478,11 @@ function pushFmpRow(out, row, reverse) {
     marketCap: isFiniteNum(row.marketCap) && row.marketCap > 0 ? row.marketCap : undefined, // 0 for indices
     fiftyTwoWeekHigh: isFiniteNum(row.yearHigh) ? row.yearHigh : undefined,
     fiftyTwoWeekLow: isFiniteNum(row.yearLow) ? row.yearLow : undefined,
+    // Already in the FMP payload, previously discarded — Yahoo-shaped names so they
+    // fold into the quotes map uniformly with the Yahoo/EODHD rows (zero extra calls).
+    regularMarketOpen: isFiniteNum(row.open) ? row.open : undefined,
+    fiftyDayAverage: isFiniteNum(row.priceAvg50) ? row.priceAvg50 : undefined,
+    twoHundredDayAverage: isFiniteNum(row.priceAvg200) ? row.priceAvg200 : undefined,
     _source: 'fmp',
   });
 }
@@ -785,6 +790,9 @@ function buildQuotesMap(plan) {
           marketCap: isFiniteNum(raw.marketCap) ? raw.marketCap : null,
           fiftyTwoWeekHigh: isFiniteNum(raw.fiftyTwoWeekHigh) ? raw.fiftyTwoWeekHigh : null,
           fiftyTwoWeekLow:  isFiniteNum(raw.fiftyTwoWeekLow) ? raw.fiftyTwoWeekLow : null,
+          open:                isFiniteNum(raw.regularMarketOpen) ? raw.regularMarketOpen : null,
+          fiftyDayAverage:     isFiniteNum(raw.fiftyDayAverage) ? raw.fiftyDayAverage : null,
+          twoHundredDayAverage: isFiniteNum(raw.twoHundredDayAverage) ? raw.twoHundredDayAverage : null,
           source:    provider,
         };
         break;
