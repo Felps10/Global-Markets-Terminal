@@ -15,6 +15,7 @@ import preferencesRoutes from './routes/preferences.js';
 import yahooRoutes       from './routes/yahoo.js';
 import snapshotRoutes    from './routes/snapshot.js';
 import quotesRoutes      from './routes/quotes.js';
+import ohlcvRoutes       from './routes/ohlcv.js';
 import brazilMacroRoutes from './routes/brazilMacro.js';
 import alertsRoutes      from './routes/alerts.js';
 import configRoutes      from './routes/config.js';
@@ -79,6 +80,11 @@ app.use('/api/v1/snapshot', snapshotRoutes);
 // Server-side cached Yahoo + CoinGecko data. All clients read from this
 // instead of each hitting external APIs independently through the proxy.
 app.use('/api/v1/quotes', quotesRoutes);
+
+// /api/v1/ohlcv — PUBLIC (no auth)
+// Daily OHLCV for chart classes the browser can't fetch directly (EU/Asia indices
+// via EODHD, whose key is server-only). Cached ~6h. Non-sensitive market data.
+app.use('/api/v1/ohlcv', ohlcvRoutes);
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/api/v1/health', (_req, res) => res.json({ status: 'ok', ts: Date.now() }));
