@@ -15,7 +15,7 @@ import PriceChart from './PriceChart.jsx';
 import { useTaxonomy } from '../context/TaxonomyContext.jsx';
 import {
   API_BASE,
-  fmpOHLCV,
+  fmpOHLCV, CHART_PROXY,
   fmpProfile, fmpRatios,
   fmpGradesConsensus, fmpPriceTarget, fmpAnalystEstimates,
   finnhubNews,
@@ -910,9 +910,9 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
               candleBorders
               crosshairMode={expanded ? 1 : 0}
               symbol={currentSymbol}
-              intervalLabel={timeframe}
               showLegend={expanded}
               showWatermark={expanded}
+              intervalLabel={CHART_PROXY[currentSymbol] ? `${timeframe} · proxy ${CHART_PROXY[currentSymbol]}` : timeframe}
               colors={{ up: GREEN, down: RED, bg: BG_CARD, text: TXT_2, grid: 'rgba(30,41,59,0.4)', border: 'rgba(30,41,59,0.6)' }}
               recreateKey={`${currentSymbol}:${expanded}`}
               refitKey={expanded}
