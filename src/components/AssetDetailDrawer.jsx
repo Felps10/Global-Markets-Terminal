@@ -11,7 +11,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createChart, AreaSeries, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
+import PriceChart from './PriceChart.jsx';
 import { useTaxonomy } from '../context/TaxonomyContext.jsx';
 import {
   API_BASE,
@@ -428,12 +428,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
   const [chartError,   setChartError]   = useState(null);
   const chartCacheRef     = useRef({});
   const activeSymTfRef    = useRef('');
-  const chartContainerRef = useRef(null);
-  const chartInstanceRef  = useRef(null);
-  const seriesRef         = useRef(null);
-  const volumeSeriesRef   = useRef(null);
-  const chartPointsRef    = useRef(null); // mirror of chartPoints for use in chart init effect
-  const [chartGen, setChartGen] = useState(0); // bumped when chart instance is (re)created
+  // Chart rendering (createChart + series lifecycle) lives in <PriceChart>.
 
   // Peers from same subgroup (for Compare button in Fundamentals tab)
   const peerSymbols = useMemo(() => {
@@ -596,125 +591,8 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
     if (currentSymbol) loadChart(currentSymbol, timeframe, effectiveInterval, isB3);
   }, [currentSymbol, timeframe, effectiveInterval, isB3, loadChart]);
 
-  // ── Chart: create chart instance when container mounts ───────────────────
-  // expanded is in deps because toggling switches conditional branches, which
-  // unmounts and remounts the chart container div (new DOM node).
-  useEffect(() => {
-    if (!currentSymbol) return;
-    const el = chartContainerRef.current;
-    if (!el) return;
-
-    chartInstanceRef.current?.remove();
-    seriesRef.current       = null;
-    volumeSeriesRef.current = null;
-
-    const chart = createChart(el, {
-      autoSize: true,
-      layout: {
-        background: { color: BG_CARD },
-        textColor: TXT_2,
-        fontFamily: "'JetBrains Mono', monospace",
-      },
-      grid: {
-        vertLines: { color: 'rgba(30,41,59,0.4)' },
-        horzLines: { color: 'rgba(30,41,59,0.4)' },
-      },
-      crosshair: { mode: 0 },
-      rightPriceScale: { borderColor: 'rgba(30,41,59,0.6)' },
-      timeScale: { borderColor: 'rgba(30,41,59,0.6)', timeVisible: true, secondsVisible: false },
-      handleScroll: { mouseWheel: true, pressedMouseMove: true },
-      handleScale: { mouseWheel: true, pinch: true },
-    });
-    chartInstanceRef.current = chart;
-    setChartGen(g => g + 1); // signal series effect to re-render
-
-    return () => {
-      chart.remove();
-      chartInstanceRef.current = null;
-      seriesRef.current        = null;
-      volumeSeriesRef.current  = null;
-    };
-  }, [currentSymbol, expanded]);  // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Chart: keep chartPointsRef in sync so render effect can re-apply data
-  useEffect(() => { chartPointsRef.current = chartPoints; }, [chartPoints]);
-
-  // ── Chart: render series when data or chartType changes ────────────────
-  useEffect(() => {
-    const chart = chartInstanceRef.current;
-    if (!chart) return;
-
-    // Remove existing series before creating new ones
-    if (seriesRef.current) {
-      try { chart.removeSeries(seriesRef.current); } catch (_) {}
-      seriesRef.current = null;
-    }
-    if (volumeSeriesRef.current) {
-      try { chart.removeSeries(volumeSeriesRef.current); } catch (_) {}
-      volumeSeriesRef.current = null;
-    }
-
-    const pts = chartPoints ?? chartPointsRef.current;
-    if (!pts?.length) return;
-
-    const isUp = pts[pts.length - 1].close >= pts[0].close;
-
-    if (chartType === 'candle') {
-      // ── Candlestick series ──
-      const series = chart.addSeries(CandlestickSeries, {
-        upColor: GREEN,
-        downColor: RED,
-        borderUpColor: GREEN,
-        borderDownColor: RED,
-        wickUpColor: GREEN,
-        wickDownColor: RED,
-      });
-      series.setData(pts); // [{time, open, high, low, close}]
-      seriesRef.current = series;
-
-      // ── Volume histogram ──
-      const hasVolume = pts.some(c => c.volume > 0);
-      if (hasVolume) {
-        const volSeries = chart.addSeries(HistogramSeries, {
-          priceFormat: { type: 'volume' },
-          priceScaleId: 'volume',
-        });
-        chart.priceScale('volume').applyOptions({
-          scaleMargins: { top: 0.85, bottom: 0 },
-        });
-        volSeries.setData(pts.map(c => ({
-          time: c.time,
-          value: c.volume,
-          color: c.close >= c.open ? 'rgba(0,230,118,0.25)' : 'rgba(255,82,82,0.25)',
-        })));
-        volumeSeriesRef.current = volSeries;
-      }
-    } else {
-      // ── Area series (default) ──
-      const mainColor = isUp ? GREEN : RED;
-      const series = chart.addSeries(AreaSeries, {
-        topColor:    mainColor + '30',
-        bottomColor: 'rgba(0,0,0,0)',
-        lineColor:   mainColor,
-        lineWidth:   2,
-      });
-      series.setData(pts.map(c => ({ time: c.time, value: c.close })));
-      seriesRef.current = series;
-    }
-
-    chart.timeScale().fitContent();
-  }, [chartPoints, chartType, chartGen]);
-
-  // ── Chart: refit after expand/collapse transition ─────────────────────────
-  useEffect(() => {
-    if (!chartInstanceRef.current) return;
-    const timer = setTimeout(() => {
-      if (chartInstanceRef.current) {
-        chartInstanceRef.current.timeScale().fitContent();
-      }
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [expanded]);
+  // Chart rendering (createChart + series lifecycle + refit) is handled by
+  // <PriceChart> in the render below — driven by chartPoints / chartType.
 
   // ── Early exit when closed ────────────────────────────────────────────────
   if (!currentSymbol) return null;
@@ -999,15 +877,24 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
               </span>
             </div>
           )}
-          {/* lightweight-charts mounts here */}
-          <div
-            ref={chartContainerRef}
-            style={{
-              position: 'absolute', inset: 0,
-              opacity: (chartLoading || chartError) ? 0 : 1,
-              transition: 'opacity 0.2s',
-            }}
-          />
+          {/* Shared price chart */}
+          <div style={{
+            position: 'absolute', inset: 0,
+            opacity: (chartLoading || chartError) ? 0 : 1,
+            transition: 'opacity 0.2s',
+          }}>
+            <PriceChart
+              data={chartPoints}
+              seriesType={chartType}
+              showVolume={chartType === 'candle'}
+              areaDirectional
+              candleBorders
+              crosshairMode={0}
+              colors={{ up: GREEN, down: RED, bg: BG_CARD, text: TXT_2, grid: 'rgba(30,41,59,0.4)', border: 'rgba(30,41,59,0.6)' }}
+              recreateKey={`${currentSymbol}:${expanded}`}
+              refitKey={expanded}
+            />
+          </div>
         </div>
 
         {/* Right sidebar — Fundamentals Snapshot (expanded + equity only) */}
