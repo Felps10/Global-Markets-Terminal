@@ -1466,6 +1466,22 @@ async function brapiOHLCV(ticker, timeframe) {
   return dedup.length >= 2 ? dedup : null;
 }
 
+// EODHD daily OHLCV via our own server (the EODHD API key is server-only, so this can't be a
+// client /proxy call). Serves the FMP-gated index classes (EU/Asia indices) that would otherwise
+// fall back to unreliable Yahoo. Returns null on any miss so fmpOHLCV falls through.
+async function eodhdOHLCV(symbol, timeframe) {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/v1/ohlcv?symbol=${encodeURIComponent(symbol)}&tf=${encodeURIComponent(timeframe)}`,
+      { signal: AbortSignal.timeout(12000) }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const candles = Array.isArray(data?.candles) ? data.candles : [];
+    return candles.length >= 2 ? candles : null;
+  } catch { return null; }
+}
+
 export async function fmpOHLCV(symbol, timeframe = '1M', { assets = {}, interval } = {}) {
   const isB3 = assets[symbol]?.isB3;
   // WTI/natgas futures → their liquid ETF proxy (FMP futures history is dead). Everything
@@ -1486,8 +1502,14 @@ export async function fmpOHLCV(symbol, timeframe = '1M', { assets = {}, interval
       if (candles && candles.length >= 2) return candles;
     } catch (_) { /* fall through to Yahoo */ }
   }
-  // Fallback: Yahoo on the ORIGINAL symbol (B3 when BRAPI missed + FMP-gated classes + any
-  // symbol FMP can't resolve). For a proxied future this means the real instrument as a last resort.
+  // EODHD daily fallback for FMP-gated classes (EU/Asia indices) before Yahoo. Skipped for B3
+  // (its BRAPI path already ran) and for proxied futures (charted via the ETF above; EODHD has
+  // no commodity symbol anyway).
+  if (!isB3 && !CHART_PROXY[symbol]) {
+    const candles = await eodhdOHLCV(symbol, timeframe);
+    if (candles && candles.length >= 2) return candles;
+  }
+  // Last resort: Yahoo on the ORIGINAL symbol (anything the sources above couldn't serve).
   return fetchYahooOHLCV(symbol, timeframe, { assets, interval });
 }
 
