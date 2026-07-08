@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import MarketsPageLayout from '../../components/MarketsPageLayout.jsx';
 import { useTaxonomy } from '../../context/TaxonomyContext.jsx';
-import { alphaVantageRSI, alphaVantageMACD, hasAlphaVantageKey } from '../../dataServices.js';
+import { fmpRSI, alphaVantageMACD, hasFmpKey, hasAlphaVantageKey } from '../../dataServices.js';
 import { quotaTracker, isExhausted } from '../../services/quotaTracker.js';
 import { CLUBE_COLORS } from '../../lib/tokens.js';
 
@@ -22,7 +22,6 @@ const ORANGE  = C.amber;
 const AMBER   = '#fbbf24';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const delay = ms => new Promise(r => setTimeout(r, ms));
 const mono  = { fontFamily: "'JetBrains Mono', monospace" };
 const sans  = { fontFamily: "'IBM Plex Sans', sans-serif" };
 
@@ -453,7 +452,7 @@ function ScannerResultsCard({ results, scanLoading, scanProgress, totalToScan, s
             <div style={{ width: `${(scanProgress / totalToScan) * 100}%`, height: '100%', background: ACCENT, borderRadius: 2, transition: 'width 0.3s ease' }} />
           </div>
           <div style={{ ...sans, fontSize: 11, color: TXT_3 }}>
-            Each call takes ~12s to respect rate limits. Est. {(totalToScan - 1) * 12}s total.
+            RSI via FMP Premium — no rate-limit delay.
           </div>
         </div>
       )}
@@ -547,7 +546,6 @@ export default function SignalEnginePage() {
   const [scanProgress, setScanProgress]     = useState(0);
 
   // Quota
-  const [avQuotaWarning, setAvQuotaWarning]   = useState(false);
   const [quotaRemaining, setQuotaRemaining]   = useState(null);
 
   // Mobile
@@ -558,7 +556,6 @@ export default function SignalEnginePage() {
   const refreshQuota = useCallback(() => {
     const status = quotaTracker.getRemainingQuota('alphaVantage');
     setQuotaRemaining(status.perDayRemaining);
-    if (isExhausted('alphaVantage')) setAvQuotaWarning(true);
   }, []);
 
   useEffect(() => {
@@ -584,36 +581,38 @@ export default function SignalEnginePage() {
 
   // ── Fetch RSI + MACD ───────────────────────────────────────────────────────
   const fetchSignals = useCallback(async (symbol, period) => {
-    if (!hasAlphaVantageKey()) {
-      const msg = 'Alpha Vantage API key not configured. Set VITE_ALPHAVANTAGE_KEY in .env.local.';
-      setRsiError(msg); setMacdError(msg); return;
-    }
-    if (isExhausted('alphaVantage')) {
-      setAvQuotaWarning(true);
-      const msg = 'Alpha Vantage daily quota exhausted (25 req/day). Resets at midnight UTC.';
-      setRsiError(msg); setMacdError(msg); return;
-    }
-
     setLoadingRsi(true); setLoadingMacd(true);
     setRsiError(null);   setMacdError(null);
     setRsiData(null);    setMacdData(null);
 
-    const [rsiResult, macdResult] = await Promise.allSettled([
-      alphaVantageRSI(symbol, 'daily', period),
-      alphaVantageMACD(symbol, 'daily'),
-    ]);
+    // RSI — FMP Premium (no daily cap, no 5/min throttle).
+    const rsiPromise = hasFmpKey()
+      ? fmpRSI(symbol, period, '1day')
+      : Promise.reject(new Error('FMP API key not configured. Set VITE_FMP_KEY in .env.local.'));
+
+    // MACD — still AlphaVantage (not a native FMP indicator), so it keeps the 25/day gate.
+    let macdPromise;
+    if (!hasAlphaVantageKey()) {
+      macdPromise = Promise.reject(new Error('Alpha Vantage key not configured (MACD) — set VITE_ALPHAVANTAGE_KEY.'));
+    } else if (isExhausted('alphaVantage')) {
+      macdPromise = Promise.reject(new Error('Alpha Vantage daily quota exhausted (25/day) — MACD unavailable. Resets midnight UTC.'));
+    } else {
+      macdPromise = alphaVantageMACD(symbol, 'daily');
+    }
+
+    const [rsiResult, macdResult] = await Promise.allSettled([rsiPromise, macdPromise]);
 
     if (rsiResult.status === 'fulfilled' && rsiResult.value) {
       setRsiData(rsiResult.value);
     } else {
-      setRsiError('Failed to load RSI data. Check your API key or daily quota.');
+      setRsiError(rsiResult.reason?.message || 'Failed to load RSI data.');
     }
     setLoadingRsi(false);
 
     if (macdResult.status === 'fulfilled' && macdResult.value) {
       setMacdData(macdResult.value);
     } else {
-      setMacdError('Failed to load MACD data. Check your API key or daily quota.');
+      setMacdError(macdResult.reason?.message || 'Failed to load MACD data.');
     }
     setLoadingMacd(false);
     refreshQuota();
@@ -634,11 +633,13 @@ export default function SignalEnginePage() {
 
   const runScan = useCallback(async () => {
     if (!scanSubgroupId || !activeSubgroup) return;
-    if (isExhausted('alphaVantage')) {
-      setScanError('Alpha Vantage daily quota exhausted (25 req/day). Resets at midnight UTC.');
-      setAvQuotaWarning(true); return;
+    if (!hasFmpKey()) {
+      setScanError('FMP API key not configured. Set VITE_FMP_KEY in .env.local.');
+      return;
     }
-    const assetsToScan = (activeSubgroup.assets || []).slice(0, 5);
+    // FMP has no daily cap and 750/min, so we scan the whole subgroup with no
+    // inter-request delay (bounded at 30 to keep the results table sane).
+    const assetsToScan = (activeSubgroup.assets || []).slice(0, 30);
     if (!assetsToScan.length) { setScanError('No assets in this subgroup.'); return; }
 
     setScanLoading(true); setScanError(null); setScanResults([]); setScanProgress(0);
@@ -646,7 +647,7 @@ export default function SignalEnginePage() {
     for (let i = 0; i < assetsToScan.length; i++) {
       const asset = assetsToScan[i];
       try {
-        const rsi = await alphaVantageRSI(asset.symbol, 'daily', 14);
+        const rsi = await fmpRSI(asset.symbol, 14, '1day');
         // newest-first: rsi[0] is most recent
         const rsiValue = rsi?.[0]?.value != null ? Number(rsi[0].value) : null;
         const status = rsiValue != null ? getRsiStatus(rsiValue) : null;
@@ -655,7 +656,6 @@ export default function SignalEnginePage() {
         results.push({ symbol: asset.symbol, name: asset.name, rsi: null, status: null, error: err.message });
       }
       setScanProgress(i + 1);
-      if (i < assetsToScan.length - 1) await delay(12000);
     }
     results.sort((a, b) => {
       if (a.rsi == null && b.rsi == null) return 0;
@@ -695,10 +695,10 @@ export default function SignalEnginePage() {
     const bg     = exhausted ? '#3a0000' : quotaRemaining != null && quotaRemaining <= 5 ? 'rgba(245,158,11,0.08)' : 'rgba(51,65,85,0.3)';
     const border = exhausted ? `1px solid ${RED}55` : quotaRemaining != null && quotaRemaining <= 5 ? `1px solid rgba(245,158,11,0.35)` : `1px solid ${BORDER}`;
     const color  = exhausted ? RED : quotaRemaining != null && quotaRemaining <= 5 ? AMBER : TXT_3;
-    const label  = exhausted ? 'AV QUOTA EXHAUSTED' : quotaRemaining != null && quotaRemaining <= 5 ? `AV: ${quotaRemaining} CALLS LEFT` : `AV: ${quotaRemaining ?? 25}/25 DAILY`;
+    const label  = exhausted ? 'MACD·AV EXHAUSTED' : quotaRemaining != null && quotaRemaining <= 5 ? `MACD·AV: ${quotaRemaining} LEFT` : `MACD·AV: ${quotaRemaining ?? 25}/25`;
     return (
       <div
-        title="Alpha Vantage free tier: 25 requests per day. Resets at midnight UTC."
+        title="MACD runs on Alpha Vantage (free tier: 25/day, resets midnight UTC). RSI runs on FMP Premium (no daily cap)."
         style={{ ...mono, fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', color, background: bg, border, borderRadius: 4, padding: '4px 10px', cursor: 'default' }}
       >
         {label}
@@ -789,7 +789,7 @@ export default function SignalEnginePage() {
 
           {/* Data source note */}
           <div style={{ ...sans, fontSize: 11, color: TXT_3, lineHeight: 1.5 }}>
-            RSI and MACD via Alpha Vantage.<br />Free tier: 25 req/day.
+            RSI via FMP Premium (no daily cap).<br />MACD via Alpha Vantage (25/day free tier).
           </div>
         </div>
       ) : (
@@ -820,36 +820,30 @@ export default function SignalEnginePage() {
           {activeSubgroup && (
             <div style={{ ...sans, fontSize: 11, color: TXT_3 }}>
               {activeSubgroup.assets?.length ?? 0} assets in this subgroup
-              {(activeSubgroup.assets?.length ?? 0) > 5 && (
+              {(activeSubgroup.assets?.length ?? 0) > 30 && (
                 <div style={{ color: AMBER, marginTop: 4 }}>
-                  Scanner limited to 5 assets. First 5 will be scanned to preserve daily quota.
+                  First 30 will be scanned.
                 </div>
               )}
             </div>
           )}
 
-          {/* Run scan button */}
+          {/* Run scan button — RSI scan runs on FMP (no daily cap), so AV quota
+              does not gate it. */}
           <button
             onClick={runScan}
-            disabled={!scanSubgroupId || scanLoading || exhausted}
+            disabled={!scanSubgroupId || scanLoading}
             style={{
               width: '100%', padding: '10px 0', ...mono, fontSize: 12, fontWeight: 700,
-              background: !scanSubgroupId || scanLoading || exhausted ? '#334155' : ACCENT,
-              color: '#fff', border: 'none', borderRadius: 4, cursor: !scanSubgroupId || scanLoading || exhausted ? 'not-allowed' : 'pointer',
+              background: !scanSubgroupId || scanLoading ? '#334155' : ACCENT,
+              color: '#fff', border: 'none', borderRadius: 4, cursor: !scanSubgroupId || scanLoading ? 'not-allowed' : 'pointer',
             }}
           >
-            {exhausted ? 'Quota Exhausted' : scanLoading ? 'Scanning...' : 'Run RSI Scan →'}
+            {scanLoading ? 'Scanning...' : 'Run RSI Scan →'}
           </button>
 
-          {/* Quota warning */}
-          {avQuotaWarning && (
-            <div style={{ background: 'rgba(245,158,11,0.08)', border: `1px solid rgba(245,158,11,0.3)`, borderRadius: 4, padding: '8px 10px', ...sans, fontSize: 11, color: AMBER }}>
-              ⚠ Alpha Vantage free tier: 25 req/day. Each scan uses 1 call per asset (max 5 calls).
-            </div>
-          )}
-
           <div style={{ ...sans, fontSize: 11, color: TXT_3, lineHeight: 1.5 }}>
-            RSI scanner via Alpha Vantage.<br />Free tier: 25 req/day.
+            RSI scanner via FMP Premium.<br />No daily cap.
           </div>
         </div>
       )}
