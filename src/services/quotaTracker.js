@@ -621,30 +621,36 @@ const quotaTracker = {
     assert(t7 === "healthy", `getQuotaHealth(yahoo) → "healthy" [unlimited API]`);
 
     // ── Test 8: getQuotaHealth threshold transitions ───────────────────────
-    // Simulate FMP at 80% used (200/250) → should be "exhausted" (<5% left)
-    const fmpLimit = API_REGISTRY.fmp.limits.perDay; // 250
-    const savedFmpDay = getDayUsed("fmp");
+    // Uses AlphaVantage (25/day) as the per-day fixture — FMP is now Premium
+    // (no daily cap → always "healthy"), so it can no longer drive these transitions.
+    const avLimit = API_REGISTRY.alphaVantage.limits.perDay; // 25
+    const savedAvDay = getDayUsed("alphaVantage");
     try {
-      setDayUsed("fmp", Math.floor(fmpLimit * 0.97)); // 3% remaining
-      assert(quotaTracker.getQuotaHealth("fmp") === "exhausted", "Health at 3% remaining → 'exhausted'");
-      setDayUsed("fmp", Math.floor(fmpLimit * 0.85)); // 15% remaining
-      assert(quotaTracker.getQuotaHealth("fmp") === "critical", "Health at 15% remaining → 'critical'");
-      setDayUsed("fmp", Math.floor(fmpLimit * 0.70)); // 30% remaining
-      assert(quotaTracker.getQuotaHealth("fmp") === "warning", "Health at 30% remaining → 'warning'");
-      setDayUsed("fmp", Math.floor(fmpLimit * 0.40)); // 60% remaining
-      assert(quotaTracker.getQuotaHealth("fmp") === "healthy", "Health at 60% remaining → 'healthy'");
+      setDayUsed("alphaVantage", Math.floor(avLimit * 0.97)); // 24/25 → 4% remaining
+      assert(quotaTracker.getQuotaHealth("alphaVantage") === "exhausted", "Health at 4% remaining → 'exhausted'");
+      setDayUsed("alphaVantage", Math.floor(avLimit * 0.85)); // 21/25 → 16% remaining
+      assert(quotaTracker.getQuotaHealth("alphaVantage") === "critical", "Health at 16% remaining → 'critical'");
+      setDayUsed("alphaVantage", Math.floor(avLimit * 0.70)); // 17/25 → 32% remaining
+      assert(quotaTracker.getQuotaHealth("alphaVantage") === "warning", "Health at 32% remaining → 'warning'");
+      setDayUsed("alphaVantage", Math.floor(avLimit * 0.40)); // 10/25 → 60% remaining
+      assert(quotaTracker.getQuotaHealth("alphaVantage") === "healthy", "Health at 60% remaining → 'healthy'");
     } finally {
-      // Restore original FMP day counter
-      setDayUsed("fmp", savedFmpDay);
+      // Restore original AlphaVantage day counter
+      setDayUsed("alphaVantage", savedAvDay);
       flushDayCounters();
     }
 
-    // ── Test 9: getRemainingQuota structure ────────────────────────────────
-    const q9 = quotaTracker.getRemainingQuota("fmp");
-    assert(q9.perDayLimit === 250, `getRemainingQuota(fmp).perDayLimit === 250`);
-    assert(q9.perMinuteLimit === null, `getRemainingQuota(fmp).perMinuteLimit === null [no per-min limit]`);
-    assert(typeof q9.nextDayResetISO === "string", `getRemainingQuota(fmp).nextDayResetISO is a string`);
-    assert(typeof q9.health === "string", `getRemainingQuota(fmp).health is a string`);
+    // ── Test 9: getRemainingQuota structure (AlphaVantage — has both limits) ─
+    const q9 = quotaTracker.getRemainingQuota("alphaVantage");
+    assert(q9.perDayLimit === 25, `getRemainingQuota(alphaVantage).perDayLimit === 25`);
+    assert(q9.perMinuteLimit === 5, `getRemainingQuota(alphaVantage).perMinuteLimit === 5`);
+    assert(typeof q9.nextDayResetISO === "string", `getRemainingQuota(alphaVantage).nextDayResetISO is a string`);
+    assert(typeof q9.health === "string", `getRemainingQuota(alphaVantage).health is a string`);
+
+    // ── Test 9b: FMP is now Premium — no daily cap, 750/min ────────────────
+    const q9b = quotaTracker.getRemainingQuota("fmp");
+    assert(q9b.perDayLimit === null, `getRemainingQuota(fmp).perDayLimit === null [Premium: no daily cap]`);
+    assert(q9b.perMinuteLimit === 750, `getRemainingQuota(fmp).perMinuteLimit === 750 [Premium]`);
     assert("perDayRemaining" in q9, `getRemainingQuota(fmp) has perDayRemaining field`);
     assert("exhausted" in q9, `getRemainingQuota(fmp) has exhausted field`);
 
