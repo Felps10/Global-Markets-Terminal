@@ -1432,12 +1432,52 @@ async function fmpIntradayCandles(symbol, cfg) {
   return out.reverse();
 }
 
+// App timeframe → BRAPI `range` (interval is always daily). 1D maps to a 1-bar range that the
+// >=2 guard rejects, so true-intraday B3 falls through to Yahoo; daily views (5D+) use BRAPI.
+const BRAPI_OHLCV_RANGE = {
+  '1D': '1d', '5D': '5d', '1W': '5d', '1M': '1mo', '3M': '3mo',
+  'YTD': 'ytd', '1Y': '1y', '5Y': '5y', 'MAX': 'max',
+};
+
+// BRAPI historical daily bars for a B3 ticker → the fmpOHLCV contract. Real B3 data (Yahoo .SA
+// is unreliable and FMP mis-resolves the bare ticker). Free-tier is daily-granularity and can be
+// slow, so the caller keeps a Yahoo fallback. Returns null on any miss so fmpOHLCV falls back.
+async function brapiOHLCV(ticker, timeframe) {
+  if (!BRAPI_TOKEN) return null;
+  const range = BRAPI_OHLCV_RANGE[timeframe] || '3mo';
+  const res = await fetch(
+    `${API_BASE}/proxy/brapi/quote/${encodeURIComponent(ticker)}?range=${range}&interval=1d`,
+    { signal: AbortSignal.timeout(12000), headers: { 'Authorization': `Bearer ${BRAPI_TOKEN}` } }
+  );
+  if (!res.ok) return null;
+  const data = await res.json();
+  const hist = data?.results?.[0]?.historicalDataPrice || [];
+  const out = [];
+  for (const r of hist) {
+    if (!r || !isFinite(Number(r.close)) || !isFinite(Number(r.date))) continue;
+    // BRAPI date = unix seconds → 'YYYY-MM-DD' daily time for lightweight-charts.
+    const time = new Date(r.date * 1000).toISOString().slice(0, 10);
+    out.push({ time, open: +r.open, high: +r.high, low: +r.low, close: +r.close, volume: +r.volume || 0 });
+  }
+  // BRAPI returns oldest→newest, but guard order + dedupe (lightweight-charts needs strictly
+  // ascending, unique times).
+  out.sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
+  const dedup = out.filter((r, i) => i === 0 || r.time !== out[i - 1].time);
+  return dedup.length >= 2 ? dedup : null;
+}
+
 export async function fmpOHLCV(symbol, timeframe = '1M', { assets = {}, interval } = {}) {
   const isB3 = assets[symbol]?.isB3;
   // WTI/natgas futures → their liquid ETF proxy (FMP futures history is dead). Everything
   // else charts its own symbol.
   const fetchSym = CHART_PROXY[symbol] || symbol;
-  if (!isB3 && FMP_KEY) {
+  if (isB3) {
+    // B3 → BRAPI historical (real B3 data). Falls back to Yahoo .SA if BRAPI is slow/unavailable.
+    try {
+      const candles = await brapiOHLCV(symbol, timeframe);
+      if (candles && candles.length >= 2) return candles;
+    } catch (_) { /* fall through to Yahoo */ }
+  } else if (FMP_KEY) {
     try {
       const cfg = FMP_OHLCV_TF[timeframe] || FMP_OHLCV_TF['1M'];
       const candles = cfg.mode === 'intraday'
@@ -1446,8 +1486,8 @@ export async function fmpOHLCV(symbol, timeframe = '1M', { assets = {}, interval
       if (candles && candles.length >= 2) return candles;
     } catch (_) { /* fall through to Yahoo */ }
   }
-  // Fallback: Yahoo on the ORIGINAL symbol (B3 + FMP-gated classes + any symbol FMP can't
-  // resolve). For a proxied future this means the real instrument as a last resort.
+  // Fallback: Yahoo on the ORIGINAL symbol (B3 when BRAPI missed + FMP-gated classes + any
+  // symbol FMP can't resolve). For a proxied future this means the real instrument as a last resort.
   return fetchYahooOHLCV(symbol, timeframe, { assets, interval });
 }
 
