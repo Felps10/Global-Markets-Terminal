@@ -40,6 +40,8 @@ const RED        = C.red;
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TIMEFRAMES   = ['1D', '5D', '1W', '1M', '3M', 'YTD', '1Y', '5Y', 'MAX'];
 const EQUITY_TYPES = new Set(['stock', 'etf', 'equity']);
+// Stable ref — an inline array would re-run the chart's series effect every render.
+const MA_OVERLAYS  = [{ period: 50, color: '#f59e0b' }, { period: 200, color: '#a78bfa' }];
 
 const INTERVAL_OPTIONS = {
   '1D':  { default: '5m',  options: ['1m', '5m', '15m', '30m'] },
@@ -886,7 +888,8 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
             <PriceChart
               data={chartPoints}
               seriesType={expanded ? chartType : 'area'}
-              showVolume={expanded && chartType === 'candle'}
+              showVolume={expanded}
+              movingAverages={expanded ? MA_OVERLAYS : null}
               areaDirectional
               candleBorders
               crosshairMode={expanded ? 1 : 0}
