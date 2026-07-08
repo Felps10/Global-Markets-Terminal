@@ -951,12 +951,14 @@ export function parseYahooResults(results, prevData, assets, volatility) {
  * Build marketData from the server's normalized quotes[symbol] map (Data Source Engine
  * Phase C). One code path for every asset class (equity/index/fx/commodity/B3/crypto) —
  * the server already resolved provider precedence per symbol and tagged each with `source`.
- * Sparklines are still generated client-side (the server sends prices, not sparklines).
+ * Sparklines prefer the server's real ~30-day close series (`q.sparkline`, FMP light-EOD) with
+ * the live price as the fresh tail; gap classes with no server series fall back to rolling the
+ * previous sparkline, then to a synthetic seed (until C3-6 fills them via EODHD/BRAPI/ETF-proxy).
  *
- * @param {Record<string,{price,changePct,prevClose,source,...}>} quotes
- * @param {Object|null} prevData - Previous snapshot for sparkline rolling
+ * @param {Record<string,{price,changePct,prevClose,sparkline?,source,...}>} quotes
+ * @param {Object|null} prevData - Previous snapshot for sparkline rolling (fallback path)
  * @param {Object} assets - the active asset map (filters + supplies `.cat` for volatility)
- * @param {Object} volatility - per-category volatility for the sparkline seed
+ * @param {Object} volatility - per-category volatility for the synthetic-sparkline fallback seed
  * @returns {Record<string, Object>} same shape as parseYahooResults, plus `source`
  */
 export function parseQuotesMap(quotes, prevData, assets, volatility) {
@@ -967,9 +969,16 @@ export function parseQuotesMap(quotes, prevData, assets, volatility) {
     // prevClose comes through for yahoo/eodhd/brapi; crypto lacks it → reconstruct from changePct.
     const prevClose = q.prevClose ?? (q.changePct != null ? q.price / (1 + q.changePct / 100) : q.price);
 
+    // Prefer the server's real close series; append the live price as the fresh tail (kept
+    // ≤30 pts). Anchored to real data every tick, so no drift. Fall back to rolling the prev
+    // sparkline, then a synthetic seed — the gap-class path (no server series) until C3-6.
+    const serverSpark = Array.isArray(q.sparkline) && q.sparkline.length >= 2 ? q.sparkline : null;
     const prevSparkline = prevData?.[sym]?.sparkline;
     let sparkline;
-    if (prevSparkline && prevSparkline.length >= 30) {
+    if (serverSpark) {
+      const s = [...serverSpark, q.price];
+      sparkline = s.length > 30 ? s.slice(-30) : s;
+    } else if (prevSparkline && prevSparkline.length >= 30) {
       sparkline = [...prevSparkline.slice(1), q.price];
     } else {
       sparkline = generateSparkline(prevClose, (volatility[assets[sym].cat] || 0.02) * 0.3);

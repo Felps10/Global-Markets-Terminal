@@ -39,6 +39,8 @@ let fmpCache    = { data: [], ts: 0, error: null };
 // { [bareSymbol]: {price, change, changePct, prevClose, high, low, volume, ...} } served by
 // GET /api/v1/quotes/brazil. Replaces the old per-browser, per-ticker client-side BRAPI path.
 let brazilB3Cache = { data: {}, ts: 0, error: null };
+// Sparkline series keyed by DISPLAY symbol → number[] of ~30 ascending daily closes.
+let sparklineCache = { data: {}, ts: 0, error: null };
 
 // ─── Per-provider fetch health ───────────────────────────────────────────────
 // Records the outcome of each fetch cycle so the client Data Catalog can show REAL
@@ -88,6 +90,19 @@ const FMP_BATCH            = 100;      // symbols per /stable/batch-quote (verif
 const FMP_CHUNK_GAP        = 150;      // ms between batches
 const FMP_TIMEOUT_MS       = 12_000;
 
+// Sparkline series — real ~30-day daily closes from FMP historical-price-eod/light, attached
+// to the quotes map so the client stops synthesizing sparklines with Math.random. It's a
+// single-symbol endpoint (no batch), so we fetch per FMP-resolvable symbol (~153: equities/FX/
+// indices/gold/silver) with bounded concurrency, once every SPARKLINE_INTERVAL — daily EOD only
+// moves after the close, so 6h is ample and costs ~153 calls × 4/day ≈ 600/day (trivial vs
+// FMP's 750/min). Gap classes (EU/Asia indices, B3, WTI/natgas futures) 402/empty → quarantined
+// → client keeps the synthetic fallback until C3-6 fills them (EODHD/BRAPI/ETF-proxy).
+const SPARKLINE_INTERVAL     = 6 * 60 * 60 * 1000; // 6h
+const SPARKLINE_WINDOW_DAYS  = 45;                 // calendar window → ~30 trading days
+const SPARKLINE_POINTS       = 30;                 // most-recent closes kept per symbol
+const SPARKLINE_CONCURRENCY  = 8;                  // in-flight light-EOD requests
+const SPARKLINE_CHUNK_GAP    = 150;                // ms between concurrency chunks
+
 // Brazil B3 feed (BRAPI Pro: 20 tickers/req, 500k/mo). ~191 names ÷ 20 = 10 req/cycle;
 // at 300s, 24/7 = ~86k req/mo — well under 500k. BRAPI Pro is ~5-min fresh, so ≤5-min cadence
 // gains nothing. Yahoo `.SA` covers the few tickers BRAPI drops.
@@ -106,12 +121,14 @@ let cryptoFailures = 0;
 let eodhdFailures  = 0;
 let fmpFailures    = 0;
 let brazilFailures = 0;
+let sparklineFailures = 0;
 let yahooTimer     = null;
 let cryptoTimer    = null;
 let brapiTimer     = null;
 let eodhdTimer     = null;
 let fmpTimer       = null;
 let brazilTimer    = null;
+let sparklineTimer = null;
 let eodhdKeyWarned = false;
 let fmpKeyWarned   = false;
 let brazilTokenWarned = false;
@@ -121,6 +138,9 @@ const eodhdQuarantine = new Set();
 // FMP codes that returned a hard error (e.g. a symbol gated above Premium → 402). FMP's
 // batch endpoint also fails the whole batch on one bad symbol, so quarantine confirmed-bad.
 const fmpQuarantine = new Set();
+// FMP codes whose light-EOD history is gated/empty (EU/Asia indices, B3, dead futures) —
+// skip on future sparkline cycles so we don't re-hit a known 402 every 6h.
+const sparklineQuarantine = new Set();
 
 function getInterval(base, failures) {
   if (failures === 0) return base;
@@ -603,6 +623,75 @@ function scheduleFmp() {
   }
 }
 
+// ─── Sparkline series (FMP daily-EOD closes; ~6h cadence) ─────────────────────
+// Real ~30-point close series per FMP-resolvable symbol, folded into the quotes map so the
+// client no longer synthesizes sparklines. See the SPARKLINE_* constants for the rationale.
+
+const ymd = (d) => d.toISOString().slice(0, 10);
+
+// One symbol → ascending array of the most-recent ~30 closes (or throws for the caller to skip).
+async function fetchSparklineOne(code) {
+  const to = new Date();
+  const from = new Date(to.getTime() - SPARKLINE_WINDOW_DAYS * 86_400_000);
+  const params = new URLSearchParams({ symbol: code, from: ymd(from), to: ymd(to), apikey: process.env.FMP_KEY });
+  const url = `https://financialmodelingprep.com/stable/historical-price-eod/light?${params.toString()}`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(FMP_TIMEOUT_MS) });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`); // 402 = gated class
+  const json = await r.json();
+  if (!Array.isArray(json) || json.length === 0) throw new Error('empty');
+  // Payload is NEWEST-FIRST → reverse to ascending, keep the most-recent SPARKLINE_POINTS.
+  const closes = json.map((x) => x.price).filter(isFiniteNum).reverse();
+  return closes.length > SPARKLINE_POINTS ? closes.slice(-SPARKLINE_POINTS) : closes;
+}
+
+async function fetchSparklines() {
+  const tag = '[quoteFetchManager:sparkline]';
+  if (!process.env.FMP_KEY) {
+    // No FMP key → no server sparklines; client falls back to synthetic. Log once via the FMP path.
+    scheduleSparklines();
+    return;
+  }
+  try {
+    const { fmp } = await resolveLiveSymbols();
+    const targets = (fmp || []).filter((f) => !sparklineQuarantine.has(f.fmp));
+    if (targets.length === 0) {
+      sparklineCache = { data: {}, ts: Date.now(), error: null };
+      sparklineFailures = 0;
+      scheduleSparklines();
+      return;
+    }
+    const data = {};
+    let ok = 0;
+    for (const batch of chunk(targets, SPARKLINE_CONCURRENCY)) {
+      await Promise.all(batch.map(async (f) => {
+        try {
+          const closes = await fetchSparklineOne(f.fmp);
+          if (closes.length >= 2) { data[f.display] = closes; ok++; }
+          else sparklineQuarantine.add(f.fmp); // too few points to plot
+        } catch {
+          sparklineQuarantine.add(f.fmp); // gated/empty → stop retrying it
+        }
+      }));
+      await new Promise((r) => setTimeout(r, SPARKLINE_CHUNK_GAP));
+    }
+    sparklineCache = { data, ts: Date.now(), error: null };
+    sparklineFailures = 0;
+    console.log(`${tag} OK — ${ok}/${targets.length} series${sparklineQuarantine.size ? ` (${sparklineQuarantine.size} skipped)` : ''}`);
+  } catch (err) {
+    sparklineFailures++;
+    sparklineCache.error = err.message;
+    console.error(`${tag} FAIL #${sparklineFailures}: ${err.message}`);
+  }
+  scheduleSparklines();
+}
+
+function scheduleSparklines() {
+  if (sparklineTimer) clearTimeout(sparklineTimer);
+  // Fixed cadence (daily EOD) — a transient failure just waits for the next window; the stale
+  // cache keeps serving in the meantime, so no exponential backoff is needed here.
+  sparklineTimer = setTimeout(fetchSparklines, SPARKLINE_INTERVAL);
+}
+
 // ─── Brazil B3 feed (BRAPI Pro primary + Yahoo .SA fallback) ──────────────────
 // Serves the Brazil terminal's ~191 B3 names from ONE server process (BRAPI Pro, 20/req,
 // every 5 min) instead of every browser firing one request per ticker with the public
@@ -793,6 +882,9 @@ function buildQuotesMap(plan) {
           open:                isFiniteNum(raw.regularMarketOpen) ? raw.regularMarketOpen : null,
           fiftyDayAverage:     isFiniteNum(raw.fiftyDayAverage) ? raw.fiftyDayAverage : null,
           twoHundredDayAverage: isFiniteNum(raw.twoHundredDayAverage) ? raw.twoHundredDayAverage : null,
+          // Real ~30-day daily-close series (FMP light-EOD) for FMP-resolvable symbols; null
+          // for gap classes → client synthesizes. Keyed by display, so it folds in uniformly.
+          sparkline: sparklineCache.data[p.display] || null,
           source:    provider,
         };
         break;
@@ -806,13 +898,13 @@ function buildQuotesMap(plan) {
 // into Maps and walks the full ~185-asset plan; its inputs only change when a fetcher writes
 // a new cache (every 120–300s) or the plan is re-resolved. Without this, every /quotes/live
 // request rebuilds the map from scratch. Recompute only when any provider cache timestamp
-// moves (crypto + fmp INCLUDED — they feed buildQuotesMap but crypto/fmp are excluded from
+// moves (crypto + fmp + sparkline INCLUDED — they feed buildQuotesMap but are excluded from
 // getCache's mergedTs) or the plan reference changes (getCachedPlan returns a stable ref).
 let _quotesMemo = { key: null, plan: null, result: null };
 
 function getQuotesMap() {
   const plan = getCachedPlan();
-  const key = `${yahooCache.ts}|${eodhdCache.ts}|${brapiCache.ts}|${cryptoCache.ts}|${fmpCache.ts}`;
+  const key = `${yahooCache.ts}|${eodhdCache.ts}|${brapiCache.ts}|${cryptoCache.ts}|${fmpCache.ts}|${sparklineCache.ts}`;
   if (_quotesMemo.result && _quotesMemo.key === key && _quotesMemo.plan === plan) {
     return _quotesMemo.result;
   }
@@ -883,6 +975,9 @@ export function start() {
   // BRAPI fallback starts after a short delay so the Yahoo cache is populated first
   // (it only fetches B3 tickers missing from Yahoo's results).
   brapiTimer = setTimeout(fetchBrapiFallback, 45_000);
+  // Sparklines are not latency-critical (6h cadence) — delay the first run so the quote
+  // fetchers populate first and it doesn't compete at boot.
+  sparklineTimer = setTimeout(fetchSparklines, 20_000);
 }
 
 /**
@@ -896,4 +991,5 @@ export function stop() {
   if (eodhdTimer) { clearTimeout(eodhdTimer); eodhdTimer = null; }
   if (fmpTimer) { clearTimeout(fmpTimer); fmpTimer = null; }
   if (brazilTimer) { clearTimeout(brazilTimer); brazilTimer = null; }
+  if (sparklineTimer) { clearTimeout(sparklineTimer); sparklineTimer = null; }
 }
