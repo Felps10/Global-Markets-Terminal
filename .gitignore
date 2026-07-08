@@ -27,3 +27,8 @@ server/data/*.db-shm
 
 # Claude Code local config
 .claude/
+
+# Deploy CLI link artifacts (Vercel/Railway) — never commit (project/org IDs, OIDC tokens).
+# .env / .env.local are already ignored above; .env.example* stay tracked (templates).
+.vercel/
+.railway/
