@@ -35,6 +35,8 @@ const CHART_TYPES = ['Candlestick', 'Line', 'Area'];
 const COMP_COLORS = ['#f59e0b', '#00E676', '#a78bfa'];
 const DEFAULT_CHART_HEIGHT = 450;
 const MIN_CHART_HEIGHT = 200;
+// Stable ref — an inline array would re-run the chart's series effect every render.
+const MA_OVERLAYS = [{ period: 50, color: '#f59e0b' }, { period: 200, color: '#a78bfa' }];
 
 const REC_CATS = [
   { key: 'strongBuy',  label: 'Strong Buy',  color: GREEN     },
@@ -972,6 +974,8 @@ export default function ChartResearchPage() {
                   data={ohlcvData}
                   seriesType={chartSeriesType}
                   comparison={chartComparison}
+                  showVolume
+                  movingAverages={MA_OVERLAYS}
                   crosshairMode={1}
                   candleBorders={false}
                   areaTopColor="rgba(59,130,246,0.3)"

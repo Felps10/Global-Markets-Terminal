@@ -75,6 +75,19 @@ function makeLegend(bar, seriesType, base) {
   return { ohlc: false, c: cl, up: (chg ?? 0) >= 0, chg };
 }
 
+// Simple moving average over the candle closes (rolling sum, O(n)).
+function sma(pts, period) {
+  if (!pts || pts.length < period) return [];
+  const out = [];
+  let sum = 0;
+  for (let i = 0; i < pts.length; i++) {
+    sum += pts[i].close;
+    if (i >= period) sum -= pts[i - period].close;
+    if (i >= period - 1) out.push({ time: pts[i].time, value: sum / period });
+  }
+  return out;
+}
+
 export default function PriceChart({
   data,
   seriesType = 'area',
@@ -94,6 +107,7 @@ export default function PriceChart({
   showWatermark = true,
   lastPriceLine = true,
   scaleMode = 0,
+  movingAverages = null,
   watermarkColor = 'rgba(255,255,255,0.045)',
 }) {
   const c = { ...DEFAULTS, ...(colors || {}) };
@@ -102,6 +116,7 @@ export default function PriceChart({
   const mainRef      = useRef(null);
   const volRef       = useRef(null);
   const compRefs     = useRef([]);
+  const maRefs       = useRef([]);
   const [gen, setGen] = useState(0);
   const [legend, setLegend] = useState(null);
 
@@ -169,6 +184,8 @@ export default function PriceChart({
     if (volRef.current)  { try { chart.removeSeries(volRef.current);  } catch (_) {} volRef.current  = null; }
     compRefs.current.forEach(s => { try { chart.removeSeries(s); } catch (_) {} });
     compRefs.current = [];
+    maRefs.current.forEach(s => { try { chart.removeSeries(s); } catch (_) {} });
+    maRefs.current = [];
 
     const pts = data;
     if (!pts?.length) { setLegend(null); return; }
@@ -197,12 +214,6 @@ export default function PriceChart({
       });
       s.setData(pts);
       mainRef.current = s;
-      if (showVolume && pts.some(p => p.volume > 0)) {
-        const vs = chart.addSeries(HistogramSeries, { priceFormat: { type: 'volume' }, priceScaleId: 'volume' });
-        chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.85, bottom: 0 } });
-        vs.setData(pts.map(p => ({ time: p.time, value: p.volume, color: (p.close >= p.open ? c.up : c.down) + '40' })));
-        volRef.current = vs;
-      }
     } else if (seriesType === 'line') {
       const s = chart.addSeries(LineSeries, { color: c.accent, lineWidth: 2, ...lastLineOpts });
       s.setData(pts.map(p => ({ time: p.time, value: p.close })));
@@ -214,6 +225,30 @@ export default function PriceChart({
       });
       s.setData(pts.map(p => ({ time: p.time, value: p.close })));
       mainRef.current = s;
+    }
+
+    // Volume histogram (bottom overlay, any series type; single-asset only).
+    if (!comps.length && showVolume && pts.some(p => p.volume > 0)) {
+      const vs = chart.addSeries(HistogramSeries, { priceFormat: { type: 'volume' }, priceScaleId: 'volume' });
+      chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.85, bottom: 0 } });
+      vs.setData(pts.map(p => ({ time: p.time, value: p.volume, color: (p.close >= p.open ? c.up : c.down) + '40' })));
+      volRef.current = vs;
+    }
+
+    // Moving-average overlays on the price scale (single-asset only). SMA computed
+    // client-side from closes — free, works for every timeframe/class; a longer MA
+    // simply doesn't render when there aren't enough bars.
+    if (!comps.length && movingAverages?.length) {
+      for (const ma of movingAverages) {
+        const line = sma(pts, ma.period);
+        if (line.length < 2) continue;
+        const s = chart.addSeries(LineSeries, {
+          color: ma.color, lineWidth: 1,
+          priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+        });
+        s.setData(line);
+        maRefs.current.push(s);
+      }
     }
 
     chart.timeScale().fitContent();
@@ -230,7 +265,7 @@ export default function PriceChart({
     chart.subscribeCrosshairMove(onMove);
     return () => { try { chart.unsubscribeCrosshairMove(onMove); } catch (_) {} };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, seriesType, showVolume, comparison, gen, candleBorders, areaDirectional, areaTopColor, lastPriceLine, c.up, c.down, c.accent]);
+  }, [data, seriesType, showVolume, comparison, movingAverages, gen, candleBorders, areaDirectional, areaTopColor, lastPriceLine, c.up, c.down, c.accent]);
 
   // ── Refit after a layout transition (expand/collapse) ─────────────────────
   useEffect(() => {
@@ -268,6 +303,13 @@ export default function PriceChart({
               </>
             )}
           </div>
+          {movingAverages?.length > 0 && !hasComparison && (
+            <div style={{ display: 'flex', gap: 10, marginTop: 2, fontSize: 10 }}>
+              {movingAverages.map(ma => (
+                <span key={ma.period} style={{ color: ma.color }}>MA{ma.period}</span>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
