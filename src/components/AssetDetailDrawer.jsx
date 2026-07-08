@@ -17,7 +17,8 @@ import {
   API_BASE,
   fetchYahooOHLCV,
   fmpProfile, fmpRatios,
-  finnhubRecommendation, finnhubNews,
+  fmpGradesConsensus, fmpPriceTarget, fmpAnalystEstimates,
+  finnhubNews,
   hasFmpKey, hasFinnhubKey,
 } from '../dataServices.js';
 import { useAuth } from '../hooks/useAuth.js';
@@ -406,6 +407,8 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
   const [profileData, setProfileData] = useState(null);
   const [ratiosData,  setRatiosData]  = useState(null);
   const [recData,     setRecData]     = useState(null);
+  const [targetData,  setTargetData]  = useState(null);
+  const [estimatesData, setEstimatesData] = useState(null);
   const [newsData,    setNewsData]    = useState(null);
 
   const [loadingQuote, setLoadingQuote] = useState(false);
@@ -489,6 +492,8 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
     setProfileData(null);
     setRatiosData(null);
     setRecData(null);
+    setTargetData(null);
+    setEstimatesData(null);
     setNewsData(null);
     setLoadingQuote(true);
 
@@ -527,14 +532,25 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
             setLoadingFunds(false);
           }
         });
+
+      // Analyst data now comes from FMP Premium (grades + price target + estimates),
+      // replacing the Finnhub free-tier recommendation.
+      setLoadingRec(true);
+      Promise.allSettled([
+        fmpGradesConsensus(currentSymbol),
+        fmpPriceTarget(currentSymbol),
+        fmpAnalystEstimates(currentSymbol),
+      ]).then(([grades, target, est]) => {
+        if (!cancelled) {
+          if (grades.status === 'fulfilled') setRecData(grades.value);
+          if (target.status === 'fulfilled') setTargetData(target.value);
+          if (est.status    === 'fulfilled') setEstimatesData(est.value);
+          setLoadingRec(false);
+        }
+      });
     }
 
     if (isEquity && hasFinnhubKey()) {
-      setLoadingRec(true);
-      finnhubRecommendation(currentSymbol)
-        .then(d  => { if (!cancelled) { setRecData(d);   setLoadingRec(false);  } })
-        .catch(() => { if (!cancelled) setLoadingRec(false); });
-
       setLoadingNews(true);
       finnhubNews(currentSymbol)
         .then(d  => { if (!cancelled) { setNewsData(d);  setLoadingNews(false); } })
@@ -1169,11 +1185,11 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
   const analystSection = isEquity ? (
     <CardWrap>
       <SectionTitle>Analyst Consensus</SectionTitle>
-      {!hasFinnhubKey() ? (
+      {!hasFmpKey() ? (
         <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: TXT_3, fontStyle: 'italic' }}>
-          Finnhub key required — set{' '}
+          FMP key required — set{' '}
           <code style={{ color: TXT_2, fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>
-            VITE_FINNHUB_KEY
+            VITE_FMP_KEY
           </code>{' '}
           in{' '}
           <code style={{ color: TXT_2, fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>.env.local</code>
@@ -1249,6 +1265,54 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
       ) : (
         <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: TXT_3 }}>
           No analyst data available
+        </div>
+      )}
+
+      {/* Price target (FMP price-target-consensus) */}
+      {targetData && targetData.consensus != null && (
+        <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${BORDER}` }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: TXT_3, letterSpacing: '0.08em', marginBottom: 6 }}>
+            PRICE TARGET
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 18, fontWeight: 700, color: TXT_1 }}>
+              {currency}{fmtPrice(targetData.consensus)}
+            </span>
+            {quoteData?.price != null && Number(quoteData.price) > 0 && (() => {
+              const upside = ((targetData.consensus - quoteData.price) / quoteData.price) * 100;
+              const col = upside >= 0 ? GREEN : RED;
+              return (
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700, color: col }}>
+                  {upside >= 0 ? '+' : ''}{upside.toFixed(1)}% vs price
+                </span>
+              );
+            })()}
+          </div>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: TXT_3 }}>
+            Low {currency}{fmtPrice(targetData.low)} · High {currency}{fmtPrice(targetData.high)}
+          </div>
+        </div>
+      )}
+
+      {/* Forward estimate (FMP analyst-estimates — nearest fiscal year) */}
+      {estimatesData && (estimatesData.epsAvg != null || estimatesData.revenueAvg != null) && (
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${BORDER}` }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: TXT_3, letterSpacing: '0.08em', marginBottom: 6 }}>
+            FORWARD ESTIMATE{estimatesData.date ? ` · FY${estimatesData.date.slice(0, 4)}` : ''}
+          </div>
+          <div style={{ display: 'flex', gap: 16, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: TXT_2 }}>
+            {estimatesData.epsAvg != null && (
+              <span>EPS <span style={{ color: TXT_1, fontWeight: 700 }}>{currency}{fmtPrice(estimatesData.epsAvg)}</span></span>
+            )}
+            {estimatesData.revenueAvg != null && (
+              <span>REV <span style={{ color: TXT_1, fontWeight: 700 }}>{fmtLarge(estimatesData.revenueAvg, currency)}</span></span>
+            )}
+          </div>
+          {estimatesData.numAnalysts != null && (
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: TXT_3, marginTop: 4 }}>
+              {estimatesData.numAnalysts} analyst{estimatesData.numAnalysts !== 1 ? 's' : ''}
+            </div>
+          )}
         </div>
       )}
     </CardWrap>
