@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import MarketsPageLayout from "./components/MarketsPageLayout.jsx";
 import MarketHeatmap from "./components/MarketHeatmap";
-import { finnhubQuote, hasFinnhubKey } from "./dataServices.js";
+import { fmpBatchQuote, hasFmpKey } from "./dataServices.js";
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * MarketHeatmapPage — Interactive wrapper around MarketHeatmap
@@ -233,11 +233,13 @@ export default function MarketHeatmapPage() {
       data = sorted.slice(0, topN);
     }
 
-    // 3. Size metric: replace volume with marketCap so treemap sizes cells by mktcap
+    // 3. Size metric: size cells by marketCap instead of volume. Prefer the LIVE marketCap
+    //    (from the batch-quote) so this mode is real too; fall back to the static base only
+    //    when a live value is missing.
     if (sizeMetric === "marketCap") {
       data = data.map((s) => {
         const base = BASE_STOCKS.find((b) => b.symbol === s.symbol);
-        return { ...s, volume: base?.marketCap || s.volume };
+        return { ...s, volume: s.marketCap ?? base?.marketCap ?? s.volume };
       });
     }
 
@@ -276,27 +278,32 @@ export default function MarketHeatmapPage() {
     setPinnedStocks((prev) => prev.filter((s) => s.symbol !== symbol));
   }, []);
 
-  // ── Live data refresh via Finnhub ─────────────────────────────────────────
+  // ── Live data via ONE FMP batch-quote (real tile COLOR + SIZE) ────────────
+  // batch-quote carries volume (→ tile size) AND changePercent (→ color) for all symbols in a
+  // single call, unlike the old per-symbol Finnhub /quote loop that never returned volume.
   const loadLiveData = useCallback(async () => {
     setDataStatus("loading");
     const symbols = BASE_STOCKS.map((s) => s.symbol);
 
-    const results = await Promise.allSettled(symbols.map((sym) => finnhubQuote(sym)));
+    const quotes = await fmpBatchQuote(symbols);
+    if (!quotes) { setDataStatus("mock"); return; } // no key / rate-limited / error → keep mock
 
-    const updated = BASE_STOCKS.map((stock, i) => {
-      const r = results[i];
-      if (r.status === "fulfilled" && r.value?.c) {
+    const updated = BASE_STOCKS.map((stock) => {
+      const q = quotes[stock.symbol];
+      if (q && Number.isFinite(q.price)) {
         return {
           ...stock,
-          price:         r.value.c,
-          change:        r.value.d  ?? stock.change,
-          changePercent: r.value.dp ?? stock.changePercent,
+          price:         q.price,
+          change:        q.change        ?? stock.change,
+          changePercent: q.changePercent ?? stock.changePercent, // tile color
+          volume:        q.volume        ?? stock.volume,         // tile size
+          marketCap:     q.marketCap     ?? stock.marketCap,
         };
       }
       return stock;
     });
 
-    const liveCount = results.filter((r) => r.value?.c).length;
+    const liveCount = symbols.filter((sym) => Number.isFinite(quotes[sym]?.price)).length;
     setStocks(updated);
     setDataStatus(
       liveCount === 0               ? "mock"    :
@@ -304,6 +311,12 @@ export default function MarketHeatmapPage() {
     );
     setLastUpdated(new Date());
   }, []);
+
+  // Auto-load once on mount when an FMP key is present → the treemap is live by default (one
+  // cheap batch-quote, so no reason to gate it behind a manual click like the old Finnhub path).
+  useEffect(() => {
+    if (hasFmpKey()) loadLiveData();
+  }, [loadLiveData]);
 
   // ── Look up base stock (has marketCap) for detail panel ──────────────────
   const selectedBase = selectedStock
@@ -479,7 +492,7 @@ export default function MarketHeatmapPage() {
                      dataStatus === "live"    ? "LIVE"     :
                      dataStatus === "partial" ? "PARTIAL"  : "MOCK"}
                   </span>
-                  {hasFinnhubKey() && (
+                  {hasFmpKey() && (
                     <button
                       onClick={loadLiveData}
                       disabled={dataStatus === "loading"}
@@ -507,14 +520,14 @@ export default function MarketHeatmapPage() {
                     Updated {lastUpdated.toLocaleTimeString()}
                   </div>
                 )}
-                {!hasFinnhubKey() && (
+                {!hasFmpKey() && (
                   <div style={{ fontSize: 10, color: C.textMuted, marginTop: 4 }}>
-                    Set VITE_FINNHUB_KEY for live data
+                    Set VITE_FMP_KEY for live data
                   </div>
                 )}
                 {dataStatus === "loading" && (
                   <div style={{ fontSize: 10, color: C.textMuted, marginTop: 4 }}>
-                    Fetching ~36 quotes (rate-limited, ~36s)…
+                    Fetching live quotes…
                   </div>
                 )}
               </div>
