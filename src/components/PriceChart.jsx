@@ -7,6 +7,7 @@ import {
   HistogramSeries,
   createTextWatermark,
   LineStyle,
+  PriceScaleMode,
 } from 'lightweight-charts';
 
 /**
@@ -48,13 +49,6 @@ const DEFAULTS = {
   grid:   'rgba(30,41,59,0.4)',
   border: 'rgba(30,41,59,0.6)',
 };
-
-function normalizeToPercent(candles) {
-  if (!candles || candles.length === 0) return [];
-  const first = candles[0].close ?? candles[0].value;
-  if (!first) return [];
-  return candles.map(c => ({ time: c.time, value: (((c.close ?? c.value) - first) / first) * 100 }));
-}
 
 function fmtN(v) {
   if (v == null || isNaN(Number(v))) return '—';
@@ -155,11 +149,16 @@ export default function PriceChart({
   }, [recreateKey, crosshairMode, c.bg, c.text, c.grid, c.border]);
 
   // ── Price-scale mode (linear / log / percent) — no recreate needed ────────
+  // In comparison mode the right scale switches to native Percentage so every
+  // series rebaselines to the first *visible* bar (rebases on zoom/scroll) —
+  // the TradingView %-comparison behavior, replacing the old fixed-baseline
+  // normalizeToPercent transform.
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
-    try { chart.priceScale('right').applyOptions({ mode: scaleMode }); } catch (_) {}
-  }, [scaleMode, gen]);
+    const mode = hasComparison ? PriceScaleMode.Percentage : scaleMode;
+    try { chart.priceScale('right').applyOptions({ mode }); } catch (_) {}
+  }, [scaleMode, hasComparison, gen]);
 
   // ── Ticker watermark (faint, centered) ────────────────────────────────────
   useEffect(() => {
@@ -198,12 +197,16 @@ export default function PriceChart({
     const comps = (comparison || []).filter(x => x?.data?.length);
 
     if (comps.length) {
+      // Raw closes on a Percentage-mode price scale (set in the scale-mode
+      // effect) → lightweight-charts rebaselines each line to its first visible
+      // value, so the axis reads % and comparison rebases as you zoom/scroll.
+      const toClose = arr => arr.map(p => ({ time: p.time, value: p.close ?? p.value }));
       const main = chart.addSeries(LineSeries, { color: c.accent, lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
-      main.setData(normalizeToPercent(pts));
+      main.setData(toClose(pts));
       mainRef.current = main;
       comps.forEach(cmp => {
         const s = chart.addSeries(LineSeries, { color: cmp.color, lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
-        s.setData(normalizeToPercent(cmp.data));
+        s.setData(toClose(cmp.data));
         compRefs.current.push(s);
       });
     } else if (seriesType === 'candle') {

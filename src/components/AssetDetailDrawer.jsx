@@ -425,6 +425,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
   const [timeframe,    setTimeframe]    = useState('1M');
   const [chartInterval, setChartInterval] = useState(null); // null = use default for timeframe
   const [chartType,    setChartType]    = useState('candle'); // 'area' | 'candle' (expanded default; collapsed always area)
+  const [showMA,       setShowMA]       = useState(true);      // SMA-50/200 overlays (expanded only)
   const [chartPoints,  setChartPoints]  = useState(null);
   const [chartLoading, setChartLoading] = useState(false);
   const [chartError,   setChartError]   = useState(null);
@@ -745,6 +746,21 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
                 );
               })}
               <button
+                onClick={() => setShowMA(v => !v)}
+                title={showMA ? 'Hide moving averages' : 'Show moving averages'}
+                style={{
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: 9, fontWeight: showMA ? 600 : 400,
+                  color: showMA ? GREEN : TXT_3,
+                  background: showMA ? 'rgba(0,230,118,0.08)' : 'transparent',
+                  border: `1px solid ${showMA ? 'rgba(0,230,118,0.25)' : 'transparent'}`,
+                  borderRadius: 3, padding: '3px 8px',
+                  cursor: 'pointer', transition: 'all 0.12s ease',
+                }}
+              >
+                MA
+              </button>
+              <button
                 onClick={() => navigate(`/markets/research?symbol=${currentSymbol}`)}
                 title="Open in Chart & Research"
                 style={{
@@ -889,7 +905,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
               data={chartPoints}
               seriesType={expanded ? chartType : 'area'}
               showVolume={expanded}
-              movingAverages={expanded ? MA_OVERLAYS : null}
+              movingAverages={expanded && showMA ? MA_OVERLAYS : null}
               areaDirectional
               candleBorders
               crosshairMode={expanded ? 1 : 0}
