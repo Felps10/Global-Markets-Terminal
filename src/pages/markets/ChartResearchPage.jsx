@@ -267,6 +267,7 @@ export default function ChartResearchPage() {
   // ── Chart ─────────────────────────────────────────────────────────────────
   const [timeframe,    setTimeframe]    = useState('3M');
   const [chartType,    setChartType]    = useState('Candlestick');
+  const [showMA,       setShowMA]       = useState(true); // SMA-50/200 overlays (single-asset only)
   const [ohlcvData,    setOhlcvData]    = useState([]);
   const [chartLoading, setChartLoading] = useState(false);
   const [chartError,   setChartError]   = useState(null);
@@ -953,6 +954,14 @@ export default function ChartResearchPage() {
                 <TabBtn key={tf} label={tf} active={timeframe === tf} onClick={() => setTimeframe(tf)} />
               ))}
               <div style={{ flex: 1 }} />
+              <div style={{ display: 'flex', gap: 4, marginRight: 8 }}>
+                <TabBtn
+                  label="MA"
+                  active={showMA}
+                  onClick={() => setShowMA(v => !v)}
+                  disabled={hasComparisons}
+                />
+              </div>
               <div style={{ display: 'flex', gap: 4 }}>
                 {CHART_TYPES.map(ct => (
                   <TabBtn
@@ -975,7 +984,7 @@ export default function ChartResearchPage() {
                   seriesType={chartSeriesType}
                   comparison={chartComparison}
                   showVolume
-                  movingAverages={MA_OVERLAYS}
+                  movingAverages={showMA ? MA_OVERLAYS : null}
                   crosshairMode={1}
                   candleBorders={false}
                   areaTopColor="rgba(59,130,246,0.3)"
