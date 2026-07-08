@@ -389,8 +389,9 @@ let fmpRateLimitHits = 0;
 export function getFmpRateLimitHits() { return fmpRateLimitHits; }
 
 /// ── FMP-aware fetch: handles 429 with exponential backoff + Retry-After ───────
-// DORMANT-SUPPORT — fmpSafeFetch / fmpQueue / processFmpQueue / fmpFetch are used
-// only by dormant function D-6 (fmpDCF). Remove when D-6 is activated and migrated.
+// Shared throttled single-call path (1/sec via fmpQueue) for the client FMP /stable helpers:
+// fmpKeyMetrics, fmpGradesConsensus, fmpPriceTarget, fmpAnalystEstimates, fmpRSI, fmpDCF, and
+// fmpBatchQuote. (Was flagged DORMANT/D-6-only; C1/C2 + the live heatmap now use it.)
 async function fmpSafeFetch(url, maxRetries = 3) {
   let attempt = 0;
   while (attempt <= maxRetries) {
@@ -688,6 +689,29 @@ export async function fmpDCF(symbol) {
     return data[0];
   }
   return null;
+}
+
+// One FMP /stable/batch-quote call for many symbols → { [symbol]: {price, change, changePercent,
+// marketCap, volume} }. Powers the live market heatmap: real tile SIZE (volume) + real COLOR
+// (changePercent) from a single request, replacing ~38 serialized Finnhub /quote calls that never
+// carried volume (so tile size stayed mock). Equities only — batch-quote 402s index symbols.
+export async function fmpBatchQuote(symbols) {
+  if (!FMP_KEY || !symbols?.length) return null;
+  const codes = symbols.map(encodeURIComponent).join(',');
+  const data = await fmpFetch(`${API_BASE}/proxy/fmp/batch-quote?symbols=${codes}&apikey=${FMP_KEY}`);
+  if (!Array.isArray(data)) return null; // null / {_rateLimited} / non-array error
+  const map = {};
+  for (const r of data) {
+    if (!r?.symbol || !Number.isFinite(r.price)) continue;
+    map[r.symbol] = {
+      price:         r.price,
+      change:        Number.isFinite(r.change) ? r.change : null,
+      changePercent: Number.isFinite(r.changePercentage) ? r.changePercentage : null,
+      marketCap:     Number.isFinite(r.marketCap) && r.marketCap > 0 ? r.marketCap : null,
+      volume:        Number.isFinite(r.volume) ? r.volume : null,
+    };
+  }
+  return Object.keys(map).length ? map : null;
 }
 
 export async function fmpBatchProfile(symbols) {
