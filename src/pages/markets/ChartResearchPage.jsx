@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { createChart, CandlestickSeries, LineSeries, AreaSeries } from 'lightweight-charts';
+import PriceChart from '../../components/PriceChart.jsx';
 import MarketsPageLayout from '../../components/MarketsPageLayout.jsx';
 import { useTaxonomy } from '../../context/TaxonomyContext.jsx';
 import { useWatchlist } from '../../context/WatchlistContext.jsx';
@@ -75,15 +75,6 @@ async function fetchAssetQuote(symbol) {
   } catch (_) { return null; }
 }
 
-function normalizeToPercent(candles) {
-  if (!candles || candles.length === 0) return [];
-  const first = candles[0].close ?? candles[0].value;
-  if (!first) return [];
-  return candles.map(c => ({
-    time:  c.time,
-    value: (((c.close ?? c.value) - first) / first) * 100,
-  }));
-}
 
 function fmtPrice(v) {
   if (v == null || isNaN(v)) return '—';
@@ -277,9 +268,7 @@ export default function ChartResearchPage() {
   const [ohlcvData,    setOhlcvData]    = useState([]);
   const [chartLoading, setChartLoading] = useState(false);
   const [chartError,   setChartError]   = useState(null);
-  const chartContainerRef = useRef(null);
-  const chartRef          = useRef(null);
-  const mainSeriesRef     = useRef(null);
+  // Chart rendering (createChart + series lifecycle) lives in <PriceChart>.
 
   // ── Comparison (up to 3) ──────────────────────────────────────────────────
   const [compSymbols,  setCompSymbols]  = useState([]);   // ['MSFT', 'GOOGL']
@@ -287,7 +276,6 @@ export default function ChartResearchPage() {
   const [compExpanded, setCompExpanded] = useState(false);
   const [compSearch,   setCompSearch]   = useState('');
   const [compLoading,  setCompLoading]  = useState(false);
-  const compSeriesRefs = useRef([]);
   const compSearchRef  = useRef(null);
 
   // ── Sidebar data ──────────────────────────────────────────────────────────
@@ -474,98 +462,13 @@ export default function ChartResearchPage() {
     return () => { cancelled = true; };
   }, [timeframe, assetMap, compSymbols.join(',')]);
 
-  // 6. lightweight-charts init on mount
-  useEffect(() => {
-    if (!chartContainerRef.current) return;
-    const chart = createChart(chartContainerRef.current, {
-      autoSize: true,
-      layout: {
-        background: { color: BG_PAGE },
-        textColor:  TXT_2,
-        fontFamily: "'JetBrains Mono', monospace",
-      },
-      grid: {
-        vertLines: { color: '#1e2d3d' },
-        horzLines: { color: '#1e2d3d' },
-      },
-      crosshair: { mode: 1 },
-      rightPriceScale: { borderColor: '#1e2d3d' },
-      timeScale: {
-        borderColor:  '#1e2d3d',
-        timeVisible:  true,
-        secondsVisible: false,
-      },
-    });
-    chartRef.current = chart;
-    return () => {
-      chart.remove();
-      chartRef.current    = null;
-      mainSeriesRef.current = null;
-      compSeriesRefs.current = [];
-    };
-  }, []);
-
-  // 7. Series rendering on data/type/comparison change
-  useEffect(() => {
-    const chart = chartRef.current;
-    if (!chart) return;
-
-    // Remove existing series
-    if (mainSeriesRef.current) {
-      try { chart.removeSeries(mainSeriesRef.current); } catch (_) {}
-      mainSeriesRef.current = null;
-    }
-    compSeriesRefs.current.forEach(s => {
-      try { chart.removeSeries(s); } catch (_) {}
-    });
-    compSeriesRefs.current = [];
-
-    if (ohlcvData.length === 0) return;
-
-    const activeComps = compSymbols.filter(sym => compData[sym]?.length > 0);
-
-    if (activeComps.length > 0) {
-      // Comparison mode: normalized % change lines
-      const mainNorm = normalizeToPercent(ohlcvData);
-      const mainSeries = chart.addSeries(LineSeries, { color: ACCENT, lineWidth: 2 });
-      mainSeries.setData(mainNorm);
-      mainSeriesRef.current = mainSeries;
-
-      activeComps.forEach((sym, i) => {
-        const norm = normalizeToPercent(compData[sym]);
-        const s = chart.addSeries(LineSeries, {
-          color:     COMP_COLORS[i % COMP_COLORS.length],
-          lineWidth: 2,
-        });
-        s.setData(norm);
-        compSeriesRefs.current.push(s);
-      });
-    } else {
-      // Single asset mode
-      let series;
-      if (chartType === 'Candlestick') {
-        series = chart.addSeries(CandlestickSeries, {
-          upColor: GREEN, downColor: RED,
-          wickUpColor: GREEN, wickDownColor: RED,
-          borderVisible: false,
-        });
-        series.setData(ohlcvData);
-      } else if (chartType === 'Line') {
-        series = chart.addSeries(LineSeries, { color: ACCENT, lineWidth: 2 });
-        series.setData(ohlcvData.map(c => ({ time: c.time, value: c.close })));
-      } else {
-        series = chart.addSeries(AreaSeries, {
-          topColor: 'rgba(59,130,246,0.3)',
-          bottomColor: 'rgba(59,130,246,0.0)',
-          lineColor: ACCENT,
-        });
-        series.setData(ohlcvData.map(c => ({ time: c.time, value: c.close })));
-      }
-      mainSeriesRef.current = series;
-    }
-
-    chart.timeScale().fitContent();
-  }, [ohlcvData, compData, compSymbols, chartType]);
+  // Chart props for <PriceChart> (createChart + series lifecycle live there).
+  const chartSeriesType = chartType === 'Candlestick' ? 'candle' : chartType === 'Line' ? 'line' : 'area';
+  const chartComparison = useMemo(() => {
+    const active = compSymbols.filter(sym => compData[sym]?.length > 0);
+    if (!active.length) return null;
+    return active.map((sym, i) => ({ data: compData[sym], color: COMP_COLORS[i % COMP_COLORS.length] }));
+  }, [compSymbols, compData]);
 
   // 8. Resize handler
   useEffect(() => {
@@ -1062,7 +965,19 @@ export default function ChartResearchPage() {
             </div>
 
             {/* Chart container */}
-            <div ref={chartContainerRef} style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+            <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+              {/* Shared price chart */}
+              <div style={{ position: 'absolute', inset: 0 }}>
+                <PriceChart
+                  data={ohlcvData}
+                  seriesType={chartSeriesType}
+                  comparison={chartComparison}
+                  crosshairMode={1}
+                  candleBorders={false}
+                  areaTopColor="rgba(59,130,246,0.3)"
+                  colors={{ up: GREEN, down: RED, accent: ACCENT, bg: BG_PAGE, text: TXT_2, grid: '#1e2d3d', border: '#1e2d3d' }}
+                />
+              </div>
               {/* Comparison legend overlay */}
               {hasComparisons && (
                 <div style={{
