@@ -565,6 +565,87 @@ export async function fmpKeyMetrics(symbol) {
   return null;
 }
 
+// ─── FMP ANALYST (Premium /stable — TipRanks-sourced) ───────────────────────
+// Analyst consensus, price targets and forward estimates. Premium-included
+// (probe-verified 2026-07-07). Cached 6hr — these change slowly. Replace the
+// Finnhub free-tier recommendation (single latest month) in the terminals.
+
+// Buy/hold/sell distribution — SAME shape as the old Finnhub recommendation, so
+// existing consensus bars render unchanged.
+export async function fmpGradesConsensus(symbol) {
+  if (!FMP_KEY) return null;
+  const cacheKey = `fmp:grades:${symbol}`;
+  const cached = cacheGet(cacheKey);
+  if (cached) return cached;
+  const data = await fmpFetch(
+    `${API_BASE}/proxy/fmp/grades-consensus?symbol=${encodeURIComponent(symbol)}&apikey=${FMP_KEY}`
+  );
+  if (data && !data._rateLimited && Array.isArray(data) && data.length > 0) {
+    const r = data[0];
+    const out = {
+      strongBuy:  r.strongBuy  ?? 0,
+      buy:        r.buy         ?? 0,
+      hold:       r.hold        ?? 0,
+      sell:       r.sell        ?? 0,
+      strongSell: r.strongSell  ?? 0,
+      consensus:  r.consensus   ?? null,
+    };
+    cacheSet(cacheKey, out, 21_600_000); // 6hr
+    return out;
+  }
+  return null;
+}
+
+// Analyst price-target consensus (TipRanks): high / low / consensus / median.
+export async function fmpPriceTarget(symbol) {
+  if (!FMP_KEY) return null;
+  const cacheKey = `fmp:pricetarget:${symbol}`;
+  const cached = cacheGet(cacheKey);
+  if (cached) return cached;
+  const data = await fmpFetch(
+    `${API_BASE}/proxy/fmp/price-target-consensus?symbol=${encodeURIComponent(symbol)}&apikey=${FMP_KEY}`
+  );
+  if (data && !data._rateLimited && Array.isArray(data) && data.length > 0) {
+    const r = data[0];
+    const out = {
+      high:      r.targetHigh      ?? null,
+      low:       r.targetLow       ?? null,
+      consensus: r.targetConsensus ?? null,
+      median:    r.targetMedian    ?? null,
+    };
+    cacheSet(cacheKey, out, 21_600_000); // 6hr
+    return out;
+  }
+  return null;
+}
+
+// Forward revenue/EPS estimates. FMP returns rows newest-first, so we sort
+// ascending and pick the nearest upcoming fiscal year (≥ today).
+export async function fmpAnalystEstimates(symbol) {
+  if (!FMP_KEY) return null;
+  const cacheKey = `fmp:estimates:${symbol}`;
+  const cached = cacheGet(cacheKey);
+  if (cached) return cached;
+  const data = await fmpFetch(
+    `${API_BASE}/proxy/fmp/analyst-estimates?symbol=${encodeURIComponent(symbol)}&period=annual&limit=6&apikey=${FMP_KEY}`
+  );
+  if (data && !data._rateLimited && Array.isArray(data) && data.length > 0) {
+    const rows = data.filter(r => r && r.date).sort((a, b) => a.date.localeCompare(b.date));
+    const today = new Date().toISOString().slice(0, 10);
+    const next = rows.find(r => r.date >= today) || rows[rows.length - 1];
+    if (!next) return null;
+    const out = {
+      date:        next.date,
+      revenueAvg:  next.revenueAvg ?? null,
+      epsAvg:      next.epsAvg ?? null,
+      numAnalysts: next.numAnalystsEps ?? next.numAnalystsRevenue ?? null,
+    };
+    cacheSet(cacheKey, out, 21_600_000); // 6hr
+    return out;
+  }
+  return null;
+}
+
 // DORMANT (D-6) — exported for future panel use; not called by any active UI path.
 // When activated: replace the inner fmpFetch() call with apiClient.call('fmp', 'dcf', { symbol }, { fetcher }).
 export async function fmpDCF(symbol) {

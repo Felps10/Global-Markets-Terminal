@@ -8,7 +8,8 @@ import {
   API_BASE,
   fetchYahooOHLCV,
   fmpProfile, fmpRatios,
-  finnhubNews, finnhubRecommendation,
+  fmpGradesConsensus, fmpPriceTarget, fmpAnalystEstimates,
+  finnhubNews,
   hasFmpKey, hasFinnhubKey,
 } from '../../dataServices.js';
 import { CLUBE_COLORS } from '../../lib/tokens.js';
@@ -299,7 +300,10 @@ export default function ChartResearchPage() {
   // ── Research data (Part 2) ────────────────────────────────────────────────
   const [newsData,     setNewsData]     = useState(null);
   const [recData,      setRecData]      = useState(null);
+  const [targetData,   setTargetData]   = useState(null);
+  const [estimatesData, setEstimatesData] = useState(null);
   const [loadingNews,  setLoadingNews]  = useState(true);
+  const [loadingRec,   setLoadingRec]   = useState(true);
   const [descExpanded, setDescExpanded] = useState(false);
 
   // ── Resize ────────────────────────────────────────────────────────────────
@@ -387,8 +391,8 @@ export default function ChartResearchPage() {
     let cancelled = false;
 
     setPriceData(null); setProfileData(null); setRatiosData(null);
-    setNewsData(null); setRecData(null);
-    setLoadingPrice(true); setLoadingFunds(true); setLoadingNews(true);
+    setNewsData(null); setRecData(null); setTargetData(null); setEstimatesData(null);
+    setLoadingPrice(true); setLoadingFunds(true); setLoadingNews(true); setLoadingRec(true);
 
     const yahooSymbol = activeAsset?.meta?.isB3 ? activeSymbol + '.SA' : activeSymbol;
     fetchAssetQuote(yahooSymbol).then(d => {
@@ -404,14 +408,26 @@ export default function ChartResearchPage() {
             setLoadingFunds(false);
           }
         });
-    } else { setLoadingFunds(false); }
+      // Analyst data from FMP Premium (grades + price target + estimates).
+      Promise.allSettled([
+        fmpGradesConsensus(activeSymbol),
+        fmpPriceTarget(activeSymbol),
+        fmpAnalystEstimates(activeSymbol),
+      ]).then(([g, t, e]) => {
+        if (!cancelled) {
+          if (g.status === 'fulfilled') setRecData(g.value);
+          if (t.status === 'fulfilled') setTargetData(t.value);
+          if (e.status === 'fulfilled') setEstimatesData(e.value);
+          setLoadingRec(false);
+        }
+      });
+    } else { setLoadingFunds(false); setLoadingRec(false); }
 
     if (hasFinnhubKey()) {
-      Promise.allSettled([finnhubNews(activeSymbol), finnhubRecommendation(activeSymbol)])
-        .then(([n, r]) => {
+      Promise.allSettled([finnhubNews(activeSymbol)])
+        .then(([n]) => {
           if (!cancelled) {
             if (n.status === 'fulfilled') setNewsData(n.value);
-            if (r.status === 'fulfilled') setRecData(r.value);
             setLoadingNews(false);
           }
         });
@@ -1247,12 +1263,12 @@ export default function ChartResearchPage() {
               <Card style={{ flex: 40, minWidth: isMobile ? '100%' : 0 }}>
                 <PanelTitle>Analyst Consensus</PanelTitle>
 
-                {!hasFinnhubKey() ? (
+                {!hasFmpKey() ? (
                   <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: TXT_3, fontStyle: 'italic' }}>
-                    Finnhub key required for analyst data.<br /><br />
-                    Set <code style={{ fontFamily: "'JetBrains Mono', monospace", color: TXT_2, fontSize: 11 }}>VITE_FINNHUB_KEY</code> in <code style={{ fontFamily: "'JetBrains Mono', monospace", color: TXT_2, fontSize: 11 }}>.env.local</code> to enable.
+                    FMP key required for analyst data.<br /><br />
+                    Set <code style={{ fontFamily: "'JetBrains Mono', monospace", color: TXT_2, fontSize: 11 }}>VITE_FMP_KEY</code> in <code style={{ fontFamily: "'JetBrains Mono', monospace", color: TXT_2, fontSize: 11 }}>.env.local</code> to enable.
                   </div>
-                ) : loadingNews ? (
+                ) : loadingRec ? (
                   <>
                     <Skeleton height={24} width="100%" mb={8} />
                     <Skeleton height={14} width="60%" mb={12} />
@@ -1314,6 +1330,54 @@ export default function ChartResearchPage() {
                 ) : (
                   <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: TXT_3, fontStyle: 'italic' }}>
                     No analyst data available for {activeSymbol}.
+                  </div>
+                )}
+
+                {/* Price target (FMP price-target-consensus) */}
+                {targetData && targetData.consensus != null && (
+                  <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${BORDER}` }}>
+                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: TXT_3, letterSpacing: '0.08em', marginBottom: 6 }}>
+                      PRICE TARGET
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 18, fontWeight: 700, color: TXT_1 }}>
+                        ${fmtPrice(targetData.consensus)}
+                      </span>
+                      {priceData?.price != null && Number(priceData.price) > 0 && (() => {
+                        const upside = ((targetData.consensus - priceData.price) / priceData.price) * 100;
+                        const col = upside >= 0 ? GREEN : RED;
+                        return (
+                          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700, color: col }}>
+                            {upside >= 0 ? '+' : ''}{upside.toFixed(1)}% vs price
+                          </span>
+                        );
+                      })()}
+                    </div>
+                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: TXT_3 }}>
+                      Low ${fmtPrice(targetData.low)} · High ${fmtPrice(targetData.high)}
+                    </div>
+                  </div>
+                )}
+
+                {/* Forward estimate (FMP analyst-estimates — nearest fiscal year) */}
+                {estimatesData && (estimatesData.epsAvg != null || estimatesData.revenueAvg != null) && (
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${BORDER}` }}>
+                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: TXT_3, letterSpacing: '0.08em', marginBottom: 6 }}>
+                      FORWARD ESTIMATE{estimatesData.date ? ` · FY${estimatesData.date.slice(0, 4)}` : ''}
+                    </div>
+                    <div style={{ display: 'flex', gap: 16, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: TXT_2 }}>
+                      {estimatesData.epsAvg != null && (
+                        <span>EPS <span style={{ color: TXT_1, fontWeight: 700 }}>${fmtPrice(estimatesData.epsAvg)}</span></span>
+                      )}
+                      {estimatesData.revenueAvg != null && (
+                        <span>REV <span style={{ color: TXT_1, fontWeight: 700 }}>{fmtLarge(estimatesData.revenueAvg)}</span></span>
+                      )}
+                    </div>
+                    {estimatesData.numAnalysts != null && (
+                      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: TXT_3, marginTop: 4 }}>
+                        {estimatesData.numAnalysts} analyst{estimatesData.numAnalysts !== 1 ? 's' : ''}
+                      </div>
+                    )}
                   </div>
                 )}
               </Card>
