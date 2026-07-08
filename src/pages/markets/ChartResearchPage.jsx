@@ -6,7 +6,7 @@ import { useTaxonomy } from '../../context/TaxonomyContext.jsx';
 import { useWatchlist } from '../../context/WatchlistContext.jsx';
 import {
   API_BASE,
-  fmpOHLCV,
+  fmpOHLCV, CHART_PROXY,
   fmpProfile, fmpRatios,
   fmpGradesConsensus, fmpPriceTarget, fmpAnalystEstimates,
   finnhubNews,
@@ -989,7 +989,7 @@ export default function ChartResearchPage() {
                   candleBorders={false}
                   areaTopColor="rgba(59,130,246,0.3)"
                   symbol={activeSymbol}
-                  intervalLabel={timeframe}
+                  intervalLabel={CHART_PROXY[activeSymbol] ? `${timeframe} · proxy ${CHART_PROXY[activeSymbol]}` : timeframe}
                   colors={{ up: GREEN, down: RED, accent: '#3b82f6', bg: BG_PAGE, text: TXT_2, grid: '#1e2d3d', border: '#1e2d3d' }}
                 />
               </div>

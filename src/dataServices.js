@@ -1369,10 +1369,16 @@ export async function fetchYahooOHLCV(symbol, timeframe = '1M', { assets = {}, i
 //   (symbol, timeframe, {assets, interval}) -> [{time, open, high, low, close, volume}] ascending.
 // FMP charts US equities/ETFs, US indices (^GSPC), FX, crypto, gold/silver — daily
 // (historical-price-eod/full, date-string time) + intraday (historical-chart/*, UTC
-// seconds from exchange-local wall time). Classes FMP GATES (Brazil B3, EU/Asia indices,
-// WTI/natgas) or symbols FMP can't resolve fall back to the existing Yahoo path until the
-// per-class EODHD/BRAPI routing lands (C3-1/C3-6). B3 is routed to Yahoo up front — its
-// bare symbol could match a WRONG US-listed instrument on FMP.
+// seconds from exchange-local wall time). WTI/natgas futures (CL=F/NG=F) return DEAD FMP
+// history (CL=F ends 2022), so they're charted via their liquid ETF proxy (USO/UNG — see
+// CHART_PROXY below). Classes FMP still GATES (Brazil B3, EU/Asia indices) fall back to the
+// Yahoo path until the per-class BRAPI/EODHD routing lands (C3-6b/c). B3 is routed to Yahoo
+// up front — its bare symbol could match a WRONG US-listed instrument on FMP.
+
+// ETF proxies for instruments FMP can't chart directly. The chart legend flags the proxy:
+// price LEVELS are the ETF's, but the SHAPE tracks the underlying commodity.
+export const CHART_PROXY = { 'CL=F': 'USO', 'NG=F': 'UNG' };
+
 const FMP_OHLCV_TF = {
   '1D':  { mode: 'intraday', interval: '5min',  days: 2 },
   '5D':  { mode: 'intraday', interval: '30min', days: 7 },
@@ -1428,16 +1434,20 @@ async function fmpIntradayCandles(symbol, cfg) {
 
 export async function fmpOHLCV(symbol, timeframe = '1M', { assets = {}, interval } = {}) {
   const isB3 = assets[symbol]?.isB3;
+  // WTI/natgas futures → their liquid ETF proxy (FMP futures history is dead). Everything
+  // else charts its own symbol.
+  const fetchSym = CHART_PROXY[symbol] || symbol;
   if (!isB3 && FMP_KEY) {
     try {
       const cfg = FMP_OHLCV_TF[timeframe] || FMP_OHLCV_TF['1M'];
       const candles = cfg.mode === 'intraday'
-        ? await fmpIntradayCandles(symbol, cfg)
-        : await fmpDailyCandles(symbol, cfg);
+        ? await fmpIntradayCandles(fetchSym, cfg)
+        : await fmpDailyCandles(fetchSym, cfg);
       if (candles && candles.length >= 2) return candles;
     } catch (_) { /* fall through to Yahoo */ }
   }
-  // Fallback: Yahoo (B3 + FMP-gated classes + any symbol FMP can't resolve).
+  // Fallback: Yahoo on the ORIGINAL symbol (B3 + FMP-gated classes + any symbol FMP can't
+  // resolve). For a proxied future this means the real instrument as a last resort.
   return fetchYahooOHLCV(symbol, timeframe, { assets, interval });
 }
 
