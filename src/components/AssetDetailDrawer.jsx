@@ -422,7 +422,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
   // ── Chart state ───────────────────────────────────────────────────────────
   const [timeframe,    setTimeframe]    = useState('1M');
   const [chartInterval, setChartInterval] = useState(null); // null = use default for timeframe
-  const [chartType,    setChartType]    = useState('area'); // 'area' | 'candle'
+  const [chartType,    setChartType]    = useState('candle'); // 'area' | 'candle' (expanded default; collapsed always area)
   const [chartPoints,  setChartPoints]  = useState(null);
   const [chartLoading, setChartLoading] = useState(false);
   const [chartError,   setChartError]   = useState(null);
@@ -505,7 +505,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
     setTimeframe('1M');
     setChartInterval(null);
     setExpanded(false);
-    setChartType('area');
+    setChartType('candle');
     setActiveTab('overview');
   }, [currentSymbol]);
 
@@ -885,11 +885,15 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
           }}>
             <PriceChart
               data={chartPoints}
-              seriesType={chartType}
-              showVolume={chartType === 'candle'}
+              seriesType={expanded ? chartType : 'area'}
+              showVolume={expanded && chartType === 'candle'}
               areaDirectional
               candleBorders
-              crosshairMode={0}
+              crosshairMode={expanded ? 1 : 0}
+              symbol={currentSymbol}
+              intervalLabel={timeframe}
+              showLegend={expanded}
+              showWatermark={expanded}
               colors={{ up: GREEN, down: RED, bg: BG_CARD, text: TXT_2, grid: 'rgba(30,41,59,0.4)', border: 'rgba(30,41,59,0.6)' }}
               recreateKey={`${currentSymbol}:${expanded}`}
               refitKey={expanded}

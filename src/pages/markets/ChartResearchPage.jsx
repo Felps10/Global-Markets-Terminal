@@ -742,7 +742,7 @@ export default function ChartResearchPage() {
         <div style={{ display: 'flex', alignItems: 'center', padding: '6px 16px', gap: 10, flexWrap: 'wrap' }}>
           {/* Main symbol legend */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginRight: 4 }}>
-            <div style={{ width: 14, height: 2, background: ACCENT, borderRadius: 1 }} />
+            <div style={{ width: 14, height: 2, background: '#3b82f6', borderRadius: 1 }} />
             <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: TXT_2 }}>
               {activeAsset?.symbol} %Δ
             </span>
@@ -975,7 +975,9 @@ export default function ChartResearchPage() {
                   crosshairMode={1}
                   candleBorders={false}
                   areaTopColor="rgba(59,130,246,0.3)"
-                  colors={{ up: GREEN, down: RED, accent: ACCENT, bg: BG_PAGE, text: TXT_2, grid: '#1e2d3d', border: '#1e2d3d' }}
+                  symbol={activeSymbol}
+                  intervalLabel={timeframe}
+                  colors={{ up: GREEN, down: RED, accent: '#3b82f6', bg: BG_PAGE, text: TXT_2, grid: '#1e2d3d', border: '#1e2d3d' }}
                 />
               </div>
               {/* Comparison legend overlay */}
@@ -985,7 +987,7 @@ export default function ChartResearchPage() {
                   display: 'flex', alignItems: 'center', gap: 12, pointerEvents: 'none',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <div style={{ width: 16, height: 2, background: ACCENT, borderRadius: 1 }} />
+                    <div style={{ width: 16, height: 2, background: '#3b82f6', borderRadius: 1 }} />
                     <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: TXT_2 }}>
                       {activeAsset?.symbol} %Δ
                     </span>
