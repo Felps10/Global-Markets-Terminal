@@ -20,13 +20,33 @@ export function MarketDataProvider({ children }) {
         const data = await res.json();
         if (!mountedRef.current) return;
 
+        // Build from the normalized `quotes` map (Phase C source of truth): it is keyed by
+        // display symbol — the same key the Watchlist pins by (item.target_id) — and carries
+        // marketCap + the 52-week range that the legacy `yahoo` array drops. Falling back to
+        // the legacy array only for symbols the normalized map does not cover also fixes B3
+        // (.SA) and crypto rows, which are absent under a bare-display key in `data.yahoo`.
         const map = {};
+        if (data.quotes && typeof data.quotes === 'object') {
+          for (const [sym, q] of Object.entries(data.quotes)) {
+            if (!q) continue;
+            map[sym] = {
+              price:            q.price ?? null,
+              changePct:        q.changePct ?? null,
+              marketCap:        q.marketCap ?? null,
+              fiftyTwoWeekHigh: q.fiftyTwoWeekHigh ?? null,
+              fiftyTwoWeekLow:  q.fiftyTwoWeekLow ?? null,
+            };
+          }
+        }
         if (Array.isArray(data.yahoo)) {
           data.yahoo.forEach(q => {
-            if (q.symbol) {
+            if (q.symbol && !map[q.symbol]) {
               map[q.symbol] = {
-                price:     q.regularMarketPrice ?? null,
-                changePct: q.regularMarketChangePercent ?? null,
+                price:            q.regularMarketPrice ?? null,
+                changePct:        q.regularMarketChangePercent ?? null,
+                marketCap:        null,
+                fiftyTwoWeekHigh: null,
+                fiftyTwoWeekLow:  null,
               };
             }
           });
