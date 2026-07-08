@@ -15,7 +15,7 @@ import { createChart, AreaSeries, CandlestickSeries, HistogramSeries } from 'lig
 import { useTaxonomy } from '../context/TaxonomyContext.jsx';
 import {
   API_BASE,
-  fetchYahooOHLCV,
+  fmpOHLCV,
   fmpProfile, fmpRatios,
   fmpGradesConsensus, fmpPriceTarget, fmpAnalystEstimates,
   finnhubNews,
@@ -579,8 +579,9 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
     setChartPoints(null);
 
     try {
-      // fetchYahooOHLCV appends `.SA` only when the passed assets map flags isB3.
-      const candles = await fetchYahooOHLCV(sym, tf, { interval: iv, assets: symIsB3 ? { [sym]: { isB3: true } } : undefined });
+      // fmpOHLCV charts FMP-covered classes and falls back to Yahoo for B3 + gaps.
+      // The isB3 flag routes B3 straight to the Yahoo path (FMP gates Brazil).
+      const candles = await fmpOHLCV(sym, tf, { interval: iv, assets: symIsB3 ? { [sym]: { isB3: true } } : undefined });
       chartCacheRef.current[cacheKey] = candles;
       if (activeSymTfRef.current === cacheKey) setChartPoints(candles);
     } catch (err) {

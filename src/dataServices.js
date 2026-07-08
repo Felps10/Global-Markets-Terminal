@@ -1331,6 +1331,83 @@ export async function fetchYahooOHLCV(symbol, timeframe = '1M', { assets = {}, i
   return response.data;
 }
 
+// ─── FMP OHLCV (Premium /stable) — the C3 chart data adapter ─────────────────
+// Drop-in replacement for fetchYahooOHLCV with the SAME contract:
+//   (symbol, timeframe, {assets, interval}) -> [{time, open, high, low, close, volume}] ascending.
+// FMP charts US equities/ETFs, US indices (^GSPC), FX, crypto, gold/silver — daily
+// (historical-price-eod/full, date-string time) + intraday (historical-chart/*, UTC
+// seconds from exchange-local wall time). Classes FMP GATES (Brazil B3, EU/Asia indices,
+// WTI/natgas) or symbols FMP can't resolve fall back to the existing Yahoo path until the
+// per-class EODHD/BRAPI routing lands (C3-1/C3-6). B3 is routed to Yahoo up front — its
+// bare symbol could match a WRONG US-listed instrument on FMP.
+const FMP_OHLCV_TF = {
+  '1D':  { mode: 'intraday', interval: '5min',  days: 2 },
+  '5D':  { mode: 'intraday', interval: '30min', days: 7 },
+  '1W':  { mode: 'intraday', interval: '1hour', days: 8 },
+  '1M':  { mode: 'daily', days: 31 },
+  '3M':  { mode: 'daily', days: 93 },
+  'YTD': { mode: 'daily', ytd: true },
+  '1Y':  { mode: 'daily', days: 366 },
+  '5Y':  { mode: 'daily', days: 1830 },
+  'MAX': { mode: 'daily', all: true },
+};
+
+function isoDaysAgo(days) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+async function fmpDailyCandles(symbol, cfg) {
+  const from = cfg.all ? '' : cfg.ytd ? `${new Date().getFullYear()}-01-01` : isoDaysAgo(cfg.days);
+  const url = `${API_BASE}/proxy/fmp/historical-price-eod/full?symbol=${encodeURIComponent(symbol)}${from ? `&from=${from}` : ''}&apikey=${FMP_KEY}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!res.ok) return null;
+  const json = await res.json();
+  const arr = Array.isArray(json) ? json : (json?.historical || []);
+  // FMP returns newest-first → build ascending. Daily time = 'YYYY-MM-DD' string.
+  const out = [];
+  for (const r of arr) {
+    if (!r || !r.date || !isFinite(Number(r.close))) continue;
+    out.push({ time: r.date.slice(0, 10), open: +r.open, high: +r.high, low: +r.low, close: +r.close, volume: +r.volume || 0 });
+  }
+  return out.reverse();
+}
+
+async function fmpIntradayCandles(symbol, cfg) {
+  const from = isoDaysAgo(cfg.days);
+  const url = `${API_BASE}/proxy/fmp/historical-chart/${cfg.interval}?symbol=${encodeURIComponent(symbol)}&from=${from}&apikey=${FMP_KEY}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!res.ok) return null;
+  const json = await res.json();
+  const arr = Array.isArray(json) ? json : [];
+  // Intraday datetimes are exchange-local wall time (no tz). Parse as UTC so the axis
+  // shows the session wall-clock (e.g. 09:30–16:00) and stays monotonic. time = UTC seconds.
+  const out = [];
+  for (const r of arr) {
+    if (!r || !r.date || !isFinite(Number(r.close))) continue;
+    const t = Math.floor(Date.parse(r.date.replace(' ', 'T') + 'Z') / 1000);
+    if (!isFinite(t)) continue;
+    out.push({ time: t, open: +r.open, high: +r.high, low: +r.low, close: +r.close, volume: +r.volume || 0 });
+  }
+  return out.reverse();
+}
+
+export async function fmpOHLCV(symbol, timeframe = '1M', { assets = {}, interval } = {}) {
+  const isB3 = assets[symbol]?.isB3;
+  if (!isB3 && FMP_KEY) {
+    try {
+      const cfg = FMP_OHLCV_TF[timeframe] || FMP_OHLCV_TF['1M'];
+      const candles = cfg.mode === 'intraday'
+        ? await fmpIntradayCandles(symbol, cfg)
+        : await fmpDailyCandles(symbol, cfg);
+      if (candles && candles.length >= 2) return candles;
+    } catch (_) { /* fall through to Yahoo */ }
+  }
+  // Fallback: Yahoo (B3 + FMP-gated classes + any symbol FMP can't resolve).
+  return fetchYahooOHLCV(symbol, timeframe, { assets, interval });
+}
+
 // ─── HEALTH CHECKS & USAGE TRACKING ─────────────────────────────────────────
 
 export function trackApiCall(source) {

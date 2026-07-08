@@ -6,7 +6,7 @@ import { useTaxonomy } from '../../context/TaxonomyContext.jsx';
 import { useWatchlist } from '../../context/WatchlistContext.jsx';
 import {
   API_BASE,
-  fetchYahooOHLCV,
+  fmpOHLCV,
   fmpProfile, fmpRatios,
   fmpGradesConsensus, fmpPriceTarget, fmpAnalystEstimates,
   finnhubNews,
@@ -444,7 +444,7 @@ export default function ChartResearchPage() {
     setChartError(null);
     setOhlcvData([]);
 
-    fetchYahooOHLCV(activeAsset.symbol, timeframe, { assets: assetMap })
+    fmpOHLCV(activeAsset.symbol, timeframe, { assets: assetMap })
       .then(data => { if (!cancelled) { setOhlcvData(data); setChartLoading(false); } })
       .catch(err => { if (!cancelled) { setChartError(err.message || 'Chart data unavailable'); setChartLoading(false); } });
 
@@ -459,7 +459,7 @@ export default function ChartResearchPage() {
 
     Promise.all(
       compSymbols.map(sym =>
-        fetchYahooOHLCV(sym, timeframe, { assets: assetMap })
+        fmpOHLCV(sym, timeframe, { assets: assetMap })
           .then(data => ({ sym, data }))
           .catch(() => ({ sym, data: null }))
       )
@@ -631,7 +631,7 @@ export default function ChartResearchPage() {
     setCompLoading(true);
 
     try {
-      const data = await fetchYahooOHLCV(sym, timeframe, { assets: assetMap });
+      const data = await fmpOHLCV(sym, timeframe, { assets: assetMap });
       setCompData(prev => ({ ...prev, [sym]: data }));
     } catch (_) {
       setCompData(prev => ({ ...prev, [sym]: null }));
