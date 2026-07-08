@@ -646,6 +646,33 @@ export async function fmpAnalystEstimates(symbol) {
   return null;
 }
 
+// ─── FMP TECHNICAL INDICATORS (Premium /stable) ─────────────────────────────
+// No daily cap (vs AlphaVantage's 25/day) and no 5/min throttle, so the Signal
+// Engine's single-asset RSI and the subgroup scanner no longer ration calls.
+// Returns [{date, value}] NEWEST-FIRST — the exact shape the old alphaVantageRSI
+// produced, so the RSI chart + scanner consume it unchanged. (MACD is NOT a
+// native FMP indicator — /stable/technical-indicators/macd 404s — so MACD stays
+// on AlphaVantage.) Cached 1hr — RSI only moves once per daily bar.
+export async function fmpRSI(symbol, periodLength = 14, timeframe = '1day') {
+  if (!FMP_KEY) return null;
+  const cacheKey = `fmp:rsi:${symbol}:${periodLength}:${timeframe}`;
+  const cached = cacheGet(cacheKey);
+  if (cached) return cached;
+  const data = await fmpFetch(
+    `${API_BASE}/proxy/fmp/technical-indicators/rsi?symbol=${encodeURIComponent(symbol)}&periodLength=${periodLength}&timeframe=${timeframe}&apikey=${FMP_KEY}`
+  );
+  if (data && !data._rateLimited && Array.isArray(data) && data.length > 0) {
+    const rows = data
+      .slice(0, 60)
+      .filter(r => r && r.date != null && isFinite(Number(r.rsi)))
+      .map(r => ({ date: r.date, value: Number(r.rsi) }));
+    if (!rows.length) return null;
+    cacheSet(cacheKey, rows, 3_600_000); // 1hr
+    return rows;
+  }
+  return null;
+}
+
 // DORMANT (D-6) — exported for future panel use; not called by any active UI path.
 // When activated: replace the inner fmpFetch() call with apiClient.call('fmp', 'dcf', { symbol }, { fetcher }).
 export async function fmpDCF(symbol) {
