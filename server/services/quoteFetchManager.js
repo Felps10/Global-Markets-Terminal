@@ -18,6 +18,7 @@ import https from 'https';
 import { ensureSession, getSession, refreshSession, httpsGet } from './yahooSession.js';
 import { resolveLiveSymbols, resolveBrazilB3, getCachedPlan } from '../lib/symbolResolver.js';
 import { isFmpSingleQuote } from '../lib/fmpSymbols.js';
+import { getEodhd52wk, getCached52wk } from '../lib/eodhd52wk.js';
 
 // ─── Cache state ─────────────────────────────────────────────────────────────
 
@@ -370,6 +371,9 @@ function pushEodhdRow(out, row, reverse) {
   if (!row || !isFiniteNum(row.close)) return;
   const symbol = reverse.get(row.code);
   if (!symbol) return; // unknown code — shouldn't happen (we built the request)
+  // EODHD real-time carries no 52-week range → backfill from the cached 1y-EOD extremes
+  // (warmed by fetchEodhd). Null until the first warm completes.
+  const w52 = getCached52wk(row.code);
   out.push({
     symbol,
     regularMarketPrice: row.close,
@@ -379,6 +383,8 @@ function pushEodhdRow(out, row, reverse) {
     regularMarketDayHigh: isFiniteNum(row.high) ? row.high : undefined,
     regularMarketDayLow: isFiniteNum(row.low) ? row.low : undefined,
     regularMarketVolume: isFiniteNum(row.volume) ? row.volume : undefined,
+    fiftyTwoWeekHigh: w52 ? w52.high : undefined,
+    fiftyTwoWeekLow: w52 ? w52.low : undefined,
     _source: 'eodhd',
   });
 }
@@ -426,6 +432,10 @@ async function fetchEodhd() {
       reverse.set(e.eodhd, e.display);
       if (!eodhdQuarantine.has(e.eodhd)) codes.push(e.eodhd);
     }
+
+    // Warm the 52-week cache for these codes (fire-and-forget; TTL-guarded so it truly fetches
+    // only ~once/12h per code). pushEodhdRow reads getCached52wk() to attach the range.
+    void Promise.allSettled(codes.map((c) => getEodhd52wk(c)));
 
     const out = [];
     let okBatches = 0;
