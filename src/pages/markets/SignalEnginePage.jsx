@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import MarketsPageLayout from '../../components/MarketsPageLayout.jsx';
 import { useTaxonomy } from '../../context/TaxonomyContext.jsx';
-import { fmpRSI, alphaVantageMACD, hasFmpKey, hasAlphaVantageKey } from '../../dataServices.js';
-import { quotaTracker, isExhausted } from '../../services/quotaTracker.js';
+import { fmpRSI, fmpMACD, hasFmpKey } from '../../dataServices.js';
 import { CLUBE_COLORS } from '../../lib/tokens.js';
 
 const C       = CLUBE_COLORS;
@@ -545,25 +544,15 @@ export default function SignalEnginePage() {
   const [scanError, setScanError]           = useState(null);
   const [scanProgress, setScanProgress]     = useState(0);
 
-  // Quota
-  const [quotaRemaining, setQuotaRemaining]   = useState(null);
-
   // Mobile
   const [isMobile, setIsMobile]   = useState(window.innerWidth < 768);
   const [panelOpen, setPanelOpen] = useState(false);
 
-  // ── Quota badge refresh ────────────────────────────────────────────────────
-  const refreshQuota = useCallback(() => {
-    const status = quotaTracker.getRemainingQuota('alphaVantage');
-    setQuotaRemaining(status.perDayRemaining);
-  }, []);
-
   useEffect(() => {
-    refreshQuota();
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [refreshQuota]);
+  }, []);
 
   // Close search dropdown on outside click
   useEffect(() => {
@@ -590,15 +579,11 @@ export default function SignalEnginePage() {
       ? fmpRSI(symbol, period, '1day')
       : Promise.reject(new Error('FMP API key not configured. Set VITE_FMP_KEY in .env.local.'));
 
-    // MACD — still AlphaVantage (not a native FMP indicator), so it keeps the 25/day gate.
-    let macdPromise;
-    if (!hasAlphaVantageKey()) {
-      macdPromise = Promise.reject(new Error('Alpha Vantage key not configured (MACD) — set VITE_ALPHAVANTAGE_KEY.'));
-    } else if (isExhausted('alphaVantage')) {
-      macdPromise = Promise.reject(new Error('Alpha Vantage daily quota exhausted (25/day) — MACD unavailable. Resets midnight UTC.'));
-    } else {
-      macdPromise = alphaVantageMACD(symbol, 'daily');
-    }
+    // MACD — computed server-side-key'd from FMP Premium daily closes (no daily cap, no
+    // 5/min throttle). Retires the old AlphaVantage 25/day dependency.
+    const macdPromise = hasFmpKey()
+      ? fmpMACD(symbol)
+      : Promise.reject(new Error('FMP API key not configured.'));
 
     const [rsiResult, macdResult] = await Promise.allSettled([rsiPromise, macdPromise]);
 
@@ -615,8 +600,7 @@ export default function SignalEnginePage() {
       setMacdError(macdResult.reason?.message || 'Failed to load MACD data.');
     }
     setLoadingMacd(false);
-    refreshQuota();
-  }, [refreshQuota]);
+  }, []);
 
   // Auto-fetch on mount (SPY default) and when symbol/period changes
   const fetchedRef = useRef(new Set());
@@ -665,8 +649,7 @@ export default function SignalEnginePage() {
     });
     setScanResults(results);
     setScanLoading(false);
-    refreshQuota();
-  }, [scanSubgroupId, activeSubgroup, refreshQuota]);
+  }, [scanSubgroupId, activeSubgroup]);
 
   // ── Search results ─────────────────────────────────────────────────────────
   const searchResults = useMemo(() => {
@@ -687,23 +670,6 @@ export default function SignalEnginePage() {
     setMode(newMode);
     setScanResults([]); setScanError(null); setScanProgress(0);
     if (newMode === 'single') { setRsiData(null); setMacdData(null); setRsiError(null); setMacdError(null); }
-  };
-
-  // ── Quota badge ────────────────────────────────────────────────────────────
-  const exhausted = isExhausted('alphaVantage');
-  const QuotaBadge = () => {
-    const bg     = exhausted ? '#3a0000' : quotaRemaining != null && quotaRemaining <= 5 ? 'rgba(245,158,11,0.08)' : 'rgba(51,65,85,0.3)';
-    const border = exhausted ? `1px solid ${RED}55` : quotaRemaining != null && quotaRemaining <= 5 ? `1px solid rgba(245,158,11,0.35)` : `1px solid ${BORDER}`;
-    const color  = exhausted ? RED : quotaRemaining != null && quotaRemaining <= 5 ? AMBER : TXT_3;
-    const label  = exhausted ? 'MACD·AV EXHAUSTED' : quotaRemaining != null && quotaRemaining <= 5 ? `MACD·AV: ${quotaRemaining} LEFT` : `MACD·AV: ${quotaRemaining ?? 25}/25`;
-    return (
-      <div
-        title="MACD runs on Alpha Vantage (free tier: 25/day, resets midnight UTC). RSI runs on FMP Premium (no daily cap)."
-        style={{ ...mono, fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', color, background: bg, border, borderRadius: 4, padding: '4px 10px', cursor: 'default' }}
-      >
-        {label}
-      </div>
-    );
   };
 
   // ── Left panel content ─────────────────────────────────────────────────────
@@ -856,7 +822,6 @@ export default function SignalEnginePage() {
       {isMobile && (
         <button onClick={() => setPanelOpen(true)} style={{ ...mono, fontSize: 11, color: TXT_2, background: 'transparent', border: `1px solid ${BORDER}`, borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>⚙ Configure</button>
       )}
-      <QuotaBadge />
     </>
   );
 

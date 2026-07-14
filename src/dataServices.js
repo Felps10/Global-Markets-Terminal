@@ -232,6 +232,82 @@ export async function alphaVantageMACD(symbol, interval = "daily") {
   return response.data ?? null;
 }
 
+// ─── MACD from FMP daily closes (retires the AlphaVantage 25/day dependency) ─────────────────
+// FMP has no native MACD indicator (technical-indicators/macd returns []), so compute it from
+// FMP Premium daily closes: MACD = EMA(fast) − EMA(slow); Signal = EMA(signal) of MACD;
+// Histogram = MACD − Signal. Standard params 12/26/9. Pure + unit-tested (see macd.test.js).
+
+/**
+ * @param {number[]} closes  ASCENDING daily closes (oldest → newest)
+ * @param {{fast?:number, slow?:number, signal?:number}} [opts]
+ * @returns {Array<{i:number, macd:number, signal:number, hist:number}>} one row per input index
+ *          where all three values are defined (`i` = index into `closes`).
+ */
+export function computeMacd(closes, { fast = 12, slow = 26, signal = 9 } = {}) {
+  if (!Array.isArray(closes) || closes.length < slow + signal) return [];
+  // EMA over a series; null until `period` NON-NULL values have been seen (seed = SMA of those).
+  // Counting non-null values (not the raw index) lets us EMA the MACD line, which has leading nulls.
+  const ema = (vals, period) => {
+    const k = 2 / (period + 1);
+    const out = new Array(vals.length).fill(null);
+    let seen = 0, sum = 0, prev = null;
+    for (let i = 0; i < vals.length; i++) {
+      const v = vals[i];
+      if (v == null || !Number.isFinite(v)) continue;
+      seen++;
+      if (seen < period) { sum += v; continue; }
+      if (seen === period) { sum += v; prev = sum / period; out[i] = prev; continue; }
+      prev = v * k + prev * (1 - k);
+      out[i] = prev;
+    }
+    return out;
+  };
+  const emaFast = ema(closes, fast);
+  const emaSlow = ema(closes, slow);
+  const macdLine = closes.map((_, i) =>
+    emaFast[i] != null && emaSlow[i] != null ? emaFast[i] - emaSlow[i] : null
+  );
+  const signalLine = ema(macdLine, signal);
+  const out = [];
+  for (let i = 0; i < closes.length; i++) {
+    if (macdLine[i] != null && signalLine[i] != null) {
+      out.push({ i, macd: macdLine[i], signal: signalLine[i], hist: macdLine[i] - signalLine[i] });
+    }
+  }
+  return out;
+}
+
+/**
+ * MACD for a symbol, computed from FMP Premium daily closes. Drop-in replacement for
+ * alphaVantageMACD — same contract: newest-first [{date, macd, signal, hist}] (up to `points`).
+ * Server key via /api/v1/fmp (Stage 2). Returns null on any miss.
+ */
+export async function fmpMACD(symbol, { fast = 12, slow = 26, signal = 9, points = 30 } = {}) {
+  if (!FMP_ENABLED) return null;
+  // ~250 calendar days ≈ 170 trading days — plenty for EMA(slow) + signal to stabilize.
+  const from = new Date(Date.now() - 250 * 86_400_000).toISOString().slice(0, 10);
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/v1/fmp/historical-price-eod/full?symbol=${encodeURIComponent(symbol)}&from=${from}`,
+      { signal: AbortSignal.timeout(12000) }
+    );
+    if (!res.ok) return null;
+    const json = await res.json();
+    const arr = Array.isArray(json) ? json : (json?.historical || []);
+    const rows = [];
+    for (const r of arr) {
+      if (!r || !r.date || !Number.isFinite(Number(r.close))) continue;
+      rows.push({ date: r.date.slice(0, 10), close: +r.close });
+    }
+    rows.reverse(); // FMP is newest-first → make ascending for the EMAs
+    if (rows.length < slow + signal) return null;
+    const macd = computeMacd(rows.map((r) => r.close), { fast, slow, signal });
+    if (!macd.length) return null;
+    const dated = macd.map((m) => ({ date: rows[m.i].date, macd: m.macd, signal: m.signal, hist: m.hist }));
+    return dated.slice(-points).reverse(); // newest-first, last `points`
+  } catch { return null; }
+}
+
 // ─── FRED (unlimited — most reliable) ────────────────────────────────────────
 
 export function hasFredKey() { return !!FRED_KEY; }
