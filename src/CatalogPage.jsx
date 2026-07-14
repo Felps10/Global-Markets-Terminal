@@ -144,7 +144,7 @@ const SOURCE_META = {
     assetClasses: ["Equities", "FX", "Fundamentals", "Valuation"], geo: "US + global",
     docUrl: "https://financialmodelingprep.com/developer/docs",
     keyRegistrationUrl: "https://financialmodelingprep.com/developer",
-    healthEndpoint: "/proxy/fmp/profile?symbol=AAPL",
+    healthEndpoint: "server-side · /api/v1/fmp/profile?symbol=AAPL",
     note: "PRIMARY real-time quote source for equities/ETFs/FX (+ gold/silver + ^FTSE) and fundamentals. Premium tier — 750/min, no daily cap.",
     fallbackSuggestion: null,
     tier: "paid",
@@ -243,7 +243,7 @@ const SOURCE_DETAIL_DATA = {
     description: "BRAPI is the primary source for B3 (Bovespa) equity data — prices in BRL, day change and volume. Primary B3 quotes are now fetched server-side via BRAPI Pro (batch 20 tickers/req, ~5-min) with a Yahoo .SA fallback for tickers BRAPI drops. The client-side path shown here is the secondary fallback plus the Terminal Mini ticker. A BRAPI Pro token is used.",
     type: "HTTP REST API", owner: "BRAPI (Community)", domain: "Brazil — B3 Equities",
     tags: ["Primary", "Brasil", "B3", "FIIs", "ETFs"],
-    endpoint: "brapi.dev/api → GET /api/v1/quotes/brazil", authType: "Bearer Token (VITE_BRAPI_TOKEN)",
+    endpoint: "brapi.dev/api → GET /api/v1/quotes/brazil", authType: "Server-side (BRAPI Pro token injected by /api/v1/brapi)",
     refreshCadence: "~5-min server cycle (Pro batch)", lastSuccessfulSync: "Managed server-side",
   },
   bcb: {

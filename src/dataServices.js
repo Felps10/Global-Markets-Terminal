@@ -10,8 +10,11 @@ import { MINI_ASSETS, MINI_YAHOO_SYMBOLS, MINI_BRAPI_SYMBOLS, MINI_CRYPTO_SYMBOL
 const FINNHUB_KEY   = import.meta.env.VITE_FINNHUB_KEY  || "";
 const AV_KEY        = import.meta.env.VITE_ALPHAVANTAGE_KEY || "";
 const FRED_KEY      = import.meta.env.VITE_FRED_KEY     || "";
-const FMP_KEY       = import.meta.env.VITE_FMP_KEY      || "";
-const BRAPI_TOKEN   = import.meta.env.VITE_BRAPI_TOKEN  || "";
+// FMP Premium + BRAPI Pro keys moved SERVER-SIDE (Stage 2). The client no longer holds them —
+// it hits /api/v1/fmp and /api/v1/brapi, which inject the key server-side. These flags gate the
+// client-side UI affordances only; the server is the source of truth for whether data returns.
+const FMP_ENABLED   = true;
+const BRAPI_ENABLED = true;
 
 export const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -20,8 +23,7 @@ const KEY_CONFIG = [
   { key: "VITE_FINNHUB_KEY",      value: FINNHUB_KEY, label: "Finnhub",      url: "https://finnhub.io" },
   { key: "VITE_ALPHAVANTAGE_KEY", value: AV_KEY,       label: "Alpha Vantage", url: "https://www.alphavantage.co/support/#api-key" },
   { key: "VITE_FRED_KEY",         value: FRED_KEY,     label: "FRED",          url: "https://fred.stlouisfed.org/docs/api/api_key.html" },
-  { key: "VITE_FMP_KEY",          value: FMP_KEY,      label: "FMP",           url: "https://financialmodelingprep.com/developer" },
-  { key: "VITE_BRAPI_TOKEN",     value: BRAPI_TOKEN,  label: "BRAPI",         url: "https://brapi.dev" },
+  // FMP + BRAPI intentionally omitted — their keys are server-side now (see /api/v1/fmp, /api/v1/brapi).
 ];
 
 KEY_CONFIG.forEach(({ key, value, label, url }) => {
@@ -382,7 +384,7 @@ export async function coingeckoTrending() {
 // All FMP requests are serialized through a throttled queue (1 req/sec max)
 // to prevent burst 429s. Profile data cached 24hr, ratios/DCF cached 6hr.
 
-export function hasFmpKey() { return !!FMP_KEY; }
+export function hasFmpKey() { return !!FMP_ENABLED; }
 
 // ── FMP rate-limit observability counter ──────────────────────────────────────
 let fmpRateLimitHits = 0;
@@ -417,7 +419,7 @@ async function fmpSafeFetch(url, maxRetries = 3) {
 
       // Auth errors — fail fast, no retry
       if (res.status === 401 || res.status === 403) {
-        console.warn(`[FMP] Auth error HTTP ${res.status} — check VITE_FMP_KEY`);
+        console.warn(`[FMP] Auth error HTTP ${res.status} — check the server FMP_ENABLED`);
         return null;
       }
 
@@ -460,11 +462,11 @@ function fmpFetch(url) {
 }
 
 export async function fmpProfile(symbol) {
-  if (!FMP_KEY) return null;
+  if (!FMP_ENABLED) return null;
   const response = await apiClient.call('fmp', 'profile', { symbol }, {
     fetcher: async () => {
       const res = await fetch(
-        `${API_BASE}/proxy/fmp/profile?symbol=${encodeURIComponent(symbol)}&apikey=${FMP_KEY}`,
+        `${API_BASE}/api/v1/fmp/profile?symbol=${encodeURIComponent(symbol)}`,
         { signal: AbortSignal.timeout(10000) }
       );
       if (res.status === 429) {
@@ -496,11 +498,11 @@ export async function fmpProfile(symbol) {
 }
 
 export async function fmpRatios(symbol) {
-  if (!FMP_KEY) return null;
+  if (!FMP_ENABLED) return null;
   const response = await apiClient.call('fmp', 'ratiosTTM', { symbol }, {
     fetcher: async () => {
       const res = await fetch(
-        `${API_BASE}/proxy/fmp/ratios-ttm?symbol=${encodeURIComponent(symbol)}&apikey=${FMP_KEY}`,
+        `${API_BASE}/api/v1/fmp/ratios-ttm?symbol=${encodeURIComponent(symbol)}`,
         { signal: AbortSignal.timeout(10000) }
       );
       if (res.status === 429) {
@@ -546,12 +548,12 @@ export async function fmpRatios(symbol) {
 // key-metrics-ttm in the /stable API) — so the Fundamental Lab's ROE was silently null
 // until this was wired. Cached 6hr like the other slow-moving fundamentals.
 export async function fmpKeyMetrics(symbol) {
-  if (!FMP_KEY) return null;
+  if (!FMP_ENABLED) return null;
   const cacheKey = `fmp:keymetrics:${symbol}`;
   const cached = cacheGet(cacheKey);
   if (cached) return cached;
   const data = await fmpFetch(
-    `${API_BASE}/proxy/fmp/key-metrics-ttm?symbol=${encodeURIComponent(symbol)}&apikey=${FMP_KEY}`
+    `${API_BASE}/api/v1/fmp/key-metrics-ttm?symbol=${encodeURIComponent(symbol)}`
   );
   if (data && !data._rateLimited && Array.isArray(data) && data.length > 0) {
     const r = data[0];
@@ -574,12 +576,12 @@ export async function fmpKeyMetrics(symbol) {
 // Buy/hold/sell distribution — SAME shape as the old Finnhub recommendation, so
 // existing consensus bars render unchanged.
 export async function fmpGradesConsensus(symbol) {
-  if (!FMP_KEY) return null;
+  if (!FMP_ENABLED) return null;
   const cacheKey = `fmp:grades:${symbol}`;
   const cached = cacheGet(cacheKey);
   if (cached) return cached;
   const data = await fmpFetch(
-    `${API_BASE}/proxy/fmp/grades-consensus?symbol=${encodeURIComponent(symbol)}&apikey=${FMP_KEY}`
+    `${API_BASE}/api/v1/fmp/grades-consensus?symbol=${encodeURIComponent(symbol)}`
   );
   if (data && !data._rateLimited && Array.isArray(data) && data.length > 0) {
     const r = data[0];
@@ -599,12 +601,12 @@ export async function fmpGradesConsensus(symbol) {
 
 // Analyst price-target consensus (TipRanks): high / low / consensus / median.
 export async function fmpPriceTarget(symbol) {
-  if (!FMP_KEY) return null;
+  if (!FMP_ENABLED) return null;
   const cacheKey = `fmp:pricetarget:${symbol}`;
   const cached = cacheGet(cacheKey);
   if (cached) return cached;
   const data = await fmpFetch(
-    `${API_BASE}/proxy/fmp/price-target-consensus?symbol=${encodeURIComponent(symbol)}&apikey=${FMP_KEY}`
+    `${API_BASE}/api/v1/fmp/price-target-consensus?symbol=${encodeURIComponent(symbol)}`
   );
   if (data && !data._rateLimited && Array.isArray(data) && data.length > 0) {
     const r = data[0];
@@ -623,12 +625,12 @@ export async function fmpPriceTarget(symbol) {
 // Forward revenue/EPS estimates. FMP returns rows newest-first, so we sort
 // ascending and pick the nearest upcoming fiscal year (≥ today).
 export async function fmpAnalystEstimates(symbol) {
-  if (!FMP_KEY) return null;
+  if (!FMP_ENABLED) return null;
   const cacheKey = `fmp:estimates:${symbol}`;
   const cached = cacheGet(cacheKey);
   if (cached) return cached;
   const data = await fmpFetch(
-    `${API_BASE}/proxy/fmp/analyst-estimates?symbol=${encodeURIComponent(symbol)}&period=annual&limit=6&apikey=${FMP_KEY}`
+    `${API_BASE}/api/v1/fmp/analyst-estimates?symbol=${encodeURIComponent(symbol)}&period=annual&limit=6`
   );
   if (data && !data._rateLimited && Array.isArray(data) && data.length > 0) {
     const rows = data.filter(r => r && r.date).sort((a, b) => a.date.localeCompare(b.date));
@@ -655,12 +657,12 @@ export async function fmpAnalystEstimates(symbol) {
 // native FMP indicator — /stable/technical-indicators/macd 404s — so MACD stays
 // on AlphaVantage.) Cached 1hr — RSI only moves once per daily bar.
 export async function fmpRSI(symbol, periodLength = 14, timeframe = '1day') {
-  if (!FMP_KEY) return null;
+  if (!FMP_ENABLED) return null;
   const cacheKey = `fmp:rsi:${symbol}:${periodLength}:${timeframe}`;
   const cached = cacheGet(cacheKey);
   if (cached) return cached;
   const data = await fmpFetch(
-    `${API_BASE}/proxy/fmp/technical-indicators/rsi?symbol=${encodeURIComponent(symbol)}&periodLength=${periodLength}&timeframe=${timeframe}&apikey=${FMP_KEY}`
+    `${API_BASE}/api/v1/fmp/technical-indicators/rsi?symbol=${encodeURIComponent(symbol)}&periodLength=${periodLength}&timeframe=${timeframe}`
   );
   if (data && !data._rateLimited && Array.isArray(data) && data.length > 0) {
     const rows = data
@@ -677,12 +679,12 @@ export async function fmpRSI(symbol, periodLength = 14, timeframe = '1day') {
 // DORMANT (D-6) — exported for future panel use; not called by any active UI path.
 // When activated: replace the inner fmpFetch() call with apiClient.call('fmp', 'dcf', { symbol }, { fetcher }).
 export async function fmpDCF(symbol) {
-  if (!FMP_KEY) return null;
+  if (!FMP_ENABLED) return null;
   const cacheKey = `fmp:dcf:${symbol}`;
   const cached = cacheGet(cacheKey);
   if (cached) return cached;
   const data = await fmpFetch(
-    `${API_BASE}/proxy/fmp/discounted-cash-flow?symbol=${encodeURIComponent(symbol)}&apikey=${FMP_KEY}`
+    `${API_BASE}/api/v1/fmp/discounted-cash-flow?symbol=${encodeURIComponent(symbol)}`
   );
   if (data && !data._rateLimited && Array.isArray(data) && data.length > 0) {
     cacheSet(cacheKey, data[0], 21_600_000); // 6hr
@@ -696,9 +698,9 @@ export async function fmpDCF(symbol) {
 // (changePercent) from a single request, replacing ~38 serialized Finnhub /quote calls that never
 // carried volume (so tile size stayed mock). Equities only — batch-quote 402s index symbols.
 export async function fmpBatchQuote(symbols) {
-  if (!FMP_KEY || !symbols?.length) return null;
+  if (!FMP_ENABLED || !symbols?.length) return null;
   const codes = symbols.map(encodeURIComponent).join(',');
-  const data = await fmpFetch(`${API_BASE}/proxy/fmp/batch-quote?symbols=${codes}&apikey=${FMP_KEY}`);
+  const data = await fmpFetch(`${API_BASE}/api/v1/fmp/batch-quote?symbols=${codes}`);
   if (!Array.isArray(data)) return null; // null / {_rateLimited} / non-array error
   const map = {};
   for (const r of data) {
@@ -715,7 +717,7 @@ export async function fmpBatchQuote(symbols) {
 }
 
 export async function fmpBatchProfile(symbols) {
-  if (!FMP_KEY || !symbols.length) return null;
+  if (!FMP_ENABLED || !symbols.length) return null;
   const sorted = [...symbols].sort();
   // callCount MUST be passed at the call site — not cached in a variable.
   // apiClient throws synchronously if callCount is absent or 0 (variable-cost contract).
@@ -726,7 +728,7 @@ export async function fmpBatchProfile(symbols) {
       // Serialize requests — 1 per second to avoid FMP burst 429s
       for (const sym of symbols) {
         const res = await fetch(
-          `${API_BASE}/proxy/fmp/profile?symbol=${encodeURIComponent(sym)}&apikey=${FMP_KEY}`,
+          `${API_BASE}/api/v1/fmp/profile?symbol=${encodeURIComponent(sym)}`,
           { signal: AbortSignal.timeout(10000) }
         );
         if (res.status === 429) {
@@ -766,15 +768,12 @@ export async function fmpBatchProfile(symbols) {
 
 // ─── BRAPI (Brazilian B3 equities) ──────────────────────────────────────────
 
-export function hasBrapiToken() { return !!BRAPI_TOKEN; }
+export function hasBrapiToken() { return !!BRAPI_ENABLED; }
 
 async function brapiQuoteSingle(ticker) {
   const res = await fetch(
-    `${API_BASE}/proxy/brapi/quote/${ticker}`,
-    {
-      signal:  AbortSignal.timeout(10000),
-      headers: { 'Authorization': `Bearer ${BRAPI_TOKEN}` },
-    }
+    `${API_BASE}/api/v1/brapi/quote/${ticker}`,
+    { signal: AbortSignal.timeout(10000) }
   );
   if (!res.ok) {
     let body = '';
@@ -804,7 +803,7 @@ async function brapiQuoteSingle(ticker) {
 }
 
 export async function brapiQuote(tickers) {
-  if (!BRAPI_TOKEN || !tickers.length) return null;
+  if (!BRAPI_ENABLED || !tickers.length) return null;
   const sorted = [...tickers].sort();
   const response = await apiClient.call('brapi', 'quote', { tickers: sorted }, {
     fetcher: async () => {
@@ -1436,7 +1435,7 @@ function isoDaysAgo(days) {
 
 async function fmpDailyCandles(symbol, cfg) {
   const from = cfg.all ? '' : cfg.ytd ? `${new Date().getFullYear()}-01-01` : isoDaysAgo(cfg.days);
-  const url = `${API_BASE}/proxy/fmp/historical-price-eod/full?symbol=${encodeURIComponent(symbol)}${from ? `&from=${from}` : ''}&apikey=${FMP_KEY}`;
+  const url = `${API_BASE}/api/v1/fmp/historical-price-eod/full?symbol=${encodeURIComponent(symbol)}${from ? `&from=${from}` : ''}`;
   const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
   if (!res.ok) return null;
   const json = await res.json();
@@ -1452,7 +1451,7 @@ async function fmpDailyCandles(symbol, cfg) {
 
 async function fmpIntradayCandles(symbol, cfg) {
   const from = isoDaysAgo(cfg.days);
-  const url = `${API_BASE}/proxy/fmp/historical-chart/${cfg.interval}?symbol=${encodeURIComponent(symbol)}&from=${from}&apikey=${FMP_KEY}`;
+  const url = `${API_BASE}/api/v1/fmp/historical-chart/${cfg.interval}?symbol=${encodeURIComponent(symbol)}&from=${from}`;
   const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
   if (!res.ok) return null;
   const json = await res.json();
@@ -1480,11 +1479,11 @@ const BRAPI_OHLCV_RANGE = {
 // is unreliable and FMP mis-resolves the bare ticker). Free-tier is daily-granularity and can be
 // slow, so the caller keeps a Yahoo fallback. Returns null on any miss so fmpOHLCV falls back.
 async function brapiOHLCV(ticker, timeframe) {
-  if (!BRAPI_TOKEN) return null;
+  if (!BRAPI_ENABLED) return null;
   const range = BRAPI_OHLCV_RANGE[timeframe] || '3mo';
   const res = await fetch(
-    `${API_BASE}/proxy/brapi/quote/${encodeURIComponent(ticker)}?range=${range}&interval=1d`,
-    { signal: AbortSignal.timeout(12000), headers: { 'Authorization': `Bearer ${BRAPI_TOKEN}` } }
+    `${API_BASE}/api/v1/brapi/quote/${encodeURIComponent(ticker)}?range=${range}&interval=1d`,
+    { signal: AbortSignal.timeout(12000) }
   );
   if (!res.ok) return null;
   const data = await res.json();
@@ -1536,7 +1535,7 @@ export async function fmpOHLCV(symbol, timeframe = '1M', { assets = {}, interval
       const candles = await eodhdOHLCV(`${symbol}.SA`, timeframe);
       if (candles && candles.length >= 2) return candles;
     } catch (_) { /* fall through to Yahoo */ }
-  } else if (FMP_KEY) {
+  } else if (FMP_ENABLED) {
     try {
       const cfg = FMP_OHLCV_TF[timeframe] || FMP_OHLCV_TF['1M'];
       const candles = cfg.mode === 'intraday'
@@ -1634,8 +1633,8 @@ export async function healthPing(source) {
     alphaVantage: AV_KEY ? `${API_BASE}/proxy/alphavantage/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=${AV_KEY}` : null,
     fred:         FRED_KEY ? `${API_BASE}/proxy/fred/series/observations?series_id=DGS10&sort_order=desc&limit=1&file_type=json&api_key=${FRED_KEY}` : null,
     coingecko:    `${API_BASE}/proxy/coingecko/ping`,
-    fmp:          FMP_KEY ? `${API_BASE}/proxy/fmp/profile?symbol=AAPL&apikey=${FMP_KEY}` : null,
-    brapi:        BRAPI_TOKEN ? `${API_BASE}/proxy/brapi/quote/PETR4?token=${BRAPI_TOKEN}` : null,
+    fmp:          FMP_ENABLED ? `${API_BASE}/api/v1/fmp/profile?symbol=AAPL` : null,
+    brapi:        BRAPI_ENABLED ? `${API_BASE}/api/v1/brapi/quote/PETR4` : null,
     bcb:          `${API_BASE}/proxy/bcb/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json`,
     awesomeapi:   `${API_BASE}/proxy/awesomeapi/last/USD-BRL`,
   };
@@ -1690,8 +1689,8 @@ export function getSourceStatus() {
     alphaVantage:{ active: !!AV_KEY,      keyRequired: true, hasKey: !!AV_KEY },
     fred:        { active: !!FRED_KEY,    keyRequired: true, hasKey: !!FRED_KEY },
     coingecko:   { active: true,  keyRequired: false, hasKey: true },
-    fmp:         { active: !!FMP_KEY,     keyRequired: true, hasKey: !!FMP_KEY },
-    brapi:       { active: !!BRAPI_TOKEN,  keyRequired: true, hasKey: !!BRAPI_TOKEN, serverSide: true },
+    fmp:         { active: FMP_ENABLED,   keyRequired: false, hasKey: FMP_ENABLED, serverSide: true },
+    brapi:       { active: BRAPI_ENABLED, keyRequired: false, hasKey: BRAPI_ENABLED, serverSide: true },
     bcb:         { active: true,  keyRequired: false, hasKey: true },
     awesomeapi:  { active: true,  keyRequired: false, hasKey: true },
   };
