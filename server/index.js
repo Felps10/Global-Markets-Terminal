@@ -17,6 +17,8 @@ import snapshotRoutes    from './routes/snapshot.js';
 import quotesRoutes      from './routes/quotes.js';
 import quoteRoutes       from './routes/quote.js';
 import ohlcvRoutes       from './routes/ohlcv.js';
+import fmpRoutes         from './routes/fmp.js';
+import brapiRoutes       from './routes/brapi.js';
 import brazilMacroRoutes from './routes/brazilMacro.js';
 import alertsRoutes      from './routes/alerts.js';
 import configRoutes      from './routes/config.js';
@@ -92,6 +94,13 @@ app.use('/api/v1/quote', quoteRoutes);
 // via EODHD, whose key is server-only). Cached ~6h. Non-sensitive market data.
 app.use('/api/v1/ohlcv', ohlcvRoutes);
 
+// /api/v1/fmp + /api/v1/brapi — PUBLIC (no auth), key injected SERVER-SIDE + cached.
+// The browser no longer holds VITE_FMP_KEY / VITE_BRAPI_TOKEN; these allowlisted read
+// endpoints keep the paid keys off the client and share one quota pool. They replace the
+// old open `/proxy/fmp` + `/proxy/brapi` passthroughs (removed below).
+app.use('/api/v1/fmp', fmpRoutes);
+app.use('/api/v1/brapi', brapiRoutes);
+
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/api/v1/health', (_req, res) => res.json({ status: 'ok', ts: Date.now() }));
 
@@ -113,8 +122,8 @@ app.use('/proxy/yahoo', yahooRoutes);
 // so no pathRewrite is needed.
 app.use('/proxy/finnhub',      createProxyMiddleware({ target: 'https://finnhub.io/api/v1',                    changeOrigin: true }));
 app.use('/proxy/coingecko',    createProxyMiddleware({ target: 'https://api.coingecko.com/api/v3',             changeOrigin: true }));
-app.use('/proxy/fmp',          createProxyMiddleware({ target: 'https://financialmodelingprep.com/stable',     changeOrigin: true }));
-app.use('/proxy/brapi',        createProxyMiddleware({ target: 'https://brapi.dev/api',                        changeOrigin: true }));
+// FMP + BRAPI open passthroughs REMOVED (Stage 2) — their paid keys are now injected server-side
+// by the allowlisted /api/v1/fmp + /api/v1/brapi routes above. No open passthrough for paid providers.
 app.use('/proxy/bcb',          createProxyMiddleware({ target: 'https://api.bcb.gov.br',                       changeOrigin: true }));
 app.use('/proxy/awesomeapi',   createProxyMiddleware({ target: 'https://economia.awesomeapi.com.br',           changeOrigin: true }));
 app.use('/proxy/alphavantage', createProxyMiddleware({ target: 'https://www.alphavantage.co',                  changeOrigin: true }));
@@ -159,8 +168,8 @@ async function start() {
     console.log('│    ANY    /proxy/yahoo/*  (Yahoo crumb/cookie proxy) │');
     console.log('│    ANY    /proxy/finnhub/*                           │');
     console.log('│    ANY    /proxy/coingecko/*                         │');
-    console.log('│    ANY    /proxy/fmp/*                               │');
-    console.log('│    ANY    /proxy/brapi/*                             │');
+    console.log('│    GET    /api/v1/fmp/*  (server-key, allowlisted)   │');
+    console.log('│    GET    /api/v1/brapi/quote/* (server-key)        │');
     console.log('│    ANY    /proxy/bcb/*                               │');
     console.log('│    ANY    /proxy/awesomeapi/*                        │');
     console.log('│    ANY    /proxy/alphavantage/*                      │');

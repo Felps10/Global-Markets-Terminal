@@ -424,7 +424,7 @@ export const API_REGISTRY = {
     id: "fmp",
     name: "Financial Modeling Prep",
     baseUrl: "https://financialmodelingprep.com/stable",
-    proxyPath: "/proxy/fmp",
+    proxyPath: "/api/v1/fmp",
     currentTier: "Premium",
     limits: { perMinute: 750, perDay: null, perMonth: null },
     throttleMs: 100, // Premium: 750/min ceiling; light client spacing (10/sec ≪ cap)
@@ -537,7 +537,7 @@ export const API_REGISTRY = {
     id: "brapi",
     name: "BRAPI (Brazilian B3 Equities)",
     baseUrl: "https://brapi.dev/api",
-    proxyPath: "/proxy/brapi",
+    proxyPath: "/api/v1/brapi",
     currentTier: "Pro",
     // Pro plan: 20 tickers/request, 500k calls/month, 5-min data.
     limits: { perMinute: null, perDay: null, perMonth: 500_000 },
