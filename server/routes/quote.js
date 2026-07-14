@@ -27,6 +27,7 @@
 import { Router } from 'express';
 import { yahooToFmp } from '../lib/fmpSymbols.js';
 import { yahooToEodhd } from '../lib/eodhdSymbols.js';
+import { getEodhd52wk } from '../lib/eodhd52wk.js';
 
 const router = Router();
 
@@ -81,14 +82,16 @@ async function eodhdQuote(symbol) {
   const q = await r.json();
   const price = num(q.close);
   if (price == null || q.close === 'NA') return null; // EODHD returns "NA" for unsupported codes
+  // EODHD real-time lacks the 52-week range → backfill it from 1y of daily EOD (cached ~12h).
+  const w52 = await getEodhd52wk(code);
   return {
     source: 'eodhd',
     price, change: num(q.change), changePct: num(q.change_p),
     open: pos(q.open), prevClose: num(q.previousClose),
     dayHigh: pos(q.high), dayLow: pos(q.low),
     volume: pos(q.volume), avgVolume: null,
-    marketCap: null,             // EODHD real-time carries neither market cap
-    w52High: null, w52Low: null, // nor the 52-week range
+    marketCap: null,             // EODHD real-time carries no market cap
+    w52High: w52 ? w52.high : null, w52Low: w52 ? w52.low : null,
     beta: null, eps: null, pe: null,
     timestamp: num(q.timestamp),
   };
