@@ -94,13 +94,17 @@ const FMP_TIMEOUT_MS       = 12_000;
 // single-symbol endpoint (no batch), so we fetch per FMP-resolvable symbol (~153: equities/FX/
 // indices/gold/silver) with bounded concurrency, once every SPARKLINE_INTERVAL — daily EOD only
 // moves after the close, so 6h is ample and costs ~153 calls × 4/day ≈ 600/day (trivial vs
-// FMP's 750/min). Gap classes (EU/Asia indices, B3, WTI/natgas futures) 402/empty → quarantined
-// → client keeps the synthetic fallback until C3-6 fills them (EODHD/BRAPI/ETF-proxy).
+// FMP's 750/min). Gap classes FMP light-EOD can't serve (EU/Asia indices, B3, WTI/natgas futures,
+// crypto) are then filled from their class-appropriate source (EODHD /eod, BRAPI history,
+// CoinGecko market_chart, ETF-proxy) so NOTHING falls back to the client's Math.random synthetic.
 const SPARKLINE_INTERVAL     = 6 * 60 * 60 * 1000; // 6h
 const SPARKLINE_WINDOW_DAYS  = 45;                 // calendar window → ~30 trading days
 const SPARKLINE_POINTS       = 30;                 // most-recent closes kept per symbol
 const SPARKLINE_CONCURRENCY  = 8;                  // in-flight light-EOD requests
 const SPARKLINE_CHUNK_GAP    = 150;                // ms between concurrency chunks
+// WTI/natgas have no FMP/EODHD daily history → their sparkline tracks the liquid ETF proxy
+// (shape only; the chart legend already flags proxied levels). Mirrors the client CHART_PROXY.
+const SPARKLINE_PROXY = { 'CL=F': 'USO', 'NG=F': 'UNG' };
 
 // Brazil B3 feed (BRAPI Pro: 20 tickers/req, 500k/mo). ~191 names ÷ 20 = 10 req/cycle;
 // at 300s, 24/7 = ~86k req/mo — well under 500k. BRAPI Pro is ~5-min fresh, so ≤5-min cadence
@@ -645,6 +649,40 @@ async function fetchSparklineOne(code) {
   return closes.length > SPARKLINE_POINTS ? closes.slice(-SPARKLINE_POINTS) : closes;
 }
 
+// Gap-fill helpers — one ASCENDING close array (≥2) or null. Used for classes FMP light-EOD
+// can't serve, so the client never has to synthesize.
+const sparkTrim = (closes) => (closes.length >= 2 ? closes.slice(-SPARKLINE_POINTS) : null);
+
+async function sparklineFromEodhd(code) { // EODHD-only indices/FX (^GDAXI, ^BVSP, …)
+  if (!process.env.EODHD_API_KEY || !code) return null;
+  const from = ymd(new Date(Date.now() - SPARKLINE_WINDOW_DAYS * 86_400_000));
+  const url = `https://eodhd.com/api/eod/${encodeURIComponent(code)}?api_token=${process.env.EODHD_API_KEY}&fmt=json&period=d&from=${from}`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(FMP_TIMEOUT_MS) });
+  if (!r.ok) return null;
+  const rows = await r.json(); // ascending [{date, close, …}]
+  return sparkTrim((Array.isArray(rows) ? rows : []).map((x) => x.close).filter(isFiniteNum));
+}
+
+async function sparklineFromCoinGecko(cgId) { // crypto
+  if (!cgId) return null;
+  const url = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(cgId)}/market_chart?vs_currency=usd&days=30&interval=daily`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(FMP_TIMEOUT_MS), headers: { Accept: 'application/json', 'User-Agent': 'GMT-Server/1.0' } });
+  if (!r.ok) return null;
+  const json = await r.json(); // { prices: [[ts, price], …] } ascending
+  return sparkTrim((json?.prices || []).map((p) => p[1]).filter(isFiniteNum));
+}
+
+async function sparklineFromBrapi(ticker) { // B3
+  const token = process.env.VITE_BRAPI_TOKEN;
+  if (!token || !ticker) return null;
+  const url = `https://brapi.dev/api/quote/${encodeURIComponent(ticker)}?range=1mo&interval=1d&token=${encodeURIComponent(token)}`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(BRAPI_TIMEOUT_MS) });
+  if (!r.ok) return null;
+  const json = await r.json();
+  const hist = json?.results?.[0]?.historicalDataPrice || []; // ascending
+  return sparkTrim(hist.map((x) => x.close).filter(isFiniteNum));
+}
+
 async function fetchSparklines() {
   const tag = '[quoteFetchManager:sparkline]';
   if (!process.env.FMP_KEY) {
@@ -653,16 +691,12 @@ async function fetchSparklines() {
     return;
   }
   try {
-    const { fmp } = await resolveLiveSymbols();
-    const targets = (fmp || []).filter((f) => !sparklineQuarantine.has(f.fmp));
-    if (targets.length === 0) {
-      sparklineCache = { data: {}, ts: Date.now(), error: null };
-      sparklineFailures = 0;
-      scheduleSparklines();
-      return;
-    }
+    const { fmp, crypto, b3, eodhd } = await resolveLiveSymbols();
     const data = {};
     let ok = 0;
+
+    // Pass 1 — FMP light-EOD for FMP-resolvable symbols (equities/FX/gold-silver/US+FTSE indices).
+    const targets = (fmp || []).filter((f) => !sparklineQuarantine.has(f.fmp));
     for (const batch of chunk(targets, SPARKLINE_CONCURRENCY)) {
       await Promise.all(batch.map(async (f) => {
         try {
@@ -675,9 +709,33 @@ async function fetchSparklines() {
       }));
       await new Promise((r) => setTimeout(r, SPARKLINE_CHUNK_GAP));
     }
+
+    // Pass 2 — gap-fill everything FMP couldn't serve, from its class-appropriate source, so the
+    // client never synthesizes. crypto→CoinGecko, B3→BRAPI, EODHD-only indices/FX→EODHD,
+    // WTI/natgas→FMP light-EOD on the ETF proxy. Equities in the eodhd warm-fallback set are
+    // already filled by pass 1 (skipped here). Failures leave the symbol out (client synthesizes).
+    const gap = [];
+    for (const [display, cgId] of Object.entries(crypto || {}))
+      if (!data[display]) gap.push([display, () => sparklineFromCoinGecko(cgId)]);
+    for (const x of (b3 || []))
+      if (!data[x.display]) gap.push([x.display, () => sparklineFromBrapi(x.brapi)]);
+    for (const x of (eodhd || []))
+      if (!data[x.display]) gap.push([x.display, () => sparklineFromEodhd(x.eodhd)]);
+    for (const [display, proxy] of Object.entries(SPARKLINE_PROXY))
+      if (!data[display]) gap.push([display, () => fetchSparklineOne(proxy)]);
+
+    let gapOk = 0;
+    for (const batch of chunk(gap, SPARKLINE_CONCURRENCY)) {
+      await Promise.all(batch.map(async ([display, fn]) => {
+        try { const closes = await fn(); if (closes && closes.length >= 2) { data[display] = closes; gapOk++; } }
+        catch { /* leave it out → client synthesizes */ }
+      }));
+      await new Promise((r) => setTimeout(r, SPARKLINE_CHUNK_GAP));
+    }
+
     sparklineCache = { data, ts: Date.now(), error: null };
     sparklineFailures = 0;
-    console.log(`${tag} OK — ${ok}/${targets.length} series${sparklineQuarantine.size ? ` (${sparklineQuarantine.size} skipped)` : ''}`);
+    console.log(`${tag} OK — ${ok}/${targets.length} FMP + ${gapOk}/${gap.length} gap-fill = ${Object.keys(data).length} series${sparklineQuarantine.size ? ` (${sparklineQuarantine.size} FMP-quarantined)` : ''}`);
   } catch (err) {
     sparklineFailures++;
     sparklineCache.error = err.message;
