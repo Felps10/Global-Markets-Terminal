@@ -67,10 +67,10 @@ export const RECOMMENDED_IDEAL = {
   equity:     ['fmp', 'eodhd', 'yahoo'],     // FMP real-time + fundamentals; EODHD (15min) warm fallback
 };
 
-export const RECOMMENDED_EFFECTIVE = {
-  ...RECOMMENDED_IDEAL,
-  b3: ['yahoo', 'brapi'], // B3 unchanged this increment (BRAPI-Pro-primary is the next one)
-};
+// B3 is now BRAPI-Pro-PRIMARY (Stage 3 / P2): the global-B3 fetcher batch-fetches every global
+// B3 name with full fields (day high/low, volume, marketCap, 52wk) → EODHD `.SA` warm fallback →
+// Yahoo `.SA` last resort. Effective === ideal, so the override is gone.
+export const RECOMMENDED_EFFECTIVE = { ...RECOMMENDED_IDEAL };
 
 /**
  * Effective, capability-valid provider order for an asset.

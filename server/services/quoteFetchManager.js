@@ -67,8 +67,7 @@ function recordStat(provider, { ok, ms = null, count = 0, expected = 0, error = 
 
 const YAHOO_BASE_INTERVAL  = 120_000;  // 120s — reduced load; Yahoo rate-limits datacenter IPs
 const CRYPTO_BASE_INTERVAL = 120_000;  // 120s
-const BRAPI_INTERVAL       = 900_000;  // 15 min — B3 fallback (free BRAPI = 15k req/mo)
-const BRAPI_MAX_TICKERS    = 25;       // hard cap so the free budget can't run away
+const GLOBAL_B3_INTERVAL   = 300_000;  // 5 min — global B3 (BRAPI Pro primary, full fields)
 const MAX_BACKOFF          = 600_000;  // 10 min cap
 
 // EODHD (paid, 100k calls/day; bills 1 call/symbol). Since Stage 2, FMP is PRIMARY for
@@ -294,61 +293,63 @@ function scheduleCoinGecko() {
   }
 }
 
-// ─── BRAPI fallback (B3 tickers Yahoo missed) ────────────────────────────────
-// Effective/free precedence for B3 is Yahoo-first, BRAPI-fallback. Yahoo `.SA`
-// covers most B3 names; this recovers the few it drops (e.g. JBSS3, EMBR3) using
-// BRAPI's authoritative B3 data. Free BRAPI = 1 ticker/request, so we run slowly
-// (15 min) and only for the misses, capped, to stay inside the 15k/mo budget.
-async function fetchBrapiFallback() {
-  const tag = '[quoteFetchManager:brapi]';
+// ─── Global B3 feed (BRAPI Pro PRIMARY, full fields) ─────────────────────────
+// Stage 3 / P2: the global terminal's Brazilian highlights (terminal_view='global',
+// brazil-highlights — PETR4/VALE3/ITUB4/BBDC4…) are BRAPI-Pro-primary. One server process
+// batch-fetches every global B3 name (20/req) with FULL fields — BRAPI's field names mirror
+// Yahoo v7 (`regularMarket*` + marketCap + 52wk), so the raw rows fold straight into
+// buildQuotesMap keyed by display. Precedence ['brapi','eodhd','yahoo'] gives an EODHD `.SA`
+// warm cache then Yahoo `.SA` as fallbacks. Replaces the old misses-only, sparse (price+%
+// only), 1-req/ticker free-tier fallback that left global B3 on Yahoo with zeroed OHLC.
+async function fetchGlobalB3() {
+  const tag = '[quoteFetchManager:global-b3]';
+  const token = process.env.VITE_BRAPI_TOKEN;
+  if (!token) { brapiCache = { data: [], ts: Date.now() }; scheduleGlobalB3(); return; }
   try {
-    const token = process.env.VITE_BRAPI_TOKEN;
-    // Need a populated Yahoo cache to know which B3 names actually missed.
-    if (!token || !yahooCache.data || yahooCache.data.length === 0) {
-      brapiTimer = setTimeout(fetchBrapiFallback, 60_000); // retry soon; Yahoo not ready
-      return;
-    }
     const { b3 } = await resolveLiveSymbols();
-    if (!b3 || b3.length === 0) { brapiCache = { data: [], ts: Date.now() }; scheduleBrapi(); return; }
+    if (!b3 || b3.length === 0) { brapiCache = { data: [], ts: Date.now() }; scheduleGlobalB3(); return; }
 
-    const have = new Set(
-      yahooCache.data.filter((q) => q.regularMarketPrice != null).map((q) => q.symbol)
-    );
-    const missing = b3.filter((x) => !have.has(x.yahoo));
-    const toFetch = missing.slice(0, BRAPI_MAX_TICKERS);
-
+    // BRAPI rewrites `symbol` after ticker renames → key by the requested (bare) ticker.
+    const displayByBrapi = new Map(b3.map((x) => [x.brapi, x.display]));
     const out = [];
-    for (const m of toFetch) {
+    for (const batch of chunk(b3.map((x) => x.brapi), BRAPI_BATCH)) {
       try {
-        const r = await fetch(
-          `https://brapi.dev/api/quote/${encodeURIComponent(m.brapi)}?token=${encodeURIComponent(token)}`,
-          { signal: AbortSignal.timeout(10_000) }
-        );
-        if (!r.ok) continue;
-        const j = await r.json();
-        const q = j?.results?.[0];
-        if (q?.regularMarketPrice != null) {
+        for (const q of await fetchBrapiBatch(batch, token)) {
+          if (!isFiniteNum(q.regularMarketPrice)) continue;
+          const reqSym = q.requestedSymbol || q.symbol;
+          const display = displayByBrapi.get(reqSym) || reqSym;
           out.push({
-            symbol: m.display, // key by display symbol so the client matches it
-            regularMarketPrice: q.regularMarketPrice,
-            regularMarketChangePercent: q.regularMarketChangePercent,
+            symbol: display, // key by display so buildQuotesMap matches p.display
+            regularMarketPrice:          q.regularMarketPrice,
+            regularMarketChangePercent:  q.regularMarketChangePercent,
+            regularMarketPreviousClose:  q.regularMarketPreviousClose,
+            regularMarketOpen:           q.regularMarketOpen,
+            regularMarketDayHigh:        q.regularMarketDayHigh,
+            regularMarketDayLow:         q.regularMarketDayLow,
+            regularMarketVolume:         q.regularMarketVolume,
+            marketCap:                   q.marketCap,
+            fiftyTwoWeekHigh:            q.fiftyTwoWeekHigh,
+            fiftyTwoWeekLow:             q.fiftyTwoWeekLow,
             _source: 'brapi',
           });
         }
-      } catch { /* tolerate per-ticker failures */ }
+      } catch (err) {
+        console.error(`${tag} BRAPI batch of ${batch.length} failed: ${err.message}`);
+      }
+      await new Promise((r) => setTimeout(r, BRAZIL_B3_GAP));
     }
 
     brapiCache = { data: out, ts: Date.now() };
-    console.log(`${tag} recovered ${out.length}/${missing.length} B3 tickers Yahoo missed${missing.length > BRAPI_MAX_TICKERS ? ` (capped ${BRAPI_MAX_TICKERS})` : ''}`);
+    console.log(`${tag} OK — ${out.length}/${b3.length} global B3 names cached (BRAPI Pro, full fields)`);
   } catch (err) {
     console.error(`${tag} FAIL: ${err.message}`);
   }
-  scheduleBrapi();
+  scheduleGlobalB3();
 }
 
-function scheduleBrapi() {
+function scheduleGlobalB3() {
   if (brapiTimer) clearTimeout(brapiTimer);
-  brapiTimer = setTimeout(fetchBrapiFallback, BRAPI_INTERVAL);
+  brapiTimer = setTimeout(fetchGlobalB3, GLOBAL_B3_INTERVAL);
 }
 
 // ─── EODHD fetch (primary for global classes) ────────────────────────────────
@@ -972,9 +973,7 @@ export function start() {
   fetchEodhd(); // primary for global classes; no-ops safely if EODHD_API_KEY is unset
   fetchFmp();   // gap-filler (gold/silver + ^FTSE); no-ops safely if FMP_KEY is unset
   fetchBrazilB3(); // Brazil-terminal B3 feed; no-ops safely if VITE_BRAPI_TOKEN is unset
-  // BRAPI fallback starts after a short delay so the Yahoo cache is populated first
-  // (it only fetches B3 tickers missing from Yahoo's results).
-  brapiTimer = setTimeout(fetchBrapiFallback, 45_000);
+  fetchGlobalB3(); // global-terminal B3 highlights (BRAPI Pro primary, full fields); safe no-op w/o token
   // Sparklines are not latency-critical (6h cadence) — delay the first run so the quote
   // fetchers populate first and it doesn't compete at boot.
   sparklineTimer = setTimeout(fetchSparklines, 20_000);
