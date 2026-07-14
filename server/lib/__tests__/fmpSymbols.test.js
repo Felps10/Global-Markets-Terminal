@@ -12,14 +12,23 @@ describe('yahooToFmp', () => {
     expect(yahooToFmp('NG=F')).toBeNull();
   });
 
-  it('maps ^FTSE (the EODHD "NA" hole) to ^FTSE', () => {
-    expect(yahooToFmp('^FTSE')).toBe('^FTSE');
+  it('maps the 8 FMP-covered indices to their caret symbol (single-quote endpoint)', () => {
+    expect(yahooToFmp('^GSPC')).toBe('^GSPC');
+    expect(yahooToFmp('^DJI')).toBe('^DJI');
+    expect(yahooToFmp('^IXIC')).toBe('^IXIC');
+    expect(yahooToFmp('^VIX')).toBe('^VIX');
+    expect(yahooToFmp('^FTSE')).toBe('^FTSE'); // also the EODHD "NA" hole
+    expect(yahooToFmp('^N225')).toBe('^N225');
+    expect(yahooToFmp('^HSI')).toBe('^HSI');
+    expect(yahooToFmp('^STOXX50E')).toBe('^STOXX50E');
   });
 
-  it('returns null for indices EODHD already serves (FMP must not fetch them)', () => {
-    expect(yahooToFmp('^GSPC')).toBeNull();
-    expect(yahooToFmp('^GDAXI')).toBeNull(); // also gated on Premium
-    expect(yahooToFmp('^N225')).toBeNull();
+  it('returns null for indices FMP does not cover (EODHD stays primary)', () => {
+    expect(yahooToFmp('^GDAXI')).toBeNull();
+    expect(yahooToFmp('^FCHI')).toBeNull();
+    expect(yahooToFmp('^BVSP')).toBeNull();
+    expect(yahooToFmp('^AXJO')).toBeNull();
+    expect(yahooToFmp('^KS11')).toBeNull();
   });
 
   it('maps US equities/ETFs/ADRs to the bare ticker (FMP-primary, Stage 2)', () => {
