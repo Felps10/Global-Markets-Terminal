@@ -6,31 +6,18 @@ import { apiClient, ApiHttpError } from './services/apiClient.js';
 import { getApiDef } from './services/apiRegistry.js';
 import { MINI_ASSETS, MINI_YAHOO_SYMBOLS, MINI_BRAPI_SYMBOLS, MINI_CRYPTO_SYMBOLS } from './data/miniAssets.js';
 
-// ─── API KEYS (from .env.local via Vite) ─────────────────────────────────────
-const FINNHUB_KEY   = import.meta.env.VITE_FINNHUB_KEY  || "";
-const AV_KEY        = import.meta.env.VITE_ALPHAVANTAGE_KEY || "";
-const FRED_KEY      = import.meta.env.VITE_FRED_KEY     || "";
-// FMP Premium + BRAPI Pro keys moved SERVER-SIDE (Stage 2). The client no longer holds them —
-// it hits /api/v1/fmp and /api/v1/brapi, which inject the key server-side. These flags gate the
+// ─── PROVIDER FLAGS ──────────────────────────────────────────────────────────
+// ALL keyed providers are SERVER-SIDE now. The client holds NO market-data API keys — it hits
+// /api/v1/{fmp,brapi,finnhub,fred}, which inject the key server-side. These flags gate the
 // client-side UI affordances only; the server is the source of truth for whether data returns.
-const FMP_ENABLED   = true;
-const BRAPI_ENABLED = true;
+// (FMP Premium + BRAPI Pro moved server-side in Stage 2; Finnhub + FRED in Stage 4; AlphaVantage
+// removed — its only use, Signal Engine MACD, is now computed from FMP.)
+const FMP_ENABLED     = true;
+const BRAPI_ENABLED   = true;
+const FINNHUB_ENABLED = true;
+const FRED_ENABLED    = true;
 
 export const API_BASE = import.meta.env.VITE_API_URL || '';
-
-// ─── STARTUP VALIDATION ─────────────────────────────────────────────────────
-const KEY_CONFIG = [
-  { key: "VITE_FINNHUB_KEY",      value: FINNHUB_KEY, label: "Finnhub",      url: "https://finnhub.io" },
-  { key: "VITE_ALPHAVANTAGE_KEY", value: AV_KEY,       label: "Alpha Vantage", url: "https://www.alphavantage.co/support/#api-key" },
-  { key: "VITE_FRED_KEY",         value: FRED_KEY,     label: "FRED",          url: "https://fred.stlouisfed.org/docs/api/api_key.html" },
-  // FMP + BRAPI intentionally omitted — their keys are server-side now (see /api/v1/fmp, /api/v1/brapi).
-];
-
-KEY_CONFIG.forEach(({ key, value, label, url }) => {
-  if (!value) {
-    console.warn(`[CONFIG WARNING] ${key} is not set. ${label} data will be unavailable. Get your free key at ${url}`);
-  }
-});
 
 // ─── GENERIC HELPERS ─────────────────────────────────────────────────────────
 
@@ -92,14 +79,14 @@ function finnhubFetch(url) {
   });
 }
 
-export function hasFinnhubKey() { return !!FINNHUB_KEY; }
+export function hasFinnhubKey() { return !!FINNHUB_ENABLED; }
 
 export async function finnhubQuote(symbol) {
-  if (!FINNHUB_KEY) return null;
+  if (!FINNHUB_ENABLED) return null;
   const response = await apiClient.call('finnhub', 'quote', { symbol }, {
     fetcher: async () => {
       const res = await fetch(
-        `${API_BASE}/proxy/finnhub/quote?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_KEY}`,
+        `${API_BASE}/api/v1/finnhub/quote?symbol=${encodeURIComponent(symbol)}`,
         { signal: AbortSignal.timeout(10000) }
       );
       if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
@@ -114,12 +101,12 @@ export async function finnhubQuote(symbol) {
 // DORMANT (D-1) — exported for future panel use; not called by any active UI path.
 // When activated: replace the inner finnhubFetch() call with apiClient.call('finnhub', 'earnings', { symbol }, { fetcher }).
 export async function finnhubEarnings(symbol) {
-  if (!FINNHUB_KEY) return null;
+  if (!FINNHUB_ENABLED) return null;
   const cacheKey = `fh:earnings:${symbol}`;
   const cached = cacheGet(cacheKey);
   if (cached) return cached;
   const data = await finnhubFetch(
-    `${API_BASE}/proxy/finnhub/stock/earnings?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_KEY}`
+    `${API_BASE}/api/v1/finnhub/stock/earnings?symbol=${encodeURIComponent(symbol)}`
   );
   if (data && Array.isArray(data)) {
     cacheSet(cacheKey, data, 3600_000); // 1hr cache
@@ -129,14 +116,14 @@ export async function finnhubEarnings(symbol) {
 }
 
 export async function finnhubNews(symbol) {
-  if (!FINNHUB_KEY) return null;
+  if (!FINNHUB_ENABLED) return null;
   const now  = new Date();
   const from = new Date(now - 7 * 86400_000).toISOString().slice(0, 10);
   const to   = now.toISOString().slice(0, 10);
   const response = await apiClient.call('finnhub', 'news', { symbol, from, to }, {
     fetcher: async () => {
       const res = await fetch(
-        `${API_BASE}/proxy/finnhub/company-news?symbol=${encodeURIComponent(symbol)}&from=${from}&to=${to}&token=${FINNHUB_KEY}`,
+        `${API_BASE}/api/v1/finnhub/company-news?symbol=${encodeURIComponent(symbol)}&from=${from}&to=${to}`,
         { signal: AbortSignal.timeout(10000) }
       );
       if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
@@ -152,12 +139,12 @@ export async function finnhubNews(symbol) {
 // DORMANT (D-2) — exported for future panel use; not called by any active UI path.
 // When activated: replace the inner finnhubFetch() call with apiClient.call('finnhub', 'insiderSentiment', { symbol }, { fetcher }).
 export async function finnhubInsiderSentiment(symbol) {
-  if (!FINNHUB_KEY) return null;
+  if (!FINNHUB_ENABLED) return null;
   const cacheKey = `fh:insider:${symbol}`;
   const cached = cacheGet(cacheKey);
   if (cached) return cached;
   const data = await finnhubFetch(
-    `${API_BASE}/proxy/finnhub/stock/insider-sentiment?symbol=${encodeURIComponent(symbol)}&from=2024-01-01&token=${FINNHUB_KEY}`
+    `${API_BASE}/api/v1/finnhub/stock/insider-sentiment?symbol=${encodeURIComponent(symbol)}&from=2024-01-01`
   );
   if (data && data.data) {
     cacheSet(cacheKey, data.data, 3600_000);
@@ -167,11 +154,11 @@ export async function finnhubInsiderSentiment(symbol) {
 }
 
 export async function finnhubRecommendation(symbol) {
-  if (!FINNHUB_KEY) return null;
+  if (!FINNHUB_ENABLED) return null;
   const response = await apiClient.call('finnhub', 'recommendation', { symbol }, {
     fetcher: async () => {
       const res = await fetch(
-        `${API_BASE}/proxy/finnhub/stock/recommendation?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_KEY}`,
+        `${API_BASE}/api/v1/finnhub/stock/recommendation?symbol=${encodeURIComponent(symbol)}`,
         { signal: AbortSignal.timeout(10000) }
       );
       if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
@@ -184,53 +171,8 @@ export async function finnhubRecommendation(symbol) {
   return response.data ?? null;
 }
 
-// ─── ALPHA VANTAGE (25 calls/day — ON DEMAND ONLY) ──────────────────────────
-// NEVER called on page load. Only triggered by explicit user action.
-
-export function hasAlphaVantageKey() { return !!AV_KEY; }
-
-export async function alphaVantageRSI(symbol, interval = "daily", timePeriod = 14) {
-  if (!AV_KEY) return null;
-  const response = await apiClient.call('alphaVantage', 'rsi', { symbol, interval, timePeriod }, {
-    fetcher: async () => {
-      const res = await fetch(
-        `${API_BASE}/proxy/alphavantage/query?function=RSI&symbol=${encodeURIComponent(symbol)}&interval=${interval}&time_period=${timePeriod}&series_type=close&apikey=${AV_KEY}`,
-        { signal: AbortSignal.timeout(15000) }
-      );
-      if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
-      const data = await res.json();
-      if (!data?.["Technical Analysis: RSI"]) throw new ApiHttpError(204, 'No RSI data in response');
-      const entries = Object.entries(data["Technical Analysis: RSI"]);
-      return entries.slice(0, 30).map(([date, v]) => ({ date, value: parseFloat(v.RSI) }));
-    },
-  });
-  if (response.error || response.deferred) return null;
-  return response.data ?? null;
-}
-
-export async function alphaVantageMACD(symbol, interval = "daily") {
-  if (!AV_KEY) return null;
-  const response = await apiClient.call('alphaVantage', 'macd', { symbol, interval }, {
-    fetcher: async () => {
-      const res = await fetch(
-        `${API_BASE}/proxy/alphavantage/query?function=MACD&symbol=${encodeURIComponent(symbol)}&interval=${interval}&series_type=close&apikey=${AV_KEY}`,
-        { signal: AbortSignal.timeout(15000) }
-      );
-      if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
-      const data = await res.json();
-      if (!data?.["Technical Analysis: MACD"]) throw new ApiHttpError(204, 'No MACD data in response');
-      const entries = Object.entries(data["Technical Analysis: MACD"]);
-      return entries.slice(0, 30).map(([date, v]) => ({
-        date,
-        macd:   parseFloat(v.MACD),
-        signal: parseFloat(v.MACD_Signal),
-        hist:   parseFloat(v.MACD_Hist),
-      }));
-    },
-  });
-  if (response.error || response.deferred) return null;
-  return response.data ?? null;
-}
+// AlphaVantage removed (Stage 4 / P3): its only use was Signal Engine MACD, now computed from
+// FMP daily closes (see fmpMACD below); RSI runs on FMP Premium. No client AlphaVantage key.
 
 // ─── MACD from FMP daily closes (retires the AlphaVantage 25/day dependency) ─────────────────
 // FMP has no native MACD indicator (technical-indicators/macd returns []), so compute it from
@@ -310,7 +252,7 @@ export async function fmpMACD(symbol, { fast = 12, slow = 26, signal = 9, points
 
 // ─── FRED (unlimited — most reliable) ────────────────────────────────────────
 
-export function hasFredKey() { return !!FRED_KEY; }
+export function hasFredKey() { return !!FRED_ENABLED; }
 
 const FRED_SERIES = {
   cpi:               { id: "CPIAUCSL",     label: "CPI (All Urban)",          unit: "Index" },
@@ -327,13 +269,13 @@ const FRED_SERIES = {
 export function getFredSeriesConfig() { return FRED_SERIES; }
 
 export async function fredSeries(seriesKey) {
-  if (!FRED_KEY) return null;
+  if (!FRED_ENABLED) return null;
   const cfg = FRED_SERIES[seriesKey];
   if (!cfg) return null;
   const response = await apiClient.call('fred', 'seriesObservations', { seriesKey }, {
     fetcher: async () => {
       const res = await fetch(
-        `${API_BASE}/proxy/fred/series/observations?series_id=${cfg.id}&sort_order=desc&limit=12&file_type=json&api_key=${FRED_KEY}`,
+        `${API_BASE}/api/v1/fred/series/observations?series_id=${cfg.id}&sort_order=desc&limit=12&file_type=json`,
         { signal: AbortSignal.timeout(10000) }
       );
       if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
@@ -373,11 +315,11 @@ export async function fredAllMacro() {
  * Returns an array of release objects, or [] if no key or fetch fails.
  */
 export async function fredReleases() {
-  if (!FRED_KEY) return [];
+  if (!FRED_ENABLED) return [];
   const response = await apiClient.call('fred', 'releases', {}, {
     fetcher: async () => {
       const res = await fetch(
-        `${API_BASE}/proxy/fred/releases?api_key=${FRED_KEY}&file_type=json`,
+        `${API_BASE}/api/v1/fred/releases?file_type=json`,
         { signal: AbortSignal.timeout(10000) }
       );
       if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
@@ -399,14 +341,14 @@ export async function fredReleases() {
  *   Sorted ascending by date. Returns [] if no key or fetch fails.
  */
 export async function fredReleaseDates(startDate, endDate) {
-  if (!FRED_KEY) return [];
+  if (!FRED_ENABLED) return [];
   const today = new Date();
   const s = startDate || (() => { const d = new Date(today); d.setDate(d.getDate() - 14); return d.toISOString().slice(0, 10); })();
   const e = endDate   || (() => { const d = new Date(today); d.setDate(d.getDate() + 30); return d.toISOString().slice(0, 10); })();
   const response = await apiClient.call('fred', 'releaseDates', { s, e }, {
     fetcher: async () => {
       const url =
-        `${API_BASE}/proxy/fred/releases/dates?api_key=${FRED_KEY}&file_type=json` +
+        `${API_BASE}/api/v1/fred/releases/dates?file_type=json` +
         `&realtime_start=${s}&realtime_end=${e}` +
         `&include_release_dates_with_no_data=true&limit=1000`;
       const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
@@ -1705,9 +1647,8 @@ export async function healthPing(source) {
   }
   const endpoints = {
     yahoo:        `${API_BASE}/proxy/yahoo/v7/finance/quote?symbols=AAPL`,
-    finnhub:      FINNHUB_KEY ? `${API_BASE}/proxy/finnhub/quote?symbol=AAPL&token=${FINNHUB_KEY}` : null,
-    alphaVantage: AV_KEY ? `${API_BASE}/proxy/alphavantage/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=${AV_KEY}` : null,
-    fred:         FRED_KEY ? `${API_BASE}/proxy/fred/series/observations?series_id=DGS10&sort_order=desc&limit=1&file_type=json&api_key=${FRED_KEY}` : null,
+    finnhub:      FINNHUB_ENABLED ? `${API_BASE}/api/v1/finnhub/quote?symbol=AAPL` : null,
+    fred:         FRED_ENABLED ? `${API_BASE}/api/v1/fred/series/observations?series_id=DGS10&sort_order=desc&limit=1&file_type=json` : null,
     coingecko:    `${API_BASE}/proxy/coingecko/ping`,
     fmp:          FMP_ENABLED ? `${API_BASE}/api/v1/fmp/profile?symbol=AAPL` : null,
     brapi:        BRAPI_ENABLED ? `${API_BASE}/api/v1/brapi/quote/PETR4` : null,
@@ -1735,7 +1676,6 @@ export async function healthPing(source) {
     let rawValue = null;
     if (source === "yahoo") rawValue = json?.quoteResponse?.result?.[0]?.regularMarketPrice;
     else if (source === "finnhub") rawValue = json?.c;
-    else if (source === "alphaVantage") rawValue = json?.["Global Quote"]?.["05. price"];
     else if (source === "fred") rawValue = json?.observations?.[0]?.value;
     else if (source === "coingecko") rawValue = json?.gecko_says || "OK";
     else if (source === "fmp") rawValue = Array.isArray(json) ? json[0]?.price : null;
@@ -1761,9 +1701,8 @@ export function getSourceStatus() {
     // read it. It is the primary global provider; flagged serverSide for the UI.
     eodhd:       { active: true,  keyRequired: true,  hasKey: true, serverSide: true },
     yahoo:       { active: true,  keyRequired: false, hasKey: true },
-    finnhub:     { active: !!FINNHUB_KEY, keyRequired: true, hasKey: !!FINNHUB_KEY },
-    alphaVantage:{ active: !!AV_KEY,      keyRequired: true, hasKey: !!AV_KEY },
-    fred:        { active: !!FRED_KEY,    keyRequired: true, hasKey: !!FRED_KEY },
+    finnhub:     { active: FINNHUB_ENABLED, keyRequired: false, hasKey: FINNHUB_ENABLED, serverSide: true },
+    fred:        { active: FRED_ENABLED,    keyRequired: false, hasKey: FRED_ENABLED, serverSide: true },
     coingecko:   { active: true,  keyRequired: false, hasKey: true },
     fmp:         { active: FMP_ENABLED,   keyRequired: false, hasKey: FMP_ENABLED, serverSide: true },
     brapi:       { active: BRAPI_ENABLED, keyRequired: false, hasKey: BRAPI_ENABLED, serverSide: true },

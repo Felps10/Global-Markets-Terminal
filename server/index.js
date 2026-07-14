@@ -19,6 +19,8 @@ import quoteRoutes       from './routes/quote.js';
 import ohlcvRoutes       from './routes/ohlcv.js';
 import fmpRoutes         from './routes/fmp.js';
 import brapiRoutes       from './routes/brapi.js';
+import finnhubRoutes     from './routes/finnhub.js';
+import fredRoutes        from './routes/fred.js';
 import brazilMacroRoutes from './routes/brazilMacro.js';
 import alertsRoutes      from './routes/alerts.js';
 import configRoutes      from './routes/config.js';
@@ -101,6 +103,11 @@ app.use('/api/v1/ohlcv', ohlcvRoutes);
 app.use('/api/v1/fmp', fmpRoutes);
 app.use('/api/v1/brapi', brapiRoutes);
 
+// /api/v1/finnhub + /api/v1/fred — PUBLIC, key injected SERVER-SIDE + cached (Stage 4 / P3).
+// Free keys, kept off the client for hygiene + shared quota. Replace the open /proxy/* passthroughs.
+app.use('/api/v1/finnhub', finnhubRoutes);
+app.use('/api/v1/fred', fredRoutes);
+
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/api/v1/health', (_req, res) => res.json({ status: 'ok', ts: Date.now() }));
 
@@ -120,14 +127,12 @@ app.use('/proxy/yahoo', yahooRoutes);
 // Simple pass-through proxies.
 // Express strips the mount prefix from req.url before passing to the middleware,
 // so no pathRewrite is needed.
-app.use('/proxy/finnhub',      createProxyMiddleware({ target: 'https://finnhub.io/api/v1',                    changeOrigin: true }));
 app.use('/proxy/coingecko',    createProxyMiddleware({ target: 'https://api.coingecko.com/api/v3',             changeOrigin: true }));
-// FMP + BRAPI open passthroughs REMOVED (Stage 2) — their paid keys are now injected server-side
-// by the allowlisted /api/v1/fmp + /api/v1/brapi routes above. No open passthrough for paid providers.
+// FMP + BRAPI (Stage 2) and Finnhub + FRED (Stage 4) open passthroughs REMOVED — their keys are now
+// injected server-side by the allowlisted /api/v1/{fmp,brapi,finnhub,fred} routes above. AlphaVantage
+// removed entirely (its only use, Signal Engine MACD, moved to FMP). No open passthrough for keyed providers.
 app.use('/proxy/bcb',          createProxyMiddleware({ target: 'https://api.bcb.gov.br',                       changeOrigin: true }));
 app.use('/proxy/awesomeapi',   createProxyMiddleware({ target: 'https://economia.awesomeapi.com.br',           changeOrigin: true }));
-app.use('/proxy/alphavantage', createProxyMiddleware({ target: 'https://www.alphavantage.co',                  changeOrigin: true }));
-app.use('/proxy/fred',         createProxyMiddleware({ target: 'https://api.stlouisfed.org/fred',              changeOrigin: true }));
 
 // ── 404 ───────────────────────────────────────────────────────────────────────
 app.use((_req, res) => res.status(404).json({ error: 'NOT_FOUND' }));
@@ -166,14 +171,10 @@ async function start() {
     console.log('│    GET    /api/yahoo/v7/finance/quote                │');
     console.log('│    GET    /api/yahoo/v8/finance/chart                │');
     console.log('│    ANY    /proxy/yahoo/*  (Yahoo crumb/cookie proxy) │');
-    console.log('│    ANY    /proxy/finnhub/*                           │');
     console.log('│    ANY    /proxy/coingecko/*                         │');
-    console.log('│    GET    /api/v1/fmp/*  (server-key, allowlisted)   │');
-    console.log('│    GET    /api/v1/brapi/quote/* (server-key)        │');
+    console.log('│    GET    /api/v1/{fmp,brapi,finnhub,fred}/* (keyed) │');
     console.log('│    ANY    /proxy/bcb/*                               │');
     console.log('│    ANY    /proxy/awesomeapi/*                        │');
-    console.log('│    ANY    /proxy/alphavantage/*                      │');
-    console.log('│    ANY    /proxy/fred/*                              │');
     console.log('├──────────────────────────────────────────────────────┤');
     console.log('│  Database: Supabase (hosted Postgres)                │');
     console.log(`│  CORS origins: ${ALLOWED_ORIGINS.join(', ')}`);

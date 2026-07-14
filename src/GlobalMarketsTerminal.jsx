@@ -8,7 +8,6 @@ import {
   hasFinnhubKey, finnhubNews, finnhubRecommendation,
   hasFmpKey, fmpProfile, fmpRatios, fmpBatchProfile,
   hasFredKey, fredSeries, fredAllMacro, getFredSeriesConfig,
-  hasAlphaVantageKey, alphaVantageRSI, alphaVantageMACD,
   coingeckoPrices,
   getSourceStatus,
   fetchYahooMarketData,
