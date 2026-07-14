@@ -253,10 +253,10 @@ export default function MarketHeatmapPage() {
     const gainers   = heatmapData.filter((s) => s.changePercent > 0).length;
     const losers    = heatmapData.filter((s) => s.changePercent < 0).length;
     const avgChange = heatmapData.reduce((sum, s) => sum + s.changePercent, 0) / n;
-    // Always use BASE_STOCKS for marketCap (even when sizeMetric = marketCap remap)
-    const totalMCap = BASE_STOCKS
-      .filter((b) => heatmapData.some((h) => h.symbol === b.symbol))
-      .reduce((sum, b) => sum + (b.marketCap || 0), 0);
+    // Live marketCap (FMP batch-quote → folded into `stocks` → heatmapData). The
+    // sizeMetric='marketCap' remap preserves `marketCap` via the spread, so this is correct
+    // in both size modes; falls back to the seeded value only until the first live fetch.
+    const totalMCap = heatmapData.reduce((sum, s) => sum + (s.marketCap || 0), 0);
     return { total: n, gainers, losers, avgChange, totalMCap };
   }, [heatmapData]);
 
@@ -318,9 +318,9 @@ export default function MarketHeatmapPage() {
     if (hasFmpKey()) loadLiveData();
   }, [loadLiveData]);
 
-  // ── Look up base stock (has marketCap) for detail panel ──────────────────
+  // ── Look up the LIVE stock (carries the FMP marketCap) for the detail panel ──
   const selectedBase = selectedStock
-    ? BASE_STOCKS.find((b) => b.symbol === selectedStock.symbol)
+    ? stocks.find((b) => b.symbol === selectedStock.symbol)
     : null;
 
   const isPinned = selectedStock
