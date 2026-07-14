@@ -99,7 +99,7 @@ const SOURCE_META = {
     assetClasses: ["Equities", "Indices", "Forex", "Commodities"], geo: "Global",
     docUrl: "https://finance.yahoo.com",
     healthEndpoint: "/proxy/yahoo/v7/finance/quote?symbols=AAPL",
-    note: "Unofficial scraping-based source — now the FALLBACK behind EODHD for global quotes, but still the primary source for commodities (=F) and historical charts. No API key; may break without notice.",
+    note: "Unofficial scraping-based source — now the LAST-RESORT fallback only, behind FMP/EODHD/BRAPI for every class (quotes AND charts). Still the live-quote fallback for WTI/natgas (CL=F/NG=F), which have no paid single-quote. No API key; may break without notice.",
     fallbackSuggestion: "EODHD is the primary; Yahoo backfills what EODHD does not return",
   },
   finnhub: {
@@ -198,7 +198,7 @@ const SOURCE_DETAIL_DATA = {
     refreshCadence: "~180s server cycle (batch ≤20 symbols/req)", lastSuccessfulSync: "Managed server-side",
   },
   yahoo: {
-    description: "Yahoo Finance is an unofficial, scraping-based market data source accessed via an Express proxy. It is now the FALLBACK behind EODHD for global equities, indices and FX, but remains the PRIMARY source for commodities (=F) and for historical OHLC charts. Because it has no official API contract, the response schema may change without notice, and datacenter IPs can be rate-limited — the reason the paid EODHD/BRAPI migration happened.",
+    description: "Yahoo Finance is an unofficial, scraping-based market data source accessed via an Express proxy. It is now the LAST-RESORT fallback only — FMP Premium is primary for equities/FX/metals, EODHD for indices, BRAPI Pro for B3, and charts run on FMP/BRAPI/EODHD (no longer Yahoo). Its only remaining primary role is the live quote for WTI/natgas (CL=F/NG=F), which have no paid single-quote (their charts use the USO/UNG ETF proxy). Because it has no official API contract, the schema may change without notice and datacenter IPs get rate-limited — the reason the paid FMP/EODHD/BRAPI migration happened.",
     type: "HTTP REST (Unofficial / Proxy)", owner: "Yahoo Finance", domain: "Market Data",
     tags: ["Fallback", "Commodities", "Charts", "Unofficial"],
     endpoint: "server engine + /proxy/yahoo → finance.yahoo.com", authType: "None (proxy tunnels requests)",
@@ -268,13 +268,13 @@ const CATALOG = [
   {
     category: "Market Data", icon: "📈",
     items: [
-      { name: "Real-time Price", source: "eodhd", fallback: "yahoo", rateLimit: "EODHD 100k/day (server) · Yahoo fallback", frequency: "~15–20 min delayed (server merge)", coverage: "Global equities, indices, FX, ETFs", status: "active", description: "Current market price for all tracked assets, served by the server-side quote engine: EODHD is primary and Yahoo backfills anything EODHD does not return (and remains primary for commodities).", groups: ["All equity groups", "Indices", "FX"], component: "Dashboard cards, Detail panel", endpoint: "server: /api/v1/quotes/live (EODHD → Yahoo)", fetchMode: "Server cycle" },
-      { name: "Daily Volume", source: "eodhd", fallback: "yahoo", rateLimit: "EODHD (server) · Yahoo fallback", frequency: "~15–20 min delayed (server merge)", coverage: "Equities and indices", status: "active", description: "Trading volume for the current session, from the same merged live quote (EODHD primary, Yahoo fallback).", groups: ["All equity groups", "Indices"], component: "Dashboard cards", endpoint: "server: /api/v1/quotes/live", fetchMode: "Server cycle" },
-      { name: "Day Change (%)", source: "eodhd", fallback: "yahoo", rateLimit: "EODHD (server) · Yahoo fallback", frequency: "~15–20 min delayed (server merge)", coverage: "All tracked assets", status: "active", description: "Percentage change from previous close, drives heat bars and sentiment indicators. From the merged live quote (EODHD primary, Yahoo fallback).", groups: ["All groups"], component: "Dashboard cards, Sentiment bar, Top movers", endpoint: "server: /api/v1/quotes/live", fetchMode: "Server cycle" },
-      { name: "Market Capitalization", source: "fmp", fallback: "yahoo", rateLimit: "FMP Premium · 750/min", frequency: "Server cycle + on demand", coverage: "US equities/ETFs", status: "active", description: "Total market value of outstanding shares. Carried on the FMP-won rows of the live quote engine (EODHD does not return it), and sourced from FMP profile in the detail/Fundamental Lab panels.", groups: ["All equity groups"], component: "Dashboard cards, Detail panel", endpoint: "server: /api/v1/quotes/live · /profile?symbol={symbol}", fetchMode: "Server cycle + on demand" },
-      { name: "52-Week High / Low", source: "yahoo", fallback: null, rateLimit: "Yahoo quote", frequency: "On page load", coverage: "Equities and indices", status: "active", description: "Highest and lowest prices in the past 52 weeks. Sourced from the Yahoo quote (not part of the EODHD live quote).", groups: ["All equity groups", "Indices"], component: "Detail panel", endpoint: "/v7/finance/quote", fetchMode: "Page load" },
-      { name: "Historical Price Chart", source: "yahoo", fallback: null, rateLimit: "Yahoo v8 chart", frequency: "On demand (per tab)", coverage: "All tracked assets", status: "active", description: "Historical OHLC data for 9 timeframes (1D to MAX) rendered as area charts. Yahoo v8 chart — separate from the quote engine.", groups: ["All groups"], component: "Detail panel chart", endpoint: "/v8/finance/chart/{symbol}?range=...&interval=...", fetchMode: "On demand" },
-      { name: "Intraday Sparkline", source: "synthetic", fallback: null, rateLimit: "n/a (computed)", frequency: "Cosmetic (not real history)", coverage: "All tracked assets", status: "active", description: "Illustrative 30-point random-walk (generateSparkline) seeded by per-asset volatility; the latest real price rolls onto the tail each refresh. It is NOT a real intraday price series — a real one would need per-symbol intraday closes.", groups: ["All groups"], component: "Dashboard cards", endpoint: "Computed (Math.random walk)", fetchMode: "Computed" },
+      { name: "Real-time Price", source: "fmp", fallback: "eodhd", rateLimit: "FMP Premium 750/min (server) · EODHD/BRAPI/Yahoo fallback", frequency: "~1 min (server merge)", coverage: "Global equities, indices, FX, ETFs, B3, crypto", status: "active", description: "Current market price for all tracked assets, from the server-side quote engine: FMP Premium is primary for equities/FX/metals, EODHD for indices (+ warm equity/FX fallback), BRAPI Pro for B3, CoinGecko for crypto; Yahoo is the last-resort fallback only (CL=F/NG=F).", groups: ["All groups"], component: "Dashboard cards, Detail panel", endpoint: "server: /api/v1/quotes/live", fetchMode: "Server cycle" },
+      { name: "Daily Volume", source: "fmp", fallback: "eodhd", rateLimit: "FMP/EODHD/BRAPI (server)", frequency: "~1 min (server merge)", coverage: "Equities, indices, B3", status: "active", description: "Trading volume for the current session, from the same merged live quote (FMP/EODHD/BRAPI per class).", groups: ["All equity groups", "Indices"], component: "Dashboard cards", endpoint: "server: /api/v1/quotes/live", fetchMode: "Server cycle" },
+      { name: "Day Change (%)", source: "fmp", fallback: "eodhd", rateLimit: "FMP/EODHD/BRAPI/CoinGecko (server)", frequency: "~1 min (server merge)", coverage: "All tracked assets", status: "active", description: "Percentage change from previous close; drives heat bars and sentiment. From the merged live quote (winning provider per class).", groups: ["All groups"], component: "Dashboard cards, Sentiment bar, Top movers", endpoint: "server: /api/v1/quotes/live", fetchMode: "Server cycle" },
+      { name: "Market Capitalization", source: "fmp", fallback: "brapi", rateLimit: "FMP Premium · 750/min", frequency: "Server cycle + on demand", coverage: "US equities/ETFs + B3", status: "active", description: "Total market value of outstanding shares. FMP on the live quote engine + profile panels; BRAPI Pro supplies it for B3. (EODHD real-time does not return it.)", groups: ["All equity groups"], component: "Dashboard cards, Detail panel", endpoint: "server: /api/v1/quotes/live · /api/v1/fmp/profile", fetchMode: "Server cycle + on demand" },
+      { name: "52-Week High / Low", source: "fmp", fallback: "eodhd", rateLimit: "FMP quote · EODHD 1y-EOD · BRAPI (B3)", frequency: "On demand + server cycle", coverage: "Equities, indices, B3", status: "active", description: "Highest/lowest price over the past 52 weeks. FMP yearHigh/yearLow for equities/FX/covered indices; BRAPI for B3; computed from EODHD 1-year EOD for the EODHD-only indices (no longer from Yahoo).", groups: ["All equity groups", "Indices"], component: "Detail panel, Watchlist", endpoint: "server: /api/v1/quote", fetchMode: "On demand" },
+      { name: "Historical Price Chart", source: "fmp", fallback: "brapi", rateLimit: "FMP/BRAPI/EODHD", frequency: "On demand (per timeframe)", coverage: "All tracked assets", status: "active", description: "OHLC candles for 9 timeframes (1D–MAX). FMP (US equities/FX/metals/US+major indices), BRAPI Pro (B3), EODHD (EU/Asia indices), USO/UNG ETF proxy (WTI/natgas); Yahoo is the last-resort fallback only.", groups: ["All groups"], component: "Chart & Research, Detail panel chart", endpoint: "client fmpOHLCV → /api/v1/fmp · /api/v1/brapi · /api/v1/ohlcv", fetchMode: "On demand" },
+      { name: "Sparkline (30-day)", source: "fmp", fallback: "eodhd", rateLimit: "server, 6h cadence", frequency: "Daily EOD (~6h refresh)", coverage: "All tracked assets", status: "active", description: "Real ~30-point daily-close series folded into the live quote server-side: FMP light-EOD (equities/FX/metals/indices), CoinGecko (crypto), BRAPI (B3), EODHD (EU/Asia indices), ETF proxy (WTI/natgas). The old Math.random synthetic is now only a last-resort client fallback.", groups: ["All groups"], component: "Dashboard cards", endpoint: "server: /api/v1/quotes/live (sparkline)", fetchMode: "Server cycle" },
     ],
   },
   {
@@ -1808,15 +1808,15 @@ export default function CatalogPage() {
           <div style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "1.5px", marginBottom: 8 }}>HOW LIVE QUOTES ARE SOURCED</div>
           <div style={{ display: "grid", gap: 6, fontFamily: sans, fontSize: 12, color: "var(--c-text-2)", lineHeight: 1.5 }}>
             <div>
-              <SourceBadge source="eodhd" /> <span style={{ color: "var(--c-text-3)" }}>→</span> <SourceBadge source="yahoo" />
-              {"  "}Global equities, indices, FX &amp; ETFs — <strong>EODHD primary</strong>, Yahoo fallback. Fetched server-side and merged into one quote per symbol.
+              <SourceBadge source="fmp" /> <span style={{ color: "var(--c-text-3)" }}>→</span> <SourceBadge source="eodhd" /> <span style={{ color: "var(--c-text-3)" }}>→</span> <SourceBadge source="yahoo" />
+              {"  "}Equities, FX &amp; ETFs — <strong>FMP Premium primary</strong> (real-time), EODHD warm fallback, Yahoo last resort. Indices are <strong>EODHD primary</strong> (FMP for US/FTSE/Nikkei/HSI/STOXX). Merged server-side into one quote per symbol.
             </div>
             <div>
-              <SourceBadge source="brapi" /> <span style={{ color: "var(--c-text-3)" }}>→</span> <SourceBadge source="yahoo" />
-              {"  "}Brazil B3 — <strong>BRAPI Pro primary</strong> (batch 20/req, ~5-min), Yahoo <code style={{ fontFamily: mono }}>.SA</code> fallback. EODHD is not used for B3 (budget).
+              <SourceBadge source="brapi" /> <span style={{ color: "var(--c-text-3)" }}>→</span> <SourceBadge source="eodhd" /> <span style={{ color: "var(--c-text-3)" }}>→</span> <SourceBadge source="yahoo" />
+              {"  "}Brazil B3 — <strong>BRAPI Pro primary</strong> (batch 20/req, ~5-min, full fields), EODHD <code style={{ fontFamily: mono }}>.SA</code> then Yahoo <code style={{ fontFamily: mono }}>.SA</code> fallback.
             </div>
             <div>
-              <SourceBadge source="coingecko" />{"  "}Crypto (BTC / ETH / SOL). <SourceBadge source="yahoo" style={{ marginLeft: 8 }} /> also remains <strong>primary for commodities</strong> and historical charts.
+              <SourceBadge source="coingecko" />{"  "}Crypto (BTC / ETH / SOL). <SourceBadge source="fmp" style={{ marginLeft: 8 }} /> gold &amp; silver; charts run on FMP/BRAPI/EODHD. <SourceBadge source="yahoo" style={{ marginLeft: 8 }} /> is last-resort only (+ the WTI/natgas live quote).
             </div>
             <div style={{ color: "var(--c-text-3)", fontSize: 11 }}>
               On-demand fundamentals, technicals, news &amp; macro use FMP, Finnhub, Alpha Vantage, FRED, BCB &amp; AwesomeAPI directly from the browser.
@@ -1863,7 +1863,7 @@ export default function CatalogPage() {
             <div>
               <div style={{ fontFamily: mono, fontSize: 10, color: "var(--c-error)", fontWeight: 700, letterSpacing: "0.5px" }}>YAHOO FINANCE UNAVAILABLE</div>
               <div style={{ fontFamily: sans, fontSize: 11, color: "var(--c-text-3)", marginTop: 2 }}>
-                Yahoo is an unofficial API and may break without notice. EODHD is now the primary source for global quotes, so live prices continue; Yahoo-only data (commodities, historical charts, market cap, 52-week ranges) may be affected.
+                Yahoo is an unofficial API and may break without notice. It is now only a last-resort fallback — FMP/EODHD/BRAPI serve quotes, charts, market cap and 52-week ranges — so a Yahoo outage is largely invisible. The one exception is the WTI/natgas (CL=F/NG=F) live quote, which has no paid single-quote source.
               </div>
             </div>
           </div>
