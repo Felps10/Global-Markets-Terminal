@@ -1243,6 +1243,43 @@ export async function fetchB3MarketDataFromServer(b3Assets, { assets, volatility
  * @param {{ assets: Object }} maps
  * @returns {Promise<{ points: Array<{t:number,v:number}>, change: number, changePct: number }>}
  */
+// ─── SINGLE LIVE QUOTE (server-resolved paid providers — no Yahoo) ───────────
+// Drop-in replacement for the old client-side /proxy/yahoo/v7/finance/quote header quotes.
+// The server route /api/v1/quote infers the asset class from the symbol suffix (`.SA`→BRAPI,
+// `^`→FMP/EODHD index, `=X`→FMP FX, `=F`→FMP metals, else→FMP equity→EODHD) using server-only
+// keys, and returns the SAME field shape the callers consumed from Yahoo v7. Callers append
+// `.SA` for B3 (as they already did for Yahoo). Returns null on total failure.
+export async function fetchQuote(symbol) {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/v1/quote?symbol=${encodeURIComponent(symbol)}`,
+      { signal: AbortSignal.timeout(9000) }
+    );
+    if (!res.ok) return null;
+    const q = await res.json();
+    if (q == null || q.price == null) return null;
+    return {
+      price:     q.price,
+      change:    q.change,
+      changePct: q.changePct,
+      open:      q.open,
+      prevClose: q.prevClose,
+      dayHigh:   q.dayHigh,
+      dayLow:    q.dayLow,
+      volume:    q.volume,
+      avgVolume: q.avgVolume,
+      marketCap: q.marketCap,
+      w52High:   q.w52High,
+      w52Low:    q.w52Low,
+      beta:      q.beta,
+      eps:       q.eps,
+      pe:        q.pe,
+      timestamp: q.timestamp,
+      source:    q.source,
+    };
+  } catch (_) { return null; }
+}
+
 export async function fetchYahooChartData(symbol, range, interval, { assets }) {
   // B3 stocks need .SA suffix for Yahoo chart data
   const chartSymbol = assets[symbol]?.isB3 ? symbol + ".SA" : symbol;
@@ -1488,9 +1525,15 @@ export async function fmpOHLCV(symbol, timeframe = '1M', { assets = {}, interval
   // else charts its own symbol.
   const fetchSym = CHART_PROXY[symbol] || symbol;
   if (isB3) {
-    // B3 → BRAPI historical (real B3 data). Falls back to Yahoo .SA if BRAPI is slow/unavailable.
+    // B3 → BRAPI historical (real B3 data). Falls back to EODHD .SA, then Yahoo .SA.
     try {
       const candles = await brapiOHLCV(symbol, timeframe);
+      if (candles && candles.length >= 2) return candles;
+    } catch (_) { /* fall through */ }
+    // EODHD .SA daily via our server (reliable; replaces the dead-Yahoo B3 fallback). yahooToEodhd
+    // maps '<TICKER>.SA' → identity, so pass the .SA form.
+    try {
+      const candles = await eodhdOHLCV(`${symbol}.SA`, timeframe);
       if (candles && candles.length >= 2) return candles;
     } catch (_) { /* fall through to Yahoo */ }
   } else if (FMP_KEY) {

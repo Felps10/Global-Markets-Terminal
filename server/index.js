@@ -15,6 +15,7 @@ import preferencesRoutes from './routes/preferences.js';
 import yahooRoutes       from './routes/yahoo.js';
 import snapshotRoutes    from './routes/snapshot.js';
 import quotesRoutes      from './routes/quotes.js';
+import quoteRoutes       from './routes/quote.js';
 import ohlcvRoutes       from './routes/ohlcv.js';
 import brazilMacroRoutes from './routes/brazilMacro.js';
 import alertsRoutes      from './routes/alerts.js';
@@ -80,6 +81,11 @@ app.use('/api/v1/snapshot', snapshotRoutes);
 // Server-side cached Yahoo + CoinGecko data. All clients read from this
 // instead of each hitting external APIs independently through the proxy.
 app.use('/api/v1/quotes', quotesRoutes);
+
+// /api/v1/quote — PUBLIC (no auth)
+// One normalized live quote for an arbitrary symbol, resolved server-side against the paid
+// providers (FMP/EODHD/BRAPI) — replaces the client-side /proxy/yahoo/v7 header-quote calls.
+app.use('/api/v1/quote', quoteRoutes);
 
 // /api/v1/ohlcv — PUBLIC (no auth)
 // Daily OHLCV for chart classes the browser can't fetch directly (EU/Asia indices

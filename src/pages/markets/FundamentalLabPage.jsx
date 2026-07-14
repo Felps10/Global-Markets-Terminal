@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTaxonomy } from '../../context/TaxonomyContext.jsx';
-import { API_BASE, fmpProfile, fmpRatios, fmpKeyMetrics, hasFmpKey } from '../../dataServices.js';
+import { fetchQuote, fmpProfile, fmpRatios, fmpKeyMetrics, hasFmpKey } from '../../dataServices.js';
 import MarketsPageLayout from '../../components/MarketsPageLayout.jsx';
 import { isExhausted } from '../../services/quotaTracker.js';
 import { useWatchlist } from '../../context/WatchlistContext.jsx';
@@ -90,9 +90,9 @@ const METRICS = [
   { key: 'payoutRatio',  label: 'Payout Ratio',  fmt: fmtPct,              src: 'fmp',   thresholds: null },
   // Market
   { key: 'marketCap',    label: 'Market Cap',    fmt: fmtLarge,            src: 'fmp',   thresholds: null },
-  { key: 'price',        label: 'Price',         fmt: fmtPrice,            src: 'yahoo', thresholds: null },
-  { key: 'changePct',    label: 'Daily Change',  fmt: v => (v != null && !isNaN(Number(v))) ? `${Number(v) >= 0 ? '+' : ''}${fmtNum(v, 2)}%` : '—', src: 'yahoo', thresholds: null },
-  { key: 'volume',       label: 'Volume',        fmt: fmtVol,              src: 'yahoo', thresholds: null },
+  { key: 'price',        label: 'Price',         fmt: fmtPrice,            src: 'fmp', thresholds: null },
+  { key: 'changePct',    label: 'Daily Change',  fmt: v => (v != null && !isNaN(Number(v))) ? `${Number(v) >= 0 ? '+' : ''}${fmtNum(v, 2)}%` : '—', src: 'fmp', thresholds: null },
+  { key: 'volume',       label: 'Volume',        fmt: fmtVol,              src: 'fmp', thresholds: null },
 ];
 
 const METRICS_MAP = Object.fromEntries(METRICS.map(m => [m.key, m]));
@@ -378,29 +378,23 @@ export default function FundamentalLabPage() {
   );
 
   // ── Data fetchers ──────────────────────────────────────────────────────────
-  const fetchYahooQuote = useCallback(async symbol => {
-    try {
-      const res  = await fetch(
-        `${API_BASE}/proxy/yahoo/v7/finance/quote?symbols=${encodeURIComponent(symbol)}`,
-        { signal: AbortSignal.timeout(8000) }
-      );
-      const json = await res.json();
-      const q    = json?.quoteResponse?.result?.[0];
-      if (!q) throw new Error('No result');
-      setAssetData(prev => ({
-        ...prev,
-        [symbol]: {
-          ...prev[symbol],
-          price:     q.regularMarketPrice         ?? null,
-          changePct: q.regularMarketChangePercent ?? null,
-          volume:    q.regularMarketVolume        ?? null,
-          loadingYahoo: false,
-        },
-      }));
-    } catch {
-      setAssetData(prev => ({ ...prev, [symbol]: { ...prev[symbol], loadingYahoo: false } }));
-    }
-  }, []);
+  // Live Price / Daily Change / Volume — server-resolved (FMP/EODHD/BRAPI), no Yahoo.
+  // B3 tickers need the `.SA` suffix so the server routes them to BRAPI (bare ticker mis-resolves
+  // on FMP); this also fixes B3 rows that previously always showed '—' for these 3 metrics.
+  const fetchLiveQuote = useCallback(async symbol => {
+    const quoteSym = assetMap[symbol]?.meta?.isB3 ? `${symbol}.SA` : symbol;
+    const q = await fetchQuote(quoteSym);
+    setAssetData(prev => ({
+      ...prev,
+      [symbol]: {
+        ...prev[symbol],
+        price:     q?.price     ?? null,
+        changePct: q?.changePct ?? null,
+        volume:    q?.volume    ?? null,
+        loadingYahoo: false,
+      },
+    }));
+  }, [assetMap]);
 
   const fetchFmpData = useCallback(async symbol => {
     if (isExhausted('fmp')) {
@@ -467,9 +461,9 @@ export default function FundamentalLabPage() {
       ...prev,
       [symbol]: { loadingFmp: hasFmpKey(), loadingYahoo: true, error: null, name: assetName },
     }));
-    fetchYahooQuote(symbol);
+    fetchLiveQuote(symbol);
     if (hasFmpKey()) fetchFmpData(symbol);
-  }, [selectedSymbols, assetMap, fetchYahooQuote, fetchFmpData]);
+  }, [selectedSymbols, assetMap, fetchLiveQuote, fetchFmpData]);
 
   // Load symbols from URL search params on mount (e.g., ?symbols=COP,XOM,CVX)
   const urlParamsLoaded = useRef(false);

@@ -15,8 +15,9 @@
  *   fx      `EURUSD=X` → `EURUSD` ✅ (13/13, real-time)
  *   commodity `GC=F` → `GCUSD` ✅  `SI=F` → `SIUSD` ✅ ; `CL=F`/`NG=F` ❌ 402 (gated above
  *             Premium → USO/UNG ETF proxies)
- *   index   `^FTSE` → `^FTSE` ✅ (single /stable/quote; batch-quote 402s indices). Other
- *             indices → null (EODHD is their primary; FMP gates ^GDAXI/^FCHI/^AXJO/^KS11/^BVSP).
+ *   index   `^GSPC/^DJI/^IXIC/^VIX/^FTSE/^N225/^HSI/^STOXX50E` → identity ✅ (single /stable/quote;
+ *             batch-quote 402s indices). Other indices → null (EODHD primary; FMP returns empty
+ *             for ^GDAXI/^FCHI/^BVSP/^AXJO/^KS11/^GSPTSE/^BSESN — re-verified live 2026-07-13).
  *   b3      `PETR4.SA` → null (BRAPI Pro stays primary; FMP is weak on B3).
  *   NOTE: FMP's legacy /api/v3 API is dead (403 for subs after 2025-08-31) — use /stable.
  *         batch-quote handles equities/FX/commodities; indices need single /quote.
@@ -29,10 +30,21 @@ const FMP_COMMODITY = {
   'SI=F': 'SIUSD',
 };
 
-// Indices routed to FMP. Only ^FTSE: EODHD returns "NA" for it and FMP quotes it as ^FTSE.
-// Every other index is served by EODHD (primary), so FMP must NOT fetch it.
+// Indices routed to FMP. Re-verified LIVE via the /stable/quote SINGLE endpoint (2026-07-13,
+// Premium key): FMP quotes these 8 indices (US majors + FTSE/Nikkei/Hang Seng/Euro STOXX 50)
+// by their caret symbol. The earlier "only ^FTSE" restriction came from testing /batch-quote,
+// which 402s on every index — the single endpoint (isFmpSingleQuote → /quote) does not.
+// The remaining indices (^GDAXI ^FCHI ^BVSP ^AXJO ^KS11 ^GSPTSE ^BSESN) return EMPTY from FMP
+// on this plan → still null here → EODHD stays their primary.
 const FMP_INDEX = {
-  '^FTSE': '^FTSE',
+  '^GSPC': '^GSPC',   // S&P 500
+  '^DJI': '^DJI',     // Dow Jones
+  '^IXIC': '^IXIC',   // Nasdaq Composite
+  '^VIX': '^VIX',     // CBOE Volatility
+  '^FTSE': '^FTSE',   // FTSE 100 (also the EODHD "NA" hole)
+  '^N225': '^N225',   // Nikkei 225
+  '^HSI': '^HSI',     // Hang Seng
+  '^STOXX50E': '^STOXX50E', // Euro STOXX 50
 };
 
 /**

@@ -5,7 +5,7 @@ import MarketsPageLayout from '../../components/MarketsPageLayout.jsx';
 import { useTaxonomy } from '../../context/TaxonomyContext.jsx';
 import { useWatchlist } from '../../context/WatchlistContext.jsx';
 import {
-  API_BASE,
+  fetchQuote,
   fmpOHLCV, CHART_PROXY,
   fmpProfile, fmpRatios,
   fmpGradesConsensus, fmpPriceTarget, fmpAnalystEstimates,
@@ -48,33 +48,9 @@ const REC_CATS = [
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
+// Server-resolved live quote (FMP/EODHD/BRAPI, no Yahoo). `symbol` already carries `.SA` for B3.
 async function fetchAssetQuote(symbol) {
-  try {
-    const res = await fetch(
-      `${API_BASE}/proxy/yahoo/v7/finance/quote?symbols=${encodeURIComponent(symbol)}`,
-      { signal: AbortSignal.timeout(8000) }
-    );
-    if (!res.ok) return null;
-    const json = await res.json();
-    const q = json?.quoteResponse?.result?.[0];
-    if (!q) return null;
-    return {
-      price:     q.regularMarketPrice,
-      change:    q.regularMarketChange,
-      changePct: q.regularMarketChangePercent,
-      open:      q.regularMarketOpen,
-      prevClose: q.regularMarketPreviousClose,
-      dayHigh:   q.regularMarketDayHigh,
-      dayLow:    q.regularMarketDayLow,
-      volume:    q.regularMarketVolume,
-      avgVolume: q.averageDailyVolume3Month,
-      marketCap: q.marketCap,
-      w52High:   q.fiftyTwoWeekHigh,
-      w52Low:    q.fiftyTwoWeekLow,
-      beta:      q.beta,
-      timestamp: q.regularMarketTime,
-    };
-  } catch (_) { return null; }
+  return fetchQuote(symbol);
 }
 
 
