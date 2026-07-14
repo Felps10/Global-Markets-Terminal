@@ -795,7 +795,7 @@ function SymbolNewsFeed({ symbol, onBack }) {
           borderRadius: 6, padding: "10px 14px", marginBottom: 20,
         }}>
           <span style={{ fontFamily: mono, fontSize: 9, color: "var(--c-text-3)", letterSpacing: "1px" }}>
-            MONITORING:
+            TYPICAL COVERAGE:
           </span>
           {CAT_SOURCE_AFFINITY[asset.cat].map(srcKey => {
             const src = NEWS_SOURCES[srcKey];
@@ -1187,7 +1187,7 @@ export default function NewsPage() {
             </h1>
           </div>
           <div style={{ fontFamily: mono, fontSize: 11, color: "var(--c-text-3)", letterSpacing: "1.2px" }}>
-            BLOOMBERG · REUTERS · WSJ · FT · CNBC · SEEKING ALPHA · ZACKS · MORNINGSTAR · VALOR
+            MARKET HEADLINES · AGGREGATED VIA FINNHUB
           </div>
         </div>
 
