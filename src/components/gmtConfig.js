@@ -24,6 +24,11 @@ export const STATIC_CATEGORIES = Object.fromEntries(
 export function buildStaticAssetsMap(rows) {
   const map = {};
   for (const a of rows) {
+    // Parity with the taxonomy API (server filters .eq('active', true)):
+    // retired rows never enter the client map. Also resolves the IEP/IPCA
+    // collisions — each pair's INACTIVE Brazil row was clobbering the active
+    // row's identity (IEP: a BCB macro row erased the NASDAQ Icahn equity).
+    if (a.active === false) continue;
     const entry = {
       name:     a.name,
       cat:      a.subgroup_id,

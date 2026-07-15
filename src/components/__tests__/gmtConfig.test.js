@@ -99,6 +99,35 @@ describe('STATIC_ASSETS_MAP — B3 identity survives duplicate-symbol rows', () 
     expect(buildStaticAssetsMap([other, other2]).PBR._displaySymbol, 'alias may replace alias').toBe('ZZZ4');
   });
 
+  it('builder skips active:false rows (parity with the taxonomy API filter)', () => {
+    const activeRow   = { symbol: 'ACT', name: 'live', subgroup_id: 'financials', type: 'equity', exchange: 'NASDAQ', meta: null };
+    const retiredRow  = { symbol: 'ACT', name: 'dead', subgroup_id: 'br-cambio', type: 'macro-indicator', exchange: 'BCB', active: false, meta: { bcbSeries: 1 } };
+    const soloRetired = { symbol: 'GONE', name: 'x', subgroup_id: 'br-juros', type: 'rate', exchange: 'BCB', active: false, meta: null };
+    expect(buildStaticAssetsMap([activeRow, retiredRow]).ACT.name, 'inactive row must not clobber').toBe('live');
+    expect(buildStaticAssetsMap([retiredRow, activeRow]).ACT.name).toBe('live');
+    expect(buildStaticAssetsMap([soloRetired]).GONE).toBeUndefined();
+  });
+
+  it('restores the real identities the inactive-row collisions were erasing', () => {
+    // IEP: the NASDAQ Icahn Enterprises row was overwritten by an inactive
+    // BCB macro row; IPCA's active br-indices row by an inactive macro twin.
+    expect(STATIC_ASSETS_MAP.IEP.exchange).toBe('NASDAQ');
+    expect(STATIC_ASSETS_MAP.IEP.name).toBe('Icahn Enterprises');
+    expect(STATIC_ASSETS_MAP.IPCA.cat).toBe('br-indices');
+    expect(STATIC_ASSETS_MAP['NTN-B-5'], 'both NTN-B rows are inactive').toBeUndefined();
+  });
+
+  it('never lets ACTIVE duplicate rows disagree on type or sector', () => {
+    // With inactive rows out of the map, any remaining disagreement is a real
+    // split-brain (the DEV warn in the builder fires for it) — enforce at CI.
+    for (const [symbol, rows] of rowsBySymbol) {
+      const live = rows.filter((r) => r.active !== false);
+      if (live.length < 2) continue;
+      expect(new Set(live.map((r) => r.type)).size, `${symbol} active rows disagree on type`).toBe(1);
+      expect(new Set(live.map((r) => r.sector)).size, `${symbol} active rows disagree on sector`).toBe(1);
+    }
+  });
+
   it('builder keeps last-write-wins for non-flag fields of duplicates (documented semantics)', () => {
     // Only isB3 is sticky; cat/type/sector stay last-write-wins (the DEV warn
     // flags disagreements). Pins the semantics so a future "helpful" change to
