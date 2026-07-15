@@ -78,7 +78,7 @@ export const API_REGISTRY = {
     upgradeUrl: "https://finance.yahoo.com",
     notes:
       "⚠ Unofficial scraping-based source — no public API, no SLA, no key. " +
-      "Uses CORS proxies (corsproxy.io, allorigins.win) as fallbacks. " +
+      "Uses allorigins.win as a CORS-proxy fallback (corsproxy.io removed — 403s all server-side requests). " +
       "May break without notice when Yahoo changes their internal endpoints.",
     tierOptions: [
       {

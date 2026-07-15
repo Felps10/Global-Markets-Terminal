@@ -71,8 +71,10 @@ router.get('/v7/finance/quote', async (req, res) => {
 
     if (upstream.status !== 200) {
       console.error(`[yahoo] Upstream returned ${upstream.status}`);
+      // Pass a Yahoo 404 (unknown symbol — a data condition) through as 404 so
+      // clients don't retry it; everything else is a genuine upstream failure.
       return res
-        .status(502)
+        .status(upstream.status === 404 ? 404 : 502)
         .json({ error: `Yahoo Finance returned HTTP ${upstream.status}` });
     }
 
@@ -125,8 +127,10 @@ router.get('/v8/finance/chart', async (req, res) => {
 
     if (upstream.status !== 200) {
       console.error(`[yahoo] Upstream returned ${upstream.status}`);
+      // Pass a Yahoo 404 (unknown symbol — a data condition) through as 404 so
+      // clients don't retry it; everything else is a genuine upstream failure.
       return res
-        .status(502)
+        .status(upstream.status === 404 ? 404 : 502)
         .json({ error: `Yahoo Finance returned HTTP ${upstream.status}` });
     }
 

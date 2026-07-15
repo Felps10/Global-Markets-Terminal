@@ -8,8 +8,10 @@
  * Returns ONE normalized live quote for an arbitrary symbol, resolved server-side against the
  * PAID providers (FMP Premium / EODHD / BRAPI Pro) — never Yahoo. This replaces the three
  * client-side `/proxy/yahoo/v7/finance/quote` header-quote calls (ChartResearchPage,
- * FundamentalLabPage, AssetDetailDrawer) that 502/403/CORS-failed whenever Yahoo blocked the
- * Railway datacenter IP (the reported BBDC4 failure). Keys stay server-only.
+ * FundamentalLabPage, AssetDetailDrawer). Keys stay server-only.
+ * (Historical note: the original BBDC4 failure this replaced was NOT Yahoo IP-blocking —
+ * it was the client sending bare B3 symbols after losing meta.isB3 to a duplicate-row
+ * collision; see PR #59/#60. The suffix contract below is why that mattered.)
  *
  * Class is inferred from the symbol suffix (the three callers already append `.SA` for B3):
  *   `.SA`  → B3        → BRAPI Pro (full fields incl. 52wk/EPS/PE) → EODHD `.SA` fallback
@@ -149,7 +151,9 @@ router.get('/', async (req, res) => {
       }
     } catch { /* try next provider */ }
   }
-  return res.status(502).json({ error: 'no quote from any provider', symbol, class: cls });
+  // 404, not 502: "no provider has this symbol" is a data condition, not a
+  // gateway failure — 5xx here made retry-capable clients hammer a miss.
+  return res.status(404).json({ error: 'no quote from any provider', symbol, class: cls });
 });
 
 export default router;
