@@ -6,7 +6,8 @@
 // that duplicate rows can never disagree on B3 identity again.
 import { describe, it, expect } from 'vitest';
 import { ASSETS } from '../../data/assets.js';
-import { STATIC_ASSETS_MAP } from '../gmtConfig.js';
+import { STATIC_ASSETS_MAP, buildStaticAssetsMap } from '../gmtConfig.js';
+import { SECTOR_META } from '../../data/b3Sectors.js';
 
 // The 20 symbols that lost isB3 in the original incident.
 const HEADLINE_B3 = [
@@ -15,12 +16,9 @@ const HEADLINE_B3 = [
   'RDOR3', 'TOTS3', 'SUZB3', '^BVSP',
 ];
 
-// Keys of SECTOR_META in src/BrazilTerminal.jsx — the Brazil grid silently
-// drops any equity-br entry whose sector is not one of these.
-const GRID_SECTORS = [
-  'Bancos', 'Petróleo', 'Mineração', 'Agronegócio', 'Varejo', 'Utilities',
-  'Transporte', 'Indústria', 'Construção', 'Saúde', 'Telecom', 'Outros',
-];
+// The Brazil grid silently drops any equity-br entry whose sector is not a
+// SECTOR_META key — imported from the shared data module, not transcribed.
+const GRID_SECTORS = Object.keys(SECTOR_META);
 
 // B3-exchange rows that are legitimately NOT BRAPI-quotable (no isB3):
 // the DI1 futures curve rows.
@@ -72,6 +70,25 @@ describe('STATIC_ASSETS_MAP — B3 identity survives duplicate-symbol rows', () 
         expect(entry.isB3, `alias entry ${sym} must not carry isB3`).toBeFalsy();
       }
     }
+  });
+
+  it('builder keeps isB3 sticky across duplicate rows in either order', () => {
+    // Synthetic fixtures — the guard must hold regardless of which row of a
+    // duplicated symbol comes last (the incident was flag-row-first order).
+    const flagged  = { symbol: 'DUP1', name: 'x', subgroup_id: 'br-acoes', type: 'equity-br', sector: 'Bancos', exchange: 'B3', meta: { isB3: true } };
+    const flagless = { symbol: 'DUP1', name: 'x', subgroup_id: 'brazil-highlights', type: 'equity-br', sector: 'Bancos', exchange: 'B3', meta: { yahooSymbol: 'DUP1.SA' } };
+    expect(buildStaticAssetsMap([flagged, flagless]).DUP1.isB3).toBe(true);
+    expect(buildStaticAssetsMap([flagless, flagged]).DUP1.isB3).toBe(true);
+  });
+
+  it('builder never lets a yahooSymbol alias clobber a real entry or carry isB3', () => {
+    const real  = { symbol: 'PBR', name: 'real', subgroup_id: 'oil-gas', type: 'equity', exchange: 'NYSE', meta: null };
+    const other = { symbol: 'XYZ4', name: 'x', subgroup_id: 'br-acoes', type: 'equity-br', sector: 'Bancos', exchange: 'B3', meta: { isB3: true, yahooSymbol: 'PBR' } };
+    const map = buildStaticAssetsMap([real, other]);
+    expect(map.PBR.name, 'alias must not clobber the real PBR entry').toBe('real');
+    const map2 = buildStaticAssetsMap([other]);
+    expect(map2.PBR._displaySymbol).toBe('XYZ4');
+    expect(map2.PBR.isB3, 'alias entries never carry isB3').toBeFalsy();
   });
 
   it('gives every active equity-br row a sector the grid can render', () => {

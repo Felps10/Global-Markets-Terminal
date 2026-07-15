@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTaxonomy } from '../../context/TaxonomyContext.jsx';
+import { resolveAsset, buildAssetMap } from '../../lib/assetResolution.js';
 import { fetchQuote, fmpProfile, fmpRatios, fmpKeyMetrics, hasFmpKey } from '../../dataServices.js';
 import MarketsPageLayout from '../../components/MarketsPageLayout.jsx';
 import { isExhausted } from '../../services/quotaTracker.js';
@@ -335,10 +336,7 @@ export default function FundamentalLabPage() {
   }, []);
 
   // ── Derived ────────────────────────────────────────────────────────────────
-  const assetMap = useMemo(
-    () => Object.fromEntries(assets.map(a => [a.symbol, a])),
-    [assets]
-  );
+  const assetMap = useMemo(() => buildAssetMap(assets), [assets]);
 
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
@@ -362,7 +360,7 @@ export default function FundamentalLabPage() {
   const watchlistAssets = useMemo(() => {
     return watchlistItems
       .filter(i => i.type === 'asset')
-      .map(i => assets.find(a => a.symbol === i.target_id))
+      .map(i => resolveAsset(assets, i.target_id))
       .filter(Boolean);
   }, [watchlistItems, assets]);
 

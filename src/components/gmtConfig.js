@@ -15,9 +15,15 @@ export const STATIC_CATEGORIES = Object.fromEntries(
   STATIC_SUBGROUPS_ARRAY.map(s => [s.id, { label: s.display_name, icon: s.icon, color: s.color }])
 );
 
-export const STATIC_ASSETS_MAP = (() => {
+// Symbol-keyed asset map builder, shared by the static map below and the
+// runtime taxonomy map in GlobalMarketsTerminal. Duplicate symbols are legal
+// (the brazil-highlights rows mirror br-acoes symbols), so the builder must be
+// order-independent for B3 identity: isB3 is sticky — once any row for a
+// symbol declares it, a later flagless row cannot erase it (last-write-wins on
+// the flag was the 2026-07-14 incident).
+export function buildStaticAssetsMap(rows) {
   const map = {};
-  for (const a of STATIC_ASSETS_ARRAY) {
+  for (const a of rows) {
     const entry = {
       name:     a.name,
       cat:      a.subgroup_id,
@@ -26,17 +32,29 @@ export const STATIC_ASSETS_MAP = (() => {
       type:     a.type,
       ...(a.meta || {}),
     };
+    const prev = map[a.symbol];
+    if (prev && !prev._displaySymbol) {
+      entry.isB3 = !!(prev.isB3 || entry.isB3);
+      if (import.meta.env?.DEV && (prev.type !== entry.type || prev.sector !== entry.sector)) {
+        console.warn(`[gmtConfig] duplicate symbol ${a.symbol}: rows disagree on type/sector — later row wins`,
+          { kept: { type: entry.type, sector: entry.sector }, dropped: { type: prev.type, sector: prev.sector } });
+      }
+    }
     map[a.symbol] = entry;
-    if (a.meta?.yahooSymbol && a.meta.yahooSymbol !== a.symbol) {
+    if (a.meta?.yahooSymbol && a.meta.yahooSymbol !== a.symbol
+        && (!map[a.meta.yahooSymbol] || map[a.meta.yahooSymbol]._displaySymbol)) {
       // Alias entries are lookup shims for provider-keyed payloads, never B3
       // grid members: without the isB3 override, rows carrying both isB3 and a
       // yahooSymbol would admit phantom '.SA' entries into every isB3 filter
-      // (grid sections, ticker counts, fallback fetch lists).
+      // (grid sections, ticker counts, fallback fetch lists). An alias also
+      // never clobbers a real entry that owns the same key.
       map[a.meta.yahooSymbol] = { ...entry, isB3: false, _displaySymbol: a.symbol };
     }
   }
   return map;
-})();
+}
+
+export const STATIC_ASSETS_MAP = buildStaticAssetsMap(STATIC_ASSETS_ARRAY);
 
 // ─── Color maps ───────────────────────────────────────────────────────────────
 
