@@ -12,7 +12,7 @@
 --
 -- Run manually in the Supabase SQL Editor. Idempotent.
 
-begin;
+BEGIN;
 
 update assets a
 set
@@ -45,7 +45,33 @@ from (
 ) as v(id, type, sector)
 where a.id = v.id;
 
-commit;
+-- ^BVSP also lost its display identity to the highlights row — mirror br-ibov.
+update assets
+set name       = 'Ibovespa',
+    meta       = coalesce(meta, '{}'::jsonb) || '{"display": "IBOV"}'::jsonb,
+    updated_at = now()
+where id = 'br-g-bvsp';
+
+-- Fail loudly (aborting the transaction) if any target row is missing or its
+-- id drifted from assets.js — a silent partial match would leave that symbol's
+-- DB duplicate flagless while the client-side tests report the collision fixed.
+do $$
+declare n int;
+begin
+  select count(*) into n
+  from assets
+  where id in ('br-g-petr4','br-g-vale3','br-g-itub4','br-g-bbdc4','br-g-bbas3',
+               'br-g-wege3','br-g-abev3','br-g-jbss3','br-g-suzb3','br-g-embr3',
+               'br-g-lren3','br-g-bpac11','br-g-b3sa3','br-g-rent3','br-g-ggbr4',
+               'br-g-rdor3','br-g-eqtl3','br-g-tots3','br-g-mglu3','br-g-bvsp')
+    and type in ('equity-br', 'index-br')
+    and (meta->>'isB3')::boolean;
+  if n <> 20 then
+    raise exception 'migration 017: expected 20 fixed br-g-* rows, found % — DB ids drifted from assets.js', n;
+  end if;
+end $$;
+
+COMMIT;
 
 -- Verification: expect 20 rows, all isB3 = true.
 -- select id, symbol, type, sector, meta->>'isB3' as isb3

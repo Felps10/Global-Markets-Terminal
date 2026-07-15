@@ -360,7 +360,7 @@ export default function BrazilTerminal() {
   const brazilIndices = useMemo(() =>
     Object.entries(STATIC_ASSETS_MAP)
       .filter(([, a]) => a.isB3 && a.type === "index-br")
-      .map(([sym, a]) => ({ symbol: sym, name: a.name, display: a.meta?.display || sym })),
+      .map(([sym, a]) => ({ symbol: sym, name: a.name, display: a.display || sym })),
   []);
 
   // ── Toggle helpers ───────────────────────────────────────────────────────────

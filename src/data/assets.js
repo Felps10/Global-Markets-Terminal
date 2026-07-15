@@ -1,6 +1,8 @@
-// SOURCE OF TRUTH: backend database (seeded from this file)
-// This file is used for: initial seed + offline fallback only
-// Do not edit manually — use the admin UI at /admin/taxonomy
+// SOURCE OF TRUTH: backend database (seeded from this file) — BUT the client
+// STATIC_ASSETS_MAP (gmtConfig.js) is built from THIS file at bundle time;
+// BrazilTerminal and logged-out views never read the DB. Fields that affect
+// the client map (meta / type / sector) must be edited here AND mirrored to
+// the DB via a migration (e.g. 017) — the admin UI at /admin updates only the DB.
 //
 // meta field: JSON-serialisable object with extra display/source properties:
 //   isCrypto  — fetched via CoinGecko instead of Yahoo Finance
@@ -506,11 +508,9 @@ export const ASSETS = [
   { id: "br-fx-inad",    symbol: "INAD",      name: "Inadimplência PF (%)",   subgroup_id: "br-cambio", group_id: "br-macro", terminal_view: "brazil", type: "macro-indicator",exchange: "BCB",       sort_order: 9, active: false, sector: "Crédito",    meta: { bcbSeries: 21084 } },
 
   // ── Equities — Brazil Highlights (Global Terminal mirror of br-acoes rows) ─
-  // Every symbol below is ALSO defined above with terminal_view:"brazil".
-  // meta.isB3 / type / sector MUST stay identical to the shadowed row:
-  // symbol-keyed client maps (STATIC_ASSETS_MAP, taxonomy consumers) collapse
-  // duplicates, so a highlights row missing isB3 erases B3 routing for the
-  // symbol (bare-symbol quote/chart 502s + ticker dropped from the Brazil grid).
+  // Every row below duplicates a br-acoes/br-indices symbol. meta.isB3, type
+  // and sector must stay identical to the shadowed row — symbol-keyed client
+  // maps collapse duplicates. Enforced by src/components/__tests__/gmtConfig.test.js.
   { id: "br-g-petr4",  symbol: "PETR4",  name: "Petrobras PN",      subgroup_id: "brazil-highlights", group_id: "equities", terminal_view: "global", type: "equity-br", exchange: "B3", sector: "Petróleo",     active: true, meta: { isB3: true, yahooSymbol: "PETR4.SA",  currency: "BRL" } },
   { id: "br-g-vale3",  symbol: "VALE3",  name: "Vale",              subgroup_id: "brazil-highlights", group_id: "equities", terminal_view: "global", type: "equity-br", exchange: "B3", sector: "Mineração",    active: true, meta: { isB3: true, yahooSymbol: "VALE3.SA",  currency: "BRL" } },
   { id: "br-g-itub4",  symbol: "ITUB4",  name: "Itau Unibanco PN",  subgroup_id: "brazil-highlights", group_id: "equities", terminal_view: "global", type: "equity-br", exchange: "B3", sector: "Bancos",       active: true, meta: { isB3: true, yahooSymbol: "ITUB4.SA",  currency: "BRL" } },
@@ -530,5 +530,5 @@ export const ASSETS = [
   { id: "br-g-eqtl3",  symbol: "EQTL3",  name: "Equatorial Energia",subgroup_id: "brazil-highlights", group_id: "equities", terminal_view: "global", type: "equity-br", exchange: "B3", sector: "Utilities",    active: true, meta: { isB3: true, yahooSymbol: "EQTL3.SA",  currency: "BRL" } },
   { id: "br-g-tots3",  symbol: "TOTS3",  name: "TOTVS",             subgroup_id: "brazil-highlights", group_id: "equities", terminal_view: "global", type: "equity-br", exchange: "B3", sector: "Telecom",      active: true, meta: { isB3: true, yahooSymbol: "TOTS3.SA",  currency: "BRL" } },
   { id: "br-g-mglu3",  symbol: "MGLU3",  name: "Magazine Luiza",    subgroup_id: "brazil-highlights", group_id: "equities", terminal_view: "global", type: "equity-br", exchange: "B3", sector: "Varejo",       active: true, meta: { isB3: true, yahooSymbol: "MGLU3.SA",  currency: "BRL" } },
-  { id: "br-g-bvsp",   symbol: "^BVSP",  name: "Bovespa Index",     subgroup_id: "brazil-highlights", group_id: "equities", terminal_view: "global", type: "index-br",  exchange: "B3", sector: "Índice Amplo", active: true, meta: { isB3: true, yahooSymbol: "^BVSP",     currency: "BRL" } },
+  { id: "br-g-bvsp",   symbol: "^BVSP",  name: "Ibovespa",          subgroup_id: "brazil-highlights", group_id: "equities", terminal_view: "global", type: "index-br",  exchange: "B3", sector: "Índice Amplo", active: true, meta: { isB3: true, display: "IBOV", yahooSymbol: "^BVSP", currency: "BRL" } },
 ];

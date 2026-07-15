@@ -155,11 +155,13 @@ function generateSparkline(basePrice, vol, points = 30) {
 }
 
 async function fetchMarketData(prevData, assetsMap = STATIC_ASSETS_MAP) {
-  // Build Yahoo fetch list: exclude alias entries (_displaySymbol), crypto, and B3.
-  // For assets with yahooSymbol (e.g. PETR4 → PETR4.SA), fetch the .SA form.
+  // Build Yahoo fetch list: exclude alias entries (_displaySymbol), crypto, and
+  // B3 — EXCEPT B3 rows carrying a yahooSymbol (the brazil-highlights mirrors,
+  // e.g. PETR4 → PETR4.SA): those fetch the .SA form and are remapped below.
   const yahooToDisplay = {};
   const yahooSymbols = Object.keys(assetsMap)
-    .filter(s => !assetsMap[s].isCrypto && !assetsMap[s].isB3 && !assetsMap[s]._displaySymbol)
+    .filter(s => !assetsMap[s].isCrypto && !assetsMap[s]._displaySymbol
+              && (!assetsMap[s].isB3 || assetsMap[s].yahooSymbol))
     .map(s => {
       const y = assetsMap[s].yahooSymbol || s;
       if (y !== s) yahooToDisplay[y] = s;
@@ -524,9 +526,11 @@ export default function GlobalMarketsTerminal() {
               ...(a.meta ? (typeof a.meta === 'string' ? JSON.parse(a.meta) : a.meta) : {}),
             };
             map[a.symbol] = entry;
-            // Register yahooSymbol alias so parseYahooResults can validate .SA responses
+            // Register yahooSymbol alias so parseYahooResults can validate .SA responses.
+            // isB3 is overridden off — aliases are payload shims, never B3 members
+            // (mirrors the STATIC_ASSETS_MAP builder in gmtConfig.js).
             if (a.meta?.yahooSymbol && a.meta.yahooSymbol !== a.symbol) {
-              map[a.meta.yahooSymbol] = { ...entry, _displaySymbol: a.symbol };
+              map[a.meta.yahooSymbol] = { ...entry, isB3: false, _displaySymbol: a.symbol };
             }
           }
         }

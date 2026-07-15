@@ -52,6 +52,38 @@ describe('STATIC_ASSETS_MAP — B3 identity survives duplicate-symbol rows', () 
     }
   });
 
+  it('never lets duplicate rows of a B3 symbol disagree on type or sector', () => {
+    // The Brazil grid gates on type + sector as well as isB3; a mirror row
+    // that drifts on either silently drops the ticker or splits the taxonomy
+    // between first-match and last-write-wins consumers.
+    for (const [symbol, rows] of rowsBySymbol) {
+      if (rows.length < 2 || !rows.some((r) => r.meta?.isB3)) continue;
+      expect(new Set(rows.map((r) => r.type)).size, `${symbol} duplicate rows disagree on type`).toBe(1);
+      expect(new Set(rows.map((r) => r.sector)).size, `${symbol} duplicate rows disagree on sector`).toBe(1);
+    }
+  });
+
+  it('never marks yahooSymbol alias entries as B3 grid members', () => {
+    // Alias keys ('PETR4.SA' → _displaySymbol) are provider-payload shims; if
+    // they carried isB3 they would enter getB3AssetEntries and the grid
+    // section scans as phantom duplicates (wrong ticker counts, dead fetches).
+    for (const [sym, entry] of Object.entries(STATIC_ASSETS_MAP)) {
+      if (entry._displaySymbol) {
+        expect(entry.isB3, `alias entry ${sym} must not carry isB3`).toBeFalsy();
+      }
+    }
+  });
+
+  it('gives every active equity-br row a sector the grid can render', () => {
+    // Generalizes the headline check: the sector gate applies to ALL br-acoes
+    // tickers, and a plausible-looking but unknown sector silently drops the
+    // asset from the grid with no error.
+    for (const a of ASSETS) {
+      if (a.type !== 'equity-br' || a.active === false) continue;
+      expect(GRID_SECTORS, `${a.id} (${a.symbol}) sector "${a.sector}" not in SECTOR_META`).toContain(a.sector);
+    }
+  });
+
   it('declares isB3 on every quotable exchange:"B3" row', () => {
     for (const a of ASSETS) {
       if (a.exchange !== 'B3' || NON_QUOTABLE_B3_TYPES.has(a.type)) continue;
@@ -67,6 +99,7 @@ describe('STATIC_ASSETS_MAP — B3 identity survives duplicate-symbol rows', () 
       expect(entry?.isB3, `${symbol} missing isB3`).toBe(true);
       if (symbol === '^BVSP') {
         expect(entry.type, '^BVSP must group under Índices & Benchmarks').toBe('index-br');
+        expect(entry.display, '^BVSP must keep its IBOV display identity').toBe('IBOV');
       } else {
         expect(entry.type, `${symbol} must group under Ações B3`).toBe('equity-br');
         expect(GRID_SECTORS, `${symbol} sector "${entry.sector}" not in SECTOR_META`).toContain(entry.sector);
