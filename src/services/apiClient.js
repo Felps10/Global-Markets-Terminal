@@ -55,6 +55,7 @@ const ERROR_TYPES = Object.freeze({
   SERVER_ERROR:    "ServerError",
   QUEUE_FULL:      "QueueFull",
   BAD_REQUEST:     "BadRequest",
+  NOT_FOUND:       "NotFound",
 });
 
 /**
@@ -235,6 +236,13 @@ async function fetchWithRetry(apiId, endpointId, fetcher) {
           }
           await new Promise(r => setTimeout(r, backoffMs));
           continue;
+        }
+
+        // ── 404 — Upstream has no data for this request: no retry ────────────
+        // Distinct from "client" so callers don't surface a misleading
+        // "misconfigured endpoint" message for a plain data miss.
+        if (status === 404) {
+          return { ok: false, data: null, errorType: "notFound", status, retryAfterSec: null, exhausted: false };
         }
 
         // ── Other 4xx — Client/bad request: no retry ──────────────────────────
@@ -448,6 +456,14 @@ async function _executeCall(apiId, endpointId, params, options) {
       ERROR_TYPES.SERVER_ERROR,
       `"${apiId}" returned HTTP ${result.status} (server error) after ${MAX_RETRIES} retries.`,
       true,
+    );
+  }
+
+  if (result.errorType === "notFound") {
+    return makeErr(
+      ERROR_TYPES.NOT_FOUND,
+      `"${apiId}/${endpointId}" returned HTTP 404 — upstream has no data for this request.`,
+      false,
     );
   }
 

@@ -1248,19 +1248,6 @@ export async function fetchB3MarketDataFromServer(b3Assets, { assets, volatility
   return fetchB3MarketData(b3Assets, { assets, volatility });
 }
 
-// ─── YAHOO CHART DATA (GMT-2: extracted + migrated from GlobalMarketsTerminal.jsx) ──────────────
-
-/**
- * Fetch historical OHLCV chart data from Yahoo Finance for a single symbol.
- * Tries the local proxy first, then two public CORS proxies as fallback.
- * Throws Error("Chart data unavailable") when all routes fail or quota is critical (deferred).
- *
- * @param {string} symbol   - Internal symbol key (e.g. "PETR4", "AAPL")
- * @param {string} range    - Yahoo range string (e.g. "1d", "1mo", "1y")
- * @param {string} interval - Yahoo interval string (e.g. "5m", "1d")
- * @param {{ assets: Object }} maps
- * @returns {Promise<{ points: Array<{t:number,v:number}>, change: number, changePct: number }>}
- */
 // ─── SINGLE LIVE QUOTE (server-resolved paid providers — no Yahoo) ───────────
 // Drop-in replacement for the old client-side /proxy/yahoo/v7/finance/quote header quotes.
 // The server route /api/v1/quote infers the asset class from the symbol suffix (`.SA`→BRAPI,
@@ -1342,9 +1329,15 @@ export async function fetchYahooOHLCV(symbol, timeframe = '1M', { assets = {}, i
         `${API_BASE}/proxy/yahoo/v8/finance/chart?symbol=${encodeURIComponent(chartSymbol)}&range=${range}&interval=${interval}`,
         `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`,
       ];
+      let notFound = false;
       for (const url of urls) {
         try {
           const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+          // Own-proxy 404 = Yahoo says the symbol doesn't exist (the server
+          // passes v8 chart 404s through). The public fallback queries the
+          // same upstream, so stop the chain and surface a non-retryable 404
+          // instead of a synthetic 503 that apiClient would retry 4×.
+          if (res.status === 404 && url.startsWith(API_BASE)) { notFound = true; break; }
           if (!res.ok) continue;
           const json   = await res.json();
           const result = json?.chart?.result?.[0];
@@ -1375,6 +1368,7 @@ export async function fetchYahooOHLCV(symbol, timeframe = '1M', { assets = {}, i
           return candles;
         } catch (_) { /* try next proxy */ }
       }
+      if (notFound) throw new ApiHttpError(404, `Yahoo has no chart data for ${chartSymbol}`);
       throw new ApiHttpError(503, 'Yahoo OHLCV unavailable via all proxy routes');
     },
   });

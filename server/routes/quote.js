@@ -152,7 +152,9 @@ router.get('/', async (req, res) => {
     } catch { /* try next provider */ }
   }
   // 404, not 502: "no provider has this symbol" is a data condition, not a
-  // gateway failure — 5xx here made retry-capable clients hammer a miss.
+  // gateway failure. (The current caller, fetchQuote, treats any !ok as null
+  // and never retried — this keeps the status honest so retry-capable clients
+  // added later don't hammer a guaranteed miss.)
   return res.status(404).json({ error: 'no quote from any provider', symbol, class: cls });
 });
 

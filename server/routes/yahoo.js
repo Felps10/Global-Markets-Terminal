@@ -71,10 +71,12 @@ router.get('/v7/finance/quote', async (req, res) => {
 
     if (upstream.status !== 200) {
       console.error(`[yahoo] Upstream returned ${upstream.status}`);
-      // Pass a Yahoo 404 (unknown symbol — a data condition) through as 404 so
-      // clients don't retry it; everything else is a genuine upstream failure.
+      // Always 502 here: the v7 BATCH endpoint never 404s per symbol (unknown
+      // symbols are just omitted from quoteResponse.result), so any non-200 is
+      // an endpoint-level upstream failure — healthPing counts on ≥500 for its
+      // outage classification.
       return res
-        .status(upstream.status === 404 ? 404 : 502)
+        .status(502)
         .json({ error: `Yahoo Finance returned HTTP ${upstream.status}` });
     }
 
