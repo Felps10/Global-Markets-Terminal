@@ -28,7 +28,11 @@ export const STATIC_ASSETS_MAP = (() => {
     };
     map[a.symbol] = entry;
     if (a.meta?.yahooSymbol && a.meta.yahooSymbol !== a.symbol) {
-      map[a.meta.yahooSymbol] = { ...entry, _displaySymbol: a.symbol };
+      // Alias entries are lookup shims for provider-keyed payloads, never B3
+      // grid members: without the isB3 override, rows carrying both isB3 and a
+      // yahooSymbol would admit phantom '.SA' entries into every isB3 filter
+      // (grid sections, ticker counts, fallback fetch lists).
+      map[a.meta.yahooSymbol] = { ...entry, isB3: false, _displaySymbol: a.symbol };
     }
   }
   return map;
