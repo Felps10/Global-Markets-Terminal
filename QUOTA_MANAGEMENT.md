@@ -285,7 +285,7 @@ One line per call site. Migrated 2026-03-11.
 | DS-10  | `bcbMacro`                  | bcb / selic + ipca + cdi (allSettled) |
 | DS-11  | `awesomeFx`                 | awesomeapi / fx                       |
 | GMT-1  | `fetchYahooMarketData`      | yahoo / quote (extracted from GMT)    |
-| GMT-2  | `fetchYahooChartData`       | yahoo / chart (extracted from GMT)    |
+| GMT-2  | ~~`fetchYahooChartData`~~ (deleted 2026-07-14 — dead code; yahoo/chart is served by `fetchYahooOHLCV`) | yahoo / chart |
 | GMT-3  | `fetchB3MarketData` (.SA fallback) | yahoo / quote (extracted from GMT) |
 
 ---

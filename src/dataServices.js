@@ -1045,8 +1045,10 @@ export function parseQuotesMap(quotes, prevData, assets, volatility) {
 }
 
 /**
- * Fetch equity/index/fx market data from Yahoo Finance with corsproxy/allorigins fallbacks,
- * then fall back to Finnhub for key equity symbols.
+ * Fetch equity/index/fx market data from Yahoo Finance (own server proxy, then
+ * allorigins.win fallback), then fall back to Finnhub for key equity symbols.
+ * corsproxy.io was removed 2026-07-14: it 403s all requests on the free plan
+ * ("server-side requests not allowed") and leaked tickers to a third party.
  *
  * @param {string[]} yahooSymbols - Pre-filtered symbols (no crypto, no B3)
  * @param {Object|null} prevData - Previous data snapshot for sparkline rolling
@@ -1065,7 +1067,6 @@ export async function fetchYahooMarketData(yahooSymbols, prevData, { assets, vol
     fetcher: async () => {
       const urls = [
         `${API_BASE}/proxy/yahoo${yahooPath}`,
-        `https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`,
         `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`,
       ];
       for (const url of urls) {
@@ -1247,19 +1248,6 @@ export async function fetchB3MarketDataFromServer(b3Assets, { assets, volatility
   return fetchB3MarketData(b3Assets, { assets, volatility });
 }
 
-// ─── YAHOO CHART DATA (GMT-2: extracted + migrated from GlobalMarketsTerminal.jsx) ──────────────
-
-/**
- * Fetch historical OHLCV chart data from Yahoo Finance for a single symbol.
- * Tries the local proxy first, then two public CORS proxies as fallback.
- * Throws Error("Chart data unavailable") when all routes fail or quota is critical (deferred).
- *
- * @param {string} symbol   - Internal symbol key (e.g. "PETR4", "AAPL")
- * @param {string} range    - Yahoo range string (e.g. "1d", "1mo", "1y")
- * @param {string} interval - Yahoo interval string (e.g. "5m", "1d")
- * @param {{ assets: Object }} maps
- * @returns {Promise<{ points: Array<{t:number,v:number}>, change: number, changePct: number }>}
- */
 // ─── SINGLE LIVE QUOTE (server-resolved paid providers — no Yahoo) ───────────
 // Drop-in replacement for the old client-side /proxy/yahoo/v7/finance/quote header quotes.
 // The server route /api/v1/quote infers the asset class from the symbol suffix (`.SA`→BRAPI,
@@ -1297,48 +1285,13 @@ export async function fetchQuote(symbol) {
   } catch (_) { return null; }
 }
 
-export async function fetchYahooChartData(symbol, range, interval, { assets }) {
-  // B3 stocks need .SA suffix for Yahoo chart data
-  const chartSymbol = assets[symbol]?.isB3 ? symbol + ".SA" : symbol;
-  const yahooPath = `/v8/finance/chart/${encodeURIComponent(chartSymbol)}?range=${range}&interval=${interval}`;
-  const yahooUrl  = `https://query1.finance.yahoo.com${yahooPath}`;
-
-  const response = await apiClient.call('yahoo', 'chart', { symbol, range, interval }, {
-    fetcher: async () => {
-      const urls = [
-        `${API_BASE}/proxy/yahoo/v8/finance/chart?symbol=${encodeURIComponent(symbol)}&range=${range}&interval=${interval}`,
-        `https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`,
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`,
-      ];
-      for (const url of urls) {
-        try {
-          const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
-          if (!res.ok) continue;
-          const json   = await res.json();
-          const result = json?.chart?.result?.[0];
-          if (!result) continue;
-          const timestamps = result.timestamp || [];
-          const closes     = result.indicators?.quote?.[0]?.close || [];
-          const points     = timestamps
-            .map((t, i) => ({ t: t * 1000, v: closes[i] }))
-            .filter((p) => p.v != null);
-          if (points.length < 2) continue;
-          const first = points[0].v;
-          const last  = points[points.length - 1].v;
-          return { points, change: last - first, changePct: ((last - first) / first) * 100 };
-        } catch (_) { /* try next proxy */ }
-      }
-      throw new ApiHttpError(503, 'Yahoo chart unavailable via all proxy routes');
-    },
-  });
-
-  if (response.deferred || !response.data) throw new Error("Chart data unavailable");
-  return response.data;
-}
+// (fetchYahooChartData was deleted 2026-07-14: zero call sites — its one import
+// was dead — and it carried a latent bug, sending the bare symbol to the server
+// proxy while computing but never using the .SA chartSymbol. Close-only chart
+// needs are served by fetchYahooOHLCV below.)
 
 // ─── YAHOO OHLCV (for Chart & Research) ──────────────────────────────────────
 // Returns full candlestick data (open, high, low, close, volume).
-// Distinct from fetchYahooChartData which only returns close prices.
 // Timestamps are Unix seconds (lightweight-charts expects seconds).
 
 const OHLCV_TIMEFRAMES = {
@@ -1374,12 +1327,17 @@ export async function fetchYahooOHLCV(symbol, timeframe = '1M', { assets = {}, i
     fetcher: async () => {
       const urls = [
         `${API_BASE}/proxy/yahoo/v8/finance/chart?symbol=${encodeURIComponent(chartSymbol)}&range=${range}&interval=${interval}`,
-        `https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`,
         `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`,
       ];
+      let notFound = false;
       for (const url of urls) {
         try {
           const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+          // Own-proxy 404 = Yahoo says the symbol doesn't exist (the server
+          // passes v8 chart 404s through). The public fallback queries the
+          // same upstream, so stop the chain and surface a non-retryable 404
+          // instead of a synthetic 503 that apiClient would retry 4×.
+          if (res.status === 404 && url.startsWith(API_BASE)) { notFound = true; break; }
           if (!res.ok) continue;
           const json   = await res.json();
           const result = json?.chart?.result?.[0];
@@ -1410,6 +1368,7 @@ export async function fetchYahooOHLCV(symbol, timeframe = '1M', { assets = {}, i
           return candles;
         } catch (_) { /* try next proxy */ }
       }
+      if (notFound) throw new ApiHttpError(404, `Yahoo has no chart data for ${chartSymbol}`);
       throw new ApiHttpError(503, 'Yahoo OHLCV unavailable via all proxy routes');
     },
   });
@@ -1425,9 +1384,9 @@ export async function fetchYahooOHLCV(symbol, timeframe = '1M', { assets = {}, i
 // (historical-price-eod/full, date-string time) + intraday (historical-chart/*, UTC
 // seconds from exchange-local wall time). WTI/natgas futures (CL=F/NG=F) return DEAD FMP
 // history (CL=F ends 2022), so they're charted via their liquid ETF proxy (USO/UNG — see
-// CHART_PROXY below). Classes FMP still GATES (Brazil B3, EU/Asia indices) fall back to the
-// Yahoo path until the per-class BRAPI/EODHD routing lands (C3-6b/c). B3 is routed to Yahoo
-// up front — its bare symbol could match a WRONG US-listed instrument on FMP.
+// CHART_PROXY below). B3 never touches FMP here (its bare symbol could match a WRONG
+// US-listed instrument): isB3 rows route BRAPI history → EODHD `.SA` → Yahoo `.SA` as
+// last resort, in the branches below.
 
 // ETF proxies for instruments FMP can't chart directly. The chart legend flags the proxy:
 // price LEVELS are the ETF's, but the SHAPE tracks the underlying commodity.

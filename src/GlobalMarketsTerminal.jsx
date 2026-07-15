@@ -11,7 +11,6 @@ import {
   coingeckoPrices,
   getSourceStatus,
   fetchYahooMarketData,
-  fetchYahooChartData,
   fetchLiveQuotes,
   fetchSnapshotFallback,
   parseYahooResults,
