@@ -18,9 +18,10 @@ import {
   parseQuotesMap,
 } from "./dataServices.js";
 import {
-  STATIC_CATEGORIES, STATIC_ASSETS_MAP, EXCHANGE_COLORS, SOURCE_COLORS,
-  GROUP_MACRO, EQUITY_CATS, isEquityCat, VOLATILITY, DENSITY_CONFIG,
+  STATIC_CATEGORIES, STATIC_ASSETS_MAP, buildStaticAssetsMap, EXCHANGE_COLORS,
+  SOURCE_COLORS, GROUP_MACRO, EQUITY_CATS, isEquityCat, VOLATILITY, DENSITY_CONFIG,
 } from './components/gmtConfig.js';
+import { metaOf } from './lib/assetResolution.js';
 import { useTaxonomy } from './context/TaxonomyContext.jsx';
 import { useTicker } from './context/TickerContext.jsx';
 import { useSelectedAsset } from './context/SelectedAssetContext.jsx';
@@ -513,29 +514,17 @@ export default function GlobalMarketsTerminal() {
 
   const ASSETS = useMemo(() => {
     if (globalTaxonomy?.length) {
-      const map = {};
+      // Flatten the tree and normalize meta to an object, then reuse the shared
+      // collision-guarded builder (sticky isB3, alias entries with isB3 off).
+      const rows = [];
       for (const group of globalTaxonomy) {
         for (const sg of (group.subgroups || [])) {
           for (const a of (sg.assets || [])) {
-            const entry = {
-              name:     a.name,
-              cat:      a.subgroup_id,
-              sector:   a.sector || null,
-              exchange: a.exchange || 'NASDAQ',
-              type:     a.type,
-              ...(a.meta ? (typeof a.meta === 'string' ? JSON.parse(a.meta) : a.meta) : {}),
-            };
-            map[a.symbol] = entry;
-            // Register yahooSymbol alias so parseYahooResults can validate .SA responses.
-            // isB3 is overridden off — aliases are payload shims, never B3 members
-            // (mirrors the STATIC_ASSETS_MAP builder in gmtConfig.js).
-            if (a.meta?.yahooSymbol && a.meta.yahooSymbol !== a.symbol) {
-              map[a.meta.yahooSymbol] = { ...entry, isB3: false, _displaySymbol: a.symbol };
-            }
+            rows.push({ ...a, meta: metaOf(a) });
           }
         }
       }
-      return map;
+      return buildStaticAssetsMap(rows);
     }
     return STATIC_ASSETS_MAP;
   }, [globalTaxonomy]);

@@ -8,9 +8,14 @@ const router = Router();
 router.get('/', authenticate, async (req, res) => {
   const { view } = req.query; // 'global', 'brazil', or omitted/'all'
 
-  let groupsQuery   = supabase.from('groups').select('*').order('sort_order');
-  let subgroupsQuery = supabase.from('subgroups').select('*').order('sort_order');
-  let assetsQuery   = supabase.from('assets').select('*').eq('active', true).order('symbol');
+  // Secondary .order('id') everywhere: sort_order ties are real (groups
+  // 'equities' and 'br-mercado' are both 0) and duplicate symbols exist (the
+  // brazil-highlights mirrors), so without a tiebreaker Postgres returns those
+  // rows in arbitrary order and client-side first-match/last-write consumers
+  // flip winners between deploys.
+  let groupsQuery   = supabase.from('groups').select('*').order('sort_order').order('id');
+  let subgroupsQuery = supabase.from('subgroups').select('*').order('sort_order').order('id');
+  let assetsQuery   = supabase.from('assets').select('*').eq('active', true).order('symbol').order('id');
 
   if (view === 'global' || view === 'brazil') {
     groupsQuery = groupsQuery.eq('terminal_view', view);

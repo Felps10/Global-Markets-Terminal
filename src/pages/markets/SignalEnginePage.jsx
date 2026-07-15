@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import MarketsPageLayout from '../../components/MarketsPageLayout.jsx';
 import { useTaxonomy } from '../../context/TaxonomyContext.jsx';
+import { resolveAsset } from '../../lib/assetResolution.js';
 import { fmpRSI, fmpMACD, hasFmpKey } from '../../dataServices.js';
 import { CLUBE_COLORS } from '../../lib/tokens.js';
 
@@ -564,8 +565,7 @@ export default function SignalEnginePage() {
   // Track active asset from taxonomy
   useEffect(() => {
     if (!activeSymbol || !assets.length) return;
-    const found = assets.find(a => a.symbol === activeSymbol);
-    setActiveAsset(found || null);
+    setActiveAsset(resolveAsset(assets, activeSymbol));
   }, [activeSymbol, assets]);
 
   // ── Fetch RSI + MACD ───────────────────────────────────────────────────────

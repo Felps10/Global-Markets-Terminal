@@ -11,6 +11,7 @@ import { fetchBrazilMacro, fetchBrazilTitulos } from "./services/brazilDataServi
 import { usePreferences } from './context/PreferencesContext.jsx';
 import { useWatchlist } from './context/WatchlistContext.jsx';
 import { BRAZIL_NAV_SECTIONS, getSectionById } from "./data/brazilBlocks.js";
+import { SECTOR_ORDER, SECTOR_META } from "./data/b3Sectors.js";
 
 import { CLUBE_COLORS } from './lib/tokens.js';
 
@@ -25,27 +26,9 @@ const B3_VOLATILITY = {
   "br-fiis": 0.010, "br-etfs": 0.015, "br-indices": 0.012,
 };
 
-// Sector display order + labels (replaces old subgroup-based constants)
-const SECTOR_ORDER = [
-  "Bancos", "Petróleo", "Mineração", "Agronegócio", "Varejo",
-  "Utilities", "Transporte", "Indústria", "Construção", "Saúde",
-  "Telecom", "Outros",
-];
-
-const SECTOR_META = {
-  "Bancos":       { label: "Bancos & Financeiro",    icon: "🏦" },
-  "Petróleo":     { label: "Petróleo & Gás",         icon: "🛢"  },
-  "Mineração":    { label: "Mineração",              icon: "⛏"  },
-  "Agronegócio":  { label: "Agronegócio",            icon: "🌾"  },
-  "Varejo":       { label: "Varejo & Consumo",       icon: "🛍"  },
-  "Utilities":    { label: "Utilities & Energia",    icon: "⚡" },
-  "Transporte":   { label: "Logística & Transporte", icon: "🚚"  },
-  "Indústria":    { label: "Indústria",              icon: "⚙️" },
-  "Construção":   { label: "Construção Civil",       icon: "🏗️" },
-  "Saúde":        { label: "Saúde",                  icon: "🏥"  },
-  "Telecom":      { label: "Telecom & Tech",         icon: "📡"  },
-  "Outros":       { label: "Outros Setores",         icon: "📎"  },
-};
+// Sector display order + labels now live in src/data/b3Sectors.js (shared with
+// the gmtConfig regression tests — the grid drops any equity-br row whose
+// sector is not a SECTOR_META key, so the list is data, not UI config).
 
 // FII group taxonomy — the `sector` field on `type:"fii"` rows.
 const FII_GROUP_ORDER = ["Tijolo", "Papel", "Híbrido", "FOF"];

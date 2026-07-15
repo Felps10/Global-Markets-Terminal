@@ -6,7 +6,8 @@
 // that duplicate rows can never disagree on B3 identity again.
 import { describe, it, expect } from 'vitest';
 import { ASSETS } from '../../data/assets.js';
-import { STATIC_ASSETS_MAP } from '../gmtConfig.js';
+import { STATIC_ASSETS_MAP, buildStaticAssetsMap } from '../gmtConfig.js';
+import { SECTOR_META } from '../../data/b3Sectors.js';
 
 // The 20 symbols that lost isB3 in the original incident.
 const HEADLINE_B3 = [
@@ -15,12 +16,9 @@ const HEADLINE_B3 = [
   'RDOR3', 'TOTS3', 'SUZB3', '^BVSP',
 ];
 
-// Keys of SECTOR_META in src/BrazilTerminal.jsx — the Brazil grid silently
-// drops any equity-br entry whose sector is not one of these.
-const GRID_SECTORS = [
-  'Bancos', 'Petróleo', 'Mineração', 'Agronegócio', 'Varejo', 'Utilities',
-  'Transporte', 'Indústria', 'Construção', 'Saúde', 'Telecom', 'Outros',
-];
+// The Brazil grid silently drops any equity-br entry whose sector is not a
+// SECTOR_META key — imported from the shared data module, not transcribed.
+const GRID_SECTORS = Object.keys(SECTOR_META);
 
 // B3-exchange rows that are legitimately NOT BRAPI-quotable (no isB3):
 // the DI1 futures curve rows.
@@ -72,6 +70,46 @@ describe('STATIC_ASSETS_MAP — B3 identity survives duplicate-symbol rows', () 
         expect(entry.isB3, `alias entry ${sym} must not carry isB3`).toBeFalsy();
       }
     }
+  });
+
+  it('builder keeps isB3 sticky across duplicate rows in either order', () => {
+    // Synthetic fixtures — the guard must hold regardless of which row of a
+    // duplicated symbol comes last (the incident was flag-row-first order).
+    const flagged  = { symbol: 'DUP1', name: 'x', subgroup_id: 'br-acoes', type: 'equity-br', sector: 'Bancos', exchange: 'B3', meta: { isB3: true } };
+    const flagless = { symbol: 'DUP1', name: 'x', subgroup_id: 'brazil-highlights', type: 'equity-br', sector: 'Bancos', exchange: 'B3', meta: { yahooSymbol: 'DUP1.SA' } };
+    expect(buildStaticAssetsMap([flagged, flagless]).DUP1.isB3).toBe(true);
+    expect(buildStaticAssetsMap([flagless, flagged]).DUP1.isB3).toBe(true);
+  });
+
+  it('builder never lets a yahooSymbol alias clobber a real entry or carry isB3', () => {
+    const real  = { symbol: 'PBR', name: 'real', subgroup_id: 'oil-gas', type: 'equity', exchange: 'NYSE', meta: null };
+    const other = { symbol: 'XYZ4', name: 'x', subgroup_id: 'br-acoes', type: 'equity-br', sector: 'Bancos', exchange: 'B3', meta: { isB3: true, yahooSymbol: 'PBR' } };
+    const map = buildStaticAssetsMap([real, other]);
+    expect(map.PBR.name, 'alias must not clobber the real PBR entry').toBe('real');
+    const map2 = buildStaticAssetsMap([other]);
+    expect(map2.PBR._displaySymbol).toBe('XYZ4');
+    expect(map2.PBR.isB3, 'alias entries never carry isB3').toBeFalsy();
+    // Remaining alias branches: a real row arriving after an alias reclaims the
+    // key (and the alias contributes no sticky identity), and a later alias may
+    // replace an earlier alias.
+    const map3 = buildStaticAssetsMap([other, real]);
+    expect(map3.PBR.name, 'a later real row reclaims the key from an alias').toBe('real');
+    expect(map3.PBR.isB3, 'alias isB3:false must not stick onto the real row').toBeFalsy();
+    const other2 = { ...other, symbol: 'ZZZ4', name: 'z' };
+    expect(buildStaticAssetsMap([other, other2]).PBR._displaySymbol, 'alias may replace alias').toBe('ZZZ4');
+  });
+
+  it('builder keeps last-write-wins for non-flag fields of duplicates (documented semantics)', () => {
+    // Only isB3 is sticky; cat/type/sector stay last-write-wins (the DEV warn
+    // flags disagreements). Pins the semantics so a future "helpful" change to
+    // full-merge is a conscious decision, not an accident.
+    const first  = { symbol: 'DUP2', name: 'a', subgroup_id: 'catA', type: 't1', sector: 's1', exchange: 'B3', meta: { isB3: true } };
+    const second = { symbol: 'DUP2', name: 'b', subgroup_id: 'catB', type: 't2', sector: 's2', exchange: 'B3', meta: null };
+    const entry = buildStaticAssetsMap([first, second]).DUP2;
+    expect(entry.cat).toBe('catB');
+    expect(entry.type).toBe('t2');
+    expect(entry.sector).toBe('s2');
+    expect(entry.isB3, 'flag survives the last-write row').toBe(true);
   });
 
   it('gives every active equity-br row a sector the grid can render', () => {

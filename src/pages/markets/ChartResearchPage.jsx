@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import PriceChart from '../../components/PriceChart.jsx';
 import MarketsPageLayout from '../../components/MarketsPageLayout.jsx';
 import { useTaxonomy } from '../../context/TaxonomyContext.jsx';
+import { resolveAsset, buildIsB3Map } from '../../lib/assetResolution.js';
 import { useWatchlist } from '../../context/WatchlistContext.jsx';
 import {
   fetchQuote,
@@ -285,11 +286,7 @@ export default function ChartResearchPage() {
 
   // ── Derived values ────────────────────────────────────────────────────────
 
-  const assetMap = useMemo(() => {
-    const m = {};
-    assets.forEach(a => { m[a.symbol] = { isB3: a.meta?.isB3 || false }; });
-    return m;
-  }, [assets]);
+  const assetMap = useMemo(() => buildIsB3Map(assets), [assets]);
 
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
@@ -319,7 +316,7 @@ export default function ChartResearchPage() {
   const watchlistAssets = useMemo(() => {
     return watchlistItems
       .filter(i => i.type === 'asset')
-      .map(i => assets.find(a => a.symbol === i.target_id))
+      .map(i => resolveAsset(assets, i.target_id))
       .filter(Boolean);
   }, [watchlistItems, assets]);
 
@@ -336,20 +333,20 @@ export default function ChartResearchPage() {
     if (assets.length === 0) return;
     const fromParam = searchParams.get('symbol');
     if (fromParam) {
-      const found = assets.find(a => a.symbol === fromParam.toUpperCase());
+      const found = resolveAsset(assets, fromParam.toUpperCase());
       if (found) { setActiveSymbol(found.symbol); return; }
     }
     // Default to SPY
     if (activeSymbol === 'SPY' && !activeAsset) {
-      const spy = assets.find(a => a.symbol === 'SPY');
+      const spy = resolveAsset(assets, 'SPY');
       if (spy) setActiveAsset(spy);
     }
   }, [assets]);
 
   // 2. Sync activeAsset when activeSymbol changes
   useEffect(() => {
-    const found = assets.find(a => a.symbol === activeSymbol);
-    setActiveAsset(found || null);
+    const found = resolveAsset(assets, activeSymbol);
+    setActiveAsset(found);
   }, [activeSymbol, assets]);
 
   // 3. Fetch sidebar + research data on activeSymbol change

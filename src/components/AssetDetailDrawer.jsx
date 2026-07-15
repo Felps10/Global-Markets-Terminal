@@ -13,6 +13,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PriceChart from './PriceChart.jsx';
 import { useTaxonomy } from '../context/TaxonomyContext.jsx';
+import { resolveAsset } from '../lib/assetResolution.js';
 import {
   fetchQuote,
   fmpOHLCV, CHART_PROXY,
@@ -364,7 +365,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
   const [expanded, setExpanded] = useState(false);
 
   // ── Asset info from taxonomy ──────────────────────────────────────────────
-  const assetInfo = assets.find(a => a.symbol === currentSymbol) || null;
+  const assetInfo = resolveAsset(assets, currentSymbol);
   const assetMeta = (() => {
     if (!assetInfo?.meta) return {};
     if (typeof assetInfo.meta === 'string') {
