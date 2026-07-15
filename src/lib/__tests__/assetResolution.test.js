@@ -36,9 +36,30 @@ describe('assetResolution', () => {
     expect(buildIsB3Map([plain]).AAPL.isB3).toBe(false);
   });
 
+  it('agrees across helpers when BOTH duplicate rows carry isB3 (live prod shape after migration 017)', () => {
+    const glbFlagged = { ...glbRow, meta: { isB3: true, yahooSymbol: 'BBDC4.SA' } };
+    // First flagged row wins in every helper, both orders — resolveAsset and
+    // buildAssetMap must return the SAME row so no two consumers disagree.
+    expect(resolveAsset([brRow, glbFlagged], 'BBDC4')).toBe(brRow);
+    expect(buildAssetMap([brRow, glbFlagged]).BBDC4).toBe(brRow);
+    expect(resolveAsset([glbFlagged, brRow], 'BBDC4')).toBe(glbFlagged);
+    expect(buildAssetMap([glbFlagged, brRow]).BBDC4).toBe(glbFlagged);
+    expect(buildIsB3Map([brRow, glbFlagged]).BBDC4.isB3).toBe(true);
+  });
+
+  it('buildAssetMap falls back to the first occurrence for flagless duplicates (agrees with resolveAsset)', () => {
+    const dup1 = { symbol: 'IEP', meta: null };
+    const dup2 = { symbol: 'IEP', meta: { bcbSeries: 1 } };
+    expect(buildAssetMap([dup1, dup2]).IEP).toBe(dup1);
+    expect(buildAssetMap([dup2, dup1]).IEP).toBe(dup2);
+    expect(buildAssetMap([dup1, dup2]).IEP).toBe(resolveAsset([dup1, dup2], 'IEP'));
+  });
+
   it('metaOf tolerates string meta and null', () => {
     expect(metaOf({ meta: '{"isB3": true}' }).isB3).toBe(true);
     expect(metaOf({ meta: 'not json' })).toEqual({});
+    expect(metaOf({ meta: 'null' }), 'JSON null string must not crash callers').toEqual({});
+    expect(metaOf({ meta: '42' })).toEqual({});
     expect(metaOf({ meta: null })).toEqual({});
     expect(metaOf(null)).toEqual({});
     expect(resolveAsset([{ symbol: 'X', meta: '{"isB3": true}' }, { symbol: 'X', meta: null }], 'X')?.meta)

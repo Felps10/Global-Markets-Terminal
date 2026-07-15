@@ -21,6 +21,7 @@ import {
   STATIC_CATEGORIES, STATIC_ASSETS_MAP, buildStaticAssetsMap, EXCHANGE_COLORS,
   SOURCE_COLORS, GROUP_MACRO, EQUITY_CATS, isEquityCat, VOLATILITY, DENSITY_CONFIG,
 } from './components/gmtConfig.js';
+import { metaOf } from './lib/assetResolution.js';
 import { useTaxonomy } from './context/TaxonomyContext.jsx';
 import { useTicker } from './context/TickerContext.jsx';
 import { useSelectedAsset } from './context/SelectedAssetContext.jsx';
@@ -519,8 +520,7 @@ export default function GlobalMarketsTerminal() {
       for (const group of globalTaxonomy) {
         for (const sg of (group.subgroups || [])) {
           for (const a of (sg.assets || [])) {
-            const meta = a.meta ? (typeof a.meta === 'string' ? JSON.parse(a.meta) : a.meta) : null;
-            rows.push({ ...a, meta });
+            rows.push({ ...a, meta: metaOf(a) });
           }
         }
       }

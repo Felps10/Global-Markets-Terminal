@@ -34,7 +34,7 @@ export function buildStaticAssetsMap(rows) {
     };
     const prev = map[a.symbol];
     if (prev && !prev._displaySymbol) {
-      entry.isB3 = !!(prev.isB3 || entry.isB3);
+      if (prev.isB3 || entry.isB3) entry.isB3 = true;
       if (import.meta.env?.DEV && (prev.type !== entry.type || prev.sector !== entry.sector)) {
         console.warn(`[gmtConfig] duplicate symbol ${a.symbol}: rows disagree on type/sector — later row wins`,
           { kept: { type: entry.type, sector: entry.sector }, dropped: { type: prev.type, sector: prev.sector } });

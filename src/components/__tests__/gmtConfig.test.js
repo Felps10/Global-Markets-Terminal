@@ -89,6 +89,27 @@ describe('STATIC_ASSETS_MAP — B3 identity survives duplicate-symbol rows', () 
     const map2 = buildStaticAssetsMap([other]);
     expect(map2.PBR._displaySymbol).toBe('XYZ4');
     expect(map2.PBR.isB3, 'alias entries never carry isB3').toBeFalsy();
+    // Remaining alias branches: a real row arriving after an alias reclaims the
+    // key (and the alias contributes no sticky identity), and a later alias may
+    // replace an earlier alias.
+    const map3 = buildStaticAssetsMap([other, real]);
+    expect(map3.PBR.name, 'a later real row reclaims the key from an alias').toBe('real');
+    expect(map3.PBR.isB3, 'alias isB3:false must not stick onto the real row').toBeFalsy();
+    const other2 = { ...other, symbol: 'ZZZ4', name: 'z' };
+    expect(buildStaticAssetsMap([other, other2]).PBR._displaySymbol, 'alias may replace alias').toBe('ZZZ4');
+  });
+
+  it('builder keeps last-write-wins for non-flag fields of duplicates (documented semantics)', () => {
+    // Only isB3 is sticky; cat/type/sector stay last-write-wins (the DEV warn
+    // flags disagreements). Pins the semantics so a future "helpful" change to
+    // full-merge is a conscious decision, not an accident.
+    const first  = { symbol: 'DUP2', name: 'a', subgroup_id: 'catA', type: 't1', sector: 's1', exchange: 'B3', meta: { isB3: true } };
+    const second = { symbol: 'DUP2', name: 'b', subgroup_id: 'catB', type: 't2', sector: 's2', exchange: 'B3', meta: null };
+    const entry = buildStaticAssetsMap([first, second]).DUP2;
+    expect(entry.cat).toBe('catB');
+    expect(entry.type).toBe('t2');
+    expect(entry.sector).toBe('s2');
+    expect(entry.isB3, 'flag survives the last-write row').toBe(true);
   });
 
   it('gives every active equity-br row a sector the grid can render', () => {
