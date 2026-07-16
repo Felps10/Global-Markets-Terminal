@@ -6,13 +6,14 @@ import { useTaxonomy } from '../../context/TaxonomyContext.jsx';
 import { resolveAsset, buildIsB3Map } from '../../lib/assetResolution.js';
 import { useWatchlist } from '../../context/WatchlistContext.jsx';
 import {
-  fetchQuote,
+  fetchQuote, quoteSrcLabel,
   fmpOHLCV, CHART_PROXY,
   fmpProfile, fmpRatios,
   fmpGradesConsensus, fmpPriceTarget, fmpAnalystEstimates,
   finnhubNews,
   hasFmpKey, hasFinnhubKey,
 } from '../../dataServices.js';
+import SourcePill from '../../components/SourcePill.jsx';
 import { CLUBE_COLORS } from '../../lib/tokens.js';
 
 const C       = CLUBE_COLORS;
@@ -45,9 +46,6 @@ const REC_CATS = [
 ];
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-
-// /api/v1/quote resolves server-side to FMP/EODHD/BRAPI and tags the winner.
-const quoteSrcLabel = (q) => (q?.source || 'LIVE').toUpperCase();
 
 function fmtPrice(v) {
   if (v == null || isNaN(v)) return '—';
@@ -182,25 +180,6 @@ function Skeleton({ height = 14, width = '60%', mb = 8 }) {
       background: 'rgba(255,255,255,0.04)', borderRadius: 4,
       animation: 'pulse 2s infinite',
     }} />
-  );
-}
-
-function SourcePill({ label, color }) {
-  return (
-    <span style={{
-      fontFamily:    "'JetBrains Mono', monospace",
-      fontSize:      9,
-      fontWeight:    600,
-      color:         color,
-      background:    `${color}18`,
-      border:        `1px solid ${color}44`,
-      borderRadius:  3,
-      padding:       '3px 8px',
-      display:       'inline-block',
-      letterSpacing: '0.04em',
-    }}>
-      {label}
-    </span>
   );
 }
 
