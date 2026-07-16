@@ -51,7 +51,6 @@ quota MUST go through `apiClient.call()`. The only exemption is `healthPing()`
 | yahoo         | chart              | 1               | 5min      | yes      | high     |
 | finnhub       | quote              | 1               | 30s       | no       | critical |
 | finnhub       | news               | 1               | 10min     | yes      | medium   |
-| finnhub       | recommendation     | 1               | 1hr       | yes      | medium   |
 | finnhub       | earnings           | 1               | 1hr       | yes      | medium   | *(dormant D-1)* |
 | finnhub       | insiderSentiment   | 1               | 1hr       | yes      | low      | *(dormant D-2)* |
 | alphaVantage  | rsi                | 1               | 24hr      | yes      | medium   | Used by SignalEnginePage |
@@ -276,7 +275,7 @@ One line per call site. Migrated 2026-03-11.
 |--------|-----------------------------|---------------------------------------|
 | DS-1   | `finnhubQuote`              | finnhub / quote                       |
 | DS-2   | `finnhubNews`               | finnhub / news                        |
-| DS-3   | `finnhubRecommendation`     | finnhub / recommendation              |
+| DS-3   | `finnhubRecommendation` *(removed 2026-07-16 — superseded by FMP analyst data)* | finnhub / recommendation |
 | DS-4   | `fredSeries`                | fred / seriesObservations             |
 | DS-5   | `coingeckoPrices`           | coingecko / prices                    |
 | DS-6   | `fmpProfile`                | fmp / profile                         |

@@ -176,16 +176,6 @@ export const API_REGISTRY = {
         canBatch: false,
       },
       {
-        id: "recommendation",
-        path: "/stock/recommendation",
-        callsPerRequest: 1,
-        callsNote: "1 call per symbol. Returns latest analyst consensus. Called on detail panel open.",
-        cacheTTL: 3600, // 1hr
-        priority: "medium",
-        canDefer: true,
-        canBatch: false,
-      },
-      {
         id: "earnings",
         path: "/stock/earnings",
         callsPerRequest: 1,

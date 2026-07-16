@@ -19,7 +19,6 @@ const TTL = {
   'company-news':          5 * 60e3,
   'stock/earnings':       60 * 60e3,
   'stock/insider-sentiment': 60 * 60e3,
-  'stock/recommendation':    60 * 60e3,
 };
 function ttlFor(ep) { return ep in TTL ? TTL[ep] : null; }
 

@@ -28,9 +28,6 @@ const TXT_3   = C.textDim;
 const ACCENT  = C.accent;
 const GREEN   = C.green;
 const RED     = C.red;
-const ORANGE  = C.amber;
-const AMBER   = C.amber;
-
 const TIMEFRAMES  = ['1D', '1W', '1M', '3M', '1Y'];
 const CHART_TYPES = ['Candlestick', 'Line', 'Area'];
 const COMP_COLORS = ['#f59e0b', '#00E676', '#a78bfa'];
@@ -49,11 +46,8 @@ const REC_CATS = [
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-// Server-resolved live quote (FMP/EODHD/BRAPI, no Yahoo). `symbol` already carries `.SA` for B3.
-async function fetchAssetQuote(symbol) {
-  return fetchQuote(symbol);
-}
-
+// /api/v1/quote resolves server-side to FMP/EODHD/BRAPI and tags the winner.
+const quoteSrcLabel = (q) => (q?.source || 'LIVE').toUpperCase();
 
 function fmtPrice(v) {
   if (v == null || isNaN(v)) return '—';
@@ -363,7 +357,7 @@ export default function ChartResearchPage() {
     // bare B3 symbols (BBDC4 → /api/v1/quote 404) and, inversely, `.SA` on non-B3
     // symbols when switching away from a B3 asset.
     const quoteSym = assetMap[activeSymbol]?.isB3 ? activeSymbol + '.SA' : activeSymbol;
-    fetchAssetQuote(quoteSym).then(d => {
+    fetchQuote(quoteSym).then(d => {
       if (!cancelled) { setPriceData(d); setLoadingPrice(false); }
     }).catch(() => { if (!cancelled) setLoadingPrice(false); });
 
@@ -621,7 +615,7 @@ export default function ChartResearchPage() {
             )}
 
             <div style={{ marginTop: 8, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              <SourcePill label="YAHOO" color={ACCENT} />
+              <SourcePill label={quoteSrcLabel(priceData)} color={ACCENT} />
               {profileData && <SourcePill label="FMP" color={GREEN} />}
             </div>
           </>
@@ -1094,7 +1088,7 @@ export default function ChartResearchPage() {
                     </div>
 
                     <div style={{ marginTop: 12, display: 'flex', gap: 4, alignItems: 'center' }}>
-                      <SourcePill label="YAHOO" color={ACCENT} />
+                      <SourcePill label={quoteSrcLabel(priceData)} color={ACCENT} />
                       {profileData && <SourcePill label="FMP" color="#22c55e" />}
                     </div>
                   </>

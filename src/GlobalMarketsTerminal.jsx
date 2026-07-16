@@ -5,11 +5,9 @@ import CommandBar from "./components/CommandBar.jsx";
 import AssetListView from "./components/AssetListView.jsx";
 import AssetDetailDrawer from "./components/AssetDetailDrawer.jsx";
 import {
-  hasFinnhubKey, finnhubNews, finnhubRecommendation,
-  hasFmpKey, fmpProfile, fmpRatios, fmpBatchProfile,
-  hasFredKey, fredSeries, fredAllMacro, getFredSeriesConfig,
+  hasFmpKey, fmpBatchProfile,
+  hasFredKey, fredSeries,
   coingeckoPrices,
-  getSourceStatus,
   fetchYahooMarketData,
   fetchLiveQuotes,
   fetchSnapshotFallback,
