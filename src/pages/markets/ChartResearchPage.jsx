@@ -358,8 +358,12 @@ export default function ChartResearchPage() {
     setNewsData(null); setRecData(null); setTargetData(null); setEstimatesData(null);
     setLoadingPrice(true); setLoadingFunds(true); setLoadingNews(true); setLoadingRec(true);
 
-    const yahooSymbol = activeAsset?.meta?.isB3 ? activeSymbol + '.SA' : activeSymbol;
-    fetchAssetQuote(yahooSymbol).then(d => {
+    // Look the flag up synchronously — activeAsset (state) is synced by effect 2 one
+    // render AFTER activeSymbol changes, so reading it here sees the PREVIOUS asset:
+    // bare B3 symbols (BBDC4 → /api/v1/quote 404) and, inversely, `.SA` on non-B3
+    // symbols when switching away from a B3 asset.
+    const quoteSym = assetMap[activeSymbol]?.isB3 ? activeSymbol + '.SA' : activeSymbol;
+    fetchAssetQuote(quoteSym).then(d => {
       if (!cancelled) { setPriceData(d); setLoadingPrice(false); }
     }).catch(() => { if (!cancelled) setLoadingPrice(false); });
 
