@@ -7,6 +7,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
+const authState   = vi.hoisted(() => ({ isAuthenticated: false }));
+const navigateSpy = vi.hoisted(() => vi.fn());
+
+vi.mock('react-router-dom', async (importOriginal) => ({
+  ...(await importOriginal()),
+  useNavigate: () => navigateSpy,
+}));
+
 vi.mock('../PriceChart.jsx', () => ({
   default: () => <div data-testid="price-chart" />,
 }));
@@ -21,7 +29,7 @@ vi.mock('../../context/TaxonomyContext.jsx', () => ({
 }));
 
 vi.mock('../../hooks/useAuth.js', () => ({
-  useAuth: () => ({ isAuthenticated: false, openAuthPanel: vi.fn() }),
+  useAuth: () => ({ isAuthenticated: authState.isAuthenticated, openAuthPanel: vi.fn() }),
 }));
 
 vi.mock('../../context/AlertsContext.jsx', () => ({
@@ -66,6 +74,7 @@ function renderDrawer(symbol = 'ENPH') {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  authState.isAuthenticated = false;
   fetchQuote.mockResolvedValue(QUOTE);
   fmpOHLCV.mockResolvedValue(candles());
 });
@@ -132,5 +141,40 @@ describe('AssetDetailDrawer period stats', () => {
     expect(await screen.findByText('DAY HIGH')).toBeTruthy();
     expect(screen.queryByText('1M HIGH')).toBeNull();
     expect(screen.queryByTitle(/Return over the charted/)).toBeNull();
+  });
+});
+
+describe('AssetDetailDrawer open-in-page links', () => {
+  it('routes each tab to its Markets page carrying the symbol', async () => {
+    authState.isAuthenticated = true;
+    renderDrawer();
+    await screen.findByText('1M HIGH');
+
+    const cases = [
+      ['Overview',     'Open in Chart & Research →', '/markets/research?symbol=ENPH'],
+      ['Fundamentals', 'Open in Fundamental Lab →',  '/markets/fundamentals?symbols=ENPH'],
+      ['Analyst',      'Open in Signal Engine →',    '/markets/signals?symbol=ENPH'],
+      ['News',         'Open in News →',             '/app/news?symbol=ENPH'],
+    ];
+    for (const [tab, label, path] of cases) {
+      fireEvent.click(screen.getByText(tab));
+      const btn = screen.getByText(label);
+      fireEvent.click(btn);
+      expect(navigateSpy).toHaveBeenLastCalledWith(path);
+    }
+  });
+
+  it('shows the Chart & Research link even without tabs (non-equity assets)', async () => {
+    authState.isAuthenticated = true;
+    renderDrawer('CL=F'); // not in taxonomy mock → no equity tabs
+    expect(await screen.findByText('Open in Chart & Research →')).toBeTruthy();
+    fireEvent.click(screen.getByText('Open in Chart & Research →'));
+    expect(navigateSpy).toHaveBeenLastCalledWith('/markets/research?symbol=CL%3DF');
+  });
+
+  it('hides the link row for guests (target pages are auth-gated)', async () => {
+    renderDrawer();
+    await screen.findByText('1M HIGH');
+    expect(screen.queryByText(/Open in /)).toBeNull();
   });
 });
