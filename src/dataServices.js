@@ -153,23 +153,8 @@ export async function finnhubInsiderSentiment(symbol) {
   return null;
 }
 
-export async function finnhubRecommendation(symbol) {
-  if (!FINNHUB_ENABLED) return null;
-  const response = await apiClient.call('finnhub', 'recommendation', { symbol }, {
-    fetcher: async () => {
-      const res = await fetch(
-        `${API_BASE}/api/v1/finnhub/stock/recommendation?symbol=${encodeURIComponent(symbol)}`,
-        { signal: AbortSignal.timeout(10000) }
-      );
-      if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
-      const data = await res.json();
-      if (!Array.isArray(data) || !data.length) throw new ApiHttpError(204, 'No recommendation data');
-      return data[0];
-    },
-  });
-  if (response.deferred) return null;
-  return response.data ?? null;
-}
+// (finnhubRecommendation was deleted 2026-07-16: zero call sites since the FMP
+// analyst swap (PR #36 / C1) — Analyst Consensus now renders fmpGradesConsensus.)
 
 // AlphaVantage removed (Stage 4 / P3): its only use was Signal Engine MACD, now computed from
 // FMP daily closes (see fmpMACD below); RSI runs on FMP Premium. No client AlphaVantage key.
@@ -265,8 +250,6 @@ const FRED_SERIES = {
   consumerSentiment: { id: "UMCSENT",      label: "Consumer Sentiment",       unit: "Index" },
   retailSales:       { id: "RSAFS",        label: "Retail Sales (Monthly)",   unit: "$M" },
 };
-
-export function getFredSeriesConfig() { return FRED_SERIES; }
 
 export async function fredSeries(seriesKey) {
   if (!FRED_ENABLED) return null;
@@ -1323,7 +1306,7 @@ export async function fetchQuote(symbol) {
 // proxy while computing but never using the .SA chartSymbol. Close-only chart
 // needs are served by fetchYahooOHLCV below.)
 
-// ─── YAHOO OHLCV (for Chart & Research) ──────────────────────────────────────
+// ─── YAHOO OHLCV (last-resort fallback for fmpOHLCV) ─────────────────────────
 // Returns full candlestick data (open, high, low, close, volume).
 // Timestamps are Unix seconds (lightweight-charts expects seconds).
 
@@ -1341,14 +1324,15 @@ const OHLCV_TIMEFRAMES = {
 
 /**
  * Fetch OHLCV candlestick data for a symbol and timeframe.
- * Used by ChartResearchPage for interactive charts.
+ * Module-private: only fmpOHLCV calls this, as its last-resort fallback —
+ * charts (ChartResearchPage, AssetDetailDrawer) go through fmpOHLCV.
  *
  * @param {string} symbol       - Internal symbol key (e.g. "SPY", "PETR4")
  * @param {string} [timeframe]  - '1D' | '1W' | '1M' | '3M' | '1Y' (default: '1M')
  * @param {{ assets?: Object }} [maps]
  * @returns {Promise<Array<{ time: number, open: number, high: number, low: number, close: number, volume: number }>>}
  */
-export async function fetchYahooOHLCV(symbol, timeframe = '1M', { assets = {}, interval: intervalOverride } = {}) {
+async function fetchYahooOHLCV(symbol, timeframe = '1M', { assets = {}, interval: intervalOverride } = {}) {
   const tf = OHLCV_TIMEFRAMES[timeframe] || OHLCV_TIMEFRAMES['1M'];
   const range = tf.range;
   const interval = intervalOverride || tf.interval;

@@ -21,7 +21,6 @@ const TXT_3   = C.textDim;
 const ACCENT  = C.accent;
 const GREEN   = C.green;
 const RED     = C.red;
-const ORANGE  = C.amber;
 const AMBER   = '#fbbf24';
 
 // ─── Position colors — chip = bar = table header (consistent) ─────────────────
@@ -973,12 +972,10 @@ export default function FundamentalLabPage() {
                               fontSize: 9, padding: '1px 5px', borderRadius: 3,
                               fontFamily: "'JetBrains Mono', monospace", fontWeight: 700,
                               letterSpacing: '0.04em', flexShrink: 0,
-                              ...(m.src === 'fmp'
-                                ? { background: 'rgba(59,130,246,0.1)',  color: ACCENT, border: `1px solid rgba(59,130,246,0.3)` }
-                                : { background: 'rgba(245,158,11,0.1)',  color: ORANGE, border: `1px solid rgba(245,158,11,0.3)` }
-                              ),
+                              background: 'rgba(59,130,246,0.1)', color: ACCENT,
+                              border: `1px solid rgba(59,130,246,0.3)`,
                             }}>
-                              {m.src === 'fmp' ? 'FMP' : 'YAHOO'}
+                              FMP
                             </span>
                           </div>
                         </td>

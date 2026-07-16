@@ -205,9 +205,9 @@ const SOURCE_DETAIL_DATA = {
     refreshCadence: "~120s server cycle; charts on demand", lastSuccessfulSync: "Continuous (server cycle)",
   },
   finnhub: {
-    description: "Finnhub is a professional-grade market data REST API. In this app it is the source for analyst consensus recommendations and company news in the detail panel (on demand), and a legacy equity-quote fallback. It is not part of the live quote precedence engine. API key required.",
+    description: "Finnhub is a professional-grade market data REST API. In this app it is the source for company news in the detail panel, News page and Chart & Research (on demand), and a legacy equity-quote fallback. Analyst consensus moved to FMP Premium (2026-07). It is not part of the live quote precedence engine. API key required.",
     type: "HTTP REST API", owner: "Finnhub.io", domain: "Market Data / Sentiment",
-    tags: ["Sentiment", "News", "Analyst", "On-demand"],
+    tags: ["Sentiment", "News", "On-demand"],
     endpoint: "https://finnhub.io/api/v1 (via proxy)", authType: "API Key (query param: token=...)",
     refreshCadence: "On demand; queue limited to 1 req/sec", lastSuccessfulSync: "On demand",
   },
@@ -315,7 +315,7 @@ const CATALOG = [
   {
     category: "Sentiment & Events", icon: "📰",
     items: [
-      { name: "Analyst Recommendations", source: "finnhub", fallback: null, rateLimit: "60 calls/min (queued)", frequency: "On demand (panel open)", coverage: "US equities", status: "active", description: "Buy/Hold/Sell consensus from sell-side analysts, rendered as a stacked bar in the detail panel.", groups: ["All equity groups"], component: "Detail panel Analyst Consensus", endpoint: "/stock/recommendation?symbol=...", fetchMode: "On demand" },
+      { name: "Analyst Ratings & Price Targets", source: "fmp", fallback: null, rateLimit: "FMP Premium · 750/min", frequency: "On demand (panel open)", coverage: "US equities", status: "active", description: "Buy/Hold/Sell consensus, price-target consensus and forward estimates from FMP Premium, rendered as a stacked bar in the Analyst Consensus panels (replaced the Finnhub recommendation feed 2026-07).", groups: ["All equity groups"], component: "Detail panel + Chart & Research Analyst Consensus", endpoint: "/grades-consensus · /price-target-consensus · /analyst-estimates", fetchMode: "On demand" },
       { name: "Company News", source: "finnhub", fallback: null, rateLimit: "60 calls/min (queued)", frequency: "On demand (10min cache)", coverage: "US equities", status: "active", description: "Latest 5 company news headlines from the past 7 days.", groups: ["All equity groups"], component: "Detail panel Recent News", endpoint: "/company-news?symbol=...&from=...&to=...", fetchMode: "On demand" },
       { name: "Insider Sentiment", source: "finnhub", fallback: null, rateLimit: "60 calls/min (queued)", frequency: "On demand", coverage: "US equities", status: "planned", description: "Aggregate insider trading sentiment data.", groups: ["Health Care"], component: "Planned", endpoint: "/stock/insider-sentiment?symbol=...", fetchMode: "On demand" },
       { name: "Earnings Calendar", source: "finnhub", fallback: null, rateLimit: "60 calls/min (queued)", frequency: "On demand", coverage: "US equities", status: "planned", description: "Upcoming and recent earnings dates and EPS estimates.", groups: ["Financials", "Aerospace & Defense"], component: "Planned", endpoint: "/stock/earnings?symbol=...", fetchMode: "On demand" },
