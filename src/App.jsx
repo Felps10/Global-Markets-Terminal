@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import TerminalLayout from './components/TerminalLayout.jsx';
 import { TickerProvider } from './context/TickerContext.jsx';
@@ -37,6 +37,13 @@ const PricingPage           = React.lazy(() => import('./pages/PricingPage.jsx')
 const AboutPage             = React.lazy(() => import('./pages/AboutPage.jsx'));
 const CommunityPage         = React.lazy(() => import('./pages/CommunityPage.jsx'));
 const AlertsPage            = React.lazy(() => import('./pages/AlertsPage.jsx'));
+
+// /markets/chart was merged into /markets/research (Chart & Research, 324024b);
+// keep old links and ?symbol= deep links working. Exported for routing.test.jsx.
+export function ChartAliasRedirect() {
+  const { search, hash } = useLocation();
+  return <Navigate to={{ pathname: '/markets/research', search, hash }} replace />;
+}
 
 // Minimal loading fallback — matches the dark theme background.
 function RouteFallback() {
@@ -173,7 +180,7 @@ function AppWithPanel() {
           {/* Markets modules — any authenticated user */}
           <Route path="/markets/heatmap"      element={<ProtectedRoute requiredRole={null}><MarketHeatmapPage /></ProtectedRoute>} />
           <Route path="/markets/research"     element={<ProtectedRoute requiredRole={null}><ChartResearchPage /></ProtectedRoute>} />
-          <Route path="/markets/chart"        element={<ProtectedRoute requiredRole={null}><ChartResearchPage /></ProtectedRoute>} />
+          <Route path="/markets/chart"        element={<ChartAliasRedirect />} />
           <Route path="/markets/fundamentals" element={<ProtectedRoute requiredRole={null}><FundamentalLabPage /></ProtectedRoute>} />
           <Route path="/markets/macro"        element={<ProtectedRoute requiredRole={null}><MacroHubPage /></ProtectedRoute>} />
           <Route path="/markets/signals"      element={<ProtectedRoute requiredRole={null}><SignalEnginePage /></ProtectedRoute>} />

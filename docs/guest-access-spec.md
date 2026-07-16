@@ -52,8 +52,7 @@ Open everything that drives discovery and engagement. Lock everything that requi
 | Catalog | Yes | Navigate freely |
 | News | Yes | Navigate freely — full feed gated, 3 items per asset shown |
 | Markets dropdown | Yes | Shows all items with lock icons |
-| Chart Center | Yes — lock icon | Locked page |
-| Research Terminal | Yes — lock icon | Locked page |
+| Chart & Research | Yes — lock icon | Locked page |
 | Fundamental Lab | Yes — lock icon | Locked page |
 | Macro Hub | Yes — lock icon | Locked page |
 | Signal Engine | Yes — lock icon | Locked page |
@@ -86,8 +85,7 @@ Open everything that drives discovery and engagement. Lock everything that requi
 | Signals tab in drawer | `signals` | Acesse sinais técnicos (RSI, MACD) — crie uma conta gratuita |
 | News full feed | `news` | Acesse o feed completo de notícias — crie uma conta gratuita |
 | Watchlist nav tab | `watchlist` | Sua watchlist personalizada — crie uma conta gratuita |
-| Chart Center locked page CTA | `chart_center` | Charts interativos e comparações — crie uma conta gratuita |
-| Research Terminal locked page CTA | `research` | Terminal de pesquisa aprofundada — crie uma conta gratuita |
+| Chart & Research locked page CTA | `research` | Charts interativos e pesquisa aprofundada — crie uma conta gratuita |
 | Fundamental Lab locked page CTA | `fundamental_lab` | Laboratório de valuation e métricas — crie uma conta gratuita |
 | Macro Hub locked page CTA | `macro_hub` | Dashboards macro e calendário econômico — crie uma conta gratuita |
 | Signal Engine locked page CTA | `signal_engine` | Scanner de sinais técnicos — crie uma conta gratuita |

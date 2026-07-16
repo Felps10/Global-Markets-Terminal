@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext.jsx';
 import ProtectedRoute from '../components/ProtectedRoute.jsx';
 import {
@@ -9,6 +9,7 @@ import {
   mockAuthenticatedUser,
   mockAuthenticatedAdmin,
 } from './mocks/authMock.js';
+import { ChartAliasRedirect } from '../App.jsx';
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ const USER_PATHS = [
   ['/app/watchlist',           null],
   ['/app/alerts',              null],
   ['/app/settings',            null],
-  ['/markets/chart',           null],
+  // '/markets/chart' is a redirect alias of research — covered by its own suite below
   ['/markets/research',        null],
   ['/markets/fundamentals',    null],
   ['/markets/macro',           null],
@@ -69,6 +70,33 @@ describe('ProtectedRoute — unauthenticated user', () => {
       expect(screen.queryByTestId('protected-page')).not.toBeInTheDocument();
     }
   );
+});
+
+describe('ChartAliasRedirect — /markets/chart alias', () => {
+  function renderAlias(initialEntry) {
+    return render(
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <Routes>
+          <Route path="/markets/chart" element={<ChartAliasRedirect />} />
+          <Route path="/markets/research" element={<LocationEcho />} />
+        </Routes>
+      </MemoryRouter>
+    );
+  }
+  function LocationEcho() {
+    const loc = useLocation();
+    return <div data-testid="research-page">{loc.pathname + loc.search}</div>;
+  }
+
+  it('redirects /markets/chart to /markets/research', () => {
+    renderAlias('/markets/chart');
+    expect(screen.getByTestId('research-page')).toHaveTextContent('/markets/research');
+  });
+
+  it('preserves ?symbol= deep links', () => {
+    renderAlias('/markets/chart?symbol=PETR4');
+    expect(screen.getByTestId('research-page')).toHaveTextContent('/markets/research?symbol=PETR4');
+  });
 });
 
 describe('ProtectedRoute — loading state', () => {
