@@ -15,13 +15,14 @@ import PriceChart from './PriceChart.jsx';
 import { useTaxonomy } from '../context/TaxonomyContext.jsx';
 import { resolveAsset } from '../lib/assetResolution.js';
 import {
-  fetchQuote,
+  fetchQuote, quoteSrcLabel,
   fmpOHLCV, CHART_PROXY,
   fmpProfile, fmpRatios,
   fmpGradesConsensus, fmpPriceTarget, fmpAnalystEstimates,
   finnhubNews,
   hasFmpKey, hasFinnhubKey,
 } from '../dataServices.js';
+import SourcePill from './SourcePill.jsx';
 import { useAuth } from '../hooks/useAuth.js';
 import { useAlerts } from '../context/AlertsContext.jsx';
 import { CLUBE_COLORS } from '../lib/tokens.js';
@@ -614,7 +615,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
           <div style={{
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: 10, color: TXT_3,
-            display: 'flex', gap: 16, flexWrap: 'wrap',
+            display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center',
           }}>
             {quoteData.volume    != null && <span>VOL {fmtVol(quoteData.volume)}</span>}
             {quoteData.marketCap != null && <span>MCAP {fmtLarge(quoteData.marketCap, currency)}</span>}
@@ -625,6 +626,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
                 })}
               </span>
             )}
+            <SourcePill label={quoteSrcLabel(quoteData)} color={ACCENT} />
           </div>
         </>
       ) : (

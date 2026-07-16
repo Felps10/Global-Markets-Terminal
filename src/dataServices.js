@@ -1270,6 +1270,9 @@ export async function fetchB3MarketDataFromServer(b3Assets, { assets, volatility
 // `^`→FMP/EODHD index, `=X`→FMP FX, `=F`→FMP metals, else→FMP equity→EODHD) using server-only
 // keys, and returns the SAME field shape the callers consumed from Yahoo v7. Callers append
 // `.SA` for B3 (as they already did for Yahoo). Returns null on total failure.
+// Pill label for a fetchQuote response — the provider that won the resolution.
+export const quoteSrcLabel = (q) => (q?.source || 'LIVE').toUpperCase();
+
 export async function fetchQuote(symbol) {
   try {
     const res = await fetch(
