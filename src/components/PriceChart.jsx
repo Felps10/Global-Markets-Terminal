@@ -14,7 +14,7 @@ import {
  * Shared price chart — the single lightweight-charts v5 surface used by the
  * AssetDetailDrawer and ChartResearchPage. Owns createChart + the series
  * lifecycle (candle / area / line, volume, %-normalized comparison) PLUS the
- * TradingView-caliber polish (crosshair OHLC legend, last-price line, dashed
+ * pro-terminal polish (crosshair OHLC legend, last-price line, dashed
  * crosshair, ticker watermark). Data fetching, timeframe/type controls, and
  * loading/error overlays stay in the parent.
  *
@@ -126,7 +126,7 @@ export default function PriceChart({
 
     const chart = createChart(el, {
       autoSize: true,
-      layout: { background: { color: c.bg }, textColor: c.text, fontFamily: "'JetBrains Mono', monospace" },
+      layout: { background: { color: c.bg }, textColor: c.text, fontFamily: "'JetBrains Mono', monospace", attributionLogo: false },
       grid:   { vertLines: { color: c.grid }, horzLines: { color: c.grid } },
       crosshair: {
         mode: crosshairMode,
@@ -151,8 +151,8 @@ export default function PriceChart({
   // ── Price-scale mode (linear / log / percent) — no recreate needed ────────
   // In comparison mode the right scale switches to native Percentage so every
   // series rebaselines to the first *visible* bar (rebases on zoom/scroll) —
-  // the TradingView %-comparison behavior, replacing the old fixed-baseline
-  // normalizeToPercent transform.
+  // the standard charting-platform %-comparison behavior, replacing the old
+  // fixed-baseline normalizeToPercent transform.
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
