@@ -1,5 +1,7 @@
 // server/services/bcbService.js
-// BCB SGS batch service + AwesomeAPI FX rates for Brazil macro data.
+// BCB SGS batch service + BRL FX rates for Brazil macro data.
+// FX: BRAPI Pro v2/currency primary; keyless AwesomeAPI fallback (rate-limits per IP,
+// and Railway's single egress IP is shared by every user).
 // Queries Supabase for assets with meta.bcbSeries, fetches them in parallel.
 
 import { supabase } from '../db.js';
@@ -94,50 +96,85 @@ export async function fetchBCBMacro() {
 }
 
 // ── fetchBRLRates ───────────────────────────────────────────────────────────
+const FX_PAIRS = ['USD-BRL', 'EUR-BRL', 'GBP-BRL'];
+
+async function fetchBRLRatesFromBrapi() {
+  const token = process.env.VITE_BRAPI_TOKEN;
+  if (!token) return null;
+
+  const res = await fetch(
+    `https://brapi.dev/api/v2/currency?currency=${FX_PAIRS.join(',')}&token=${encodeURIComponent(token)}`,
+    { signal: AbortSignal.timeout(8000) }
+  );
+  if (!res.ok) {
+    console.error(`[bcbService] BRAPI currency HTTP ${res.status}`);
+    return null;
+  }
+
+  const data = await res.json();
+  const result = {};
+  for (const c of data?.currency ?? []) {
+    const bid = parseFloat(c.bidPrice);
+    if (!isFinite(bid)) continue;
+    result[`${c.fromCurrency}-${c.toCurrency}`] = {
+      value: bid,
+      change: parseFloat(c.percentageChange),
+      changePct: parseFloat(c.percentageChange),
+      unit: 'BRL',
+    };
+  }
+  return Object.keys(result).length > 0 ? result : null;
+}
+
+async function fetchBRLRatesFromAwesome() {
+  const res = await fetch(
+    `https://economia.awesomeapi.com.br/json/last/${FX_PAIRS.join(',')}`,
+    { signal: AbortSignal.timeout(8000) }
+  );
+  if (!res.ok) {
+    console.error(`[bcbService] AwesomeAPI HTTP ${res.status}`);
+    return null;
+  }
+
+  const data = await res.json();
+  const result = {};
+  for (const displayKey of FX_PAIRS) {
+    const q = data?.[displayKey.replace('-', '')];
+    if (q) {
+      result[displayKey] = {
+        value: parseFloat(q.bid),
+        change: parseFloat(q.pctChange),
+        changePct: parseFloat(q.pctChange),
+        unit: 'BRL',
+      };
+    }
+  }
+  return Object.keys(result).length > 0 ? result : null;
+}
+
 export async function fetchBRLRates() {
   if (_fxCache.data && (Date.now() - _fxCache.ts) < TTL_MS) {
     return _fxCache.data;
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
-
+  let result = null;
   try {
-    const res = await fetch(
-      'https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL,GBP-BRL',
-      { signal: controller.signal }
-    );
-    clearTimeout(timeout);
-
-    if (!res.ok) {
-      console.error(`[bcbService] AwesomeAPI HTTP ${res.status}`);
-      return {};
-    }
-
-    const data = await res.json();
-    const result = {};
-
-    const pairs = { USDBRL: 'USD-BRL', EURBRL: 'EUR-BRL', GBPBRL: 'GBP-BRL' };
-    for (const [apiKey, displayKey] of Object.entries(pairs)) {
-      if (data?.[apiKey]) {
-        result[displayKey] = {
-          value: parseFloat(data[apiKey].bid),
-          change: parseFloat(data[apiKey].pctChange),
-          changePct: parseFloat(data[apiKey].pctChange),
-          unit: 'BRL',
-        };
-      }
-    }
-
-    if (Object.keys(result).length > 0) {
-      _fxCache.data = result;
-      _fxCache.ts = Date.now();
-    }
-
-    return result;
+    result = await fetchBRLRatesFromBrapi();
   } catch (err) {
-    clearTimeout(timeout);
-    console.error('[bcbService] AwesomeAPI failed:', err.message);
-    return {};
+    console.error('[bcbService] BRAPI currency failed:', err.message);
   }
+  if (!result) {
+    try {
+      result = await fetchBRLRatesFromAwesome();
+    } catch (err) {
+      console.error('[bcbService] AwesomeAPI failed:', err.message);
+    }
+  }
+
+  if (result) {
+    _fxCache.data = result;
+    _fxCache.ts = Date.now();
+    return result;
+  }
+  return {};
 }

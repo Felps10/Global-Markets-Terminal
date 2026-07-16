@@ -21,7 +21,7 @@ const FEATURES_FULL = [
     tag: 'BRAZIL',
     title: 'Brazil Terminal',
     headline: 'The only terminal with B3 and BCB in one place.',
-    body: 'Dedicated Brazil mode with full B3 equities, Renda Fixa rates (SELIC, CDI, DI curve), and BCB macro indicators. Live prices via BRAPI for active stocks. FX pairs including USD/BRL via AwesomeAPI. Gold accent theme distinct from the global terminal.',
+    body: 'Dedicated Brazil mode with full B3 equities, Renda Fixa rates (SELIC, CDI, DI curve), and BCB macro indicators. Live prices via BRAPI for active stocks. FX pairs including USD/BRL via BRAPI. Gold accent theme distinct from the global terminal.',
     detail: 'B3 equities · BCB macro · Renda Fixa · FX',
   },
   {

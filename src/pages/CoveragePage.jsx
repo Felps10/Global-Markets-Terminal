@@ -92,8 +92,8 @@ const BRAZIL_COVERAGE = [
     name: 'Macro Brasil',
     count: 'INDICATORS',
     groups: '2 SUBGROUPS',
-    description: 'IPCA inflation, GDP growth, unemployment, industrial production, USD/BRL, EUR/BRL, and liquidity indicators. All from Banco Central do Brasil — no third-party dependency.',
-    source: 'BCB SGS · AwesomeAPI',
+    description: 'IPCA inflation, GDP growth, unemployment, industrial production, USD/BRL, EUR/BRL, and liquidity indicators. Macro series from Banco Central do Brasil; FX pairs from BRAPI.',
+    source: 'BCB SGS · BRAPI',
     subgroups: ['Macro Indicators', 'FX & Liquidity'],
   },
 ];

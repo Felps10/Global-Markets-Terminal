@@ -912,31 +912,64 @@ export async function bcbMacro() {
   return Object.values(result).some(v => v !== null) ? result : null;
 }
 
-// ─── AWESOMEAPI — FX Rates (no key required) ────────────────────────────────
+// ─── BRAZIL FX — USD/BRL + EUR/BRL (BRAPI primary, AwesomeAPI fallback) ─────
+// BRAPI Pro v2/currency, token injected server-side. Keyless AwesomeAPI is the
+// warm fallback only — it rate-limits per IP, and Railway's egress IP is shared.
 
-export async function awesomeFx() {
-  const response = await apiClient.call('awesomeapi', 'fx', {}, {
-    fetcher: async () => {
-      const res = await fetch(
-        `${API_BASE}/proxy/awesomeapi/last/USD-BRL,EUR-BRL`,
-        { signal: AbortSignal.timeout(10000) }
-      );
-      if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
-      const data = await res.json();
-      const result = {};
-      if (data?.USDBRL) {
-        result.usdBrl    = parseFloat(data.USDBRL.bid);
-        result.usdBrlAsk = parseFloat(data.USDBRL.ask);
-        result.usdBrlPct = parseFloat(data.USDBRL.pctChange);
-      }
-      if (data?.EURBRL) {
-        result.eurBrl    = parseFloat(data.EURBRL.bid);
-        result.eurBrlPct = parseFloat(data.EURBRL.pctChange);
-      }
-      if (!Object.keys(result).length) throw new ApiHttpError(204, 'No FX data');
-      return result;
-    },
-  });
+async function brapiFxFetcher() {
+  const res = await fetch(
+    `${API_BASE}/api/v1/brapi/currency/USD-BRL,EUR-BRL`,
+    { signal: AbortSignal.timeout(10000) }
+  );
+  if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
+  const data = await res.json();
+  const bySymbol = {};
+  for (const c of data?.currency ?? []) {
+    bySymbol[`${c.fromCurrency}${c.toCurrency}`] = c;
+  }
+  const result = {};
+  if (bySymbol.USDBRL) {
+    result.usdBrl    = parseFloat(bySymbol.USDBRL.bidPrice);
+    result.usdBrlAsk = parseFloat(bySymbol.USDBRL.askPrice);
+    result.usdBrlPct = parseFloat(bySymbol.USDBRL.percentageChange);
+  }
+  if (bySymbol.EURBRL) {
+    result.eurBrl    = parseFloat(bySymbol.EURBRL.bidPrice);
+    result.eurBrlPct = parseFloat(bySymbol.EURBRL.percentageChange);
+  }
+  if (!Object.keys(result).length) throw new ApiHttpError(204, 'No FX data');
+  return result;
+}
+
+async function awesomeFxFetcher() {
+  const res = await fetch(
+    `${API_BASE}/proxy/awesomeapi/last/USD-BRL,EUR-BRL`,
+    { signal: AbortSignal.timeout(10000) }
+  );
+  if (!res.ok) throw new ApiHttpError(res.status, res.statusText);
+  const data = await res.json();
+  const result = {};
+  if (data?.USDBRL) {
+    result.usdBrl    = parseFloat(data.USDBRL.bid);
+    result.usdBrlAsk = parseFloat(data.USDBRL.ask);
+    result.usdBrlPct = parseFloat(data.USDBRL.pctChange);
+  }
+  if (data?.EURBRL) {
+    result.eurBrl    = parseFloat(data.EURBRL.bid);
+    result.eurBrlPct = parseFloat(data.EURBRL.pctChange);
+  }
+  if (!Object.keys(result).length) throw new ApiHttpError(204, 'No FX data');
+  return result;
+}
+
+export async function brazilFx() {
+  if (BRAPI_ENABLED) {
+    // maxRetries: 0 — fail fast to the warm fallback below instead of stalling
+    // ~7s on the backoff ladder (which would gate the whole terminal refresh).
+    const response = await apiClient.call('brapi', 'currency', {}, { fetcher: brapiFxFetcher, maxRetries: 0 });
+    if (response.data) return response.data;
+  }
+  const response = await apiClient.call('awesomeapi', 'fx', {}, { fetcher: awesomeFxFetcher });
   if (response.deferred) return null;
   return response.data ?? null;
 }

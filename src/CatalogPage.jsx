@@ -172,14 +172,14 @@ const SOURCE_META = {
     fallbackSuggestion: null,
   },
   awesomeapi: {
-    rateLimit: "Free, no key required", rateLimitMax: null, rateLimitPer: null,
+    rateLimit: "Free, no key — rate-limited per IP", rateLimitMax: null, rateLimitPer: null,
     coverage: "Brazilian Real exchange rates — USD/BRL, EUR/BRL", freshness: "Real-time (15min local cache)",
     assetClasses: ["FX"], geo: "Brazil",
     docUrl: "https://docs.awesomeapi.com.br",
     keyRegistrationUrl: "https://docs.awesomeapi.com.br",
     healthEndpoint: "/proxy/awesomeapi/last/USD-BRL",
-    note: "Unauthenticated requests cached 1 minute by provider — no key required",
-    fallbackSuggestion: null,
+    note: "Keyless public endpoint rate-limits per IP (429s on the shared Railway IP) — fallback only; primary Brazil FX is BRAPI v2/currency",
+    fallbackSuggestion: "BRAPI v2/currency (current primary)",
   },
 };
 
@@ -254,9 +254,9 @@ const SOURCE_DETAIL_DATA = {
     refreshCadence: "1-hour cache", lastSuccessfulSync: "On demand (cached)",
   },
   awesomeapi: {
-    description: "AwesomeAPI is a free, keyless Brazilian FX rate API providing USD/BRL and EUR/BRL rates with bid/ask spreads and 24h change. It powers the USD/BRL macro context banner in the Brazil Equities group. Provider-side responses are cached for 1 minute; the app adds a 15-minute cache on top.",
+    description: "AwesomeAPI is a free, keyless Brazilian FX rate API providing USD/BRL and EUR/BRL rates with bid/ask spreads and 24h change. Since Jul 2026 it is the warm FALLBACK for Brazil FX only — the public endpoint rate-limits per IP and all users share the Railway proxy IP. Primary is BRAPI v2/currency (Pro token, server-side).",
     type: "HTTP REST API (Public)", owner: "AwesomeAPI (Community)", domain: "FX / Currency",
-    tags: ["Brasil", "FX", "USD/BRL", "EUR/BRL", "No Auth"],
+    tags: ["Brasil", "FX", "USD/BRL", "EUR/BRL", "No Auth", "Fallback"],
     endpoint: "https://economia.awesomeapi.com.br → GET /api/v1/brazil/macro", authType: "None (public endpoint)",
     refreshCadence: "15-minute cache", lastSuccessfulSync: "On demand (cached)",
   },
@@ -339,14 +339,14 @@ const CATALOG = [
       { name: "SELIC Rate", source: "bcb", fallback: null, rateLimit: "Unlimited — no key", frequency: "1-hour cache", coverage: "Brazil", status: "active", description: "Brazilian base interest rate (equivalent to Fed Funds Rate), from BCB SGS series 432.", groups: ["Brazil Equities"], component: "Group macro banner", endpoint: "/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json", fetchMode: "Cached" },
       { name: "IPCA (Inflation)", source: "bcb", fallback: null, rateLimit: "Unlimited — no key", frequency: "1-hour cache", coverage: "Brazil", status: "active", description: "Brazilian inflation index (equivalent to CPI), from BCB SGS series 433.", groups: ["Brazil Equities"], component: "Group macro banner", endpoint: "/dados/serie/bcdata.sgs.433/dados/ultimos/1?formato=json", fetchMode: "Cached" },
       { name: "CDI Rate", source: "bcb", fallback: null, rateLimit: "Unlimited — no key", frequency: "1-hour cache", coverage: "Brazil", status: "active", description: "CDI (Certificado de Depósito Interbancário) rate, from BCB SGS series 4389.", groups: ["Brazil Equities"], component: "Group macro banner", endpoint: "/dados/serie/bcdata.sgs.4389/dados/ultimos/1?formato=json", fetchMode: "Cached" },
-      { name: "USD/BRL Rate", source: "awesomeapi", fallback: null, rateLimit: "Free — no key", frequency: "15-minute cache", coverage: "Brazil", status: "active", description: "Real-time USD/BRL exchange rate with bid/ask and percentage change from AwesomeAPI.", groups: ["Brazil Equities"], component: "Group macro banner", endpoint: "/last/USD-BRL", fetchMode: "Cached" },
+      { name: "USD/BRL Rate", source: "brapi", fallback: "awesomeapi", rateLimit: "BRAPI Pro — 500k/mo", frequency: "15-minute cache", coverage: "Brazil", status: "active", description: "Real-time USD/BRL exchange rate with bid/ask and percentage change. BRAPI v2/currency primary (token server-side); keyless AwesomeAPI is the warm fallback (rate-limits per IP).", groups: ["Brazil Equities"], component: "Group macro banner", endpoint: "/api/v1/brapi/currency/USD-BRL,EUR-BRL", fetchMode: "Cached" },
     ],
   },
 ];
 
 const ASSET_GROUPS = [
   { name: "Aerospace & Defense",  icon: "🛡",  assetCount: "5 tickers",          assignment: "Manual ticker list",                    sources: ["eodhd", "yahoo", "finnhub", "fmp"],      macroBanner: null },
-  { name: "Brazil Equities",      icon: "🇧🇷", assetCount: "17 tickers",         assignment: "Manual ticker list",                    sources: ["brapi", "yahoo", "bcb", "awesomeapi"],    macroBanner: "SELIC, IPCA, CDI (BCB) + USD/BRL (AwesomeAPI)" },
+  { name: "Brazil Equities",      icon: "🇧🇷", assetCount: "17 tickers",         assignment: "Manual ticker list",                    sources: ["brapi", "yahoo", "bcb", "awesomeapi"],    macroBanner: "SELIC, IPCA, CDI (BCB) + USD/BRL (BRAPI, AwesomeAPI fallback)" },
   { name: "Clean Energy",         icon: "🔋",  assetCount: "5 + cross-listed",   assignment: "Manual + cross-list from Technology",   sources: ["eodhd", "yahoo", "finnhub", "fmp", "fred"], macroBanner: "10Y Treasury Yield (FRED)" },
   { name: "Consumer",             icon: "🛒",  assetCount: "5 + cross-listed",   assignment: "Manual + cross-list from Technology",   sources: ["eodhd", "yahoo", "finnhub", "fmp", "fred"], macroBanner: "Consumer Sentiment (FRED)" },
   { name: "Crypto",               icon: "🪙",  assetCount: "3 coins",            assignment: "CoinGecko price data exclusively",      sources: ["coingecko"],                             macroBanner: null },
