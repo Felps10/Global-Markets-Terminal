@@ -205,6 +205,38 @@ export function computeMacd(closes, { fast = 12, slow = 26, signal = 9 } = {}) {
 }
 
 /**
+ * Period-level statistics over an ascending OHLCV candle array (the shape
+ * returned by fmpOHLCV / fetchYahooOHLCV). Pure and client-side — no API
+ * calls, one O(n) pass. Returns null when there aren't enough candles.
+ *
+ * Semantics: stats describe the CHARTED span — returnPct is last close vs
+ * first close, high/low are the span extremes. Fetched spans can overshoot
+ * their timeframe label (see FMP_OHLCV_TF), so these are "stats of what the
+ * chart shows", which is exactly what a chart-adjacent panel should display.
+ * No volume stats on purpose: per-candle volume units vary with the interval
+ * (30m vs 1d vs 1wk bars), so a candle-derived volume average is not
+ * comparable across timeframes or asset classes.
+ */
+export function computePeriodStats(candles) {
+  if (!Array.isArray(candles) || candles.length < 2) return null;
+  // Number(null) is 0 — guard nulls before coercing so a null high/low/close
+  // can't masquerade as a real 0 level.
+  const num = (v) => (v == null ? NaN : Number(v));
+  let high = null, low = null;
+  for (const c of candles) {
+    const h = num(c?.high), l = num(c?.low);
+    if (Number.isFinite(h) && (high === null || h > high)) high = h;
+    if (Number.isFinite(l) && (low === null || l < low)) low = l;
+  }
+  const first = num(candles[0]?.close);
+  const last = num(candles[candles.length - 1]?.close);
+  const returnPct = Number.isFinite(first) && first > 0 && Number.isFinite(last)
+    ? ((last - first) / first) * 100
+    : null;
+  return { returnPct, high, low };
+}
+
+/**
  * MACD for a symbol, computed from FMP Premium daily closes. Drop-in replacement for
  * alphaVantageMACD — same contract: newest-first [{date, macd, signal, hist}] (up to `points`).
  * Server key via /api/v1/fmp (Stage 2). Returns null on any miss.

@@ -16,7 +16,7 @@ import { useTaxonomy } from '../context/TaxonomyContext.jsx';
 import { resolveAsset } from '../lib/assetResolution.js';
 import {
   fetchQuote, quoteSrcLabel,
-  fmpOHLCV, CHART_PROXY,
+  fmpOHLCV, CHART_PROXY, computePeriodStats,
   fmpProfile, fmpRatios,
   fmpGradesConsensus, fmpPriceTarget, fmpAnalystEstimates,
   finnhubNews,
@@ -308,6 +308,27 @@ function SourceBadge({ source }) {
   );
 }
 
+function PeriodChip({ timeframe, returnPct }) {
+  if (returnPct == null) return null;
+  const up  = returnPct >= 0;
+  const col = up ? GREEN : RED;
+  return (
+    <span
+      title={`Return over the charted ${timeframe} period`}
+      style={{
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: 10, fontWeight: 700, color: col,
+        background: `${col}18`,
+        border: `1px solid ${col}44`,
+        borderRadius: 3, padding: '2px 6px', marginLeft: 10,
+        letterSpacing: '0.04em', verticalAlign: 'middle',
+      }}
+    >
+      {timeframe} {up ? '+' : ''}{returnPct.toFixed(1)}%
+    </span>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
   const navigate   = useNavigate();
@@ -405,6 +426,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
   const [chartType,    setChartType]    = useState('candle'); // 'area' | 'candle' (expanded default; collapsed always area)
   const [showMA,       setShowMA]       = useState(true);      // SMA-50/200 overlays (expanded only)
   const [chartPoints,  setChartPoints]  = useState(null);
+  const [chartKey,     setChartKey]     = useState(''); // `${sym}:${tf}:${iv}` the loaded chartPoints belong to
   const [chartLoading, setChartLoading] = useState(false);
   const [chartError,   setChartError]   = useState(null);
   const chartCacheRef     = useRef({});
@@ -545,6 +567,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
 
     if (chartCacheRef.current[cacheKey]) {
       setChartPoints(chartCacheRef.current[cacheKey]);
+      setChartKey(cacheKey);
       setChartLoading(false);
       setChartError(null);
       return;
@@ -559,7 +582,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
       // The isB3 flag routes B3 straight to the Yahoo path (FMP gates Brazil).
       const candles = await fmpOHLCV(sym, tf, { interval: iv, assets: symIsB3 ? { [sym]: { isB3: true } } : undefined });
       chartCacheRef.current[cacheKey] = candles;
-      if (activeSymTfRef.current === cacheKey) setChartPoints(candles);
+      if (activeSymTfRef.current === cacheKey) { setChartPoints(candles); setChartKey(cacheKey); }
     } catch (err) {
       if (activeSymTfRef.current === cacheKey)
         setChartError(err.message || 'Chart unavailable');
@@ -572,6 +595,20 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
     if (currentSymbol) loadChart(currentSymbol, timeframe, effectiveInterval, isB3);
   }, [currentSymbol, timeframe, effectiveInterval, isB3, loadChart]);
 
+  // ── Period stats derived from the charted candles (zero extra fetches) ────
+  // Eligibility lives here and only here. 1D stays quote-based (its correct
+  // baseline is prevClose, matching the header change%). Proxied symbols
+  // (CL=F/NG=F chart USO/UNG) are excluded — their candle levels are ETF
+  // prices, not the quoted future. The chartKey check pins the stats to
+  // candles that belong to the CURRENT selection, so a timeframe/symbol
+  // switch can never paint stats computed from the previous one; while null,
+  // the stat rows fall back to quote-based day values.
+  const periodStats = useMemo(() => {
+    if (timeframe === '1D' || CHART_PROXY[currentSymbol] || !chartPoints) return null;
+    if (chartKey !== `${currentSymbol}:${timeframe}:${effectiveInterval}`) return null;
+    return computePeriodStats(chartPoints);
+  }, [chartPoints, chartKey, timeframe, currentSymbol, effectiveInterval]);
+
   // Chart rendering (createChart + series lifecycle + refit) is handled by
   // <PriceChart> in the render below — driven by chartPoints / chartType.
 
@@ -582,6 +619,28 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
   const positive   = (quoteData?.changePct ?? 0) >= 0;
   const priceColor = positive ? GREEN : RED;
   const sign       = positive ? '+' : '';
+
+  // Overview stat rows — shared verbatim by the below-chart Key Stats grid
+  // and the expanded PRICE DATA sidebar so the two surfaces can't drift.
+  // HIGH/LOW follow the selected timeframe once its candles are loaded; on
+  // 1D, proxied symbols, in-flight fetches, and chart errors they fall back
+  // to the quote's day values. VOLUME stays quote-based on purpose: candle
+  // volume units vary with the bar interval (30m/1d/1wk), so a candle-derived
+  // average is not comparable across timeframes.
+  const overviewStatRows = [
+    { label: 'OPEN',     value: fmtPrice(quoteData?.open) },
+    { label: 'PREV CL',  value: fmtPrice(quoteData?.prevClose) },
+    periodStats?.high != null
+      ? { label: `${timeframe} HIGH`, value: fmtPrice(periodStats.high), color: GREEN }
+      : { label: 'DAY HIGH', value: fmtPrice(quoteData?.dayHigh), color: GREEN },
+    periodStats?.low != null
+      ? { label: `${timeframe} LOW`, value: fmtPrice(periodStats.low), color: RED }
+      : { label: 'DAY LOW', value: fmtPrice(quoteData?.dayLow), color: RED },
+    { label: '52W HIGH', value: fmtPrice(quoteData?.w52High), color: GREEN },
+    { label: '52W LOW',  value: fmtPrice(quoteData?.w52Low),  color: RED },
+    { label: 'VOLUME',   value: fmtVol(quoteData?.volume) },
+    { label: 'MKT CAP',  value: fmtLarge(quoteData?.marketCap, currency) },
+  ];
 
   const exchangeLabel = assetMeta.isB3 ? 'B3'
     : assetMeta.isCrypto ? 'CRYPTO'
@@ -611,6 +670,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
           }}>
             {positive ? '▲' : '▼'} {sign}{fmtPrice(quoteData.change)}{' '}
             ({sign}{quoteData.changePct?.toFixed(2) ?? '—'}%)
+            <PeriodChip timeframe={timeframe} returnPct={periodStats?.returnPct} />
           </div>
           <div style={{
             fontFamily: "'JetBrains Mono', monospace",
@@ -635,37 +695,6 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
         </div>
       )}
     </div>
-  );
-
-  // ── Section: key stats ────────────────────────────────────────────────────
-  const keyStatsSection = (
-    <CardWrap>
-      <SectionTitle>Key Stats</SectionTitle>
-      {loadingQuote ? (
-        [...Array(6)].map((_, i) => <Skeleton key={i} height={26} width="100%" mb={2} />)
-      ) : quoteData ? (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 20 }}>
-          <div>
-            <SidebarRow label="Open"      value={fmtPrice(quoteData.open)} />
-            <SidebarRow label="Day High"  value={fmtPrice(quoteData.dayHigh)}  valueColor={GREEN} />
-            <SidebarRow label="52W High"  value={fmtPrice(quoteData.w52High)}  valueColor={GREEN} />
-            <SidebarRow label="Volume"    value={fmtVol(quoteData.volume)} />
-            <SidebarRow label="Mkt Cap"   value={fmtLarge(quoteData.marketCap, currency)} />
-          </div>
-          <div>
-            <SidebarRow label="Prev Close" value={fmtPrice(quoteData.prevClose)} />
-            <SidebarRow label="Day Low"    value={fmtPrice(quoteData.dayLow)}   valueColor={RED} />
-            <SidebarRow label="52W Low"    value={fmtPrice(quoteData.w52Low)}   valueColor={RED} />
-            <SidebarRow label="Avg Vol"    value={fmtVol(quoteData.avgVolume)} />
-            <SidebarRow label="Beta"       value={fmtNum(quoteData.beta ?? profileData?.beta)} />
-          </div>
-        </div>
-      ) : (
-        <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: TXT_3, fontStyle: 'italic' }}>
-          Stats unavailable
-        </div>
-      )}
-    </CardWrap>
   );
 
   // ── Section: price chart ──────────────────────────────────────────────────
@@ -818,16 +847,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
               padding: '8px 12px 6px', flexShrink: 0,
             }}>PRICE DATA</div>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly' }}>
-              {[
-                { label: 'OPEN',     value: fmtPrice(quoteData?.open) },
-                { label: 'PREV CL',  value: fmtPrice(quoteData?.prevClose) },
-                { label: 'DAY HIGH', value: fmtPrice(quoteData?.dayHigh), color: GREEN },
-                { label: 'DAY LOW',  value: fmtPrice(quoteData?.dayLow),  color: RED },
-                { label: '52W HIGH', value: fmtPrice(quoteData?.w52High), color: GREEN },
-                { label: '52W LOW',  value: fmtPrice(quoteData?.w52Low),  color: RED },
-                { label: 'VOLUME',   value: fmtVol(quoteData?.volume) },
-                { label: 'MKT CAP',  value: fmtLarge(quoteData?.marketCap, currency) },
-              ].map((item, i) => (
+              {overviewStatRows.map((item, i) => (
                 <div key={i} style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   padding: '0 10px 0 12px', paddingRight: 14,
@@ -1029,47 +1049,6 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
     </CardWrap>
   ) : null;
 
-  // ── Section: fundamentals ─────────────────────────────────────────────────
-  const fundamentalsSection = isEquity ? (
-    <CardWrap>
-      <SectionTitle>Fundamentals</SectionTitle>
-      {!hasFmpKey() ? (
-        <div style={{
-          fontFamily: "'IBM Plex Sans', sans-serif",
-          fontSize: 12, color: TXT_3, fontStyle: 'italic', lineHeight: 1.6,
-        }}>
-          FMP key not configured.<br />
-          Add{' '}
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: TXT_2 }}>
-            VITE_FMP_KEY=your_key
-          </span>{' '}
-          to your{' '}
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: TXT_2 }}>
-            .env
-          </span>{' '}
-          file and restart the dev server.
-        </div>
-      ) : loadingFunds ? (
-        <>
-          <Skeleton width="80%" height={12} mb={8} />
-          <Skeleton width="60%" height={12} mb={8} />
-          <Skeleton width="70%" height={12} mb={8} />
-          <Skeleton width="50%" height={12} mb={8} />
-        </>
-      ) : (
-        <>
-          <SidebarRow label="P/E Ratio"   value={fmtNum(profileData?.pe ?? ratiosData?.peRatio, 1)} />
-          <SidebarRow label="EPS"         value={fmtNum(profileData?.eps, 2)} />
-          <SidebarRow label="Mkt Cap"     value={fmtLarge(profileData?.marketCap)} />
-          <SidebarRow label="Beta"        value={fmtNum(profileData?.beta, 2)} />
-          <SidebarRow label="Net Margin"  value={fmtPct(ratiosData?.profitMargin)} />
-          <SidebarRow label="Debt/Equity" value={fmtNum(ratiosData?.debtEquity, 2)} />
-          <SidebarRow label="ROE"         value={fmtPct(ratiosData?.roe)} />
-          <SidebarRow label="Curr. Ratio" value={fmtNum(ratiosData?.currentRatio, 2)} />
-        </>
-      )}
-    </CardWrap>
-  ) : null;
 
   // ── Section: analyst consensus ────────────────────────────────────────────
   const analystSection = isEquity ? (
@@ -1610,16 +1589,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
                   border: `1px solid ${BORDER}`, borderRadius: 6,
                   overflow: 'hidden', marginBottom: 10,
                 }}>
-                  {[
-                    { label: 'OPEN',     value: fmtPrice(quoteData.open) },
-                    { label: 'PREV CL',  value: fmtPrice(quoteData.prevClose) },
-                    { label: 'DAY HIGH', value: fmtPrice(quoteData.dayHigh), color: GREEN },
-                    { label: 'DAY LOW',  value: fmtPrice(quoteData.dayLow),  color: RED },
-                    { label: '52W HIGH', value: fmtPrice(quoteData.w52High), color: GREEN },
-                    { label: '52W LOW',  value: fmtPrice(quoteData.w52Low),  color: RED },
-                    { label: 'VOLUME',   value: fmtVol(quoteData.volume) },
-                    { label: 'MKT CAP',  value: fmtLarge(quoteData.marketCap) },
-                  ].map((item, i) => (
+                  {overviewStatRows.map((item, i) => (
                     <div key={i} style={{
                       background: BG_CARD, padding: '5px 10px',
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
