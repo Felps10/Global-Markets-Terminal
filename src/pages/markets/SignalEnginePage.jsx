@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import MarketsPageLayout from '../../components/MarketsPageLayout.jsx';
 import { useTaxonomy } from '../../context/TaxonomyContext.jsx';
 import { resolveAsset } from '../../lib/assetResolution.js';
@@ -518,12 +519,17 @@ function ScannerResultsCard({ results, scanLoading, scanProgress, totalToScan, s
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function SignalEnginePage() {
   const { assets, subgroups } = useTaxonomy();
+  const [searchParams] = useSearchParams();
 
   // Mode
   const [mode, setMode] = useState('single');
 
-  // Single asset
-  const [activeSymbol, setActiveSymbol] = useState('SPY');
+  // Single asset — seeded from the ?symbol= deep link so the SPY default
+  // never fetches (or stamps fetchedRef) on deep-linked visits. Reads the
+  // router's searchParams (declared above) rather than window.location.
+  const [activeSymbol, setActiveSymbol] = useState(() =>
+    (searchParams.get('symbol') || 'SPY').toUpperCase()
+  );
   const [activeAsset, setActiveAsset]   = useState(null);
   const [rsiPeriod, setRsiPeriod]       = useState(14);
   const [rsiData, setRsiData]           = useState(null);
@@ -568,8 +574,25 @@ export default function SignalEnginePage() {
     setActiveAsset(resolveAsset(assets, activeSymbol));
   }, [activeSymbol, assets]);
 
+  // Validate the ?symbol= deep link once taxonomy arrives: canonicalize a
+  // valid symbol (no-op when the lazy init already matched), fall back to the
+  // SPY default for an unknown one. Applied at most once per mount so a later
+  // taxonomy refresh can't re-apply a stale URL param over a manual selection.
+  const paramAppliedRef = useRef(false);
+  useEffect(() => {
+    if (paramAppliedRef.current) return;
+    const fromParam = searchParams.get('symbol');
+    if (!fromParam || !assets.length) return;
+    paramAppliedRef.current = true;
+    const found = resolveAsset(assets, fromParam.toUpperCase());
+    setActiveSymbol(found ? found.symbol : 'SPY');
+  }, [assets, searchParams]);
+
   // ── Fetch RSI + MACD ───────────────────────────────────────────────────────
+  const latestFetchRef = useRef(null);
+  const fetchedRef = useRef(new Set()); // symbols already auto-fetched, keyed `${symbol}:${period}`
   const fetchSignals = useCallback(async (symbol, period) => {
+    latestFetchRef.current = `${symbol}:${period}`;
     setLoadingRsi(true); setLoadingMacd(true);
     setRsiError(null);   setMacdError(null);
     setRsiData(null);    setMacdData(null);
@@ -587,6 +610,15 @@ export default function SignalEnginePage() {
 
     const [rsiResult, macdResult] = await Promise.allSettled([rsiPromise, macdPromise]);
 
+    // A newer selection started its own fetch while this one was in flight —
+    // drop these results so stale data can't render under the new header, and
+    // un-stamp the key so revisiting this symbol refetches instead of showing
+    // whatever data the winning fetch left in state.
+    if (latestFetchRef.current !== `${symbol}:${period}`) {
+      fetchedRef.current.delete(`${symbol}:${period}`);
+      return;
+    }
+
     if (rsiResult.status === 'fulfilled' && rsiResult.value) {
       setRsiData(rsiResult.value);
     } else {
@@ -603,7 +635,6 @@ export default function SignalEnginePage() {
   }, []);
 
   // Auto-fetch on mount (SPY default) and when symbol/period changes
-  const fetchedRef = useRef(new Set());
   useEffect(() => {
     if (mode !== 'single' || !activeSymbol) return;
     const key = `${activeSymbol}:${rsiPeriod}`;

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { hasFinnhubKey, finnhubNews } from "./dataServices.js";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -1041,6 +1042,7 @@ export default function NewsPage() {
   const [catArticles,   setCatArticles]   = useState({});  // catKey → articles[]
   const [tickerNews,    setTickerNews]    = useState([]);
   const [selectedSymbol, setSelectedSymbol] = useState(null);
+  const [searchParams] = useSearchParams();
   const [activeSource,  setActiveSource]  = useState("all");
   const [activeCat,     setActiveCat]     = useState("all");
   const [searchQuery,   setSearchQuery]   = useState("");
@@ -1105,6 +1107,17 @@ export default function NewsPage() {
   }, [hasFinnhub]);
 
   useEffect(() => { loadAllNews(); }, [loadAllNews]);
+
+  // Deep-link: /app/news?symbol=ENPH opens that asset's feed directly, and
+  // navigating back to plain /app/news clears it (same-route nav, no remount).
+  // No ASSETS-map guard on purpose — the drawer links symbols from the live
+  // taxonomy (~137 equities) while ASSETS is a hand-synced subset, and
+  // SymbolNewsFeed degrades gracefully for unmapped tickers (bare-symbol
+  // header + Finnhub fetch by ticker).
+  useEffect(() => {
+    const sym = searchParams.get("symbol");
+    setSelectedSymbol(sym ? sym.toUpperCase() : null);
+  }, [searchParams]);
 
   const toggleCat = (catKey) => {
     setCollapsedCats(prev => ({ ...prev, [catKey]: !prev[catKey] }));

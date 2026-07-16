@@ -32,3 +32,13 @@ export const ROUTES = {
     community: '/community',
   },
 };
+
+// Deep-link builders — single-source each page's query-param contract so
+// producers can't mix up ?symbol= (single-asset pages) with ?symbols=
+// (the Fundamental Lab's multi-asset list).
+export const marketsUrl = {
+  research:     (symbol)  => `${ROUTES.markets.research}?symbol=${encodeURIComponent(symbol)}`,
+  fundamentals: (symbols) => `${ROUTES.markets.fundamentals}?symbols=${symbols.map(encodeURIComponent).join(',')}`,
+  signals:      (symbol)  => `${ROUTES.markets.signals}?symbol=${encodeURIComponent(symbol)}`,
+  news:         (symbol)  => `${ROUTES.terminal.news}?symbol=${encodeURIComponent(symbol)}`,
+};
