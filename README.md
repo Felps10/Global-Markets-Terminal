@@ -103,8 +103,8 @@ Terminal (authenticated — shared TerminalLayout with GMTHeader):
   /app/watchlist       Watchlist
 
 Markets (authenticated):
-  /markets/chart       Chart Center
-  /markets/research    Research Terminal
+  /markets/research    Chart & Research (interactive charts + asset research)
+  /markets/chart       → redirect alias of /markets/research
   /markets/fundamentals Fundamental Lab
   /markets/macro       Macro Hub
   /markets/signals     Signal Engine

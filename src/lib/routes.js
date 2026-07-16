@@ -10,7 +10,7 @@ export const ROUTES = {
   },
   markets: {
     heatmap:      '/markets/heatmap',
-    chart:        '/markets/chart',
+    // '/markets/chart' is a redirect alias of research (see App.jsx ChartAliasRedirect)
     research:     '/markets/research',
     fundamentals: '/markets/fundamentals',
     macro:        '/markets/macro',

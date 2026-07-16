@@ -29,16 +29,9 @@ function injectDropdownStyles() {
 
 const MARKETS_ITEMS = [
   {
-    icon: '📈',
-    label: 'Chart Center',
-    description: 'Interactive price charts & comparisons',
-    route: ROUTES.markets.chart,
-    requiresAuth: true,
-  },
-  {
-    icon: '🔬',
-    label: 'Research Terminal',
-    description: 'Deep-dive asset research workspace',
+    icon: '📊',
+    label: 'Chart & Research',
+    description: 'Interactive charts & deep-dive asset research',
     route: ROUTES.markets.research,
     requiresAuth: true,
   },
