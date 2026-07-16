@@ -1,12 +1,12 @@
 // brazilDataServices.js
 // Brazil Terminal data providers: BRAPI, BCB SGS
-// (via /api/v1/brazil/macro), AwesomeAPI.
+// (via /api/v1/brazil/macro; FX = BRAPI primary, AwesomeAPI fallback).
 //
 // SCOPE RULE: This file must never call Yahoo Finance,
 // Finnhub, FMP, FRED, AlphaVantage, or CoinGecko.
 //
-// fetchBrazilMacro() calls the Express endpoint
-// which handles BCB+AwesomeAPI server-side.
+// fetchBrazilMacro() calls the Express endpoint which handles
+// BCB + BRAPI FX (AwesomeAPI fallback) server-side.
 
 import { supabase } from '../lib/supabase.js';
 
@@ -24,7 +24,7 @@ async function authHeaders() {
   };
 }
 
-// ── BCB + AwesomeAPI (via Express endpoint) ─────────
+// ── BCB + BRAPI FX (via Express endpoint) ───────────
 /**
  * Fetch Brazil macro data from the backend endpoint
  * built in Prompt 2 (server/routes/brazilMacro.js).

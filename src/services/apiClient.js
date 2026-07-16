@@ -166,6 +166,9 @@ function makeDeferred(quotaRemaining) {
  * @param {string} apiId
  * @param {string} endpointId
  * @param {Function} fetcher            - Async fn from the caller; throws ApiHttpError on error
+ * @param {number} [maxRetries]         - Retry cap for 429/5xx (default MAX_RETRIES). Callers with
+ *                                        their own warm fallback pass 0 to fail fast instead of
+ *                                        stalling on backoff — the fallback IS the retry.
  * @returns {Promise<{
  *   ok: boolean,
  *   data: any,
@@ -175,10 +178,10 @@ function makeDeferred(quotaRemaining) {
  *   exhausted: boolean
  * }>}
  */
-async function fetchWithRetry(apiId, endpointId, fetcher) {
+async function fetchWithRetry(apiId, endpointId, fetcher, maxRetries = MAX_RETRIES) {
   let networkAttempted = false;
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const data = await fetcher();
       return { ok: true, data, errorType: null, status: 200, retryAfterSec: null, exhausted: false };
@@ -213,9 +216,9 @@ async function fetchWithRetry(apiId, endpointId, fetcher) {
             : BACKOFF_MS[attempt] ?? BACKOFF_MS[BACKOFF_MS.length - 1];
           console.warn(
             `[ApiClient] ${apiId}/${endpointId} HTTP 429 — ` +
-            `attempt ${attempt + 1}/${MAX_RETRIES + 1}, backing off ${backoffMs}ms`
+            `attempt ${attempt + 1}/${maxRetries + 1}, backing off ${backoffMs}ms`
           );
-          if (attempt === MAX_RETRIES) {
+          if (attempt === maxRetries) {
             // Retries exhausted — delegate exhaustion duration to quotaTracker (never compute here)
             quotaTracker.markExhausted(apiId);
             return { ok: false, data: null, errorType: "quota", status, retryAfterSec, exhausted: true };
@@ -229,9 +232,9 @@ async function fetchWithRetry(apiId, endpointId, fetcher) {
           const backoffMs = BACKOFF_MS[attempt] ?? BACKOFF_MS[BACKOFF_MS.length - 1];
           console.warn(
             `[ApiClient] ${apiId}/${endpointId} HTTP ${status} (server error) — ` +
-            `attempt ${attempt + 1}/${MAX_RETRIES + 1}, backing off ${backoffMs}ms`
+            `attempt ${attempt + 1}/${maxRetries + 1}, backing off ${backoffMs}ms`
           );
-          if (attempt === MAX_RETRIES) {
+          if (attempt === maxRetries) {
             return { ok: false, data: null, errorType: "server", status, retryAfterSec: null, exhausted: false };
           }
           await new Promise(r => setTimeout(r, backoffMs));
@@ -324,6 +327,7 @@ async function drainAllQueues() {
  */
 async function _executeCall(apiId, endpointId, params, options) {
   const { fetcher, callCount } = options;
+  const maxRetries = options.maxRetries ?? MAX_RETRIES;
   const isDraining = !!options[DRAIN_FLAG];
 
   // ── Step 1: Resolve endpoint ───────────────────────────────────────────────
@@ -360,7 +364,7 @@ async function _executeCall(apiId, endpointId, params, options) {
     if (!quotaTracker.canCall(apiId, endpointId, effectiveCallCount)) {
       return;
     }
-    const result = await fetchWithRetry(apiId, endpointId, fetcher);
+    const result = await fetchWithRetry(apiId, endpointId, fetcher, maxRetries);
     if (result.ok && result.data !== null) {
       cacheSet(apiId, endpointId, params, result.data);
       quotaTracker.recordCall(apiId, endpointId, effectiveCallCount);
@@ -412,7 +416,7 @@ async function _executeCall(apiId, endpointId, params, options) {
     );
   }
 
-  const result = await fetchWithRetry(apiId, endpointId, fetcher);
+  const result = await fetchWithRetry(apiId, endpointId, fetcher, maxRetries);
 
   // ── Step 7 (success path) ─────────────────────────────────────────────────
   if (result.ok) {
@@ -442,7 +446,7 @@ async function _executeCall(apiId, endpointId, params, options) {
     // Never compute exhaustion duration here — always delegated to quotaTracker
     return makeErr(
       ERROR_TYPES.QUOTA_EXHAUSTED,
-      `"${apiId}" returned HTTP 429 after ${MAX_RETRIES} retries. ` +
+      `"${apiId}" returned HTTP 429 after ${maxRetries} retries. ` +
       `All calls to this API are now blocked until the quota window resets. ` +
       `Check the QuotaDashboard for reset time.`,
       false,
@@ -454,7 +458,7 @@ async function _executeCall(apiId, endpointId, params, options) {
     // 5xx: quota is NOT consumed (recordCall not called — intentional)
     return makeErr(
       ERROR_TYPES.SERVER_ERROR,
-      `"${apiId}" returned HTTP ${result.status} (server error) after ${MAX_RETRIES} retries.`,
+      `"${apiId}" returned HTTP ${result.status} (server error) after ${maxRetries} retries.`,
       true,
     );
   }
@@ -505,6 +509,10 @@ export const apiClient = {
    * @param {number} [options.callCount]
    *   REQUIRED when endpointId has callsPerRequest: 0 (variable cost, e.g. batchProfile).
    *   Set to the number of symbols/items in the batch. Throws if absent.
+   * @param {number} [options.maxRetries]
+   *   Retry cap for 429/5xx responses (default: MAX_RETRIES). Pass 0 for a single attempt —
+   *   used by callers with their own warm fallback (e.g. brazilFx: BRAPI → AwesomeAPI), where
+   *   backing off on the primary just delays the fallback.
    * @returns {Promise<ApiResponse>}
    *
    * @throws {Error} Only when callCount is missing for a variable-cost endpoint.

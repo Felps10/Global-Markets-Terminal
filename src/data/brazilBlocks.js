@@ -117,7 +117,7 @@ export const BRAZIL_BLOCKS = [
         sectionId:  "cambio-liquidez",
         label:      "Câmbio & Liquidez",
         icon:       "💵",
-        dataSource: "awesomeapi",
+        dataSource: "brapi",
         assetType:  "fx-br",
       },
 

@@ -236,9 +236,9 @@ GMT aggregates data from eight external providers. In development, requests are 
 | **Finnhub** | Equities, News, Analyst Ratings | Real-time quotes, company news, analyst recommendations | Free — 60 req/min |
 | **CoinGecko** | Cryptocurrency | BTC, ETH, SOL + 5 more altcoins | Public — ~30 req/min (no key) |
 | **Financial Modeling Prep** | Equities — Fundamentals | Company profiles, P/E, EPS, sector, ratios TTM, DCF | Free — 250 req/day |
-| **BRAPI** | Brazilian B3 Equities & ETFs | B3 stocks, FIIs, ETFs (batched calls by sector) | Free (limits undocumented) |
+| **BRAPI** | Brazilian B3 Equities, ETFs & BRL FX | B3 stocks, FIIs, ETFs + USD/BRL, EUR/BRL, GBP/BRL (v2/currency) | Pro — 500k req/mo |
 | **BCB (Banco Central do Brasil)** | Brazilian Macro & Renda Fixa | SELIC, IPCA, CDI, interest rate curve, public bond yields | Public — unlimited (no key) |
-| **AwesomeAPI** | FX — BRL pairs | USD/BRL, EUR/BRL exchange rates | Public — unlimited (no key) |
+| **AwesomeAPI** | FX — BRL pairs (fallback) | USD/BRL, EUR/BRL fallback when BRAPI FX errors | Public — no key, rate-limited per IP |
 | **FRED (Federal Reserve Economic Data)** | US Macro | Fed Funds Rate, CPI, GDP, unemployment, treasury yields, mortgage rates, consumer sentiment, retail sales | Free — unlimited |
 
 GMT's multi-source architecture means no single API outage takes down the entire dashboard. When Yahoo Finance returns a session error, the system falls back to Finnhub quotes automatically. All responses are cached at the endpoint level with per-provider TTLs — from 30 seconds for live prices to 24 hours for company profiles — so the platform remains responsive even under tight rate limits. Data from all providers is normalized into a common quote shape before being consumed by components.

@@ -1,5 +1,5 @@
 // server/routes/brazilMacro.js
-// GET /api/v1/brazil/macro — BCB SGS macro data + AwesomeAPI FX rates
+// GET /api/v1/brazil/macro — BCB SGS macro data + BRL FX rates (BRAPI primary, AwesomeAPI fallback)
 
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.js';

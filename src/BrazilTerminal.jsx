@@ -6,7 +6,7 @@ import { STATIC_ASSETS_MAP, DENSITY_CONFIG } from "./components/gmtConfig.js";
 import AssetDetailDrawer from "./components/AssetDetailDrawer.jsx";
 import CommandBar from "./components/CommandBar.jsx";
 import GroupSummaryCard from "./components/GroupSummaryCard.jsx";
-import { fetchB3MarketDataFromServer, bcbMacro, awesomeFx } from "./dataServices.js";
+import { fetchB3MarketDataFromServer, bcbMacro, brazilFx } from "./dataServices.js";
 import { fetchBrazilMacro, fetchBrazilTitulos } from "./services/brazilDataServices.js";
 import { usePreferences } from './context/PreferencesContext.jsx';
 import { useWatchlist } from './context/WatchlistContext.jsx';
@@ -76,7 +76,7 @@ const FOOTER_SECTION_TEXT = {
   "indices-benchmarks": "ÍNDICES & BENCHMARKS",
   "credito":            "CRÉDITO · B3",
   "titulos-publicos":   "TÍTULOS PÚBLICOS · TESOURO DIRETO",
-  "macro-brasil":       "MACRO BRASIL · BCB / IBGE / AWESOMEAPI",
+  "macro-brasil":       "MACRO BRASIL · BCB / IBGE / BRAPI",
 };
 
 // ─── INDICATOR CARD ───────────────────────────────────────────────────────────
@@ -252,7 +252,7 @@ export default function BrazilTerminal() {
       const [b3Result, macroSettled, fxSettled] = await Promise.all([
         fetchB3MarketDataFromServer(getB3AssetEntries(), { assets: STATIC_ASSETS_MAP, volatility: B3_VOLATILITY }),
         bcbMacro().then(v => ({ status: "fulfilled", value: v })).catch(e => ({ status: "rejected", reason: e })),
-        awesomeFx().then(v => ({ status: "fulfilled", value: v })).catch(e => ({ status: "rejected", reason: e })),
+        brazilFx().then(v => ({ status: "fulfilled", value: v })).catch(e => ({ status: "rejected", reason: e })),
       ]);
       if (!mountedRef.current) return;
       prevDataRef.current = b3Result;
@@ -276,7 +276,7 @@ export default function BrazilTerminal() {
     return () => clearInterval(intervalRef.current);
   }, [loadData, refreshInterval]);
 
-  // ── Extended macro fetch (BCB batch + AwesomeAPI via backend) ──────────────
+  // ── Extended macro fetch (BCB batch + BRAPI FX via backend) ────────────────
   useEffect(() => {
     let cancelled = false;
     const fetchMacro = async () => {
@@ -597,7 +597,7 @@ export default function BrazilTerminal() {
                       value={d?.value ?? null}
                       date={isFx ? null : (d?.date || null)}
                       unit={sym === "M2" ? "R$ bi" : area.unit}
-                      source={isFx ? "AwesomeAPI" : "BCB"}
+                      source={isFx ? "BRAPI" : "BCB"}
                       category={area.label}
                       changePct={isFx ? (d?.changePct ?? null) : null}
                     />

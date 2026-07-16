@@ -573,6 +573,18 @@ export const API_REGISTRY = {
         canDefer: false,
         canBatch: true,
       },
+      {
+        id: "currency",
+        path: "/v2/currency?currency={pairs}",
+        callsPerRequest: 1,
+        callsNote:
+          "1 call for USD-BRL + EUR-BRL batched (via /api/v1/brapi/currency, token server-side, " +
+          "60s server cache). Primary Brazil FX source — keyless AwesomeAPI is the fallback.",
+        cacheTTL: 900, // 15min — macro banner context, not live trading
+        priority: "medium",
+        canDefer: false,
+        canBatch: true,
+      },
     ],
   },
 
@@ -640,14 +652,14 @@ export const API_REGISTRY = {
     name: "AwesomeAPI (FX Rates)",
     baseUrl: "https://economia.awesomeapi.com.br",
     proxyPath: "/proxy/awesomeapi",
-    currentTier: "Public (no key, unlimited)",
+    currentTier: "Public (no key, rate-limited per IP)",
     limits: { perMinute: null, perDay: null, perMonth: null },
     costPerCall: null,
     upgradeUrl: "https://docs.awesomeapi.com.br",
     notes:
-      "Brazilian FX rate API providing USD-BRL and EUR-BRL. No key required, no documented limit. " +
-      "Fetches both pairs in a single call. 15min cache is appropriate — FX rates update frequently " +
-      "but this data is used for macro context, not live trading.",
+      "Brazilian FX rate API providing USD-BRL and EUR-BRL. No key required, but the public " +
+      "endpoint rate-limits per IP (observed 429s from the shared Railway egress IP, Jul 2026). " +
+      "FALLBACK ONLY since then — primary Brazil FX is BRAPI v2/currency (brapi/currency).",
     tierOptions: [
       {
         name: "Public (current)",
@@ -655,7 +667,9 @@ export const API_REGISTRY = {
         perDay: null,
         perMonth: null,
         costPerMonth: 0,
-        notes: "Effectively unlimited. Very stable community API.",
+        notes:
+          "Undocumented per-IP rate limit — all users share the Railway proxy IP, so it " +
+          "exhausts under real traffic. Keep as keyless warm fallback only.",
       },
     ],
     endpoints: [
@@ -664,8 +678,8 @@ export const API_REGISTRY = {
         path: "/last/{pairs}",
         callsPerRequest: 1,
         callsNote:
-          "1 call for USD-BRL and EUR-BRL in a single batched request. " +
-          "Fetched once on mount alongside BCB macro data. Cached 15min.",
+          "Fallback for brapi/currency. 1 call for USD-BRL and EUR-BRL in a single batched " +
+          "request — only fired when BRAPI FX errors. Cached 15min.",
         cacheTTL: 900, // 15min
         priority: "medium",
         canDefer: true,

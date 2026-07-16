@@ -39,9 +39,9 @@ quota MUST go through `apiClient.call()`. The only exemption is `healthPing()`
 | FRED          | Free (unlimited)  | —         | —       | Government API; extremely stable |
 | CoinGecko     | Public (no key)   | 30        | —       | Per-IP; shared across browser sessions |
 | FMP           | Free              | —         | 250     | Heaviest consumer; `batchProfile` ~80 calls/run |
-| BRAPI         | Free              | —         | ~100    | Limit undocumented; 100/day assumed conservatively |
+| BRAPI         | Pro               | —         | —       | 500k calls/month, 20 tickers/req; primary for B3 + BRL FX |
 | BCB           | Public (no key)   | —         | —       | Unlimited Brazilian government API |
-| AwesomeAPI    | Public (no key)   | —         | —       | Unlimited Brazilian FX community API |
+| AwesomeAPI    | Public (no key)   | —         | —       | Per-IP rate limit (429s observed Jul 2026) — Brazil FX fallback only; BRAPI v2/currency is primary |
 
 ### Endpoint Reference
 
@@ -65,7 +65,8 @@ quota MUST go through `apiClient.call()`. The only exemption is `healthPing()`
 | fmp           | dcf                | 1               | 6hr       | yes      | low      | *(dormant D-6)* |
 | brapi         | quote              | 1               | 30s       | no       | critical |
 | bcb           | selic / ipca / cdi | 1 each          | 1hr       | yes      | medium   |
-| awesomeapi    | fx                 | 1               | 15min     | yes      | medium   |
+| brapi         | currency           | 1               | 15min     | no       | medium   |
+| awesomeapi    | fx                 | 1               | 15min     | yes      | medium   | *(fallback for brapi/currency)*
 
 ---
 
@@ -84,7 +85,7 @@ Quota health is computed by `quotaTracker.getQuotaHealth(apiId)` using the
 Thresholds are defined in one place: `HEALTH_THRESHOLDS` in
 `src/services/quotaTracker.js`. Do not hardcode them elsewhere.
 
-Unlimited APIs (Yahoo, FRED, BCB, AwesomeAPI) always return `healthy` — they
+Unlimited APIs (Yahoo, FRED, BCB) always return `healthy` — they
 are tracked for observability only, not quota management.
 
 ---
@@ -283,7 +284,7 @@ One line per call site. Migrated 2026-03-11.
 | DS-8   | `fmpBatchProfile`           | fmp / batchProfile (variable-cost: N) |
 | DS-9   | `brapiQuote`                | brapi / quote                         |
 | DS-10  | `bcbMacro`                  | bcb / selic + ipca + cdi (allSettled) |
-| DS-11  | `awesomeFx`                 | awesomeapi / fx                       |
+| DS-11  | `brazilFx`                  | brapi / currency → awesomeapi / fx (fallback) |
 | GMT-1  | `fetchYahooMarketData`      | yahoo / quote (extracted from GMT)    |
 | GMT-2  | ~~`fetchYahooChartData`~~ (deleted 2026-07-14 — dead code; yahoo/chart is served by `fetchYahooOHLCV`) | yahoo / chart |
 | GMT-3  | `fetchB3MarketData` (.SA fallback) | yahoo / quote (extracted from GMT) |
@@ -360,7 +361,7 @@ Yahoo → FRED → BCB+AwesomeAPI. Each card shows:
 - Collapsible endpoint list (toggle with "N endpoints" button)
 - Exhausted state: red border + "QUOTA EXHAUSTED" banner + dimmed bars
 
-BCB and AwesomeAPI share a single virtual card (`_bcb`) since both are unlimited Brazilian APIs.
+BCB and AwesomeAPI share a single virtual card (`_bcb`) — keyless Brazilian APIs tracked for observability (AwesomeAPI is per-IP rate-limited and fallback-only since Jul 2026).
 
 **Section 3 — Session Log Table**
 Collapsible table listing all APIs with at least one session call, sorted by calls descending.

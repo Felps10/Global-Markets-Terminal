@@ -3,7 +3,7 @@ import MarketsPageLayout from '../../components/MarketsPageLayout.jsx';
 import {
   fredAllMacro,
   bcbMacro,
-  awesomeFx,
+  brazilFx,
   fredReleaseDates,
   hasFredKey,
 } from '../../dataServices.js';
@@ -171,7 +171,7 @@ const BRAZIL_INDICATORS = [
   },
   {
     key: 'usdBrl',
-    src: 'AWESOME',
+    src: 'BRAPI',
     label: 'USD / BRL',
     getValue: (_bcb, fx) => fx?.usdBrl,
     getPct:   (_bcb, fx) => fx?.usdBrlPct,
@@ -181,7 +181,7 @@ const BRAZIL_INDICATORS = [
   },
   {
     key: 'eurBrl',
-    src: 'AWESOME',
+    src: 'BRAPI',
     label: 'EUR / BRL',
     getValue: (_bcb, fx) => fx?.eurBrl,
     getPct:   (_bcb, fx) => fx?.eurBrlPct,
@@ -361,7 +361,7 @@ function IndicatorCard({ seriesData, config }) {
 }
 
 // ─── Brazil Indicator Card ────────────────────────────────────────────────────
-// BCB/AwesomeFX return scalars only — no history for sparkline → flat dashed line
+// BCB/brazilFx return scalars only — no history for sparkline → flat dashed line
 function BrazilCard({ config, bcbData, fxData }) {
   const value      = config.getValue(bcbData, fxData);
   const pct        = config.getPct ? config.getPct(bcbData, fxData) : null;
@@ -403,7 +403,7 @@ function BrazilCard({ config, bcbData, fxData }) {
         </div>
       )}
 
-      {/* Flat sparkline — no history available from BCB/AwesomeAPI */}
+      {/* Flat sparkline — no history available from BCB/BRAPI currency */}
       <div style={{ marginTop: 'auto', paddingTop: 8, paddingBottom: 6, opacity: 0.35 }}>
         <svg width="100%" height={32} viewBox="0 0 100 32" preserveAspectRatio="none">
           <line x1="0" y1="16" x2="100" y2="16" stroke={ACCENT} strokeWidth="1.5" strokeDasharray="3,2" />
@@ -577,7 +577,7 @@ export default function MacroHubPage() {
       setFxData(_brMacroCache.fx);
       setLoadingBrazil(false);
     } else {
-      Promise.allSettled([bcbMacro(), awesomeFx()])
+      Promise.allSettled([bcbMacro(), brazilFx()])
         .then(([br, fx]) => {
           const bcb = br.status === 'fulfilled' ? br.value : null;
           const fxv = fx.status === 'fulfilled' ? fx.value : null;
@@ -769,8 +769,8 @@ export default function MacroHubPage() {
               borderRadius: 6, padding: '12px 16px',
               fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: TXT_3, lineHeight: 1.6,
             }}>
-              Brazil macro data sourced from Banco Central do Brasil (BCB) SGS API and AwesomeAPI —
-              both public, no API key required.
+              Brazil macro data sourced from the Banco Central do Brasil (BCB) SGS API and BRAPI
+              (FX pairs, with keyless AwesomeAPI as fallback).
             </div>
           </div>
         )}
