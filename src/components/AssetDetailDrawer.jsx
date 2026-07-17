@@ -441,6 +441,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
   const [chartInterval, setChartInterval] = useState(null); // null = use default for timeframe
   const [chartType,    setChartType]    = useState('candle'); // 'area' | 'candle' (expanded default; collapsed always area)
   const [showMA,       setShowMA]       = useState(true);      // SMA-50/200 overlays (expanded only)
+  const [fitSignal,    setFitSignal]    = useState(0);         // increments → PriceChart fits all
   const [chartPoints,  setChartPoints]  = useState(null);
   const [chartKey,     setChartKey]     = useState(''); // `${sym}:${tf}:${iv}` the loaded chartPoints belong to
   const [chartLoading, setChartLoading] = useState(false);
@@ -786,6 +787,20 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
               >
                 MA
               </button>
+              <button
+                onClick={() => setFitSignal(n => n + 1)}
+                title="Fit all bars"
+                style={{
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: 9, color: TXT_3, background: 'transparent',
+                  border: '1px solid transparent', borderRadius: 3,
+                  padding: '3px 8px', cursor: 'pointer', transition: 'all 0.12s ease',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = TXT_1; e.currentTarget.style.borderColor = BORDER; }}
+                onMouseLeave={e => { e.currentTarget.style.color = TXT_3; e.currentTarget.style.borderColor = 'transparent'; }}
+              >
+                ⛶ Fit
+              </button>
             </div>
           )}
         </div>
@@ -901,6 +916,9 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
           <div style={{
             position: 'absolute', inset: 0,
             opacity: (chartLoading || chartError) ? 0 : 1,
+            // While faded out, its children (e.g. the chart's » button) must
+            // not remain invisible-but-clickable.
+            pointerEvents: (chartLoading || chartError) ? 'none' : 'auto',
             transition: 'opacity 0.2s',
           }}>
             <PriceChart
@@ -914,6 +932,8 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
               symbol={currentSymbol}
               showLegend={expanded}
               showWatermark={expanded}
+              interactive={expanded}
+              fitSignal={fitSignal}
               intervalLabel={`${timeframe} · ${effectiveInterval}${CHART_PROXY[currentSymbol] ? ` · proxy ${CHART_PROXY[currentSymbol]}` : ''}`}
               colors={{ up: GREEN, down: RED, bg: BG_CARD, text: TXT_2, grid: 'rgba(30,41,59,0.4)', border: 'rgba(30,41,59,0.6)' }}
               recreateKey={`${currentSymbol}:${expanded}`}

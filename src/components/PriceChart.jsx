@@ -38,6 +38,16 @@ import {
  *   lastPriceLine   dashed last-price line + right-axis badge (default true)
  *   scaleMode       PriceScaleMode 0 linear / 1 log / 2 percent (default 0)
  *   watermarkColor  watermark text color
+ *   interactive     wheel/drag/pinch zoom-pan + reset gestures (default true;
+ *                   false = display-only mini chart that never hijacks page scroll)
+ *   fitSignal       increment to force a fit-all (parent "Fit" buttons)
+ *
+ * Zoom/viewport model: the visible range SURVIVES config-only series rebuilds
+ * (chart type, volume, MA, comparison toggles) and refits only when the data
+ * array itself changes (new symbol/timeframe/interval — the one case the
+ * docs sanction fitContent for). Zoom is bounded (fixLeftEdge, maxBarSpacing)
+ * with a right-edge margin; recovery gestures: double-click the pane to fit,
+ * and a "»" go-to-latest button appears when scrolled into history.
  */
 
 const DEFAULTS = {
@@ -103,6 +113,8 @@ export default function PriceChart({
   scaleMode = 0,
   movingAverages = null,
   watermarkColor = 'rgba(255,255,255,0.045)',
+  interactive = true,
+  fitSignal = 0,
 }) {
   const c = { ...DEFAULTS, ...(colors || {}) };
   const containerRef = useRef(null);
@@ -111,8 +123,13 @@ export default function PriceChart({
   const volRef       = useRef(null);
   const compRefs     = useRef([]);
   const maRefs       = useRef([]);
+  const prevDataRef  = useRef(null); // last rendered data array (viewport-preserve check)
+  const prevCompRef  = useRef(null); // last comparison prop (membership change → refit)
+  const dataLenRef   = useRef(0);
+  const [axisWidth, setAxisWidth] = useState(70); // right price axis px (positions »)
   const [gen, setGen] = useState(0);
   const [legend, setLegend] = useState(null);
+  const [awayFromEdge, setAwayFromEdge] = useState(false);
 
   const hasComparison = !!(comparison && comparison.length);
 
@@ -134,19 +151,52 @@ export default function PriceChart({
         horzLine: { color: 'rgba(148,152,161,0.35)', width: 1, style: LineStyle.Dashed, labelBackgroundColor: '#1e2d3d' },
       },
       rightPriceScale: { borderColor: c.border },
-      timeScale: { borderColor: c.border, timeVisible: true, secondsVisible: false },
-      handleScroll: { mouseWheel: true, pressedMouseMove: true },
-      handleScale:  { mouseWheel: true, pinch: true },
+      timeScale: {
+        borderColor: c.border, timeVisible: true, secondsVisible: false,
+        // Bounded, breathable zoom: no panning into whitespace left of the
+        // first bar + a small right margin. Deliberately NOT set:
+        // maxBarSpacing (it also caps fitContent, cramming few-bar series —
+        // e.g. B3 5D dailies — into a left sliver) and
+        // lockVisibleTimeRangeOnResize (its rescale fights fixLeftEdge's
+        // rightOffset correction on width resizes, drifting bars off-edge).
+        fixLeftEdge: true, rightOffset: 5,
+      },
+      // Display-only mounts (drawer's collapsed mini chart) get no wheel/drag
+      // handlers at all — the chart must never hijack page scroll there.
+      handleScroll: interactive ? { mouseWheel: true, pressedMouseMove: true } : false,
+      handleScale:  interactive ? { mouseWheel: true, pinch: true } : false,
     });
     chartRef.current = chart;
+    prevDataRef.current = null; // fresh instance → next series render refits
+    setAwayFromEdge(false);     // stale » from the previous instance must not survive
+
+    // Recovery gestures (interactive only): double-click the pane fits all
+    // bars + re-enables price autoscale; the "»" button appears once the
+    // user scrolls/zooms away from the live right edge.
+    let onDbl = null, onRange = null;
+    if (interactive) {
+      onDbl = () => {
+        try {
+          chart.timeScale().fitContent();
+          chart.priceScale('right').applyOptions({ autoScale: true });
+        } catch (_) {}
+      };
+      chart.subscribeDblClick(onDbl);
+      onRange = (range) => {
+        setAwayFromEdge(!!range && range.to < dataLenRef.current - 1.5);
+      };
+      chart.timeScale().subscribeVisibleLogicalRangeChange(onRange);
+    }
     setGen(g => g + 1); // bridge: signal the series effect to (re)render
 
     return () => {
+      try { if (onDbl) chart.unsubscribeDblClick(onDbl); } catch (_) {}
+      try { if (onRange) chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRange); } catch (_) {}
       chart.remove();
       chartRef.current = null; mainRef.current = null; volRef.current = null; compRefs.current = [];
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recreateKey, crosshairMode, c.bg, c.text, c.grid, c.border]);
+  }, [recreateKey, crosshairMode, interactive, c.bg, c.text, c.grid, c.border]);
 
   // ── Price-scale mode (linear / log / percent) — no recreate needed ────────
   // In comparison mode the right scale switches to native Percentage so every
@@ -178,6 +228,19 @@ export default function PriceChart({
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
+
+    // Viewport preservation: a rebuild with the SAME data array AND the same
+    // comparison set is a config toggle (chart type / volume / MA) — snapshot
+    // the visible range now and restore it after the rebuild instead of
+    // refitting. Comparison membership changes REFIT on purpose: adding or
+    // removing a series with a different trading calendar remaps the union
+    // time scale's logical indices, so a restored range would land on the
+    // wrong date window.
+    const isNewData = prevDataRef.current !== data || prevCompRef.current !== comparison;
+    let savedRange = null;
+    if (!isNewData) {
+      try { savedRange = chart.timeScale().getVisibleLogicalRange(); } catch (_) {}
+    }
 
     if (mainRef.current) { try { chart.removeSeries(mainRef.current); } catch (_) {} mainRef.current = null; }
     if (volRef.current)  { try { chart.removeSeries(volRef.current);  } catch (_) {} volRef.current  = null; }
@@ -254,7 +317,18 @@ export default function PriceChart({
       }
     }
 
-    chart.timeScale().fitContent();
+    prevDataRef.current = data;
+    prevCompRef.current = comparison;
+    dataLenRef.current = pts.length;
+    if (isNewData) {
+      // New dataset (symbol/timeframe/interval) or comparison-set change —
+      // the sanctioned fit-all cases.
+      chart.timeScale().fitContent();
+    } else if (savedRange) {
+      try { chart.timeScale().setVisibleLogicalRange(savedRange); } catch (_) {}
+    }
+    // Anchor the » button just left of the auto-sizing price axis.
+    try { const w = chart.priceScale('right').width(); if (w > 0) setAxisWidth(w); } catch (_) {}
 
     // Crosshair legend: hovered bar (falls back to the last bar), single-asset only.
     const base = pts[0].close ?? pts[0].value;
@@ -277,9 +351,36 @@ export default function PriceChart({
     return () => clearTimeout(t);
   }, [refitKey]);
 
+  // ── Parent-triggered fit (toolbar "Fit" button) ────────────────────────────
+  useEffect(() => {
+    if (!fitSignal || !chartRef.current) return;
+    try {
+      chartRef.current.timeScale().fitContent();
+      chartRef.current.priceScale('right').applyOptions({ autoScale: true });
+    } catch (_) {}
+  }, [fitSignal]);
+
   return (
     <div style={{ position: 'relative', width: '100%', height: height ?? '100%' }}>
       <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />
+      {interactive && awayFromEdge && !hasComparison && (
+        <button
+          title="Go to latest"
+          onClick={() => { try { chartRef.current?.timeScale().scrollToRealTime(); } catch (_) {} }}
+          style={{
+            position: 'absolute', bottom: 34, right: axisWidth + 8, zIndex: 4,
+            width: 26, height: 22, padding: 0,
+            fontFamily: "'JetBrains Mono', monospace", fontSize: 12, lineHeight: 1,
+            color: c.text, background: c.bg,
+            border: `1px solid ${c.border}`, borderRadius: 3, cursor: 'pointer',
+            opacity: 0.9,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.borderColor = c.text; }}
+          onMouseLeave={e => { e.currentTarget.style.opacity = '0.9'; e.currentTarget.style.borderColor = c.border; }}
+        >
+          »
+        </button>
+      )}
       {showLegend && legend && (
         <div style={{
           position: 'absolute', top: 8, left: 10, zIndex: 3, pointerEvents: 'none',
