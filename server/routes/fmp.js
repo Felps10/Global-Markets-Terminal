@@ -32,7 +32,7 @@ const TTL = {
 // Endpoints with a dynamic trailing segment → matched by prefix.
 const PREFIX_TTL = {
   'technical-indicators/': 60 * 60e3, // .../rsi
-  'historical-chart/':      5 * 60e3, // .../5min|30min|1hour
+  'historical-chart/':      5 * 60e3, // .../1min|5min|15min|30min|1hour
 };
 
 function ttlFor(ep) {

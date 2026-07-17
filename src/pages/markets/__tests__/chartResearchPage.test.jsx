@@ -95,12 +95,32 @@ describe('ChartResearchPage toolbar', () => {
     }
   });
 
-  it('fetches the newly selected timeframe', async () => {
+  it('fetches the newly selected timeframe with its default interval', async () => {
     renderPage();
     await waitFor(() => expect(fmpOHLCV).toHaveBeenCalled());
     fireEvent.click(screen.getByText('MAX'));
     await waitFor(() =>
-      expect(fmpOHLCV).toHaveBeenLastCalledWith('ENPH', 'MAX', expect.anything())
+      expect(fmpOHLCV).toHaveBeenLastCalledWith('ENPH', 'MAX',
+        expect.objectContaining({ interval: '1mo' }))
+    );
+  });
+
+  it('offers per-timeframe interval pills and refetches on selection', async () => {
+    renderPage();
+    await waitFor(() => expect(fmpOHLCV).toHaveBeenCalledWith('ENPH', '3M',
+      expect.objectContaining({ interval: '1d' }))); // 3M default
+    fireEvent.click(screen.getByText('1wk'));
+    await waitFor(() =>
+      expect(fmpOHLCV).toHaveBeenLastCalledWith('ENPH', '3M',
+        expect.objectContaining({ interval: '1wk' }))
+    );
+    // Switching timeframe resets the manual interval to the new default —
+    // discriminating case: the sticky '1wk' is NOT 1M's default ('1d'), so
+    // this fails if setChartInterval(null) is ever dropped from the click.
+    fireEvent.click(screen.getByText('1M'));
+    await waitFor(() =>
+      expect(fmpOHLCV).toHaveBeenLastCalledWith('ENPH', '1M',
+        expect.objectContaining({ interval: '1d' }))
     );
   });
 });

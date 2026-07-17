@@ -308,7 +308,9 @@ export default function PriceChart({
           </div>
           {movingAverages?.length > 0 && !hasComparison && (
             <div style={{ display: 'flex', gap: 10, marginTop: 2, fontSize: 10 }}>
-              {movingAverages.map(ma => (
+              {/* Only label MAs that actually rendered — sma() needs period+1
+                  bars, so e.g. MA200 has no line on a 52-bar weekly series. */}
+              {movingAverages.filter(ma => (data?.length || 0) >= ma.period + 1).map(ma => (
                 <span key={ma.period} style={{ color: ma.color }}>MA{ma.period}</span>
               ))}
             </div>

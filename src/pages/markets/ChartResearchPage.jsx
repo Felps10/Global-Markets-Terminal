@@ -17,6 +17,7 @@ import {
 import SourcePill from '../../components/SourcePill.jsx';
 import { CLUBE_COLORS } from '../../lib/tokens.js';
 import { marketsUrl } from '../../lib/routes.js';
+import { intervalChoicesFor } from '../../lib/chartIntervals.js';
 
 const C       = CLUBE_COLORS;
 const BORDER  = C.borderSubtle;
@@ -228,6 +229,7 @@ export default function ChartResearchPage() {
 
   // ── Chart ─────────────────────────────────────────────────────────────────
   const [timeframe,    setTimeframe]    = useState('3M');
+  const [chartInterval, setChartInterval] = useState(null); // null = timeframe default
   const [chartType,    setChartType]    = useState('Candlestick');
   const [showMA,       setShowMA]       = useState(true); // SMA-50/200 overlays (single-asset only)
   const [ohlcvData,    setOhlcvData]    = useState([]);
@@ -310,6 +312,12 @@ export default function ChartResearchPage() {
     : activeAsset?.exchange || '—';
 
   const hasComparisons = compSymbols.length > 0;
+  // B3 history is daily-only (BRAPI/EODHD) — don't offer intraday pills the
+  // chart can't deliver.
+  const intervalChoices = intervalChoicesFor(timeframe, { dailyOnly: !!assetMap[activeSymbol]?.isB3 });
+  const effectiveInterval = chartInterval || intervalChoices.default;
+  // Base + comparison series must share one granularity for the % overlay.
+  const seriesKey = `${timeframe}:${effectiveInterval}`;
   // Non-equities (indices, FX, crypto, commodities) have no fundamentals,
   // signals, or per-symbol news — hide the card deep-links for them, matching
   // the drawer's equity-gated tabs.
@@ -396,12 +404,12 @@ export default function ChartResearchPage() {
     setChartError(null);
     setOhlcvData([]);
 
-    fmpOHLCV(activeAsset.symbol, timeframe, { assets: assetMap })
+    fmpOHLCV(activeAsset.symbol, timeframe, { interval: effectiveInterval, assets: assetMap })
       .then(data => { if (!cancelled) { setOhlcvData(data); setChartLoading(false); } })
       .catch(err => { if (!cancelled) { setChartError(err.message || 'Chart data unavailable'); setChartLoading(false); } });
 
     return () => { cancelled = true; };
-  }, [activeAsset?.symbol, timeframe, assetMap]);
+  }, [activeAsset?.symbol, timeframe, effectiveInterval, assetMap]);
 
   // 5. Single owner of comparison-series fetching. Each compData entry stores
   // the timeframe it was fetched for ({ tf, data }); anything stale — just
@@ -410,14 +418,14 @@ export default function ChartResearchPage() {
   // series drops from the chart (never a stale-timeframe overlay) and isn't
   // retried until the timeframe changes.
   useEffect(() => {
-    const stale = compSymbols.filter(sym => compData[sym]?.tf !== timeframe);
+    const stale = compSymbols.filter(sym => compData[sym]?.key !== seriesKey);
     if (stale.length === 0) { setCompLoading(false); return; }
     let cancelled = false;
     setCompLoading(true);
 
     Promise.all(
       stale.map(sym =>
-        fmpOHLCV(sym, timeframe, { assets: assetMap })
+        fmpOHLCV(sym, timeframe, { interval: effectiveInterval, assets: assetMap })
           .then(data => ({ sym, data }))
           .catch(() => ({ sym, data: null }))
       )
@@ -425,22 +433,23 @@ export default function ChartResearchPage() {
       if (cancelled) return;
       setCompData(prev => {
         const next = { ...prev };
-        results.forEach(({ sym, data }) => { next[sym] = { tf: timeframe, data }; });
+        results.forEach(({ sym, data }) => { next[sym] = { key: seriesKey, data }; });
         return next;
       });
       setCompLoading(false);
     });
 
     return () => { cancelled = true; };
-  }, [timeframe, assetMap, compSymbols.join(','), compData]);
+    // seriesKey ≡ `${timeframe}:${effectiveInterval}` — it IS the invalidation axis.
+  }, [seriesKey, assetMap, compSymbols.join(','), compData]);
 
   // Chart props for <PriceChart> (createChart + series lifecycle live there).
   const chartSeriesType = chartType === 'Candlestick' ? 'candle' : chartType === 'Line' ? 'line' : 'area';
   const chartComparison = useMemo(() => {
-    const active = compSymbols.filter(sym => compData[sym]?.tf === timeframe && compData[sym]?.data?.length > 0);
+    const active = compSymbols.filter(sym => compData[sym]?.key === seriesKey && compData[sym]?.data?.length > 0);
     if (!active.length) return null;
     return active.map((sym, i) => ({ data: compData[sym].data, color: COMP_COLORS[i % COMP_COLORS.length] }));
-  }, [compSymbols, compData, timeframe]);
+  }, [compSymbols, compData, seriesKey]);
 
   // 8. Resize handler
   useEffect(() => {
@@ -491,6 +500,7 @@ export default function ChartResearchPage() {
   function switchAsset(sym) {
     if (sym === activeSymbol) return;
     setActiveSymbol(sym);
+    setChartInterval(null);
     setSearchQuery('');
     setSearchOpen(false);
     setCompSymbols([]);
@@ -719,8 +729,10 @@ export default function ChartResearchPage() {
           {compSymbols.map((sym, i) => (
             <div key={sym} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <div style={{ width: 14, height: 2, background: COMP_COLORS[i % COMP_COLORS.length], borderRadius: 1 }} />
-              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: TXT_2 }}>{sym}</span>
-              {compLoading && compData[sym]?.tf !== timeframe && <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: TXT_3 }}>...</span>}
+              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: TXT_2 }}>
+                {CHART_PROXY[sym] ? `${sym} (proxy ${CHART_PROXY[sym]})` : sym}
+              </span>
+              {compLoading && compData[sym]?.key !== seriesKey && <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: TXT_3 }}>...</span>}
               <button
                 onClick={() => removeComparison(sym)}
                 style={{
@@ -918,7 +930,11 @@ export default function ChartResearchPage() {
               overflowX: 'auto', WebkitOverflowScrolling: 'touch',
             }}>
               {TIMEFRAMES.map(tf => (
-                <TabBtn key={tf} label={tf} active={timeframe === tf} onClick={() => setTimeframe(tf)} />
+                <TabBtn key={tf} label={tf} active={timeframe === tf} onClick={() => { setTimeframe(tf); setChartInterval(null); }} />
+              ))}
+              <div style={{ width: 1, height: 20, background: BORDER, margin: '0 6px', flexShrink: 0 }} />
+              {intervalChoices.options.map(iv => (
+                <TabBtn key={iv} label={iv} active={effectiveInterval === iv} onClick={() => setChartInterval(iv)} />
               ))}
               <div style={{ flex: 1 }} />
               <div style={{ display: 'flex', gap: 4, marginRight: 8 }}>
@@ -956,7 +972,7 @@ export default function ChartResearchPage() {
                   candleBorders={false}
                   areaTopColor="rgba(59,130,246,0.3)"
                   symbol={activeSymbol}
-                  intervalLabel={CHART_PROXY[activeSymbol] ? `${timeframe} · proxy ${CHART_PROXY[activeSymbol]}` : timeframe}
+                  intervalLabel={`${timeframe} · ${effectiveInterval}${CHART_PROXY[activeSymbol] ? ` · proxy ${CHART_PROXY[activeSymbol]}` : ''}`}
                   colors={{ up: GREEN, down: RED, accent: '#3b82f6', bg: BG_PAGE, text: TXT_2, grid: '#1e2d3d', border: '#1e2d3d' }}
                 />
               </div>
@@ -976,7 +992,7 @@ export default function ChartResearchPage() {
                     <div key={sym} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                       <div style={{ width: 16, height: 2, background: COMP_COLORS[i % COMP_COLORS.length], borderRadius: 1 }} />
                       <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: TXT_2 }}>
-                        {sym} %Δ
+                        {CHART_PROXY[sym] ? `${sym} (proxy ${CHART_PROXY[sym]})` : sym} %Δ
                       </span>
                     </div>
                   ))}
