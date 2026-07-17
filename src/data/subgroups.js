@@ -8,7 +8,7 @@ export const SUBGROUPS = [
   { id: "automobile",      display_name: "Automobile",                description: "GICS: Consumer Discretionary / Automobiles",                  slug: "automobile",      group_id: "equities",     icon: "🚗",  color: "#FF6D00", section_id: null, data_source: null, sort_order: 1  },
   { id: "biotech",         display_name: "Biotech",                   description: "GICS: Health Care — biotechnology sub-industry",               slug: "biotech",         group_id: "equities",     icon: "🧬",  color: "#EC407A", section_id: null, data_source: null, sort_order: 2  },
   { id: "cleanenergy",     display_name: "Clean Energy",              description: "Thematic: EVs + renewables + utilities",                      slug: "cleanenergy",     group_id: "equities",     icon: "🔋",  color: "#66BB6A", section_id: null, data_source: null, sort_order: 3  },
-  { id: "consumer",        display_name: "Consumer",                  description: "GICS: Consumer Discretionary + Staples",                      slug: "consumer",        group_id: "equities",     icon: "🛒",  color: "#FF7043", section_id: null, data_source: null, sort_order: 4  },
+  { id: "consumer",        display_name: "Consumer",                  description: "GICS: Consumer Discretionary (staples split out 2026-07)",    slug: "consumer",        group_id: "equities",     icon: "🛒",  color: "#FF7043", section_id: null, data_source: null, sort_order: 4  },
   { id: "financials",      display_name: "Financials",                description: "GICS: Financials",                                            slug: "financials",      group_id: "equities",     icon: "🏦",  color: "#4CAF50", section_id: null, data_source: null, sort_order: 5  },
   { id: "healthcare",      display_name: "Health Care",               description: "GICS: Health Care — official two-word form",                  slug: "healthcare",      group_id: "equities",     icon: "💊",  color: "#E91E63", section_id: null, data_source: null, sort_order: 6  },
   { id: "industrials",     display_name: "Industrials",               description: "GICS: Industrials — transportation, machinery, conglomerates", slug: "industrials",     group_id: "equities",     icon: "🏭",  color: "#78909C", section_id: null, data_source: null, sort_order: 7  },
@@ -19,6 +19,13 @@ export const SUBGROUPS = [
 
   // ── Equities — International ───────────────────────────────────────────────
   { id: "emerging",        display_name: "Emerging Markets",          description: "EM ETFs: EWZ, INDA, MCHI, EWY",                              slug: "emerging",        group_id: "equities",     icon: "🌍",  color: "#26A69A", section_id: null, data_source: null, sort_order: 12 },
+
+  // ── Equities — T1 wave 2 (2026-07-17 audit: sectors that had no home) ─────
+  { id: "consumer-staples", display_name: "Consumer Staples",         description: "GICS: Consumer Staples — food, beverage, tobacco, household", slug: "consumer-staples", group_id: "equities",    icon: "🧺",  color: "#8D6E63", section_id: null, data_source: null, sort_order: 13 },
+  { id: "utilities",       display_name: "Utilities",                 description: "GICS: Utilities — regulated electric & multi-utilities",      slug: "utilities",       group_id: "equities",     icon: "💡",  color: "#FBC02D", section_id: null, data_source: null, sort_order: 14 },
+  { id: "telecom-media",   display_name: "Telecom & Media",           description: "GICS: Communication Services — carriers + media",             slug: "telecom-media",   group_id: "equities",     icon: "📡",  color: "#5E35B1", section_id: null, data_source: null, sort_order: 15 },
+  { id: "materials",       display_name: "Materials",                 description: "GICS: Materials — chemicals, industrial gases, miners",       slug: "materials",       group_id: "equities",     icon: "🧱",  color: "#795548", section_id: null, data_source: null, sort_order: 16 },
+  { id: "us-etfs",         display_name: "US Core ETFs",              description: "Broad-market US trackers: SPY, QQQ, IWM, DIA",                slug: "us-etfs",         group_id: "equities",     icon: "🇺🇸", color: "#3F51B5", section_id: null, data_source: null, sort_order: 17 },
 
   // ── Currencies ────────────────────────────────────────────────────────────
   { id: "fx",              display_name: "Foreign Exchange",          description: "Major currency pairs via Yahoo Finance",                      slug: "fx",              group_id: "currencies",   icon: "💱",  color: "#FFD740", section_id: null, data_source: "yahoo",      sort_order: 0  },
@@ -33,6 +40,7 @@ export const SUBGROUPS = [
   { id: "precious-metals",    display_name: "Precious Metals",        description: "Gold, silver, platinum ETFs and futures",                    slug: "precious-metals",    group_id: "commodities",  icon: "🥇", color: "#FFD700", section_id: null, data_source: "yahoo", sort_order: 0 },
   { id: "energy-commodities", display_name: "Energy Commodities",     description: "Crude oil, natural gas ETFs and futures",                   slug: "energy-commodities", group_id: "commodities",  icon: "🛢", color: "#FF6F00", section_id: null, data_source: "yahoo", sort_order: 1 },
   { id: "agriculture",        display_name: "Agriculture",            description: "Corn, wheat, soybean commodity ETFs",                       slug: "agriculture",        group_id: "commodities",  icon: "🌾", color: "#8BC34A", section_id: null, data_source: "yahoo", sort_order: 2 },
+  { id: "industrial-metals",  display_name: "Industrial Metals",      description: "Copper — front-month futures + CPER ETF",                   slug: "industrial-metals",  group_id: "commodities",  icon: "🔩", color: "#B0BEC5", section_id: null, data_source: null,    sort_order: 3 },
 
   // ── Fixed Income ──────────────────────────────────────────────────────────
   { id: "dividend-income", display_name: "Dividend Income",           description: "High-yield dividend ETFs and income strategies",             slug: "dividend-income", group_id: "fixed-income", icon: "💰",  color: "#FFC107", section_id: null, data_source: "yahoo", sort_order: 0 },

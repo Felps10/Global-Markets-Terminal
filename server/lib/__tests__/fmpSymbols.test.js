@@ -2,19 +2,22 @@ import { describe, it, expect } from 'vitest';
 import { yahooToFmp, isFmpSingleQuote } from '../fmpSymbols.js';
 
 describe('yahooToFmp', () => {
-  it('maps the four Premium-available commodity futures to XXUSD', () => {
+  it('maps the served futures to their FMP codes', () => {
     expect(yahooToFmp('GC=F')).toBe('GCUSD'); // gold
     expect(yahooToFmp('SI=F')).toBe('SIUSD'); // silver
     expect(yahooToFmp('CL=F')).toBe('CLUSD'); // WTI — quotes un-gated 2026-07-17
     expect(yahooToFmp('NG=F')).toBe('NGUSD'); // natgas — quotes un-gated 2026-07-17
+    expect(yahooToFmp('BZ=F')).toBe('BZUSD'); // Brent — T1 wave 2
+    expect(yahooToFmp('HG=F')).toBe('HGUSD'); // copper — T1 wave 2
+    expect(yahooToFmp('DX=F')).toBe('DXUSD'); // dollar index — T1 wave 2
   });
 
-  it('returns null for commodity futures FMP does not serve', () => {
-    expect(yahooToFmp('HG=F')).toBeNull(); // copper — not in the served book
-    expect(yahooToFmp('BZ=F')).toBeNull(); // brent — not in the served book
+  it('returns null for futures FMP does not serve yet', () => {
+    expect(yahooToFmp('KC=F')).toBeNull(); // coffee — deferred (charts gated, no ETF proxy)
+    expect(yahooToFmp('PA=F')).toBeNull(); // palladium — T3, not served
   });
 
-  it('maps the 8 FMP-covered indices to their caret symbol (single-quote endpoint)', () => {
+  it('maps the 9 FMP-covered indices to their caret symbol (single-quote endpoint)', () => {
     expect(yahooToFmp('^GSPC')).toBe('^GSPC');
     expect(yahooToFmp('^DJI')).toBe('^DJI');
     expect(yahooToFmp('^IXIC')).toBe('^IXIC');
@@ -23,6 +26,7 @@ describe('yahooToFmp', () => {
     expect(yahooToFmp('^N225')).toBe('^N225');
     expect(yahooToFmp('^HSI')).toBe('^HSI');
     expect(yahooToFmp('^STOXX50E')).toBe('^STOXX50E');
+    expect(yahooToFmp('^RUT')).toBe('^RUT'); // T1 wave 2
   });
 
   it('returns null for indices FMP does not cover (EODHD stays primary)', () => {
@@ -51,8 +55,8 @@ describe('yahooToFmp', () => {
   });
 
   it('honors an explicit meta.fmpSymbol override', () => {
-    expect(yahooToFmp('WEIRD', { fmpSymbol: 'BZUSD' })).toBe('BZUSD');
-    expect(yahooToFmp('HG=F', { fmpSymbol: 'HGUSD' })).toBe('HGUSD'); // override can force an unmapped symbol
+    expect(yahooToFmp('WEIRD', { fmpSymbol: 'ZZTEST' })).toBe('ZZTEST');
+    expect(yahooToFmp('KC=F', { fmpSymbol: 'KCUSX' })).toBe('KCUSX'); // override can force an unmapped symbol
   });
 
   it('returns null for empty/invalid input', () => {

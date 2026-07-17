@@ -103,9 +103,10 @@ const SPARKLINE_WINDOW_DAYS  = 45;                 // calendar window → ~30 tr
 const SPARKLINE_POINTS       = 30;                 // most-recent closes kept per symbol
 const SPARKLINE_CONCURRENCY  = 8;                  // in-flight light-EOD requests
 const SPARKLINE_CHUNK_GAP    = 150;                // ms between concurrency chunks
-// WTI/natgas have no FMP/EODHD daily history → their sparkline tracks the liquid ETF proxy
-// (shape only; the chart legend already flags proxied levels). Mirrors the client CHART_PROXY.
-const SPARKLINE_PROXY = { 'CL=F': 'USO', 'NG=F': 'UNG' };
+// History-gated futures have no FMP/EODHD daily history → their sparkline tracks the liquid
+// ETF proxy (shape only; the chart legend already flags proxied levels). Mirrors the client
+// CHART_PROXY. (BZ=F is absent on purpose — BZUSD history works natively on Premium.)
+const SPARKLINE_PROXY = { 'CL=F': 'USO', 'NG=F': 'UNG', 'HG=F': 'CPER', 'DX=F': 'UUP' };
 
 // Brazil B3 feed (BRAPI Pro: 20 tickers/req, 500k/mo). ~191 names ÷ 20 = 10 req/cycle;
 // at 300s, 24/7 = ~86k req/mo — well under 500k. BRAPI Pro is ~5-min fresh, so ≤5-min cadence

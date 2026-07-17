@@ -26,13 +26,17 @@
  *         batch-quote handles equities/FX/commodities; indices need single /quote.
  */
 
-// FMP Premium commodity futures we serve (front-month, XXUSD). Quotes only — the four map
-// here, but WTI/natgas HISTORY is still gated on Premium (charts ride the USO/UNG proxies).
+// FMP Premium futures we serve (front-month). QUOTES work for all of these (live-verified
+// 2026-07-17); HISTORY is per-symbol gated on Premium — only GCUSD/SIUSD/BZUSD chart natively,
+// the rest ride ETF proxies for sparklines/charts (SPARKLINE_PROXY / client CHART_PROXY).
 const FMP_COMMODITY = {
   'GC=F': 'GCUSD',
   'SI=F': 'SIUSD',
   'CL=F': 'CLUSD', // quotes un-gated 2026-07-17 (was 402 on 2026-07-07)
   'NG=F': 'NGUSD', // quotes un-gated 2026-07-17 (was 402 on 2026-07-07)
+  'BZ=F': 'BZUSD', // Brent — quotes AND history work natively
+  'HG=F': 'HGUSD', // copper — quote-only (charts via CPER proxy)
+  'DX=F': 'DXUSD', // dollar-index futures — quote-only (charts via UUP proxy; ^DXY spot is gated)
 };
 
 // Indices routed to FMP. Re-verified LIVE via the /stable/quote SINGLE endpoint (2026-07-13,
@@ -50,6 +54,7 @@ const FMP_INDEX = {
   '^N225': '^N225',   // Nikkei 225
   '^HSI': '^HSI',     // Hang Seng
   '^STOXX50E': '^STOXX50E', // Euro STOXX 50
+  '^RUT': '^RUT',     // Russell 2000 (live-verified 2026-07-17)
 };
 
 /**
