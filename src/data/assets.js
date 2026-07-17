@@ -27,6 +27,12 @@ export const ASSETS = [
   { id: "now",   symbol: "NOW",   name: "ServiceNow",     subgroup_id: "technology",     group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
   { id: "adbe",  symbol: "ADBE",  name: "Adobe",          subgroup_id: "technology",     group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
   { id: "shop",  symbol: "SHOP",  name: "Shopify",        subgroup_id: "technology",     group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "acn",   symbol: "ACN",   name: "Accenture",      subgroup_id: "technology",     group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "ibm",   symbol: "IBM",   name: "IBM",            subgroup_id: "technology",     group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "csco",  symbol: "CSCO",  name: "Cisco",          subgroup_id: "technology",     group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
+  { id: "intu",  symbol: "INTU",  name: "Intuit",         subgroup_id: "technology",     group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
+  { id: "sap",   symbol: "SAP",   name: "SAP",            subgroup_id: "technology",     group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "pltr",  symbol: "PLTR",  name: "Palantir",       subgroup_id: "technology",     group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
 
   // ── Oil & Gas ────────────────────────────────────────────────────────────
   { id: "xom",   symbol: "XOM",   name: "ExxonMobil",      subgroup_id: "oil-gas", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE" },
@@ -37,6 +43,8 @@ export const ASSETS = [
   { id: "bp",    symbol: "BP",    name: "BP",              subgroup_id: "oil-gas", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE" },
   { id: "enb",   symbol: "ENB",   name: "Enbridge",        subgroup_id: "oil-gas", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE" },
   { id: "slb",   symbol: "SLB",   name: "Schlumberger",    subgroup_id: "oil-gas", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE" },
+  { id: "pbr",   symbol: "PBR",   name: "Petrobras ADR",   subgroup_id: "oil-gas", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE" },
+  { id: "eog",   symbol: "EOG",   name: "EOG Resources",   subgroup_id: "oil-gas", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE" },
 
   // ── Financials ───────────────────────────────────────────────────────────
   { id: "jpm",   symbol: "JPM",   name: "JPMorgan Chase",    subgroup_id: "financials", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE" },
@@ -52,6 +60,10 @@ export const ASSETS = [
   { id: "schw",  symbol: "SCHW",  name: "Charles Schwab",    subgroup_id: "financials", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
   { id: "bx",    symbol: "BX",    name: "Blackstone",        subgroup_id: "financials", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
   { id: "iep",   symbol: "IEP",   name: "Icahn Enterprises", subgroup_id: "financials", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
+  { id: "brk-b", symbol: "BRK-B", name: "Berkshire Hathaway", subgroup_id: "financials", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "spgi",  symbol: "SPGI",  name: "S&P Global",        subgroup_id: "financials", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "ice",   symbol: "ICE",   name: "Intercontinental Exchange", subgroup_id: "financials", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE" },
+  { id: "cme",   symbol: "CME",   name: "CME Group",         subgroup_id: "financials", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
 
   // ── Health Care ──────────────────────────────────────────────────────────
   { id: "jnj",   symbol: "JNJ",   name: "Johnson & Johnson", subgroup_id: "healthcare", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
@@ -65,6 +77,11 @@ export const ASSETS = [
   { id: "bmy",   symbol: "BMY",   name: "Bristol-Myers",     subgroup_id: "healthcare", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
   { id: "isrg",  symbol: "ISRG",  name: "Intuitive Surgical", subgroup_id: "healthcare", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
   { id: "elv",   symbol: "ELV",   name: "Elevance Health",   subgroup_id: "healthcare", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "tmo",   symbol: "TMO",   name: "Thermo Fisher",     subgroup_id: "healthcare", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "dhr",   symbol: "DHR",   name: "Danaher",           subgroup_id: "healthcare", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "nvo",   symbol: "NVO",   name: "Novo Nordisk",      subgroup_id: "healthcare", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "azn",   symbol: "AZN",   name: "AstraZeneca",       subgroup_id: "healthcare", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "nvs",   symbol: "NVS",   name: "Novartis",          subgroup_id: "healthcare", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
 
   // ── Semiconductors ───────────────────────────────────────────────────────
   { id: "amd",   symbol: "AMD",   name: "AMD",      subgroup_id: "semiconductors", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
@@ -77,6 +94,11 @@ export const ASSETS = [
   { id: "mrvl",  symbol: "MRVL",  name: "Marvell Technology", subgroup_id: "semiconductors", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
   { id: "on",    symbol: "ON",    name: "ON Semiconductor",   subgroup_id: "semiconductors", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
   { id: "mpwr",  symbol: "MPWR",  name: "Monolithic Power",   subgroup_id: "semiconductors", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
+  { id: "txn",   symbol: "TXN",   name: "Texas Instruments",  subgroup_id: "semiconductors", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
+  { id: "mu",    symbol: "MU",    name: "Micron",             subgroup_id: "semiconductors", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
+  { id: "amat",  symbol: "AMAT",  name: "Applied Materials",  subgroup_id: "semiconductors", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
+  { id: "lrcx",  symbol: "LRCX",  name: "Lam Research",       subgroup_id: "semiconductors", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
+  { id: "adi",   symbol: "ADI",   name: "Analog Devices",     subgroup_id: "semiconductors", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
 
   // ── Consumer ─────────────────────────────────────────────────────────────
   { id: "wmt",   symbol: "WMT",   name: "Walmart",  subgroup_id: "consumer", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
@@ -89,6 +111,10 @@ export const ASSETS = [
   { id: "pg",    symbol: "PG",    name: "Procter & Gamble",  subgroup_id: "consumer", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
   { id: "ko",    symbol: "KO",    name: "Coca-Cola",         subgroup_id: "consumer", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
   { id: "pep",   symbol: "PEP",   name: "PepsiCo",           subgroup_id: "consumer", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
+  { id: "hd",    symbol: "HD",    name: "Home Depot",        subgroup_id: "consumer", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "low",   symbol: "LOW",   name: "Lowe's",            subgroup_id: "consumer", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "bkng",  symbol: "BKNG",  name: "Booking Holdings",  subgroup_id: "consumer", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
+  { id: "tjx",   symbol: "TJX",   name: "TJX Companies",     subgroup_id: "consumer", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
 
   // ── Aerospace & Defense ──────────────────────────────────────────────────
   { id: "lmt",   symbol: "LMT",   name: "Lockheed Martin",  subgroup_id: "aerospace", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE" },
@@ -103,6 +129,9 @@ export const ASSETS = [
   // ── Clean Energy ─────────────────────────────────────────────────────────
   { id: "rivn",  symbol: "RIVN",  name: "Rivian",         subgroup_id: "automobile",  group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
   { id: "byddy", symbol: "BYDDY", name: "BYD",            subgroup_id: "automobile",  group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "tm",    symbol: "TM",    name: "Toyota",         subgroup_id: "automobile",  group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "f",     symbol: "F",     name: "Ford",           subgroup_id: "automobile",  group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "gm",    symbol: "GM",    name: "General Motors", subgroup_id: "automobile",  group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
   { id: "nee",   symbol: "NEE",   name: "NextEra Energy",  subgroup_id: "cleanenergy", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
   { id: "enph",  symbol: "ENPH",  name: "Enphase Energy",  subgroup_id: "cleanenergy", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
   { id: "fslr",  symbol: "FSLR",  name: "First Solar",    subgroup_id: "cleanenergy", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
@@ -125,6 +154,10 @@ export const ASSETS = [
   { id: "inda",  symbol: "INDA",  name: "India ETF",       subgroup_id: "emerging", group_id: "equities", terminal_view: "global", type: "etf", exchange: "NASDAQ" },
   { id: "mchi",  symbol: "MCHI",  name: "China ETF",       subgroup_id: "emerging", group_id: "equities", terminal_view: "global", type: "etf", exchange: "NASDAQ" },
   { id: "ewy",   symbol: "EWY",   name: "South Korea ETF", subgroup_id: "emerging", group_id: "equities", terminal_view: "global", type: "etf", exchange: "NYSE"   },
+  { id: "eem",   symbol: "EEM",   name: "Emerging Markets ETF",   subgroup_id: "emerging", group_id: "equities", terminal_view: "global", type: "etf",    exchange: "NYSE" },
+  { id: "vwo",   symbol: "VWO",   name: "FTSE Emerging Mkts ETF", subgroup_id: "emerging", group_id: "equities", terminal_view: "global", type: "etf",    exchange: "NYSE" },
+  { id: "baba",  symbol: "BABA",  name: "Alibaba",                subgroup_id: "emerging", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE" },
+  { id: "nu",    symbol: "NU",    name: "Nubank",                 subgroup_id: "emerging", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE" },
 
   // ── Currencies — Foreign Exchange ─────────────────────────────────────────
   { id: "eurusd", symbol: "EURUSD=X", name: "Euro / US Dollar",              subgroup_id: "fx", group_id: "currencies", terminal_view: "global", type: "forex", exchange: "FOREX", meta: { display: "EUR/USD" } },
@@ -227,6 +260,7 @@ export const ASSETS = [
   { id: "vrtx",  symbol: "VRTX",  name: "Vertex Pharma",   subgroup_id: "biotech", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
   { id: "gild",  symbol: "GILD",  name: "Gilead Sciences", subgroup_id: "biotech", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
   { id: "incy",  symbol: "INCY",  name: "Incyte",          subgroup_id: "biotech", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
+  { id: "amgn",  symbol: "AMGN",  name: "Amgen",           subgroup_id: "biotech", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
 
   // ══════════════════════════════════════════════════════════════════════
   // ── BRAZIL — B3 ───────────────────────────────────────────────────────
