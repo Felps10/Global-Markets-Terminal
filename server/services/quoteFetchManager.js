@@ -82,7 +82,7 @@ const EODHD_CHUNK_GAP      = 150;      // ms between batches
 const EODHD_TIMEOUT_MS     = 12_000;
 
 // FMP "Premium" (paid, /stable API; 1 call/request, 750/min, no daily cap, 50GB/30d). Since
-// Stage 2, FMP is PRIMARY for equities/FX + gold/silver (batch-quote) + ^FTSE (single quote):
+// Stage 2, FMP is PRIMARY for equities/FX + gold/silver/WTI/natgas (batch-quote) + ^FTSE (single quote):
 // ~153 symbols in ~2 batches + 1 single ≈ 3 calls/60s ≈ 4.3k calls/day, ~2GB/30d — trivial vs
 // the limits. Drives the real-time equity/FX feed, so it polls faster than EODHD.
 const FMP_BASE_INTERVAL    = 60_000;   // 1 min
@@ -706,6 +706,8 @@ async function fetchSparklines() {
     let ok = 0;
 
     // Pass 1 — FMP light-EOD for FMP-resolvable symbols (equities/FX/gold-silver/US+FTSE indices).
+    // WTI/natgas are FMP-resolvable for QUOTES but their history 402s on Premium — they land in
+    // the quarantine on first attempt and pass 2 fills them via SPARKLINE_PROXY (USO/UNG).
     const targets = (fmp || []).filter((f) => !sparklineQuarantine.has(f.fmp));
     for (const batch of chunk(targets, SPARKLINE_CONCURRENCY)) {
       await Promise.all(batch.map(async (f) => {
