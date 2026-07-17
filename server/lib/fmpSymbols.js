@@ -13,8 +13,11 @@
  * Verified LIVE against the paid FMP "Premium" key (2026-07-07, /stable API):
  *   equity  `AAPL` → `AAPL`  ✅ (137/137 of the live book incl. ADRs TSM/ASML + ETFs EWZ/EWY)
  *   fx      `EURUSD=X` → `EURUSD` ✅ (13/13, real-time)
- *   commodity `GC=F` → `GCUSD` ✅  `SI=F` → `SIUSD` ✅ ; `CL=F`/`NG=F` ❌ 402 (gated above
- *             Premium → USO/UNG ETF proxies)
+ *   commodity `GC=F` → `GCUSD` ✅  `SI=F` → `SIUSD` ✅  `CL=F` → `CLUSD` ✅  `NG=F` → `NGUSD` ✅
+ *             (CLUSD/NGUSD 402'd on 2026-07-07 but batch-quoted fine on 2026-07-17 — FMP
+ *             un-gated the QUOTES only; their EOD/intraday HISTORY still 402s on Premium,
+ *             so charts/sparklines keep the USO/UNG ETF proxies — see SPARKLINE_PROXY in
+ *             quoteFetchManager.js and CHART_PROXY in src/dataServices.js.)
  *   index   `^GSPC/^DJI/^IXIC/^VIX/^FTSE/^N225/^HSI/^STOXX50E` → identity ✅ (single /stable/quote;
  *             batch-quote 402s indices). Other indices → null (EODHD primary; FMP returns empty
  *             for ^GDAXI/^FCHI/^BVSP/^AXJO/^KS11/^GSPTSE/^BSESN — re-verified live 2026-07-13).
@@ -23,11 +26,13 @@
  *         batch-quote handles equities/FX/commodities; indices need single /quote.
  */
 
-// FMP Premium commodity futures we serve (front-month, XXUSD). Metals only — WTI (CL=F) and
-// natural gas (NG=F) are gated above Premium.
+// FMP Premium commodity futures we serve (front-month, XXUSD). Quotes only — the four map
+// here, but WTI/natgas HISTORY is still gated on Premium (charts ride the USO/UNG proxies).
 const FMP_COMMODITY = {
   'GC=F': 'GCUSD',
   'SI=F': 'SIUSD',
+  'CL=F': 'CLUSD', // quotes un-gated 2026-07-17 (was 402 on 2026-07-07)
+  'NG=F': 'NGUSD', // quotes un-gated 2026-07-17 (was 402 on 2026-07-07)
 };
 
 // Indices routed to FMP. Re-verified LIVE via the /stable/quote SINGLE endpoint (2026-07-13,

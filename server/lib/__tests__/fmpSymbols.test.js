@@ -2,14 +2,16 @@ import { describe, it, expect } from 'vitest';
 import { yahooToFmp, isFmpSingleQuote } from '../fmpSymbols.js';
 
 describe('yahooToFmp', () => {
-  it('maps the two Premium-available metal futures to XXUSD', () => {
+  it('maps the four Premium-available commodity futures to XXUSD', () => {
     expect(yahooToFmp('GC=F')).toBe('GCUSD'); // gold
     expect(yahooToFmp('SI=F')).toBe('SIUSD'); // silver
+    expect(yahooToFmp('CL=F')).toBe('CLUSD'); // WTI — quotes un-gated 2026-07-17
+    expect(yahooToFmp('NG=F')).toBe('NGUSD'); // natgas — quotes un-gated 2026-07-17
   });
 
-  it('returns null for WTI/natgas (gated above Premium → ETF proxies)', () => {
-    expect(yahooToFmp('CL=F')).toBeNull();
-    expect(yahooToFmp('NG=F')).toBeNull();
+  it('returns null for commodity futures FMP does not serve', () => {
+    expect(yahooToFmp('HG=F')).toBeNull(); // copper — not in the served book
+    expect(yahooToFmp('BZ=F')).toBeNull(); // brent — not in the served book
   });
 
   it('maps the 8 FMP-covered indices to their caret symbol (single-quote endpoint)', () => {
@@ -50,7 +52,7 @@ describe('yahooToFmp', () => {
 
   it('honors an explicit meta.fmpSymbol override', () => {
     expect(yahooToFmp('WEIRD', { fmpSymbol: 'BZUSD' })).toBe('BZUSD');
-    expect(yahooToFmp('CL=F', { fmpSymbol: 'CLUSD' })).toBe('CLUSD'); // override can force a gated symbol
+    expect(yahooToFmp('HG=F', { fmpSymbol: 'HGUSD' })).toBe('HGUSD'); // override can force an unmapped symbol
   });
 
   it('returns null for empty/invalid input', () => {
