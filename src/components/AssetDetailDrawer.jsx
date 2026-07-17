@@ -15,6 +15,7 @@ import PriceChart from './PriceChart.jsx';
 import { useTaxonomy } from '../context/TaxonomyContext.jsx';
 import { resolveAsset } from '../lib/assetResolution.js';
 import { marketsUrl } from '../lib/routes.js';
+import { intervalChoicesFor } from '../lib/chartIntervals.js';
 import OpenInPageButton from './OpenInPageButton.jsx';
 import {
   fetchQuote, quoteSrcLabel,
@@ -47,17 +48,8 @@ const EQUITY_TYPES = new Set(['stock', 'etf', 'equity']);
 // Stable ref — an inline array would re-run the chart's series effect every render.
 const MA_OVERLAYS  = [{ period: 50, color: '#f59e0b' }, { period: 200, color: '#a78bfa' }];
 
-const INTERVAL_OPTIONS = {
-  '1D':  { default: '5m',  options: ['1m', '5m', '15m', '30m'] },
-  '5D':  { default: '30m', options: ['15m', '30m', '1h'] },
-  '1W':  { default: '30m', options: ['15m', '30m', '1h'] },
-  '1M':  { default: '1d',  options: ['1h', '1d'] },
-  '3M':  { default: '1d',  options: ['1d', '1wk'] },
-  'YTD': { default: '1d',  options: ['1d', '1wk'] },
-  '1Y':  { default: '1wk', options: ['1d', '1wk', '1mo'] },
-  '5Y':  { default: '1wk', options: ['1d', '1wk', '1mo'] },
-  'MAX': { default: '1mo', options: ['1wk', '1mo'] },
-};
+// INTERVAL_OPTIONS moved to lib/chartIntervals.js — shared with the Chart &
+// Research toolbar so both surfaces offer identical interval choices.
 
 // ─── LockedTabCard — shown to guests on gated tabs ───────────────────────────
 function LockedTabCard({ title, description, onUnlock }) {
@@ -583,7 +575,9 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
   }, [expanded, currentSymbol, isEquity]);
 
   // ── Chart data loader ─────────────────────────────────────────────────────
-  const effectiveInterval = chartInterval || INTERVAL_OPTIONS[timeframe]?.default || '1d';
+  // B3 history is daily-only (BRAPI/EODHD) — narrow the choices accordingly.
+  const intervalChoices = intervalChoicesFor(timeframe, { dailyOnly: isB3 });
+  const effectiveInterval = chartInterval || intervalChoices.default;
 
   const loadChart = useCallback(async (sym, tf, iv, symIsB3) => {
     const cacheKey = `${sym}:${tf}:${iv}`;
@@ -809,7 +803,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
             }}>
               Interval:
             </span>
-            {(INTERVAL_OPTIONS[timeframe]?.options || []).map(iv => {
+            {intervalChoices.options.map(iv => {
               const active = effectiveInterval === iv;
               return (
                 <button
@@ -920,7 +914,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
               symbol={currentSymbol}
               showLegend={expanded}
               showWatermark={expanded}
-              intervalLabel={CHART_PROXY[currentSymbol] ? `${timeframe} · proxy ${CHART_PROXY[currentSymbol]}` : timeframe}
+              intervalLabel={`${timeframe} · ${effectiveInterval}${CHART_PROXY[currentSymbol] ? ` · proxy ${CHART_PROXY[currentSymbol]}` : ''}`}
               colors={{ up: GREEN, down: RED, bg: BG_CARD, text: TXT_2, grid: 'rgba(30,41,59,0.4)', border: 'rgba(30,41,59,0.6)' }}
               recreateKey={`${currentSymbol}:${expanded}`}
               refitKey={expanded}

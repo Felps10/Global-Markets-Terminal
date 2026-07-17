@@ -1370,7 +1370,8 @@ const OHLCV_TIMEFRAMES = {
 async function fetchYahooOHLCV(symbol, timeframe = '1M', { assets = {}, interval: intervalOverride } = {}) {
   const tf = OHLCV_TIMEFRAMES[timeframe] || OHLCV_TIMEFRAMES['1M'];
   const range = tf.range;
-  const interval = intervalOverride || tf.interval;
+  // Yahoo's hourly granularity is '60m', not the UI's '1h'.
+  const interval = (intervalOverride === '1h' ? '60m' : intervalOverride) || tf.interval;
   const chartSymbol = assets[symbol]?.isB3 ? symbol + '.SA' : symbol;
   const yahooPath = `/v8/finance/chart/${encodeURIComponent(chartSymbol)}?range=${range}&interval=${interval}`;
   const yahooUrl  = `https://query1.finance.yahoo.com${yahooPath}`;
@@ -1456,6 +1457,75 @@ const FMP_OHLCV_TF = {
   'MAX': { mode: 'daily', all: true },
 };
 
+// UI interval → FMP /historical-chart granularity. Anything not listed here
+// is either daily ('1d') or a client-side aggregation bucket ('1wk'/'1mo').
+const FMP_INTRADAY_INTERVAL = {
+  '1m': '1min', '5m': '5min', '15m': '15min', '30m': '30min', '1h': '1hour',
+};
+
+/**
+ * Aggregate ascending DAILY candles into weekly ('1wk', ISO weeks, Monday
+ * key) or monthly ('1mo') buckets: open = first bar's open, close = last
+ * bar's close, high/low = extremes, volume = sum. Pure. In production the
+ * inputs are the daily sources' 'YYYY-MM-DD' string times (FMP/BRAPI/EODHD —
+ * Yahoo serves 1wk/1mo natively and never routes through here); the
+ * Unix-seconds branch of keyOf is defensive future-proofing only. Unknown
+ * buckets and empty input pass through unchanged. Non-finite highs/lows are
+ * ignored rather than poisoning a whole bucket's extremes.
+ */
+export function aggregateCandles(candles, bucket) {
+  if (!Array.isArray(candles) || candles.length === 0) return candles ?? null;
+  if (bucket !== '1wk' && bucket !== '1mo') return candles;
+  const keyOf = (t) => {
+    const d = typeof t === 'number'
+      ? new Date(t * 1000)
+      : new Date(`${String(t).slice(0, 10)}T00:00:00Z`);
+    if (Number.isNaN(d.getTime())) return null;
+    if (bucket === '1mo') return `${d.getUTCFullYear()}-${d.getUTCMonth()}`;
+    const mon = new Date(d);
+    mon.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); // Monday of that week
+    return mon.toISOString().slice(0, 10);
+  };
+  const fin = (v) => (Number.isFinite(v) ? v : null);
+  const out = [];
+  let curKey = null, cur = null;
+  for (const c of candles) {
+    const k = keyOf(c?.time);
+    if (k === null) continue;
+    if (k !== curKey) {
+      if (cur) out.push(cur);
+      curKey = k;
+      cur = {
+        time: c.time, open: c.open,
+        high: fin(c.high) ?? c.close, low: fin(c.low) ?? c.close,
+        close: c.close, volume: c.volume || 0,
+      };
+    } else {
+      const h = fin(c.high), l = fin(c.low);
+      if (h !== null && h > cur.high) cur.high = h;
+      if (l !== null && l < cur.low) cur.low = l;
+      cur.close = c.close;
+      cur.volume += c.volume || 0;
+    }
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+/**
+ * Aggregation as the chart wants it: '1wk'/'1mo' buckets when they yield a
+ * chartable series (>= 2 bars), the ORIGINAL daily candles otherwise. The
+ * fallback matters: a young listing on MAX ('1mo' default) or YTD+'1wk' in
+ * the first week of January aggregates to a single bucket — showing the
+ * available daily bars beats erroring out or cascading down the provider
+ * chain on a request that can never succeed.
+ */
+export function aggregateForDisplay(candles, bucket) {
+  if (!candles || (bucket !== '1wk' && bucket !== '1mo')) return candles;
+  const out = aggregateCandles(candles, bucket);
+  return out && out.length >= 2 ? out : candles;
+}
+
 function isoDaysAgo(days) {
   const d = new Date();
   d.setDate(d.getDate() - days);
@@ -1473,7 +1543,15 @@ async function fmpDailyCandles(symbol, cfg) {
   const out = [];
   for (const r of arr) {
     if (!r || !r.date || !isFinite(Number(r.close))) continue;
-    out.push({ time: r.date.slice(0, 10), open: +r.open, high: +r.high, low: +r.low, close: +r.close, volume: +r.volume || 0 });
+    // Null/absent OHL coerce to 0 via unary + — fall back to close so one
+    // corrupt row can't put a to-zero wick on a chart (or, aggregated, on a
+    // whole weekly/monthly bucket).
+    const close = +r.close;
+    out.push({
+      time: r.date.slice(0, 10),
+      open: +r.open || close, high: +r.high || close, low: +r.low || close,
+      close, volume: +r.volume || 0,
+    });
   }
   return out.reverse();
 }
@@ -1552,36 +1630,70 @@ export async function fmpOHLCV(symbol, timeframe = '1M', { assets = {}, interval
   // WTI/natgas futures → their liquid ETF proxy (FMP futures history is dead). Everything
   // else charts its own symbol.
   const fetchSym = CHART_PROXY[symbol] || symbol;
+  // '1wk'/'1mo' are client-side aggregations of daily candles — real on every
+  // daily source (falling back to the raw dailies when the window is too
+  // short to yield 2 buckets). Intraday intervals are FMP-native, with Yahoo
+  // as the only interval-capable fallback.
+  const aggBucket = interval === '1wk' || interval === '1mo' ? interval : null;
+  const agg = (candles) => (aggBucket ? aggregateForDisplay(candles, aggBucket) : candles);
+  const wantsIntraday = !!FMP_INTRADAY_INTERVAL[interval];
   if (isB3) {
     // B3 → BRAPI historical (real B3 data). Falls back to EODHD .SA, then Yahoo .SA.
+    // Daily-granularity sources: '1wk'/'1mo' aggregate; intraday stays best-effort.
     try {
-      const candles = await brapiOHLCV(symbol, timeframe);
+      const candles = agg(await brapiOHLCV(symbol, timeframe));
       if (candles && candles.length >= 2) return candles;
     } catch (_) { /* fall through */ }
     // EODHD .SA daily via our server (reliable; replaces the dead-Yahoo B3 fallback). yahooToEodhd
     // maps '<TICKER>.SA' → identity, so pass the .SA form.
     try {
-      const candles = await eodhdOHLCV(`${symbol}.SA`, timeframe);
+      const candles = agg(await eodhdOHLCV(`${symbol}.SA`, timeframe));
       if (candles && candles.length >= 2) return candles;
     } catch (_) { /* fall through to Yahoo */ }
   } else if (FMP_ENABLED) {
     try {
       const cfg = FMP_OHLCV_TF[timeframe] || FMP_OHLCV_TF['1M'];
-      const candles = cfg.mode === 'intraday'
-        ? await fmpIntradayCandles(fetchSym, cfg)
-        : await fmpDailyCandles(fetchSym, cfg);
+      // Requested interval wins over the timeframe's default granularity:
+      // intraday granularities hit /historical-chart (needs a bounded window,
+      // so cfg.days must exist), '1d' forces the daily endpoint, '1wk'/'1mo'
+      // aggregate from daily. COUPLING: this relies on lib/chartIntervals.js
+      // only offering intraday options on timeframes whose cfg has .days
+      // (1D/5D/1W/1M today) — an intraday request against a days-less cfg
+      // (YTD/MAX) silently degrades to the default daily mode below.
+      const fmpIntraday = FMP_INTRADAY_INTERVAL[interval];
+      let candles;
+      if (fmpIntraday && cfg.days) {
+        candles = await fmpIntradayCandles(fetchSym, { interval: fmpIntraday, days: cfg.days });
+      } else if (interval === '1d' || aggBucket) {
+        candles = agg(await fmpDailyCandles(fetchSym, cfg));
+      } else {
+        candles = cfg.mode === 'intraday'
+          ? await fmpIntradayCandles(fetchSym, cfg)
+          : await fmpDailyCandles(fetchSym, cfg);
+      }
       if (candles && candles.length >= 2) return candles;
     } catch (_) { /* fall through to Yahoo */ }
   }
   // EODHD daily fallback for FMP-gated classes (EU/Asia indices) before Yahoo. Skipped for B3
-  // (its BRAPI path already ran) and for proxied futures (charted via the ETF above; EODHD has
-  // no commodity symbol anyway).
-  if (!isB3 && !CHART_PROXY[symbol]) {
-    const candles = await eodhdOHLCV(symbol, timeframe);
+  // (its BRAPI path already ran), for proxied futures (charted via the ETF above; EODHD has
+  // no commodity symbol anyway), and for explicit INTRADAY requests — EODHD is daily-only and
+  // would hijack the request before Yahoo (the one fallback that can honor the granularity).
+  if (!isB3 && !CHART_PROXY[symbol] && !wantsIntraday) {
+    const candles = agg(await eodhdOHLCV(symbol, timeframe));
     if (candles && candles.length >= 2) return candles;
   }
   // Last resort: Yahoo on the ORIGINAL symbol (anything the sources above couldn't serve).
-  return fetchYahooOHLCV(symbol, timeframe, { assets, interval });
+  try {
+    return await fetchYahooOHLCV(symbol, timeframe, { assets, interval });
+  } catch (err) {
+    // Yahoo couldn't honor the intraday request either — degrade to the EODHD
+    // daily bars we deliberately skipped, rather than showing an error.
+    if (wantsIntraday && !isB3 && !CHART_PROXY[symbol]) {
+      const candles = await eodhdOHLCV(symbol, timeframe);
+      if (candles && candles.length >= 2) return candles;
+    }
+    throw err;
+  }
 }
 
 // ─── HEALTH CHECKS & USAGE TRACKING ─────────────────────────────────────────
