@@ -1,5 +1,8 @@
+# --include=dev is REQUIRED: the Railway service sets NODE_ENV=production, and npm defaults
+# omit=dev under it — vite (a devDependency) then never installs and `npm run build` dies with
+# "vite: not found". Railway's legacy builder masked this; the Metal builders (2026-07) don't.
 [phases.build]
-cmds = ["npm install && npm run build"]
+cmds = ["npm install --include=dev && npm run build"]
 
 [start]
 cmd = "node server/index.js"
