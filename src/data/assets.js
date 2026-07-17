@@ -159,6 +159,41 @@ export const ASSETS = [
   { id: "baba",  symbol: "BABA",  name: "Alibaba",                subgroup_id: "emerging", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE" },
   { id: "nu",    symbol: "NU",    name: "Nubank",                 subgroup_id: "emerging", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE" },
 
+  // ── Consumer Staples ─────────────────────────────────────────────────────
+  { id: "pm",    symbol: "PM",    name: "Philip Morris",     subgroup_id: "consumer-staples", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "cl",    symbol: "CL",    name: "Colgate-Palmolive", subgroup_id: "consumer-staples", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "mdlz",  symbol: "MDLZ",  name: "Mondelez",          subgroup_id: "consumer-staples", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
+  { id: "mo",    symbol: "MO",    name: "Altria",            subgroup_id: "consumer-staples", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "ul",    symbol: "UL",    name: "Unilever",          subgroup_id: "consumer-staples", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "bud",   symbol: "BUD",   name: "AB InBev",          subgroup_id: "consumer-staples", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+
+  // ── Utilities ────────────────────────────────────────────────────────────
+  { id: "duk",   symbol: "DUK",   name: "Duke Energy",       subgroup_id: "utilities", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "so",    symbol: "SO",    name: "Southern Company",  subgroup_id: "utilities", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "d",     symbol: "D",     name: "Dominion Energy",   subgroup_id: "utilities", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "aep",   symbol: "AEP",   name: "American Electric", subgroup_id: "utilities", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
+  { id: "sre",   symbol: "SRE",   name: "Sempra",            subgroup_id: "utilities", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+
+  // ── Telecom & Media ──────────────────────────────────────────────────────
+  { id: "t",     symbol: "T",     name: "AT&T",              subgroup_id: "telecom-media", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "vz",    symbol: "VZ",    name: "Verizon",           subgroup_id: "telecom-media", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "tmus",  symbol: "TMUS",  name: "T-Mobile",          subgroup_id: "telecom-media", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
+  { id: "dis",   symbol: "DIS",   name: "Disney",            subgroup_id: "telecom-media", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "cmcsa", symbol: "CMCSA", name: "Comcast",           subgroup_id: "telecom-media", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
+
+  // ── Materials ────────────────────────────────────────────────────────────
+  { id: "lin",   symbol: "LIN",   name: "Linde",             subgroup_id: "materials", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NASDAQ" },
+  { id: "shw",   symbol: "SHW",   name: "Sherwin-Williams",  subgroup_id: "materials", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "apd",   symbol: "APD",   name: "Air Products",      subgroup_id: "materials", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "fcx",   symbol: "FCX",   name: "Freeport-McMoRan",  subgroup_id: "materials", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+  { id: "nem",   symbol: "NEM",   name: "Newmont",           subgroup_id: "materials", group_id: "equities", terminal_view: "global", type: "equity", exchange: "NYSE"   },
+
+  // ── US Core ETFs ─────────────────────────────────────────────────────────
+  { id: "spy",   symbol: "SPY",   name: "SPDR S&P 500",      subgroup_id: "us-etfs", group_id: "equities", terminal_view: "global", type: "etf", exchange: "NYSE"   },
+  { id: "qqq",   symbol: "QQQ",   name: "Invesco QQQ",       subgroup_id: "us-etfs", group_id: "equities", terminal_view: "global", type: "etf", exchange: "NASDAQ" },
+  { id: "iwm",   symbol: "IWM",   name: "iShares Russell 2000", subgroup_id: "us-etfs", group_id: "equities", terminal_view: "global", type: "etf", exchange: "NYSE" },
+  { id: "dia",   symbol: "DIA",   name: "SPDR Dow Jones",    subgroup_id: "us-etfs", group_id: "equities", terminal_view: "global", type: "etf", exchange: "NYSE"   },
+
   // ── Currencies — Foreign Exchange ─────────────────────────────────────────
   { id: "eurusd", symbol: "EURUSD=X", name: "Euro / US Dollar",              subgroup_id: "fx", group_id: "currencies", terminal_view: "global", type: "forex", exchange: "FOREX", meta: { display: "EUR/USD" } },
   { id: "gbpusd", symbol: "GBPUSD=X", name: "British Pound / US Dollar",     subgroup_id: "fx", group_id: "currencies", terminal_view: "global", type: "forex", exchange: "FOREX", meta: { display: "GBP/USD" } },
@@ -174,6 +209,9 @@ export const ASSETS = [
   { id: "usdzar", symbol: "USDZAR=X", name: "US Dollar / South African Rand", subgroup_id: "fx", group_id: "currencies", terminal_view: "global", type: "forex", exchange: "FOREX", meta: { display: "USD/ZAR" } },
   { id: "usdinr", symbol: "USDINR=X", name: "US Dollar / Indian Rupee",       subgroup_id: "fx", group_id: "currencies", terminal_view: "global", type: "forex", exchange: "FOREX", meta: { display: "USD/INR" } },
   { id: "nzdusd", symbol: "NZDUSD=X", name: "New Zealand Dollar / US Dollar", subgroup_id: "fx", group_id: "currencies", terminal_view: "global", type: "forex", exchange: "FOREX", meta: { display: "NZD/USD" } },
+  { id: "eurgbp", symbol: "EURGBP=X", name: "Euro / British Pound",           subgroup_id: "fx", group_id: "currencies", terminal_view: "global", type: "forex", exchange: "FOREX", meta: { display: "EUR/GBP" } },
+  { id: "eurjpy", symbol: "EURJPY=X", name: "Euro / Japanese Yen",            subgroup_id: "fx", group_id: "currencies", terminal_view: "global", type: "forex", exchange: "FOREX", meta: { display: "EUR/JPY" } },
+  { id: "dx-f",   symbol: "DX=F",     name: "US Dollar Index Futures",        subgroup_id: "fx", group_id: "currencies", terminal_view: "global", type: "futures", exchange: "ICE", meta: { display: "DXY" } },
 
   // ── Indices — Global Benchmarks ───────────────────────────────────────────
   { id: "gspc",  symbol: "^GSPC",  name: "S&P 500",      subgroup_id: "indices", group_id: "indices", terminal_view: "global", type: "index", exchange: "INDEX",    meta: { display: "SPX"   } },
@@ -187,6 +225,8 @@ export const ASSETS = [
   { id: "axjo",  symbol: "^AXJO",  name: "ASX 200",      subgroup_id: "indices", group_id: "indices", terminal_view: "global", type: "index", exchange: "ASX",      meta: { display: "ASX"   } },
   { id: "ks11",  symbol: "^KS11",  name: "KOSPI",        subgroup_id: "indices", group_id: "indices", terminal_view: "global", type: "index", exchange: "KRX",      meta: { display: "KOSPI" } },
   { id: "vix",   symbol: "^VIX",   name: "CBOE Volatility Index", subgroup_id: "indices", group_id: "indices", terminal_view: "global", type: "index", exchange: "CBOE", meta: { display: "VIX" } },
+  { id: "rut",   symbol: "^RUT",   name: "Russell 2000",  subgroup_id: "indices", group_id: "indices", terminal_view: "global", type: "index", exchange: "INDEX", meta: { display: "RUT"  } },
+  { id: "stoxx50e", symbol: "^STOXX50E", name: "Euro Stoxx 50", subgroup_id: "indices", group_id: "indices", terminal_view: "global", type: "index", exchange: "INDEX", meta: { display: "SX5E" } },
 
   // ── Digital Assets: Crypto ───────────────────────────────────────────────
   { id: "btc",   symbol: "BTC",    name: "Bitcoin",  subgroup_id: "crypto", group_id: "digital-assets", terminal_view: "global", type: "crypto", exchange: "CRYPTO", meta: { isCrypto: true, cgId: "bitcoin",     display: "BTC"  } },
@@ -212,6 +252,7 @@ export const ASSETS = [
   { id: "ung",   symbol: "UNG",    name: "United States Natural Gas",    subgroup_id: "energy-commodities", group_id: "commodities", terminal_view: "global", type: "etf",     exchange: "NYSE"  },
   { id: "cl-f",  symbol: "CL=F",   name: "WTI Crude Oil Futures",        subgroup_id: "energy-commodities", group_id: "commodities", terminal_view: "global", type: "futures", exchange: "NYMEX", meta: { display: "WTI" } },
   { id: "ng-f",  symbol: "NG=F",   name: "Natural Gas Futures",          subgroup_id: "energy-commodities", group_id: "commodities", terminal_view: "global", type: "futures", exchange: "NYMEX", meta: { display: "NG"  } },
+  { id: "bz-f",  symbol: "BZ=F",   name: "Brent Crude Futures",          subgroup_id: "energy-commodities", group_id: "commodities", terminal_view: "global", type: "futures", exchange: "ICE",   meta: { display: "BRENT" } },
 
   // ── Commodities: Agriculture ──────────────────────────────────────────────
   { id: "corn",  symbol: "CORN",   name: "Teucrium Corn Fund",    subgroup_id: "agriculture", group_id: "commodities", terminal_view: "global", type: "etf", exchange: "NYSE"   },
@@ -219,6 +260,10 @@ export const ASSETS = [
   { id: "soyb",  symbol: "SOYB",   name: "Teucrium Soybean Fund", subgroup_id: "agriculture", group_id: "commodities", terminal_view: "global", type: "etf", exchange: "NYSE"   },
   { id: "dba",   symbol: "DBA",    name: "Invesco DB Agriculture", subgroup_id: "agriculture", group_id: "commodities", terminal_view: "global", type: "etf", exchange: "NYSE"   },
   { id: "cane",  symbol: "CANE",   name: "Teucrium Sugar Fund",   subgroup_id: "agriculture", group_id: "commodities", terminal_view: "global", type: "etf", exchange: "NYSE"   },
+
+  // ── Industrial Metals ────────────────────────────────────────────────────
+  { id: "hg-f",  symbol: "HG=F",   name: "Copper Futures",           subgroup_id: "industrial-metals", group_id: "commodities", terminal_view: "global", type: "futures", exchange: "COMEX", meta: { display: "HG" } },
+  { id: "cper",  symbol: "CPER",   name: "US Copper Index Fund",     subgroup_id: "industrial-metals", group_id: "commodities", terminal_view: "global", type: "etf",     exchange: "NYSE"   },
 
   // ── Fixed Income: Dividend Income ─────────────────────────────────────────
   { id: "vym",   symbol: "VYM",    name: "Vanguard High Dividend Yield ETF",        subgroup_id: "dividend-income", group_id: "fixed-income", terminal_view: "global", type: "etf", exchange: "NYSE"   },

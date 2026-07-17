@@ -1443,7 +1443,7 @@ async function fetchYahooOHLCV(symbol, timeframe = '1M', { assets = {}, interval
 
 // ETF proxies for instruments FMP can't chart directly. The chart legend flags the proxy:
 // price LEVELS are the ETF's, but the SHAPE tracks the underlying commodity.
-export const CHART_PROXY = { 'CL=F': 'USO', 'NG=F': 'UNG' };
+export const CHART_PROXY = { 'CL=F': 'USO', 'NG=F': 'UNG', 'HG=F': 'CPER', 'DX=F': 'UUP' };
 
 const FMP_OHLCV_TF = {
   '1D':  { mode: 'intraday', interval: '5min',  days: 2 },
