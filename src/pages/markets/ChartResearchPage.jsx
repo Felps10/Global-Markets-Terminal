@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
 import PriceChart from '../../components/PriceChart.jsx';
+import OpenInPageButton from '../../components/OpenInPageButton.jsx';
+import useDeepLinkedSymbol from '../../hooks/useDeepLinkedSymbol.js';
 import MarketsPageLayout from '../../components/MarketsPageLayout.jsx';
 import { useTaxonomy } from '../../context/TaxonomyContext.jsx';
 import { resolveAsset, buildIsB3Map } from '../../lib/assetResolution.js';
@@ -15,6 +16,7 @@ import {
 } from '../../dataServices.js';
 import SourcePill from '../../components/SourcePill.jsx';
 import { CLUBE_COLORS } from '../../lib/tokens.js';
+import { marketsUrl } from '../../lib/routes.js';
 
 const C       = CLUBE_COLORS;
 const BORDER  = C.borderSubtle;
@@ -29,7 +31,8 @@ const TXT_3   = C.textDim;
 const ACCENT  = C.accent;
 const GREEN   = C.green;
 const RED     = C.red;
-const TIMEFRAMES  = ['1D', '1W', '1M', '3M', '1Y'];
+const TIMEFRAMES  = ['1D', '5D', '1W', '1M', '3M', 'YTD', '1Y', '5Y', 'MAX'];
+const EQUITY_TYPES = new Set(['stock', 'etf', 'equity']); // mirrors AssetDetailDrawer's tab gating
 const CHART_TYPES = ['Candlestick', 'Line', 'Area'];
 const COMP_COLORS = ['#f59e0b', '#00E676', '#a78bfa'];
 const DEFAULT_CHART_HEIGHT = 450;
@@ -157,18 +160,26 @@ function Card({ children, style }) {
   );
 }
 
-function PanelTitle({ children }) {
+function PanelTitle({ children, action }) {
   return (
     <div style={{
-      fontFamily:    "'JetBrains Mono', monospace",
-      fontSize:      11,
-      fontWeight:    700,
-      color:         TXT_1,
-      letterSpacing: '0.12em',
-      textTransform: 'uppercase',
+      display:       'flex',
+      alignItems:    'center',
+      justifyContent:'space-between',
+      gap:           10,
       marginBottom:  12,
     }}>
-      {children}
+      <div style={{
+        fontFamily:    "'JetBrains Mono', monospace",
+        fontSize:      11,
+        fontWeight:    700,
+        color:         TXT_1,
+        letterSpacing: '0.12em',
+        textTransform: 'uppercase',
+      }}>
+        {children}
+      </div>
+      {action || null}
     </div>
   );
 }
@@ -199,13 +210,14 @@ function StatBox({ label, value, color }) {
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 export default function ChartResearchPage() {
-  const navigate       = useNavigate();
-  const [searchParams] = useSearchParams();
-  const { assets, subgroups } = useTaxonomy();
+  const { assets, subgroups, error: taxonomyError } = useTaxonomy();
+  const taxonomyReady = assets.length > 0;
   const { items: watchlistItems, isPinned, pin, unpin } = useWatchlist();
 
   // ── Active asset ──────────────────────────────────────────────────────────
-  const [activeSymbol, setActiveSymbol] = useState('SPY');
+  // Seeded from the ?symbol= deep link so the SPY default never fetches its
+  // ~7-request research bundle on deep-linked visits (drawer → Research).
+  const [activeSymbol, setActiveSymbol] = useDeepLinkedSymbol(assets);
   const [activeAsset,  setActiveAsset]  = useState(null);
 
   // ── Search ────────────────────────────────────────────────────────────────
@@ -298,23 +310,16 @@ export default function ChartResearchPage() {
     : activeAsset?.exchange || '—';
 
   const hasComparisons = compSymbols.length > 0;
+  // Non-equities (indices, FX, crypto, commodities) have no fundamentals,
+  // signals, or per-symbol news — hide the card deep-links for them, matching
+  // the drawer's equity-gated tabs.
+  const isEquityAsset  = EQUITY_TYPES.has(activeAsset?.type);
 
   // ── Effects ───────────────────────────────────────────────────────────────
 
-  // 1. Asset selection on mount / URL param
-  useEffect(() => {
-    if (assets.length === 0) return;
-    const fromParam = searchParams.get('symbol');
-    if (fromParam) {
-      const found = resolveAsset(assets, fromParam.toUpperCase());
-      if (found) { setActiveSymbol(found.symbol); return; }
-    }
-    // Default to SPY
-    if (activeSymbol === 'SPY' && !activeAsset) {
-      const spy = resolveAsset(assets, 'SPY');
-      if (spy) setActiveAsset(spy);
-    }
-  }, [assets]);
+  // 1. ?symbol= deep-link seeding + validation lives in useDeepLinkedSymbol.
+  // (The SPY default needs no handling here — effect 2 resolves activeAsset
+  // for whatever activeSymbol holds as soon as assets exist.)
 
   // 2. Sync activeAsset when activeSymbol changes
   useEffect(() => {
@@ -322,9 +327,15 @@ export default function ChartResearchPage() {
     setActiveAsset(found);
   }, [activeSymbol, assets]);
 
-  // 3. Fetch sidebar + research data on activeSymbol change
+  // 3. Fetch sidebar + research data on activeSymbol change. Waits for the
+  // taxonomy while it's loading — the B3 `.SA` quote mapping below needs
+  // assetMap — but proceeds anyway if taxonomy FAILED, so a Supabase outage
+  // doesn't blank panels the market-data proxies can still fill. (On a
+  // cold-taxonomy junk/alias deep link this still fires once with the
+  // pre-validation symbol in the arrival flush — accepted: rare path,
+  // cancelled and refetched one render later.)
   useEffect(() => {
-    if (!activeSymbol) return;
+    if (!taxonomyReady && !taxonomyError) return;
     let cancelled = false;
 
     setPriceData(null); setProfileData(null); setRatiosData(null);
@@ -375,7 +386,7 @@ export default function ChartResearchPage() {
     } else { setLoadingNews(false); }
 
     return () => { cancelled = true; };
-  }, [activeSymbol]);
+  }, [activeSymbol, taxonomyReady, taxonomyError]);
 
   // 4. Fetch OHLCV on activeSymbol + timeframe change
   useEffect(() => {
@@ -392,36 +403,44 @@ export default function ChartResearchPage() {
     return () => { cancelled = true; };
   }, [activeAsset?.symbol, timeframe, assetMap]);
 
-  // 5. Re-fetch comparison data when timeframe changes
+  // 5. Single owner of comparison-series fetching. Each compData entry stores
+  // the timeframe it was fetched for ({ tf, data }); anything stale — just
+  // added, or fetched for a different timeframe — refetches here, so adds and
+  // removes never refetch existing series. Failures store data:null: the
+  // series drops from the chart (never a stale-timeframe overlay) and isn't
+  // retried until the timeframe changes.
   useEffect(() => {
-    if (compSymbols.length === 0) return;
+    const stale = compSymbols.filter(sym => compData[sym]?.tf !== timeframe);
+    if (stale.length === 0) { setCompLoading(false); return; }
     let cancelled = false;
     setCompLoading(true);
 
     Promise.all(
-      compSymbols.map(sym =>
+      stale.map(sym =>
         fmpOHLCV(sym, timeframe, { assets: assetMap })
           .then(data => ({ sym, data }))
           .catch(() => ({ sym, data: null }))
       )
     ).then(results => {
       if (cancelled) return;
-      const newData = {};
-      results.forEach(({ sym, data }) => { if (data) newData[sym] = data; });
-      setCompData(newData);
+      setCompData(prev => {
+        const next = { ...prev };
+        results.forEach(({ sym, data }) => { next[sym] = { tf: timeframe, data }; });
+        return next;
+      });
       setCompLoading(false);
     });
 
     return () => { cancelled = true; };
-  }, [timeframe, assetMap, compSymbols.join(',')]);
+  }, [timeframe, assetMap, compSymbols.join(','), compData]);
 
   // Chart props for <PriceChart> (createChart + series lifecycle live there).
   const chartSeriesType = chartType === 'Candlestick' ? 'candle' : chartType === 'Line' ? 'line' : 'area';
   const chartComparison = useMemo(() => {
-    const active = compSymbols.filter(sym => compData[sym]?.length > 0);
+    const active = compSymbols.filter(sym => compData[sym]?.tf === timeframe && compData[sym]?.data?.length > 0);
     if (!active.length) return null;
-    return active.map((sym, i) => ({ data: compData[sym], color: COMP_COLORS[i % COMP_COLORS.length] }));
-  }, [compSymbols, compData]);
+    return active.map((sym, i) => ({ data: compData[sym].data, color: COMP_COLORS[i % COMP_COLORS.length] }));
+  }, [compSymbols, compData, timeframe]);
 
   // 8. Resize handler
   useEffect(() => {
@@ -458,6 +477,10 @@ export default function ChartResearchPage() {
         searchDropRef.current && !searchDropRef.current.contains(e.target) &&
         searchInputRef.current && !searchInputRef.current.contains(e.target)
       ) setSearchOpen(false);
+      if (compSearchRef.current && !compSearchRef.current.contains(e.target)) {
+        setCompExpanded(false);
+        setCompSearch('');
+      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -478,22 +501,13 @@ export default function ChartResearchPage() {
     setMobileOpen(false);
   }
 
-  const addComparison = useCallback(async (asset) => {
+  // Effect 5 owns the fetch — adding here just registers the symbol.
+  const addComparison = useCallback((asset) => {
     if (compSymbols.length >= 3) return;
-    const sym = asset.symbol;
-    setCompSymbols(prev => [...prev, sym]);
+    setCompSymbols(prev => [...prev, asset.symbol]);
     setCompExpanded(false);
     setCompSearch('');
-    setCompLoading(true);
-
-    try {
-      const data = await fmpOHLCV(sym, timeframe, { assets: assetMap });
-      setCompData(prev => ({ ...prev, [sym]: data }));
-    } catch (_) {
-      setCompData(prev => ({ ...prev, [sym]: null }));
-    }
-    setCompLoading(false);
-  }, [compSymbols, timeframe, assetMap]);
+  }, [compSymbols]);
 
   const removeComparison = useCallback((sym) => {
     setCompSymbols(prev => prev.filter(s => s !== sym));
@@ -578,8 +592,10 @@ export default function ChartResearchPage() {
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 24, fontWeight: 700, color: TXT_1, marginBottom: 2 }}>
               {fmtPrice(priceData.price)}
             </div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: priceData.changePct >= 0 ? GREEN : RED, marginBottom: 4 }}>
-              {priceData.changePct >= 0 ? '▲' : '▼'} {priceData.change != null ? fmtNum(Math.abs(priceData.change), 2) : ''} ({fmtNum(priceData.changePct, 2)}%)
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: priceData.changePct == null ? TXT_3 : priceData.changePct >= 0 ? GREEN : RED, marginBottom: 4 }}>
+              {priceData.changePct != null
+                ? `${priceData.changePct >= 0 ? '▲' : '▼'} ${priceData.change != null ? fmtNum(Math.abs(priceData.change), 2) : ''} (${fmtNum(priceData.changePct, 2)}%)`
+                : '—'}
             </div>
             {priceData.timestamp && (
               <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 10, color: TXT_3, marginBottom: 12 }}>
@@ -686,7 +702,7 @@ export default function ChartResearchPage() {
 
   // ── Comparison bar JSX ────────────────────────────────────────────────────
 
-  const activeComps = compSymbols.filter(sym => compData[sym]?.length > 0);
+  const activeComps = compSymbols.filter(sym => compData[sym]?.data?.length > 0);
 
   const comparisonBar = (
     <div style={{ flexShrink: 0, borderTop: `1px solid ${BORDER}`, background: BG_HEAD }}>
@@ -704,7 +720,7 @@ export default function ChartResearchPage() {
             <div key={sym} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <div style={{ width: 14, height: 2, background: COMP_COLORS[i % COMP_COLORS.length], borderRadius: 1 }} />
               <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: TXT_2 }}>{sym}</span>
-              {compLoading && !compData[sym] && <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: TXT_3 }}>...</span>}
+              {compLoading && compData[sym]?.tf !== timeframe && <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: TXT_3 }}>...</span>}
               <button
                 onClick={() => removeComparison(sym)}
                 style={{
@@ -899,6 +915,7 @@ export default function ChartResearchPage() {
             <div style={{
               height: 44, flexShrink: 0, borderBottom: `1px solid ${BORDER}`,
               display: 'flex', alignItems: 'center', padding: '0 16px', gap: 6, background: BG_HEAD,
+              overflowX: 'auto', WebkitOverflowScrolling: 'touch',
             }}>
               {TIMEFRAMES.map(tf => (
                 <TabBtn key={tf} label={tf} active={timeframe === tf} onClick={() => setTimeframe(tf)} />
@@ -1040,7 +1057,7 @@ export default function ChartResearchPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
                       <span style={{
                         fontFamily: "'JetBrains Mono', monospace", fontSize: 14, fontWeight: 600,
-                        color: priceData.changePct >= 0 ? GREEN : RED,
+                        color: priceData.changePct == null ? TXT_3 : priceData.changePct >= 0 ? GREEN : RED,
                       }}>
                         {priceData.changePct != null
                           ? `${priceData.changePct >= 0 ? '▲ +' : '▼ '}${priceData.change != null ? Math.abs(priceData.change).toFixed(2) : ''} (${Math.abs(priceData.changePct).toFixed(2)}%)`
@@ -1080,7 +1097,7 @@ export default function ChartResearchPage() {
 
               {/* ── Fundamentals ────────────────────────────────────── */}
               <Card style={{ flex: 45, minWidth: isMobile ? '100%' : 0 }}>
-                <PanelTitle>Fundamentals</PanelTitle>
+                <PanelTitle action={isEquityAsset ? <OpenInPageButton label="Fundamental Lab" to={marketsUrl.fundamentals([activeSymbol])} /> : null}>Fundamentals</PanelTitle>
 
                 {!hasFmpKey() ? (
                   <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: TXT_3, fontStyle: 'italic' }}>
@@ -1141,7 +1158,7 @@ export default function ChartResearchPage() {
 
               {/* ── Analyst Consensus ───────────────────────────────── */}
               <Card style={{ flex: 40, minWidth: isMobile ? '100%' : 0 }}>
-                <PanelTitle>Analyst Consensus</PanelTitle>
+                <PanelTitle action={isEquityAsset ? <OpenInPageButton label="Signal Engine" to={marketsUrl.signals(activeSymbol)} /> : null}>Analyst Consensus</PanelTitle>
 
                 {!hasFmpKey() ? (
                   <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: TXT_3, fontStyle: 'italic' }}>
@@ -1264,7 +1281,7 @@ export default function ChartResearchPage() {
 
               {/* ── Company News ────────────────────────────────────── */}
               <Card style={{ flex: 60, minWidth: isMobile ? '100%' : 0 }}>
-                <PanelTitle>Latest News</PanelTitle>
+                <PanelTitle action={isEquityAsset ? <OpenInPageButton label="News" to={marketsUrl.news(activeSymbol)} /> : null}>Latest News</PanelTitle>
 
                 {!hasFinnhubKey() ? (
                   <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 12, color: TXT_3, fontStyle: 'italic' }}>
@@ -1285,7 +1302,7 @@ export default function ChartResearchPage() {
                       <div key={i}>
                         {i > 0 && <div style={{ height: 1, background: BORDER, margin: '10px 0' }} />}
                         <div
-                          onClick={() => window.open(item.url, '_blank')}
+                          onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
                           style={{ cursor: 'pointer', padding: '4px 0' }}
                           onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.borderRadius = '4px'; }}
                           onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
