@@ -15,10 +15,19 @@ vi.mock('lightweight-charts', () => {
     addSeries: vi.fn(() => fakeSeries()),
     removeSeries: vi.fn(),
     priceScale: vi.fn(() => ({ applyOptions: vi.fn() })),
-    timeScale: vi.fn(() => ({ fitContent: vi.fn() })),
+    timeScale: vi.fn(() => ({
+      fitContent: vi.fn(),
+      getVisibleLogicalRange: vi.fn(() => null),
+      setVisibleLogicalRange: vi.fn(),
+      subscribeVisibleLogicalRangeChange: vi.fn(),
+      unsubscribeVisibleLogicalRangeChange: vi.fn(),
+      scrollToRealTime: vi.fn(),
+    })),
     panes: vi.fn(() => [{}]),
     subscribeCrosshairMove: vi.fn(),
     unsubscribeCrosshairMove: vi.fn(),
+    subscribeDblClick: vi.fn(),
+    unsubscribeDblClick: vi.fn(),
   });
   return {
     createChart: vi.fn(() => fakeChart()),

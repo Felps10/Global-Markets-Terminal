@@ -231,6 +231,7 @@ export default function ChartResearchPage() {
   const [timeframe,    setTimeframe]    = useState('3M');
   const [chartInterval, setChartInterval] = useState(null); // null = timeframe default
   const [chartType,    setChartType]    = useState('Candlestick');
+  const [fitSignal,    setFitSignal]    = useState(0); // increments → PriceChart fits all
   const [showMA,       setShowMA]       = useState(true); // SMA-50/200 overlays (single-asset only)
   const [ohlcvData,    setOhlcvData]    = useState([]);
   const [chartLoading, setChartLoading] = useState(false);
@@ -939,6 +940,11 @@ export default function ChartResearchPage() {
               <div style={{ flex: 1 }} />
               <div style={{ display: 'flex', gap: 4, marginRight: 8 }}>
                 <TabBtn
+                  label="⛶ Fit"
+                  active={false}
+                  onClick={() => setFitSignal(n => n + 1)}
+                />
+                <TabBtn
                   label="MA"
                   active={showMA}
                   onClick={() => setShowMA(v => !v)}
@@ -964,6 +970,7 @@ export default function ChartResearchPage() {
               <div style={{ position: 'absolute', inset: 0 }}>
                 <PriceChart
                   data={ohlcvData}
+                  fitSignal={fitSignal}
                   seriesType={chartSeriesType}
                   comparison={chartComparison}
                   showVolume
