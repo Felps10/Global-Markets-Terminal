@@ -15,6 +15,7 @@ import PriceChart from './PriceChart.jsx';
 import { useTaxonomy } from '../context/TaxonomyContext.jsx';
 import { resolveAsset } from '../lib/assetResolution.js';
 import { marketsUrl } from '../lib/routes.js';
+import OpenInPageButton from './OpenInPageButton.jsx';
 import {
   fetchQuote, quoteSrcLabel,
   fmpOHLCV, CHART_PROXY, computePeriodStats,
@@ -340,7 +341,6 @@ const TAB_LINKS = {
 };
 
 function OpenInPageLink({ tab, symbol }) {
-  const navigate = useNavigate();
   const target = TAB_LINKS[tab];
   if (!target) return null;
   return (
@@ -348,21 +348,7 @@ function OpenInPageLink({ tab, symbol }) {
       display: 'flex', justifyContent: 'flex-end',
       padding: '8px 16px 0', flexShrink: 0,
     }}>
-      <button
-        onClick={() => navigate(target.url(symbol))}
-        style={{
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: 10, letterSpacing: '0.04em',
-          color: 'var(--c-accent)', background: 'transparent',
-          border: '1px solid var(--c-accent-dim)', borderRadius: 4,
-          padding: '4px 10px', cursor: 'pointer',
-          transition: 'all 0.12s ease',
-        }}
-        onMouseEnter={e => { e.currentTarget.style.background = 'var(--c-accent-muted)'; e.currentTarget.style.borderColor = 'var(--c-accent)'; }}
-        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'var(--c-accent-dim)'; }}
-      >
-        Open in {target.label} →
-      </button>
+      <OpenInPageButton label={target.label} to={target.url(symbol)} />
     </div>
   );
 }

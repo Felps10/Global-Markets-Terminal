@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import MarketsPageLayout from '../../components/MarketsPageLayout.jsx';
 import { useTaxonomy } from '../../context/TaxonomyContext.jsx';
 import { resolveAsset } from '../../lib/assetResolution.js';
 import { fmpRSI, fmpMACD, hasFmpKey } from '../../dataServices.js';
+import useDeepLinkedSymbol from '../../hooks/useDeepLinkedSymbol.js';
 import { CLUBE_COLORS } from '../../lib/tokens.js';
 
 const C       = CLUBE_COLORS;
@@ -519,17 +519,12 @@ function ScannerResultsCard({ results, scanLoading, scanProgress, totalToScan, s
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function SignalEnginePage() {
   const { assets, subgroups } = useTaxonomy();
-  const [searchParams] = useSearchParams();
-
   // Mode
   const [mode, setMode] = useState('single');
 
-  // Single asset — seeded from the ?symbol= deep link so the SPY default
-  // never fetches (or stamps fetchedRef) on deep-linked visits. Reads the
-  // router's searchParams (declared above) rather than window.location.
-  const [activeSymbol, setActiveSymbol] = useState(() =>
-    (searchParams.get('symbol') || 'SPY').toUpperCase()
-  );
+  // Single asset — ?symbol= deep-link seeding + once-per-mount validation
+  // live in useDeepLinkedSymbol (shared with Chart & Research).
+  const [activeSymbol, setActiveSymbol] = useDeepLinkedSymbol(assets);
   const [activeAsset, setActiveAsset]   = useState(null);
   const [rsiPeriod, setRsiPeriod]       = useState(14);
   const [rsiData, setRsiData]           = useState(null);
@@ -573,20 +568,6 @@ export default function SignalEnginePage() {
     if (!activeSymbol || !assets.length) return;
     setActiveAsset(resolveAsset(assets, activeSymbol));
   }, [activeSymbol, assets]);
-
-  // Validate the ?symbol= deep link once taxonomy arrives: canonicalize a
-  // valid symbol (no-op when the lazy init already matched), fall back to the
-  // SPY default for an unknown one. Applied at most once per mount so a later
-  // taxonomy refresh can't re-apply a stale URL param over a manual selection.
-  const paramAppliedRef = useRef(false);
-  useEffect(() => {
-    if (paramAppliedRef.current) return;
-    const fromParam = searchParams.get('symbol');
-    if (!fromParam || !assets.length) return;
-    paramAppliedRef.current = true;
-    const found = resolveAsset(assets, fromParam.toUpperCase());
-    setActiveSymbol(found ? found.symbol : 'SPY');
-  }, [assets, searchParams]);
 
   // ── Fetch RSI + MACD ───────────────────────────────────────────────────────
   const latestFetchRef = useRef(null);
