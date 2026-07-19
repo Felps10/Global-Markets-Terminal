@@ -4,7 +4,7 @@
 // switches, that 1D and chart failures stay quote-based, and that proxied
 // symbols never show candle-derived levels.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 const authState   = vi.hoisted(() => ({ isAuthenticated: false }));
@@ -21,10 +21,16 @@ vi.mock('../PriceChart.jsx', () => ({
 
 vi.mock('../../context/TaxonomyContext.jsx', () => ({
   useTaxonomy: () => ({
-    assets: [{
-      symbol: 'ENPH', name: 'Enphase Energy', type: 'stock',
-      exchange: 'NASDAQ', subgroup_id: 'clean-energy', meta: {},
-    }],
+    assets: [
+      {
+        symbol: 'ENPH', name: 'Enphase Energy', type: 'stock',
+        exchange: 'NASDAQ', subgroup_id: 'clean-energy', meta: {},
+      },
+      {
+        symbol: 'RUN', name: 'Sunrun', type: 'stock',
+        exchange: 'NASDAQ', subgroup_id: 'clean-energy', meta: {},
+      },
+    ],
   }),
 }));
 
@@ -36,27 +42,34 @@ vi.mock('../../context/AlertsContext.jsx', () => ({
   useAlerts: () => ({ createAlert: vi.fn() }),
 }));
 
+const fmpFlag = vi.hoisted(() => ({ on: false }));
+
 vi.mock('../../dataServices.js', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
     fetchQuote: vi.fn(),
     fmpOHLCV: vi.fn(),
-    hasFmpKey: () => false,
+    fmpProfile: vi.fn(),
+    fmpRatios: vi.fn(),
+    fmpGradesConsensus: vi.fn(),
+    fmpPriceTarget: vi.fn(),
+    fmpAnalystEstimates: vi.fn(),
+    hasFmpKey: () => fmpFlag.on,
     hasFinnhubKey: () => false,
   };
 });
 
 import AssetDetailDrawer from '../AssetDetailDrawer.jsx';
-import { fetchQuote, fmpOHLCV } from '../../dataServices.js';
+import { fetchQuote, fmpOHLCV, fmpProfile, fmpGradesConsensus } from '../../dataServices.js';
 // Shared fixtures: QUOTE + candles(n, base) — default candles() is 11 daily
 // bars, closes 100→110 (+10%), extremes 112/98.
 import { QUOTE, candles } from '../../test/marketFixtures.js';
 
-function renderDrawer(symbol = 'ENPH') {
+function renderDrawer(symbol = 'ENPH', { onSymbolChange = () => {} } = {}) {
   return render(
     <MemoryRouter>
-      <AssetDetailDrawer symbol={symbol} onClose={() => {}} onSymbolChange={() => {}} />
+      <AssetDetailDrawer symbol={symbol} onClose={() => {}} onSymbolChange={onSymbolChange} />
     </MemoryRouter>
   );
 }
@@ -64,6 +77,7 @@ function renderDrawer(symbol = 'ENPH') {
 beforeEach(() => {
   vi.clearAllMocks();
   authState.isAuthenticated = false;
+  fmpFlag.on = false;
   fetchQuote.mockResolvedValue(QUOTE);
   fmpOHLCV.mockResolvedValue(candles());
 });
@@ -165,5 +179,78 @@ describe('AssetDetailDrawer open-in-page links', () => {
     renderDrawer();
     await screen.findByText('1M HIGH');
     expect(screen.queryByText(/Open in /)).toBeNull();
+  });
+});
+
+describe('AssetDetailDrawer hygiene', () => {
+  it('arrow keys navigate siblings — but never while typing in an input', async () => {
+    authState.isAuthenticated = true;
+    const onSymbolChange = vi.fn();
+    renderDrawer('ENPH', { onSymbolChange });
+    await screen.findByText('1M HIGH');
+
+    fireEvent.keyDown(document.body, { key: 'ArrowRight' });
+    expect(onSymbolChange).toHaveBeenCalledWith('RUN'); // clean-energy sibling
+
+    onSymbolChange.mockClear();
+    fireEvent.click(screen.getByText('SET ALERT'));
+    const input = document.querySelector('input');
+    expect(input).toBeTruthy();
+    fireEvent.keyDown(input, { key: 'ArrowRight' });
+    fireEvent.keyDown(input, { key: 'ArrowLeft' });
+    expect(onSymbolChange).not.toHaveBeenCalled();
+  });
+
+  it('fetches tab data (profile/analyst) without requiring an expand', async () => {
+    authState.isAuthenticated = true;
+    fmpFlag.on = true;
+    fmpProfile.mockResolvedValue({ description: 'Solar company', sector: 'Energy' });
+    fmpGradesConsensus.mockResolvedValue({ buy: 10, hold: 5, sell: 1 });
+    renderDrawer();
+    await screen.findByText('1M HIGH');
+    // Collapsed mode, no expand click — the data fetches must fire anyway.
+    await waitFor(() => expect(fmpProfile).toHaveBeenCalledWith('ENPH'));
+    expect(fmpGradesConsensus).toHaveBeenCalledWith('ENPH');
+  });
+
+  it('persists timeframe across symbol changes (sibling comparison)', async () => {
+    const { rerender } = renderDrawer('ENPH');
+    await screen.findByText('1M HIGH');
+    fireEvent.click(screen.getByText('1Y'));
+    await screen.findByText('1Y HIGH');
+
+    // Same mounted drawer, symbol prop changes — timeframe must survive.
+    rerender(
+      <MemoryRouter>
+        <AssetDetailDrawer symbol="RUN" onClose={() => {}} onSymbolChange={() => {}} />
+      </MemoryRouter>
+    );
+    await waitFor(() =>
+      expect(fmpOHLCV).toHaveBeenLastCalledWith('RUN', '1Y', expect.anything())
+    );
+  });
+
+  it('locked Analyst card describes analyst content in English (guest view)', async () => {
+    renderDrawer(); // guest
+    await screen.findByText('1M HIGH');
+    fireEvent.click(screen.getByText('Analyst'));
+    expect(screen.getByText('Analyst consensus')).toBeTruthy();
+    expect(screen.getByText('Create free account →')).toBeTruthy();
+    expect(screen.queryByText(/RSI, MACD/)).toBeNull();
+  });
+
+  it('refreshes the quote every 30s while open, silently', async () => {
+    vi.useFakeTimers();
+    try {
+      renderDrawer();
+      await vi.advanceTimersByTimeAsync(0); // flush initial fetch
+      expect(fetchQuote).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(fetchQuote).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(fetchQuote).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
