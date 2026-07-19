@@ -98,7 +98,7 @@ function LockedTabCard({ title, description, onUnlock }) {
         onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
         onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
       >
-        Criar conta gratuita →
+        Create free account →
       </button>
     </div>
   );
@@ -390,6 +390,14 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
     closingTimerRef.current = setTimeout(() => {
       setStack([]);
       setClosing(false);
+      // View state persists across symbol changes WITHIN a session (sibling
+      // ←/→ comparison), but each open starts fresh — an expanded 5Y drawer
+      // shouldn't slam open from a casual card click an hour later.
+      setTimeframe('1M');
+      setChartInterval(null);
+      setExpanded(false);
+      setChartType('candle');
+      setActiveTab('overview');
       onClose?.();
     }, 200);
   }
@@ -434,7 +442,6 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
   const [loadingNews,  setLoadingNews]  = useState(false);
 
   // Tracks which symbols have had expand data fetched this mount
-  const expandDataLoaded = useRef({});
 
   // ── Chart state ───────────────────────────────────────────────────────────
   const [timeframe,    setTimeframe]    = useState('1M');
@@ -484,6 +491,13 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
   useEffect(() => {
     if (!currentSymbol) return;
     const handler = (e) => {
+      // Never hijack keys while the user is typing (alert form, page search):
+      // ←/→ must move the caret and ESC must cancel the field, not the drawer.
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      // Ignore held-key autorepeat: each symbol visit fetches real data, and
+      // a held arrow would sweep ~20 symbols/second through the providers.
+      if (e.repeat) return;
       if (e.key === 'Escape') handleClose();
       if (e.key === 'ArrowLeft' && prevAsset && onSymbolChange) {
         e.preventDefault();
@@ -519,21 +533,44 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
     return () => { cancelled = true; };
   }, [currentSymbol, quoteSymbol]);
 
-  // ── Reset view state when symbol changes ─────────────────────────────────
-  const [activeTab, setActiveTab] = useState('overview');
+  // ── Keep the quote fresh while the drawer is open ────────────────────────
+  // 30s cadence (the terminal's refresh rhythm), silent — no loading flicker,
+  // skipped while the tab is hidden. Period stats/chart stay as-charted; this
+  // only refreshes the header price line and quote-based stat rows.
   useEffect(() => {
-    setTimeframe('1M');
-    setChartInterval(null);
-    setExpanded(false);
-    setChartType('candle');
-    setActiveTab('overview');
-  }, [currentSymbol]);
+    if (!currentSymbol) return;
+    let cancelled = false; // an in-flight tick must not land on the NEXT symbol
+    const id = setInterval(() => {
+      if (document.hidden) return;
+      fetchAssetQuote(quoteSymbol)
+        .then(d => { if (!cancelled && d) setQuoteData(d); })
+        .catch(() => {});
+    }, 30_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [currentSymbol, quoteSymbol]);
 
-  // ── Fetch expand data on first expand per symbol ──────────────────────────
+  // ── View state PERSISTS across symbol changes ────────────────────────────
+  // Timeframe, interval, chart type, expand state, and active tab all survive
+  // sibling ←/→ navigation and drill-ins, so comparing assets at 1Y stays at
+  // 1Y. The two guards below snap back only when the new symbol can't honor
+  // the current state (non-equity has no tabs; B3 has no intraday intervals).
+  const [activeTab, setActiveTab] = useState('overview');
+  // Render-time clamp, not an effect: non-equities have no tabs, and a
+  // post-paint snap-back would flash the equity tab's body for one frame.
+  // The underlying activeTab state survives an equity→FX→equity round-trip.
+  const effectiveTab = isEquity ? activeTab : 'overview';
+
+  // ── Fetch tab data per symbol visit (profile/ratios/analyst/news) ────────
+  // NOT gated on `expanded`: the collapsed drawer renders the Fundamentals/
+  // Analyst/News tabs, Overview's quick-analyst line, and the company
+  // one-liner too — all invisible until the first expand when this was
+  // expand-gated. Deliberately NO fetched-once guard: a mark-before-fetch ref
+  // permanently blanked symbols opened before taxonomy resolved isEquity, and
+  // blocked refetching data the quote effect nulls on every symbol change.
+  // Revisits are cheap — client apiCache (profile 24h / ratios 6h / news
+  // 10min) and the server's 6h FMP TTL absorb them.
   useEffect(() => {
-    if (!expanded || !currentSymbol) return;
-    if (expandDataLoaded.current[currentSymbol]) return;
-    expandDataLoaded.current[currentSymbol] = true;
+    if (!currentSymbol) return;
 
     let cancelled = false;
 
@@ -573,12 +610,18 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
     }
 
     return () => { cancelled = true; };
-  }, [expanded, currentSymbol, isEquity]);
+  }, [currentSymbol, isEquity]);
 
   // ── Chart data loader ─────────────────────────────────────────────────────
   // B3 history is daily-only (BRAPI/EODHD) — narrow the choices accordingly.
   const intervalChoices = intervalChoicesFor(timeframe, { dailyOnly: isB3 });
-  const effectiveInterval = chartInterval || intervalChoices.default;
+  // Render-time clamp: a manual interval carried across a symbol change may
+  // not exist for the new asset class (B3 has no intraday) — fall back to the
+  // default WITHOUT clearing the state, so the choice survives a B3 detour
+  // and no doomed fetch fires in the transition commit.
+  const effectiveInterval = chartInterval && intervalChoices.options.includes(chartInterval)
+    ? chartInterval
+    : intervalChoices.default;
 
   const loadChart = useCallback(async (sym, tf, iv, symIsB3) => {
     const cacheKey = `${sym}:${tf}:${iv}`;
@@ -1060,7 +1103,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
               onMouseEnter={e => e.currentTarget.style.color = TXT_1}
               onMouseLeave={e => e.currentTarget.style.color = TXT_3}
             >
-              Ver mais notícias →
+              More news →
             </button>
           )}
         </div>
@@ -1565,7 +1608,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
                 flexShrink: 0,
               }}>
                 {tabs.map(tab => {
-                  const active = activeTab === tab.key;
+                  const active = effectiveTab === tab.key;
                   return (
                     <button
                       key={tab.key}
@@ -1591,13 +1634,13 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
           })()}
 
           {/* ── Open-in-page link row — routes each tab to its Markets page ── */}
-          {isAuthenticated && <OpenInPageLink tab={activeTab} symbol={currentSymbol} />}
+          {isAuthenticated && <OpenInPageLink tab={effectiveTab} symbol={currentSymbol} />}
 
           {/* ── TAB CONTENT ──────────────────────────────────────── */}
 
           {/* OVERVIEW TAB — chart + stats (always rendered, hidden via display) */}
           <div style={{
-            display: activeTab === 'overview' ? 'flex' : 'none',
+            display: effectiveTab === 'overview' ? 'flex' : 'none',
             flex: 1, flexDirection: 'column', overflowY: 'auto',
           }}>
             {/* Chart section (toolbar + chart with sidebars) */}
@@ -1715,13 +1758,13 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
           </div>
 
           {/* FUNDAMENTALS TAB */}
-          {activeTab === 'fundamentals' && (
+          {effectiveTab === 'fundamentals' && (
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 32px' }}>
               {!isAuthenticated ? (
                 <LockedTabCard
                   featureName="fundamentals"
-                  title="Dados fundamentalistas"
-                  description="P/L, EPS, ROE, EBITDA e recomendações de analistas — disponível para membros."
+                  title="Fundamental data"
+                  description="P/E, EPS, ROE, EBITDA and valuation ratios — available to members."
                   onUnlock={() => openAuthPanel('fundamentals')}
                 />
               ) : !hasFmpKey() ? (
@@ -1812,14 +1855,14 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
           )}
 
           {/* ANALYST TAB */}
-          {activeTab === 'analyst' && (
+          {effectiveTab === 'analyst' && (
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 32px' }}>
               {!isAuthenticated ? (
                 <LockedTabCard
-                  featureName="signals"
-                  title="Sinais técnicos"
-                  description="RSI, MACD e análise técnica em tempo real — disponível para membros."
-                  onUnlock={() => openAuthPanel('signals')}
+                  featureName="analyst"
+                  title="Analyst consensus"
+                  description="Recommendations, price targets and forward estimates — available to members."
+                  onUnlock={() => openAuthPanel('analyst')}
                 />
               ) : (
                 analystSection
@@ -1828,7 +1871,7 @@ export default function AssetDetailDrawer({ symbol, onClose, onSymbolChange }) {
           )}
 
           {/* NEWS TAB */}
-          {activeTab === 'news' && (
+          {effectiveTab === 'news' && (
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 32px' }}>
               {newsSection}
             </div>

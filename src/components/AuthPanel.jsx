@@ -15,6 +15,7 @@ const MESSAGES = {
   alerts:          'Receba alertas de preço em tempo real — crie uma conta gratuita',
   fundamentals:    'Acesse dados fundamentalistas completos — crie uma conta gratuita',
   signals:         'Acesse sinais técnicos (RSI, MACD) — crie uma conta gratuita',
+  analyst:         'Acesse recomendações de analistas, price targets e estimativas — crie uma conta gratuita',
   news:            'Acesse o feed completo de notícias — crie uma conta gratuita',
   research:        'Charts interativos e pesquisa aprofundada — crie uma conta gratuita',
   fundamental_lab: 'Laboratório de valuation e métricas — crie uma conta gratuita',
