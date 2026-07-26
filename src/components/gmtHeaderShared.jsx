@@ -1,6 +1,6 @@
 /**
  * gmtHeaderShared.js — Shared utilities for GMT header components.
- * Used by GMTHeader, GMTPublicHeader, and GMTHomepageHeader.
+ * Used by GMTHeader (logged-in) and GMTPublicHeader (all public routes).
  */
 
 // ─── Inject nav + dropdown styles ─────────────────────────────────────────────
@@ -11,7 +11,6 @@ export function injectStyles() {
   const el = document.createElement('style');
   el.id = STYLE_ID;
   el.textContent = `
-    @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap');
     .gmt-nav-item {
       position: relative;
       background: transparent;
@@ -132,6 +131,7 @@ export function injectStyles() {
     }
     @media (max-width: 768px) {
       .gmt-pub-nav-item { display: none !important; }
+      .gmt-pub-right { display: none !important; }
       .gmt-pub-hamburger { display: flex !important; }
     }
     @media (min-width: 769px) {
@@ -155,15 +155,17 @@ export function GmtLogo() {
 }
 
 // ─── Products dropdown items ──────────────────────────────────────────────────
+// English to match the (still hardcoded-EN) public header; keyed out with the
+// rest of the public chrome in the i18n pass (PR 4 of the redesign).
 export const PRODUCTS_ITEMS = [
   {
     name: 'GMT Mini',
-    desc: 'Mercado ao vivo · gratuito · sem cadastro',
+    desc: 'Live market · free · no signup',
     href: '/mini',
   },
   {
     name: 'GMT Pro',
-    desc: 'Terminal completo · research · sinais · watchlist',
+    desc: 'Full terminal · research · signals · watchlist',
     href: '/terminal',
   },
 ];

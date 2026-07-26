@@ -68,13 +68,17 @@ export default function PublicFooter() {
         ))}
       </div>
 
-      {/* Right — copyright */}
+      {/* Right — copyright + disclaimer */}
       <div style={{
         fontFamily: "'IBM Plex Sans', sans-serif",
         fontSize: 11,
         color: 'rgba(255,255,255,0.15)',
+        textAlign: 'right',
       }}>
-        © {new Date().getFullYear()} Global Markets Terminal
+        <div>© {new Date().getFullYear()} Global Markets Terminal</div>
+        <div style={{ fontSize: 10, marginTop: 4 }}>
+          For informational purposes only · Not investment advice
+        </div>
       </div>
     </footer>
   );

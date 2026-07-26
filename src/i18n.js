@@ -8,7 +8,10 @@ i18n
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({
-    fallbackLng: 'pt',
+    // EN is the default for first-time visitors (owner decision, 2026-07-26);
+    // a stored toggle choice (localStorage) wins. Browser language is
+    // deliberately NOT consulted — "EN always default".
+    fallbackLng: 'en',
     supportedLngs: ['pt', 'en'],
     defaultNS: 'translation',
     ns: ['translation'],
@@ -18,7 +21,7 @@ i18n
     },
 
     detection: {
-      order: ['localStorage', 'navigator'],
+      order: ['localStorage'],
       caches: ['localStorage'],
       lookupLocalStorage: 'gmt-lang',
     },

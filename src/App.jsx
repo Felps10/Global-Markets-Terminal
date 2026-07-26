@@ -126,8 +126,8 @@ function AppWithPanel() {
         <Routes>
           {/* Public */}
           <Route path="/"          element={<PublicLayout><LandingPage /></PublicLayout>} />
-          <Route path="/terminal"  element={<TerminalProLandingPage />} />
-          <Route path="/mini"      element={<TerminalMiniPage />} />
+          <Route path="/terminal"  element={<PublicLayout><TerminalProLandingPage /></PublicLayout>} />
+          <Route path="/mini"      element={<PublicLayout><TerminalMiniPage /></PublicLayout>} />
           <Route path="/login"     element={<PublicLayout><LoginPage /></PublicLayout>} />
           <Route path="/register"  element={<PublicLayout><RegisterPage /></PublicLayout>} />
           <Route path="/features"  element={<PublicLayout><FeaturesPage /></PublicLayout>} />

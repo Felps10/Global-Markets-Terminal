@@ -181,7 +181,7 @@ export default function RegisterPage() {
       <div style={{
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
-        minHeight: 'calc(100vh - 86px - 80px)',
+        minHeight: 'calc(100vh - 52px - 138px)', // viewport minus fixed header (52, reserved by PublicLayout) and footer (~138)
       }}>
         {/* LEFT PANEL */}
         <div style={{
