@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth }  from '../hooks/useAuth.js';
 import { hasRole }  from '../lib/roles.js';
@@ -9,11 +9,14 @@ export default function ProtectedRoute({
   showDenied   = false,
 }) {
   const { isAuthenticated, user, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) return null;
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    // Remember where the visitor was headed (path + query + hash) so the
+    // auth pages can return them there — deep links like ?symbol= survive.
+    return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
   if (requiredRole !== null && !hasRole(user?.role, requiredRole)) {
@@ -26,6 +29,7 @@ export default function ProtectedRoute({
 
 function AccessDenied() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   return (
     <div style={{
       minHeight:      '100vh',
@@ -65,16 +69,21 @@ function AccessDenied() {
       }}>
         {t('access_denied.body')}
       </div>
-      <a href="/app" style={{
+      {/* Router navigation, not <a href> — a full reload would drop the
+          session (persistSession: false) and log the user out. */}
+      <button onClick={() => navigate('/app')} style={{
         marginTop:     8,
         fontFamily:    "'JetBrains Mono', monospace",
         fontSize:      12,
         color:         'var(--c-accent)',
-        textDecoration:'none',
+        background:    'none',
+        border:        'none',
+        cursor:        'pointer',
         letterSpacing: '0.08em',
+        padding:       0,
       }}>
         {t('access_denied.back')}
-      </a>
+      </button>
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../hooks/useAuth.js';
+import { ROUTES } from '../lib/routes.js';
 import { MINI_ASSETS, MINI_GLOBAL_ASSETS, MINI_BRASIL_ASSETS } from '../data/miniAssets.js';
 import { useSnapshot } from '../hooks/useSnapshot.js';
 import { trackEvent } from '../services/analytics.js';
@@ -118,6 +120,7 @@ function injectMiniStyles() {
 export default function TerminalMiniPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { isAuthenticated } = useAuth();
   const [mode, setMode] = useState('global');
 
   const { assets: snapshotAssets, snapshotLabel } = useSnapshot();
@@ -140,10 +143,10 @@ export default function TerminalMiniPage() {
 
   useEffect(() => { injectMiniStyles(); }, []);
 
-  // Analytics
+  // Analytics — guests only; a signed-in visitor is not a conversion lead
   useEffect(() => {
-    trackEvent('guest_terminal_entry', { surface: 'mini' });
-  }, []);
+    if (!isAuthenticated) trackEvent('guest_terminal_entry', { surface: 'mini' });
+  }, [isAuthenticated]);
 
   const assets = mode === 'brasil' ? MINI_BRASIL_ASSETS : MINI_GLOBAL_ASSETS;
 
@@ -221,7 +224,8 @@ export default function TerminalMiniPage() {
         ))}
       </div>
 
-      {/* Upgrade CTA strip */}
+      {/* Upgrade CTA strip — signup for guests, straight to the terminal
+          for signed-in visitors (no point pitching what they already own) */}
       <div style={{
         borderTop: '0.5px solid rgba(255,255,255,0.06)',
         padding: '20px 24px',
@@ -233,32 +237,79 @@ export default function TerminalMiniPage() {
       }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 500, color: '#e2e8f0', marginBottom: 2, fontFamily: "'IBM Plex Sans', sans-serif" }}>
-            {t('mini.upgrade_title')}
+            {isAuthenticated ? t('mini.authed_title') : t('mini.upgrade_title')}
           </div>
           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontFamily: "'IBM Plex Sans', sans-serif" }}>
-            {t('mini.upgrade_desc')}
+            {isAuthenticated ? t('mini.authed_desc') : t('mini.upgrade_desc')}
           </div>
         </div>
-        <button
-          onClick={() => navigate('/terminal')}
-          style={{
-            background: 'var(--c-accent)',
-            border: 'none',
-            borderRadius: 4,
-            color: '#080f1a',
-            cursor: 'pointer',
-            fontFamily: "'IBM Plex Sans', sans-serif",
-            fontSize: 12,
-            fontWeight: 600,
-            padding: '8px 18px',
-            whiteSpace: 'nowrap',
-            transition: 'background 0.15s',
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = 'var(--c-accent-hover)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'var(--c-accent)'}
-        >
-          {t('mini.upgrade_cta')}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {isAuthenticated ? (
+            <button
+              onClick={() => navigate(ROUTES.terminal.global)}
+              style={{
+                background: 'var(--c-accent)',
+                border: 'none',
+                borderRadius: 4,
+                color: '#080f1a',
+                cursor: 'pointer',
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                fontSize: 12,
+                fontWeight: 600,
+                padding: '8px 18px',
+                whiteSpace: 'nowrap',
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--c-accent-hover)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'var(--c-accent)'}
+            >
+              {t('mini.authed_cta')}
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={() => navigate(ROUTES.auth.register)}
+                style={{
+                  background: 'var(--c-accent)',
+                  border: 'none',
+                  borderRadius: 4,
+                  color: '#080f1a',
+                  cursor: 'pointer',
+                  fontFamily: "'IBM Plex Sans', sans-serif",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  padding: '8px 18px',
+                  whiteSpace: 'nowrap',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--c-accent-hover)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'var(--c-accent)'}
+              >
+                {t('common.create_free_account')}
+              </button>
+              <button
+                onClick={() => navigate('/terminal')}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid rgba(59,130,246,0.35)',
+                  borderRadius: 4,
+                  color: 'rgba(255,255,255,0.6)',
+                  cursor: 'pointer',
+                  fontFamily: "'IBM Plex Sans', sans-serif",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  padding: '8px 18px',
+                  whiteSpace: 'nowrap',
+                  transition: 'color 0.15s, border-color 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.9)'; e.currentTarget.style.borderColor = 'rgba(59,130,246,0.7)'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; e.currentTarget.style.borderColor = 'rgba(59,130,246,0.35)'; }}
+              >
+                {t('mini.upgrade_cta')}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Attribution strip */}
