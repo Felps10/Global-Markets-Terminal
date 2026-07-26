@@ -275,7 +275,7 @@ export default function TerminalMiniPage() {
           GMT · Terminal Mini
         </span>
         <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', fontFamily: "'JetBrains Mono', monospace" }}>
-          {snapshotLabel} · sign in for live prices
+          {snapshotLabel} · {t('common.snapshot_note')}
         </span>
         <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', fontFamily: "'JetBrains Mono', monospace" }}>
           {t('mini.data_sources')}

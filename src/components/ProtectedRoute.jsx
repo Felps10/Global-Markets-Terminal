@@ -1,4 +1,5 @@
 import { Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth }  from '../hooks/useAuth.js';
 import { hasRole }  from '../lib/roles.js';
 
@@ -24,6 +25,7 @@ export default function ProtectedRoute({
 }
 
 function AccessDenied() {
+  const { t } = useTranslation();
   return (
     <div style={{
       minHeight:      '100vh',
@@ -42,7 +44,7 @@ function AccessDenied() {
         color:         '#475569',
         marginBottom:  8,
       }}>
-        ACESSO RESTRITO
+        {t('access_denied.eyebrow')}
       </div>
       <div style={{
         fontFamily: "'IBM Plex Sans', sans-serif",
@@ -51,7 +53,7 @@ function AccessDenied() {
         color:      '#e2e8f0',
         textAlign:  'center',
       }}>
-        Você não tem acesso a esta área
+        {t('access_denied.title')}
       </div>
       <div style={{
         fontFamily: "'IBM Plex Sans', sans-serif",
@@ -61,8 +63,7 @@ function AccessDenied() {
         maxWidth:   360,
         lineHeight: 1.6,
       }}>
-        Esta seção é restrita. Entre em contato com o
-        administrador para solicitar acesso.
+        {t('access_denied.body')}
       </div>
       <a href="/app" style={{
         marginTop:     8,
@@ -72,7 +73,7 @@ function AccessDenied() {
         textDecoration:'none',
         letterSpacing: '0.08em',
       }}>
-        ← Voltar ao terminal
+        {t('access_denied.back')}
       </a>
     </div>
   );

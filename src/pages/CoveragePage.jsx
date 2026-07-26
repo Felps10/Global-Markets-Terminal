@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ROUTES } from '../lib/routes.js';
 import { CLUBE_COLORS } from '../lib/tokens.js';
 import {
@@ -9,82 +10,77 @@ import {
 import { SECTOR_ORDER } from '../data/b3Sectors.js';
 
 // Counts and subgroup tags come from publicStats (computed from the taxonomy
-// bootstrap) so this page can't drift from the data. Names, descriptions and
-// source attributions are curated — sources must match the actual provider
-// routing in server/lib/providerRouting.js.
-const globalCard = (number, groupId, name, description, source, overrides = {}) => {
+// bootstrap) so this page can't drift from the data. Copy lives in
+// public/locales/{en,pt}/translation.json (coverage_page.*); source
+// attributions must match server/lib/providerRouting.js. Builders run inside
+// the component so everything re-resolves on language change.
+const globalCard = (t, number, groupId, nameKey, descKey, source, overrides = {}) => {
   const subgroups = subgroupNamesByGroup(groupId);
   return {
     number,
-    name,
-    count: `${countByGroup(groupId)} ${overrides.unit || 'ASSETS'}`,
-    groups: subgroups.length === 1 ? '1 GROUP' : `${subgroups.length} SUBGROUPS`,
-    description,
+    name: t(`coverage_page.${nameKey}`),
+    count: `${countByGroup(groupId)} ${t(overrides.unitKey || 'coverage_page.unit_assets')}`,
+    groups: subgroups.length === 1
+      ? `1 ${t('coverage_page.unit_group')}`
+      : `${subgroups.length} ${t('coverage_page.unit_subgroups')}`,
+    description: t(`coverage_page.${descKey}`),
     source,
     subgroups: overrides.subgroups || subgroups,
   };
 };
 
-const GLOBAL_COVERAGE = [
-  globalCard('01', 'equities', 'Global Equities',
-    'US-listed equities and ETFs mapped to GICS sectors — technology to staples — plus international ADRs, EM trackers, and B3 headline names.',
-    'FMP · EODHD'),
-  globalCard('02', 'indices', 'Global Indices',
-    'S&P 500, NASDAQ, Dow Jones, FTSE 100, Nikkei 225, IBOVESPA and more. The benchmarks that define global markets.',
-    'EODHD · FMP'),
-  globalCard('03', 'currencies', 'Foreign Exchange',
-    'Major and EM pairs — EUR/USD, GBP/USD, USD/JPY, USD/BRL and more.',
-    'FMP · EODHD', { unit: 'PAIRS' }),
-  globalCard('04', 'digital-assets', 'Digital Assets',
-    'Bitcoin, Ethereum, Solana, XRP, Cardano, Dogecoin, Avalanche, and Polkadot. Live spot prices via the CoinGecko API.',
-    'CoinGecko'),
-  globalCard('05', 'commodities', 'Commodities',
-    'Precious metals, energy, agriculture, and industrial metals — via futures and ETF proxies.',
-    'FMP'),
-  globalCard('06', 'fixed-income', 'Fixed Income',
-    'US Treasuries across the full maturity spectrum, investment-grade and high-yield credit, and dividend income ETFs.',
-    'FMP · EODHD'),
+const buildGlobalCoverage = (t) => [
+  globalCard(t, '01', 'equities', 'eq_name', 'eq_desc', 'FMP · EODHD'),
+  globalCard(t, '02', 'indices', 'idx_name', 'idx_desc', 'EODHD · FMP'),
+  globalCard(t, '03', 'currencies', 'fx_name', 'fx_desc', 'FMP · EODHD', { unitKey: 'coverage_page.unit_pairs' }),
+  globalCard(t, '04', 'digital-assets', 'crypto_name', 'crypto_desc', 'CoinGecko'),
+  globalCard(t, '05', 'commodities', 'comm_name', 'comm_desc', 'FMP'),
+  globalCard(t, '06', 'fixed-income', 'fi_name', 'fi_desc', 'FMP · EODHD'),
 ];
 
-const BRAZIL_COVERAGE = [
+const buildBrazilCoverage = (t) => [
   {
     number: '01',
-    name: 'B3 Equities & Funds',
-    count: `${countByGroup('br-mercado')} ASSETS`,
-    groups: `${SECTOR_ORDER.length} SECTORS`,
-    description: 'Full coverage of the major B3 names — equities organized by sector, plus FIIs, ETFs, and B3 indices.',
+    name: t('coverage_page.b3_name'),
+    count: `${countByGroup('br-mercado')} ${t('coverage_page.unit_assets')}`,
+    groups: `${SECTOR_ORDER.length} ${t('coverage_page.unit_sectors')}`,
+    description: t('coverage_page.b3_desc'),
     source: 'BRAPI',
     subgroups: [...SECTOR_ORDER],
   },
   {
     number: '02',
-    name: 'Renda Fixa',
-    count: 'RATES + CURVES',
-    groups: '3 SUBGROUPS',
-    description: 'SELIC, CDI, DI curve, Tesouro Direto instruments (LFT, NTN-B, LTN), and corporate credit spreads. Data sourced directly from BCB SGS series.',
+    name: t('coverage_page.rf_name'),
+    count: t('coverage_page.rf_count'),
+    groups: `3 ${t('coverage_page.unit_subgroups')}`,
+    description: t('coverage_page.rf_desc'),
     source: 'BCB SGS',
     subgroups: ['Juros', 'Títulos Públicos', 'Crédito'],
   },
   {
     number: '03',
-    name: 'Macro Brasil',
-    count: 'INDICATORS',
-    groups: '2 SUBGROUPS',
-    description: 'IPCA inflation, GDP growth, unemployment, industrial production, USD/BRL, EUR/BRL, and liquidity indicators. Macro series from Banco Central do Brasil; FX pairs from BRAPI.',
+    name: t('coverage_page.macro_name'),
+    count: t('coverage_page.macro_count'),
+    groups: `2 ${t('coverage_page.unit_subgroups')}`,
+    description: t('coverage_page.macro_desc'),
     source: 'BCB SGS · BRAPI',
     subgroups: ['Macro Indicators', 'FX & Liquidity'],
   },
 ];
 
-const HERO_STATS = [
-  { num: String(TOTAL_ASSETS), label: 'Total Assets' },
-  { num: String(GROUP_COUNT), label: 'Groups' },
-  { num: String(SUBGROUP_COUNT), label: 'Subgroups' },
-  { num: String(SOURCE_COUNT), label: 'Data Sources' },
+const buildHeroStats = (t) => [
+  { num: String(TOTAL_ASSETS), label: t('coverage_page.stat_assets') },
+  { num: String(GROUP_COUNT), label: t('coverage_page.stat_groups') },
+  { num: String(SUBGROUP_COUNT), label: t('coverage_page.stat_subgroups') },
+  { num: String(SOURCE_COUNT), label: t('coverage_page.stat_sources') },
 ];
 
 export default function CoveragePage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const GLOBAL_COVERAGE = buildGlobalCoverage(t);
+  const BRAZIL_COVERAGE = buildBrazilCoverage(t);
+  const HERO_STATS = buildHeroStats(t);
   const [hoveredGlobal, setHoveredGlobal] = useState(null);
   const [hoveredBrazil, setHoveredBrazil] = useState(null);
   const [ctaHover, setCtaHover] = useState(false);
@@ -212,7 +208,7 @@ export default function CoveragePage() {
           color: 'rgba(255,255,255,0.2)',
           letterSpacing: '0.08em',
         }}>
-          DATA SOURCE: {item.source}
+          {t('coverage_page.source_label')} {item.source}
         </div>
       </div>
     );
@@ -264,7 +260,7 @@ export default function CoveragePage() {
               onMouseEnter={e => e.currentTarget.style.color = 'var(--c-accent)'}
               onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.25)'}
             >
-              Home
+              {t('coverage_page.breadcrumb_home')}
             </button>
             <span style={{
               fontSize: 12,
@@ -274,7 +270,7 @@ export default function CoveragePage() {
               /
             </span>
             <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>
-              Coverage
+              {t('coverage_page.breadcrumb')}
             </span>
           </div>
 
@@ -286,7 +282,7 @@ export default function CoveragePage() {
             textTransform: 'uppercase',
             marginBottom: 16,
           }}>
-            ASSET COVERAGE
+            {t('coverage_page.eyebrow')}
           </div>
 
           <h1 style={{
@@ -299,7 +295,7 @@ export default function CoveragePage() {
             marginBottom: 20,
             marginTop: 0,
           }}>
-            {'Every market that matters.\nAll in one place.'}
+            {t('coverage_page.title')}
           </h1>
 
           <p style={{
@@ -309,7 +305,7 @@ export default function CoveragePage() {
             marginTop: 0,
             marginBottom: 0,
           }}>
-            {TOTAL_ASSETS} assets across {GROUP_COUNT} groups — global equities, Brazil, crypto, FX, commodities, and fixed income.
+            {t('coverage_page.subline', { assets: TOTAL_ASSETS, groups: GROUP_COUNT })}
           </p>
 
           {/* Stats row */}
@@ -353,7 +349,7 @@ export default function CoveragePage() {
                 textTransform: 'uppercase',
                 marginBottom: 16,
               }}>
-                GLOBAL TERMINAL
+                {t('coverage_page.global_eyebrow')}
               </div>
               <h2 style={{
                 fontFamily: "'Syne', sans-serif",
@@ -363,7 +359,7 @@ export default function CoveragePage() {
                 marginTop: 0,
                 marginBottom: 0,
               }}>
-                Six asset classes.
+                {t('coverage_page.global_title')}
               </h2>
             </div>
 
@@ -398,7 +394,7 @@ export default function CoveragePage() {
                 textTransform: 'uppercase',
                 marginBottom: 16,
               }}>
-                BRAZIL TERMINAL
+                {t('coverage_page.brazil_eyebrow')}
               </div>
               <h2 style={{
                 fontFamily: "'Syne', sans-serif",
@@ -409,7 +405,7 @@ export default function CoveragePage() {
                 marginTop: 0,
                 marginBottom: 0,
               }}>
-                {'Three pillars of\nBrazilian markets.'}
+                {t('coverage_page.brazil_title')}
               </h2>
               <p style={{
                 fontSize: 13,
@@ -418,8 +414,7 @@ export default function CoveragePage() {
                 marginTop: 12,
                 marginBottom: 0,
               }}>
-                Powered by BRAPI for B3 equities and BCB SGS for macro data —
-                direct from Banco Central do Brasil, no intermediary.
+                {t('coverage_page.brazil_sub')}
               </p>
             </div>
 
@@ -454,7 +449,7 @@ export default function CoveragePage() {
               marginBottom: 16,
               marginTop: 0,
             }}>
-              Ready to explore the full coverage?
+              {t('coverage_page.final_title')}
             </h2>
             <p style={{
               fontSize: 15,
@@ -463,7 +458,7 @@ export default function CoveragePage() {
               marginBottom: 40,
               marginTop: 0,
             }}>
-              Free account. Instant access. All {TOTAL_ASSETS} assets from day one.
+              {t('coverage_page.final_sub', { assets: TOTAL_ASSETS })}
             </p>
             <button
               onClick={() => navigate(ROUTES.auth.register)}
@@ -483,7 +478,7 @@ export default function CoveragePage() {
                 transition: 'background 150ms',
               }}
             >
-              Create Free Account
+              {t('common.create_free_account')}
             </button>
             <button
               onClick={() => navigate(ROUTES.auth.login)}
@@ -501,7 +496,7 @@ export default function CoveragePage() {
                 transition: 'color 150ms',
               }}
             >
-              Already have an account? Sign in →
+              {t('common.already_have_account')} {t('common.sign_in_arrow')}
             </button>
           </div>
         </section>

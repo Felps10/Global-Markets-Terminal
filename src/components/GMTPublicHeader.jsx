@@ -16,10 +16,10 @@ import { injectStyles, GmtLogo } from './gmtHeaderShared.jsx';
 // Flat nav — two products don't need a dropdown (2026-07 consolidation).
 // About/Features/Community were retired; their routes redirect in App.jsx.
 const PUBLIC_NAV = [
-  { label: 'Terminal Pro', path: ROUTES.public.terminal },
-  { label: 'Live Demo',    path: ROUTES.public.mini },
-  { label: 'Coverage',     path: ROUTES.public.coverage },
-  { label: 'Pricing',      path: ROUTES.public.pricing },
+  { key: 'common.nav_terminal_pro', path: ROUTES.public.terminal },
+  { key: 'common.nav_live_demo',    path: ROUTES.public.mini },
+  { key: 'common.nav_coverage',     path: ROUTES.public.coverage },
+  { key: 'common.nav_pricing',      path: ROUTES.public.pricing },
 ];
 
 // PT/EN segment toggle. i18next persists the choice to localStorage
@@ -64,6 +64,7 @@ function LangToggle({ compact = false }) {
 }
 
 export default function GMTPublicHeader({ isHome = false }) {
+  const { t } = useTranslation();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
@@ -141,7 +142,7 @@ export default function GMTPublicHeader({ isHome = false }) {
                   color: isActive(item.path) ? 'var(--c-accent)' : 'rgba(255,255,255,0.5)',
                 }}
               >
-                {item.label}
+                {t(item.key)}
                 <div style={{
                   position: 'absolute',
                   bottom: 0,
@@ -178,7 +179,7 @@ export default function GMTPublicHeader({ isHome = false }) {
               onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.8)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.5)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'; }}
             >
-              Sign In
+              {t('common.sign_in')}
             </button>
             <button
               onClick={handleSignUp}
@@ -196,7 +197,7 @@ export default function GMTPublicHeader({ isHome = false }) {
               onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--c-accent-hover)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--c-accent)'; }}
             >
-              Create Account
+              {t('common.create_account')}
             </button>
           </div>
 
@@ -272,7 +273,7 @@ export default function GMTPublicHeader({ isHome = false }) {
                 textAlign: 'center',
               }}
             >
-              {item.label}
+              {t(item.key)}
             </button>
           ))}
 
@@ -293,7 +294,7 @@ export default function GMTPublicHeader({ isHome = false }) {
               width: 240,
             }}
           >
-            Sign In
+            {t('common.sign_in')}
           </button>
           <button
             onClick={() => { setMobileOpen(false); handleSignUp(); }}
@@ -310,7 +311,7 @@ export default function GMTPublicHeader({ isHome = false }) {
               width: 240,
             }}
           >
-            Create Account
+            {t('common.create_account')}
           </button>
         </div>
       )}

@@ -1,15 +1,17 @@
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 // Mirrors the header nav — footer and header must agree on the sitemap.
 const NAV_LINKS = [
-  { label: 'Terminal Pro', path: '/terminal' },
-  { label: 'Live Demo',    path: '/mini' },
-  { label: 'Coverage',     path: '/coverage' },
-  { label: 'Pricing',      path: '/pricing' },
+  { key: 'common.nav_terminal_pro', path: '/terminal' },
+  { key: 'common.nav_live_demo',    path: '/mini' },
+  { key: 'common.nav_coverage',     path: '/coverage' },
+  { key: 'common.nav_pricing',      path: '/pricing' },
 ];
 
 export default function PublicFooter() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   return (
     <footer style={{
@@ -50,7 +52,7 @@ export default function PublicFooter() {
       <div style={{ display: 'flex', alignItems: 'center' }}>
         {NAV_LINKS.map((link) => (
           <button
-            key={link.label}
+            key={link.path}
             onClick={() => navigate(link.path)}
             style={{
               fontFamily: "'IBM Plex Sans', sans-serif",
@@ -65,7 +67,7 @@ export default function PublicFooter() {
             onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}
             onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.2)'}
           >
-            {link.label}
+            {t(link.key)}
           </button>
         ))}
       </div>
@@ -77,9 +79,9 @@ export default function PublicFooter() {
         color: 'rgba(255,255,255,0.15)',
         textAlign: 'right',
       }}>
-        <div>© {new Date().getFullYear()} Global Markets Terminal</div>
+        <div>{t('common.footer_copyright', { year: new Date().getFullYear() })}</div>
         <div style={{ fontSize: 10, marginTop: 4 }}>
-          For informational purposes only · Not investment advice
+          {t('common.footer_disclaimer')}
         </div>
       </div>
     </footer>
