@@ -22,8 +22,8 @@
     "pro_badge": "Mais popular",
     "pro_label": "Assinatura",
     "pro_name": "Terminal Pro",
-    "pro_desc": "O terminal profissional completo. 269 ativos, research aprofundado, sinais técnicos, watchlist e alertas de preço.",
-    "pro_f1": "269 ativos em tempo real",
+    "pro_desc": "O terminal profissional completo. Universo completo de ativos, research aprofundado, sinais técnicos, watchlist e alertas de preço.",
+    "pro_f1": "Universo completo de ativos em tempo real",
     "pro_f2": "Research e fundamentalista",
     "pro_f3": "Signal Engine (RSI, MACD)",
     "pro_f4": "Watchlist + alertas por email",
@@ -79,18 +79,18 @@
     "termos": "Termos de uso",
     "disclaimer_link": "Disclaimer",
     "disclaimer": "© 2026 GMT · Informativo apenas · Não constitui recomendação de investimento",
-    "data_sources": "Dados via Yahoo Finance, Finnhub, BRAPI, BCB, FRED e outros"
+    "data_sources": "Dados via FMP, EODHD, BRAPI, BCB, CoinGecko, FRED e Finnhub"
   },
   "terminal_pro": {
     "badge": "Terminal Pro",
     "hero_headline_1": "O terminal profissional",
     "hero_headline_2": "para investidores sérios.",
-    "hero_subline": "269 ativos em tempo real, research aprofundado, sinais técnicos, watchlist e alertas — tudo em uma interface projetada para o mercado.",
+    "hero_subline": "{{assets}} ativos em tempo real, research aprofundado, sinais técnicos, watchlist e alertas — tudo em uma interface projetada para o mercado.",
     "cta_register": "Criar conta gratuita →",
     "cta_login": "Já tenho conta",
     "included_label": "O QUE ESTÁ INCLUÍDO",
     "f_global": "Terminal Global",
-    "f_global_desc": "269 ativos · equities, FX, cripto, commodities, renda fixa",
+    "f_global_desc": "{{assets}} ativos · equities, FX, cripto, commodities, renda fixa",
     "f_brasil": "Terminal Brasil",
     "f_brasil_desc": "B3, SELIC, IPCA, curva de juros, USD/BRL",
     "f_research": "Research",
@@ -121,7 +121,7 @@
     "final_sub": "Crie uma conta gratuita e acesse o Terminal Pro agora. Sem cartão de crédito.",
     "final_cta": "Criar conta gratuita →",
     "final_link": "Ou explore o Terminal Mini primeiro",
-    "copyright": "© 2026 GMT",
+    "copyright": "© {{year}} GMT",
     "disclaimer": "Informativo apenas · Não constitui recomendação de investimento"
   },
   "clube": {
@@ -172,10 +172,10 @@
     "toggle_brasil": "Brasil",
     "loading": "Carregando...",
     "upgrade_title": "Precisa de mais?",
-    "upgrade_desc": "Terminal Pro cobre 269 ativos, research, sinais e watchlist.",
+    "upgrade_desc": "Terminal Pro cobre o universo completo de ativos, research, sinais e watchlist.",
     "upgrade_cta": "Conhecer Terminal Pro →",
     "updated": "Atualizado",
-    "data_sources": "Dados via Yahoo Finance, BRAPI, CoinGecko"
+    "data_sources": "Dados via FMP, EODHD, BRAPI e CoinGecko"
   },
   "locked": {
     "badge": "Terminal Pro",

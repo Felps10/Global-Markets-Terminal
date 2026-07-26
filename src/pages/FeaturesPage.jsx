@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../lib/routes.js';
+import { TOTAL_ASSETS, GROUP_COUNT, SUBGROUP_COUNT, SOURCE_COUNT } from '../lib/publicStats.js';
 
 const FEATURES_FULL = [
   {
     tag: 'REAL-TIME',
     title: 'Live Dashboard',
-    headline: 'The full market picture, refreshed every 30 seconds.',
-    body: '269 assets across 9 groups and 36 subgroups. Color-coded gain/loss indicators, collapsible group views, card and list layouts. Sort by ticker or daily return. Market status pill shows NYSE/LSE/B3 session state in real time.',
-    detail: '269 assets · 30s refresh · card + list views',
+    headline: 'The full market picture, continuously refreshed.',
+    body: `${TOTAL_ASSETS} assets across ${GROUP_COUNT} groups and ${SUBGROUP_COUNT} subgroups. Color-coded gain/loss indicators, collapsible group views, card and list layouts. Sort by ticker or daily return. Market status pill shows NYSE/LSE/B3 session state in real time.`,
+    detail: `${TOTAL_ASSETS} assets · live auto-refresh · card + list views`,
   },
   {
     tag: 'VISUALIZATION',
@@ -20,7 +21,7 @@ const FEATURES_FULL = [
   {
     tag: 'BRAZIL',
     title: 'Brazil Terminal',
-    headline: 'The only terminal with B3 and BCB in one place.',
+    headline: 'B3 and BCB macro, side by side.',
     body: 'Dedicated Brazil mode with full B3 equities, Renda Fixa rates (SELIC, CDI, DI curve), and BCB macro indicators. Live prices via BRAPI for active stocks. FX pairs including USD/BRL via BRAPI. Gold accent theme distinct from the global terminal.',
     detail: 'B3 equities · BCB macro · Renda Fixa · FX',
   },
@@ -28,8 +29,8 @@ const FEATURES_FULL = [
     tag: 'STRUCTURE',
     title: '3-Tier Taxonomy',
     headline: 'Organized the way institutional investors think.',
-    body: 'Group → Subgroup → Asset hierarchy mirrors MSCI GICS standards. 9 groups, 36 subgroups, 269 assets — all editable by admins at runtime via the taxonomy manager. No code changes needed to restructure the terminal.',
-    detail: '9 groups · 36 subgroups · GICS-aligned',
+    body: `Group → Subgroup → Asset hierarchy mirrors MSCI GICS standards. ${GROUP_COUNT} groups, ${SUBGROUP_COUNT} subgroups, ${TOTAL_ASSETS} assets — all editable by admins at runtime via the taxonomy manager. No code changes needed to restructure the terminal.`,
+    detail: `${GROUP_COUNT} groups · ${SUBGROUP_COUNT} subgroups · GICS-aligned`,
   },
   {
     tag: 'RESEARCH',
@@ -182,7 +183,7 @@ export default function FeaturesPage() {
             marginTop: 0,
             marginBottom: 0,
           }}>
-            Six core capabilities. Eight data sources. One terminal.
+            Six core capabilities. {SOURCE_COUNT} data sources. One terminal.
           </p>
         </section>
 

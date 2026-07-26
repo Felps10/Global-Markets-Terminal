@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 import { useSnapshot } from '../hooks/useSnapshot.js';
 import { ROUTES } from '../lib/routes.js';
+import { TOTAL_ASSETS, GROUP_COUNT, SUBGROUP_COUNT, SOURCE_COUNT, countByGroup } from '../lib/publicStats.js';
 
 function getRedirectForRole(role) {
   if (role === 'admin') return ROUTES.admin;
@@ -45,12 +46,12 @@ function buildTickerItems(assets) {
 }
 
 const COVERAGE_STATS = [
-  { num: '89', label: 'US Equities' },
-  { num: '96', label: 'B3 Assets' },
-  { num: '8', label: 'FX Pairs' },
-  { num: '8', label: 'Indices' },
-  { num: '15', label: 'Commodities' },
-  { num: '3', label: 'Crypto' },
+  { num: String(countByGroup('equities')), label: 'Global Equities' },
+  { num: String(countByGroup('br-mercado')), label: 'B3 Assets' },
+  { num: String(countByGroup('currencies')), label: 'FX Pairs' },
+  { num: String(countByGroup('indices')), label: 'Indices' },
+  { num: String(countByGroup('commodities')), label: 'Commodities' },
+  { num: String(countByGroup('digital-assets')), label: 'Crypto' },
 ];
 
 const FEATURE_TAGS = [
@@ -68,42 +69,19 @@ const WHY_GMT_PILLS = [
 ];
 
 const WHY_GMT_CELLS = [
-  { title: '30s Refresh', body: '30-second cycles across all 269 assets. Color-coded gain/loss, collapsible group views.' },
-  { title: '8 Data Sources', body: 'No single API outage takes down the terminal. Automatic fallback built in.' },
+  { title: 'Live Auto-Refresh', body: `Continuous refresh cycles across all ${TOTAL_ASSETS} assets. Color-coded gain/loss, collapsible group views.` },
+  { title: `${SOURCE_COUNT} Data Sources`, body: 'No single API outage takes down the terminal. Automatic fallback built in.' },
   { title: 'GICS Taxonomy', body: 'Group → Subgroup → Asset hierarchy mirrors MSCI GICS — intuitive for any finance professional.' },
   { title: 'Brazil First', body: 'Full B3 coverage via BRAPI plus BCB macro — SELIC, IPCA, CDI — direct from source.' },
-  { title: 'Quota Management', body: 'Intelligent rate-limit handling keeps the terminal fast across all free-tier APIs.' },
+  { title: 'Quota Management', body: 'Intelligent rate-limit handling keeps the terminal fast across every provider quota.' },
   { title: 'Free to Start', body: 'No Bloomberg price tag. Full terminal access from day one, no credit card required.' },
 ];
 
-const TESTIMONIALS = [
-  {
-    quote: "Finally a terminal that treats Brazilian markets as a first-class citizen alongside US equities. The B3 coverage combined with BCB macro data in one view is exactly what I was missing.",
-    name: "Ana Souza",
-    role: "Portfolio Manager, São Paulo",
-  },
-  {
-    quote: "The three-tier taxonomy is the killer feature. Every asset organized exactly how I think about markets — by GICS sector, not just alphabetically.",
-    name: "Carlos Mendes",
-    role: "Independent Analyst, Rio de Janeiro",
-  },
-  {
-    quote: "Eight data sources, one interface, zero context-switching. GMT does in one screen what used to take five browser tabs.",
-    name: "Rafael Lima",
-    role: "CIO, Family Office",
-  },
-  {
-    quote: "The heatmap alone is worth it. Seeing the entire asset universe in one treemap at market open tells me in 10 seconds what would have taken 30 minutes.",
-    name: "Beatriz Costa",
-    role: "Equity Researcher, Brasília",
-  },
-];
-
 const DATA_SOURCES = [
-  { name: 'Yahoo Finance', desc: 'Equities, ETFs, Indices, FX — US stocks, global indices, 8 major currency pairs' },
-  { name: 'Finnhub + FMP', desc: 'Real-time quotes, analyst recommendations, fundamentals & ratios TTM' },
-  { name: 'BRAPI + BCB', desc: 'Brazilian B3 equities, SELIC, IPCA, CDI — direct from Banco Central do Brasil' },
-  { name: 'CoinGecko + FRED', desc: 'BTC, ETH, SOL spot prices — Fed Funds Rate, CPI, GDP, treasury yields' },
+  { name: 'FMP Premium', desc: 'Real-time US equities, ETFs, FX and commodities — plus fundamentals, ratios TTM and analyst data' },
+  { name: 'EODHD All-World', desc: 'Global indices, international equities and historical price series' },
+  { name: 'BRAPI Pro + BCB', desc: 'Brazilian B3 equities, SELIC, IPCA, CDI — direct from Banco Central do Brasil' },
+  { name: 'CoinGecko + FRED + Finnhub', desc: 'Crypto spot prices — US macro series (Fed Funds, CPI, GDP) — live company news' },
 ];
 
 export default function LandingPage() {
@@ -111,7 +89,6 @@ export default function LandingPage() {
   const { isAuthenticated, user } = useAuth();
   const { assets: tickerAssets, snapshotLabel } = useSnapshot();
   const TICKER_ITEMS = buildTickerItems(tickerAssets);
-  const [hoveredCard, setHoveredCard] = useState(null);
   const [tickerPaused, setTickerPaused] = useState(false);
   const [primaryHover, setPrimaryHover] = useState(false);
   const [secondaryHover, setSecondaryHover] = useState(false);
@@ -278,7 +255,7 @@ export default function LandingPage() {
               marginBottom: 44,
               marginTop: 0,
             }}>
-              GMT aggregates real-time data from 8 professional sources — equities, fixed income,
+              GMT aggregates real-time data from {SOURCE_COUNT} professional sources — equities, fixed income,
               FX, crypto, commodities, and Brazilian markets — into one structured terminal built
               for serious investors.
             </p>
@@ -337,7 +314,7 @@ export default function LandingPage() {
               color: 'rgba(255,255,255,0.25)',
               letterSpacing: '0.08em',
             }}>
-              269 assets · 9 groups · 36 subgroups
+              {TOTAL_ASSETS} assets · {GROUP_COUNT} groups · {SUBGROUP_COUNT} subgroups
             </div>
 
             {/* Live hero prices */}
@@ -541,12 +518,12 @@ export default function LandingPage() {
                 marginTop: 0,
               }}>
                 GMT is a real-time market intelligence platform that consolidates
-                data from Bloomberg-grade sources into a single structured interface.
+                data from professional sources into a single structured interface.
                 Built for investors, analysts, and finance professionals who need
                 broad market coverage without constant context-switching.
               </p>
 
-              {/* Gold divider */}
+              {/* Accent divider */}
               <div style={{
                 width: 32,
                 height: 1,
@@ -605,8 +582,8 @@ export default function LandingPage() {
                 marginBottom: 28,
                 marginTop: 0,
               }}>
-                Eight professional-grade APIs — each selected for reliability, depth,
-                and coverage of the asset classes that matter most.
+                {SOURCE_COUNT} professional-grade APIs — each selected for reliability,
+                depth, and coverage of the asset classes that matter most.
               </p>
 
               <div style={{
@@ -771,7 +748,7 @@ export default function LandingPage() {
                 marginBottom: 16,
                 marginTop: 0,
               }}>
-                {'269 assets.\nSix asset classes.'}
+                {`${TOTAL_ASSETS} assets.\nSix asset classes.`}
               </h2>
               <p style={{
                 fontFamily: "'IBM Plex Sans', sans-serif",
@@ -971,114 +948,6 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ── WHAT USERS SAY ──────────────────────────────────────────── */}
-        <section className="gmt-section-reveal" style={{ background: '#040810', padding: '100px 80px' }}>
-          <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-            {/* Section header */}
-            <div style={{ textAlign: 'center', marginBottom: 56 }}>
-              <div style={{
-                fontFamily: "'IBM Plex Sans', sans-serif",
-                fontSize: 10,
-                fontWeight: 600,
-                letterSpacing: '0.25em',
-                color: 'var(--c-accent)',
-                textTransform: 'uppercase',
-                marginBottom: 16,
-              }}>
-                WHAT USERS SAY
-              </div>
-              <h2 style={{
-                fontFamily: "'Syne', sans-serif",
-                fontWeight: 800,
-                fontSize: 'clamp(28px, 3.5vw, 44px)',
-                color: 'rgba(255,255,255,0.92)',
-                marginTop: 0,
-                marginBottom: 0,
-              }}>
-                Trusted by serious investors.
-              </h2>
-            </div>
-
-            {/* Testimonial cards */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(2, 1fr)',
-              gap: 24,
-            }}>
-              {TESTIMONIALS.map((t, i) => (
-                <div key={i} style={{
-                  background: 'rgba(255,255,255,0.02)',
-                  border: '1px solid rgba(255,255,255,0.06)',
-                  borderRadius: 4,
-                  padding: '32px 32px 28px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                }}>
-                  <span style={{
-                    fontFamily: "'Syne', sans-serif",
-                    fontSize: 48,
-                    lineHeight: 1,
-                    color: 'rgba(59,130,246,0.25)',
-                    marginBottom: 8,
-                    display: 'block',
-                  }}>
-                    ❝
-                  </span>
-                  <p style={{
-                    fontFamily: "'IBM Plex Sans', sans-serif",
-                    fontSize: 14,
-                    fontWeight: 300,
-                    color: 'rgba(255,255,255,0.65)',
-                    lineHeight: 1.7,
-                    fontStyle: 'italic',
-                    marginBottom: 28,
-                    marginTop: 0,
-                    flex: 1,
-                  }}>
-                    {t.quote}
-                  </p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: '50%',
-                      background: 'rgba(59,130,246,0.15)',
-                      border: '1px solid rgba(59,130,246,0.3)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontFamily: "'JetBrains Mono', monospace",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: 'var(--c-accent)',
-                    }}>
-                      {t.name.charAt(0)}
-                    </div>
-                    <div>
-                      <div style={{
-                        fontFamily: "'IBM Plex Sans', sans-serif",
-                        fontSize: 13,
-                        fontWeight: 500,
-                        color: 'rgba(255,255,255,0.8)',
-                      }}>
-                        {t.name}
-                      </div>
-                      <div style={{
-                        fontFamily: "'IBM Plex Sans', sans-serif",
-                        fontSize: 12,
-                        fontWeight: 300,
-                        color: 'rgba(255,255,255,0.35)',
-                        marginTop: 3,
-                      }}>
-                        {t.role}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
 
         {/* ── FINAL CTA ───────────────────────────────────────────────── */}
         <section className="gmt-section-reveal" style={{

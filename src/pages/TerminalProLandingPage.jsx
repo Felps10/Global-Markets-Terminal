@@ -4,6 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/useAuth.js';
 import { ROUTES } from '../lib/routes.js';
 import GMTHomepageHeader from '../components/GMTHomepageHeader.jsx';
+import { useSnapshot } from '../hooks/useSnapshot.js';
+import { TOTAL_ASSETS } from '../lib/publicStats.js';
+import { MINI_ASSETS } from '../data/miniAssets.js';
 
 // ── Scoped styles for keyframes ───────────────────────────────────────────────
 function ScopedStyles() {
@@ -18,21 +21,46 @@ function ScopedStyles() {
   );
 }
 
-// ─── Mock terminal card ──────────────────────────────────────────────────────
-const MOCK_ASSETS = [
-  { sym: 'AAPL', name: 'Apple', price: '$189.84', change: '+0.82%', up: true },
-  { sym: 'NVDA', name: 'NVIDIA', price: '$131.28', change: '+3.12%', up: true },
-  { sym: 'PETR4', name: 'Petrobras', price: 'R$ 38.42', change: '+1.83%', up: true },
-  { sym: 'BTC', name: 'Bitcoin', price: '$67,432', change: '+2.14%', up: true },
-  { sym: 'VALE3', name: 'Vale', price: 'R$ 58.91', change: '-0.41%', up: false },
-  { sym: 'JPM', name: 'JPMorgan', price: '$198.72', change: '+0.67%', up: true },
+// ─── Mock terminal card — real snapshot prices, never invented ones ──────────
+const MOCK_CANDIDATES = [
+  { sym: 'AAPL', name: 'Apple', prefix: '$' },
+  { sym: 'NVDA', name: 'NVIDIA', prefix: '$' },
+  { sym: 'PETR4', name: 'Petrobras', prefix: 'R$ ' },
+  { sym: 'BTC', name: 'Bitcoin', prefix: '$' },
+  { sym: 'VALE3', name: 'Vale', prefix: 'R$ ' },
+  { sym: 'JPM', name: 'JPMorgan', prefix: '$' },
+  { sym: 'MSFT', name: 'Microsoft', prefix: '$' },
+  { sym: 'ITUB4', name: 'Itaú', prefix: 'R$ ' },
 ];
+
+function fmtMockPrice(p) {
+  if (p >= 10000) return p.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  return p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function buildMockAssets(snapshotAssets) {
+  return MOCK_CANDIDATES
+    .filter(c => snapshotAssets[c.sym])
+    .slice(0, 6)
+    .map(c => {
+      const a = snapshotAssets[c.sym];
+      return {
+        sym: c.sym,
+        name: c.name,
+        price: `${c.prefix}${fmtMockPrice(a.price)}`,
+        change: `${a.changePct >= 0 ? '+' : ''}${a.changePct.toFixed(2)}%`,
+        up: a.changePct >= 0,
+      };
+    });
+}
 
 // ─── Main component ──────────────────────────────────────────────────────────
 export default function TerminalProLandingPage() {
   const navigate = useNavigate();
   const { isAuthenticated, loading } = useAuth();
   const { t, i18n } = useTranslation();
+  const { assets: snapshotAssets } = useSnapshot();
+  const mockAssets = buildMockAssets(snapshotAssets);
   const [lang, setLang] = useState(i18n.language?.startsWith('en') ? 'en' : 'pt');
 
   function handleLangChange(newLang) {
@@ -47,7 +75,7 @@ export default function TerminalProLandingPage() {
   }, [isAuthenticated, loading, navigate]);
 
   const features = [
-    { name: t('terminal_pro.f_global'), desc: t('terminal_pro.f_global_desc') },
+    { name: t('terminal_pro.f_global'), desc: t('terminal_pro.f_global_desc', { assets: TOTAL_ASSETS }) },
     { name: t('terminal_pro.f_brasil'), desc: t('terminal_pro.f_brasil_desc') },
     { name: t('terminal_pro.f_research'), desc: t('terminal_pro.f_research_desc') },
     { name: t('terminal_pro.f_signals'), desc: t('terminal_pro.f_signals_desc') },
@@ -56,9 +84,10 @@ export default function TerminalProLandingPage() {
   ];
 
   const compareRows = [
-    { feature: t('terminal_pro.comparison_access'), mini: t('terminal_pro.free'), pro: t('terminal_pro.subscription'), proCheck: false },
+    // No price/subscription row: Pro is a free account today — pricing claims
+    // live only on /pricing once real plans exist (2026-07 truth pass).
     { feature: t('terminal_pro.comparison_signup'), mini: t('terminal_pro.no'), pro: t('terminal_pro.yes'), proCheck: false },
-    { feature: t('terminal_pro.comparison_assets'), mini: '~25', pro: '269', proCheck: false },
+    { feature: t('terminal_pro.comparison_assets'), mini: String(MINI_ASSETS.length), pro: String(TOTAL_ASSETS), proCheck: false },
     { feature: t('terminal_pro.comparison_research'), mini: null, pro: null, proCheck: true },
     { feature: t('terminal_pro.comparison_signals'), mini: null, pro: null, proCheck: true },
     { feature: t('terminal_pro.comparison_watchlist'), mini: null, pro: null, proCheck: true },
@@ -118,7 +147,7 @@ export default function TerminalProLandingPage() {
             {t('terminal_pro.hero_headline_1') + '\n' + t('terminal_pro.hero_headline_2')}
           </h1>
           <p style={{ fontSize: 15, fontWeight: 300, color: 'rgba(255,255,255,0.45)', maxWidth: 540, margin: '0 auto 36px', lineHeight: 1.65 }}>
-            {t('terminal_pro.hero_subline')}
+            {t('terminal_pro.hero_subline', { assets: TOTAL_ASSETS })}
           </p>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
             <button
@@ -201,7 +230,7 @@ export default function TerminalProLandingPage() {
               </div>
             </div>
             <div style={{ padding: 12, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-              {MOCK_ASSETS.map(a => (
+              {mockAssets.map(a => (
                 <div key={a.sym} style={{
                   background: 'rgba(255,255,255,0.04)',
                   border: '0.5px solid rgba(255,255,255,0.07)',
@@ -312,7 +341,7 @@ export default function TerminalProLandingPage() {
         gap: 8,
       }}>
         <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', fontFamily: "'JetBrains Mono', monospace" }}>
-          {t('terminal_pro.copyright')}
+          {t('terminal_pro.copyright', { year: new Date().getFullYear() })}
         </span>
         <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', fontFamily: "'JetBrains Mono', monospace" }}>
           {t('terminal_pro.disclaimer')}
