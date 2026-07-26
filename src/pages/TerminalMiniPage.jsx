@@ -242,20 +242,20 @@ export default function TerminalMiniPage() {
         <button
           onClick={() => navigate('/terminal')}
           style={{
-            background: '#fff',
+            background: 'var(--c-accent)',
             border: 'none',
-            borderRadius: 7,
+            borderRadius: 4,
             color: '#080f1a',
             cursor: 'pointer',
             fontFamily: "'IBM Plex Sans', sans-serif",
             fontSize: 12,
-            fontWeight: 500,
+            fontWeight: 600,
             padding: '8px 18px',
             whiteSpace: 'nowrap',
             transition: 'background 0.15s',
           }}
-          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.9)'}
-          onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+          onMouseEnter={e => e.currentTarget.style.background = 'var(--c-accent-hover)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'var(--c-accent)'}
         >
           {t('mini.upgrade_cta')}
         </button>

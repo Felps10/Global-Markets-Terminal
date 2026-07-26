@@ -7,21 +7,19 @@
  * Extracted from GMTHeader.jsx for file-size reduction.
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ROUTES } from '../lib/routes.js';
-import { injectStyles, GmtLogo, PRODUCTS_ITEMS } from './gmtHeaderShared.jsx';
+import { injectStyles, GmtLogo } from './gmtHeaderShared.jsx';
 
-const PUBLIC_NAV_BEFORE_PRODUCTS = [
-  { label: 'About', path: '/about' },
-];
-
-const PUBLIC_NAV_AFTER_PRODUCTS = [
-  { label: 'Features',  path: '/features'  },
-  { label: 'Coverage',  path: '/coverage'  },
-  { label: 'Pricing',   path: '/pricing'   },
-  { label: 'Community', path: '/community' },
+// Flat nav — two products don't need a dropdown (2026-07 consolidation).
+// About/Features/Community were retired; their routes redirect in App.jsx.
+const PUBLIC_NAV = [
+  { label: 'Terminal Pro', path: ROUTES.public.terminal },
+  { label: 'Live Demo',    path: ROUTES.public.mini },
+  { label: 'Coverage',     path: ROUTES.public.coverage },
+  { label: 'Pricing',      path: ROUTES.public.pricing },
 ];
 
 // PT/EN segment toggle. i18next persists the choice to localStorage
@@ -68,22 +66,10 @@ function LangToggle({ compact = false }) {
 export default function GMTPublicHeader({ isHome = false }) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [productsOpen, setProductsOpen] = useState(false);
-  const productsRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => { injectStyles(); }, []);
-
-  useEffect(() => {
-    function handleClick(e) {
-      if (productsRef.current && !productsRef.current.contains(e.target)) {
-        setProductsOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
 
   useEffect(() => {
     if (!isHome) { setScrolled(true); return; }
@@ -146,91 +132,7 @@ export default function GMTPublicHeader({ isHome = false }) {
             marginLeft: 40,
             height: 52,
           }}>
-            {/* About — before Products */}
-            {PUBLIC_NAV_BEFORE_PRODUCTS.map(item => (
-              <button
-                key={item.path}
-                className="gmt-pub-nav-item"
-                onClick={() => navigate(item.path)}
-                style={{
-                  color: isActive(item.path) ? 'var(--c-accent)' : 'rgba(255,255,255,0.5)',
-                }}
-              >
-                {item.label}
-                <div style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  left: 16,
-                  right: 16,
-                  height: 2,
-                  background: 'var(--c-accent)',
-                  opacity: isActive(item.path) ? 1 : 0,
-                  transition: 'opacity 200ms ease',
-                }} />
-              </button>
-            ))}
-
-            {/* Products dropdown */}
-            <div ref={productsRef} style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center' }}>
-              <button
-                onClick={() => setProductsOpen(o => !o)}
-                className="gmt-pub-nav-item"
-                style={{
-                  color: productsOpen ? '#fff' : 'rgba(255,255,255,0.5)',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
-                onMouseLeave={(e) => { if (!productsOpen) e.currentTarget.style.color = 'rgba(255,255,255,0.5)'; }}
-              >
-                Products
-                <span style={{ marginLeft: 4, fontSize: 9, opacity: 0.6 }}>
-                  {productsOpen ? '▲' : '▼'}
-                </span>
-              </button>
-              {productsOpen && (
-                <div style={{
-                  position: 'absolute',
-                  top: 'calc(100% + 8px)',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  background: '#0c1525',
-                  border: '0.5px solid rgba(255,255,255,0.1)',
-                  borderRadius: 10,
-                  width: 280,
-                  overflow: 'hidden',
-                  zIndex: 100,
-                }}>
-                  {PRODUCTS_ITEMS.map((item, i) => (
-                    <button
-                      key={item.name}
-                      onClick={() => { navigate(item.href); setProductsOpen(false); }}
-                      className="gmt-homepage-dropdown-item"
-                      style={{
-                        display: 'block',
-                        width: '100%',
-                        padding: '12px 16px',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        borderBottom: i < PRODUCTS_ITEMS.length - 1
-                          ? '0.5px solid rgba(255,255,255,0.06)'
-                          : 'none',
-                      }}
-                    >
-                      <div style={{ fontSize: 13, fontWeight: 500, color: '#e2e8f0', marginBottom: 3 }}>
-                        {item.name}
-                      </div>
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
-                        {item.desc}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Features, Coverage, Pricing, Community — after Products */}
-            {PUBLIC_NAV_AFTER_PRODUCTS.map(item => (
+            {PUBLIC_NAV.map(item => (
               <button
                 key={item.path}
                 className="gmt-pub-nav-item"
@@ -352,62 +254,7 @@ export default function GMTPublicHeader({ isHome = false }) {
             gap: 32,
           }}
         >
-          {PUBLIC_NAV_BEFORE_PRODUCTS.map(item => (
-            <button
-              key={item.path}
-              onClick={() => { setMobileOpen(false); navigate(item.path); }}
-              style={{
-                background: 'none',
-                border: 'none',
-                borderBottom: '1px solid rgba(255,255,255,0.06)',
-                cursor: 'pointer',
-                fontFamily: "'Syne', sans-serif",
-                fontSize: 28,
-                fontWeight: 700,
-                color: isActive(item.path) ? 'var(--c-accent)' : 'rgba(255,255,255,0.85)',
-                padding: '12px 0',
-                width: 240,
-                textAlign: 'center',
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
-
-          <div style={{ width: '100%', maxWidth: 280 }}>
-            <div style={{
-              fontSize: 10, fontWeight: 600, letterSpacing: '0.1em',
-              color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase',
-              marginBottom: 12, paddingLeft: 4,
-            }}>
-              Products
-            </div>
-            {PRODUCTS_ITEMS.map(item => (
-              <button
-                key={item.name}
-                onClick={() => { setMobileOpen(false); navigate(item.href); }}
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  padding: '10px 4px',
-                  background: 'none',
-                  border: 'none',
-                  borderBottom: '0.5px solid rgba(255,255,255,0.06)',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
-                <div style={{ fontSize: 14, fontWeight: 500, color: '#e2e8f0' }}>
-                  {item.name}
-                </div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
-                  {item.desc}
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {PUBLIC_NAV_AFTER_PRODUCTS.map(item => (
+          {PUBLIC_NAV.map(item => (
             <button
               key={item.path}
               onClick={() => { setMobileOpen(false); navigate(item.path); }}

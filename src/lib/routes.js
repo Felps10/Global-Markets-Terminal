@@ -21,15 +21,14 @@ export const ROUTES = {
     login:    '/login',
     register: '/register',
   },
+  // /features, /about, /community were retired in the 2026-07 consolidation;
+  // App.jsx keeps redirects for old links but nothing should navigate to them.
   public: {
-    landing:   '/',
-    terminal:  '/terminal',
-    mini:      '/mini',
-    features:  '/features',
-    coverage:  '/coverage',
-    pricing:   '/pricing',
-    about:     '/about',
-    community: '/community',
+    landing:  '/',
+    terminal: '/terminal',
+    mini:     '/mini',
+    coverage: '/coverage',
+    pricing:  '/pricing',
   },
 };
 

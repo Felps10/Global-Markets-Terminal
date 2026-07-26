@@ -104,9 +104,6 @@ export function injectStyles() {
     .gmt-admin-tab:hover { color: #cbd5e1; }
     .gmt-admin-tab.active { color: #e2e8f0; border-bottom-color: #f59e0b; }
     .gmt-admin-tab:focus-visible { outline: 2px solid #f59e0b; outline-offset: 2px; }
-    .gmt-homepage-dropdown-item:hover {
-      background: rgba(255,255,255,0.04);
-    }
     .gmt-pub-nav-item {
       position: relative;
       background: none;
@@ -155,17 +152,3 @@ export function GmtLogo() {
 }
 
 // ─── Products dropdown items ──────────────────────────────────────────────────
-// English to match the (still hardcoded-EN) public header; keyed out with the
-// rest of the public chrome in the i18n pass (PR 4 of the redesign).
-export const PRODUCTS_ITEMS = [
-  {
-    name: 'GMT Mini',
-    desc: 'Live market · free · no signup',
-    href: '/mini',
-  },
-  {
-    name: 'GMT Pro',
-    desc: 'Full terminal · research · signals · watchlist',
-    href: '/terminal',
-  },
-];

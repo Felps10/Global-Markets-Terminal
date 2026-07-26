@@ -919,7 +919,7 @@ export default function LandingPage() {
                 all in one structured interface.
               </p>
               <button
-                onClick={() => navigate('/features')}
+                onClick={() => navigate(ROUTES.public.terminal)}
                 onMouseEnter={() => setFeaturesLinkHover(true)}
                 onMouseLeave={() => setFeaturesLinkHover(false)}
                 style={{
@@ -937,7 +937,7 @@ export default function LandingPage() {
                   transition: 'color 150ms',
                 }}
               >
-                See all features
+                Explore Terminal Pro
                 <span style={{
                   display: 'inline-block',
                   transform: featuresLinkHover ? 'translateX(3px)' : 'translateX(0)',
