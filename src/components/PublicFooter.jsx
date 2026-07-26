@@ -1,9 +1,11 @@
 import { useNavigate } from 'react-router-dom';
 
+// Mirrors the header nav — footer and header must agree on the sitemap.
 const NAV_LINKS = [
-  { label: 'Features', path: '/features' },
-  { label: 'Coverage', path: '/coverage' },
-  { label: 'Pricing',  path: '/pricing'  },
+  { label: 'Terminal Pro', path: '/terminal' },
+  { label: 'Live Demo',    path: '/mini' },
+  { label: 'Coverage',     path: '/coverage' },
+  { label: 'Pricing',      path: '/pricing' },
 ];
 
 export default function PublicFooter() {

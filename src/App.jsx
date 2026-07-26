@@ -31,11 +31,8 @@ const ChartResearchPage     = React.lazy(() => import('./pages/markets/ChartRese
 const SettingsPage          = React.lazy(() => import('./pages/SettingsPage.jsx'));
 const TerminalProLandingPage = React.lazy(() => import('./pages/TerminalProLandingPage.jsx'));
 const TerminalMiniPage      = React.lazy(() => import('./pages/TerminalMiniPage.jsx'));
-const FeaturesPage          = React.lazy(() => import('./pages/FeaturesPage.jsx'));
 const CoveragePage          = React.lazy(() => import('./pages/CoveragePage.jsx'));
 const PricingPage           = React.lazy(() => import('./pages/PricingPage.jsx'));
-const AboutPage             = React.lazy(() => import('./pages/AboutPage.jsx'));
-const CommunityPage         = React.lazy(() => import('./pages/CommunityPage.jsx'));
 const AlertsPage            = React.lazy(() => import('./pages/AlertsPage.jsx'));
 
 // /markets/chart was merged into /markets/research (Chart & Research, 324024b);
@@ -68,11 +65,10 @@ function RouteFallback() {
  *   /mini       TerminalMiniPage
  *   /login      LoginPage
  *   /register   RegisterPage
- *   /features   FeaturesPage
  *   /coverage   CoveragePage
  *   /pricing    PricingPage
- *   /about      AboutPage
- *   /community  CommunityPage
+ *   /features → /terminal, /about → /, /community → /  (redirects; pages
+ *   deleted in the 2026-07 public-area consolidation — keep old links alive)
  *
  * PROTECTED routes — guard lives on the LAYOUT or the route itself.
  *
@@ -130,11 +126,12 @@ function AppWithPanel() {
           <Route path="/mini"      element={<PublicLayout><TerminalMiniPage /></PublicLayout>} />
           <Route path="/login"     element={<PublicLayout><LoginPage /></PublicLayout>} />
           <Route path="/register"  element={<PublicLayout><RegisterPage /></PublicLayout>} />
-          <Route path="/features"  element={<PublicLayout><FeaturesPage /></PublicLayout>} />
           <Route path="/coverage"  element={<PublicLayout><CoveragePage /></PublicLayout>} />
           <Route path="/pricing"   element={<PublicLayout><PricingPage /></PublicLayout>} />
-          <Route path="/about"     element={<PublicLayout><AboutPage /></PublicLayout>} />
-          <Route path="/community" element={<PublicLayout><CommunityPage /></PublicLayout>} />
+          {/* Retired pages (2026-07 consolidation) — redirect, don't 404 */}
+          <Route path="/features"  element={<Navigate to="/terminal" replace />} />
+          <Route path="/about"     element={<Navigate to="/" replace />} />
+          <Route path="/community" element={<Navigate to="/" replace />} />
 
           {/* Terminal — any authenticated user */}
           <Route

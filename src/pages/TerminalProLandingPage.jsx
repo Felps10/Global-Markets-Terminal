@@ -140,12 +140,12 @@ export default function TerminalProLandingPage() {
             <button
               onClick={() => navigate(ROUTES.auth.register)}
               style={{
-                background: 'white', color: '#080f1a', border: 'none', borderRadius: 8,
-                padding: '11px 28px', fontSize: 14, fontWeight: 500, cursor: 'pointer',
-                fontFamily: "'IBM Plex Sans', sans-serif", transition: 'opacity 0.15s',
+                background: 'var(--c-accent)', color: '#080f1a', border: 'none', borderRadius: 4,
+                padding: '11px 28px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                fontFamily: "'IBM Plex Sans', sans-serif", transition: 'background 0.15s',
               }}
-              onMouseEnter={e => e.currentTarget.style.opacity = '0.9'}
-              onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--c-accent-hover)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'var(--c-accent)'}
             >
               {t('terminal_pro.cta_register')}
             </button>
@@ -292,7 +292,7 @@ export default function TerminalProLandingPage() {
         <button
           onClick={() => navigate(ROUTES.auth.register)}
           style={{
-            background: 'white', color: '#080f1a', border: 'none', borderRadius: 8,
+            background: 'var(--c-accent)', color: '#080f1a', border: 'none', borderRadius: 4,
             padding: '11px 28px', fontSize: 14, fontWeight: 500, cursor: 'pointer',
             fontFamily: "'IBM Plex Sans', sans-serif", transition: 'opacity 0.15s',
             marginBottom: 16,
