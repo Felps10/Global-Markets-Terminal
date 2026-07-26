@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/useAuth.js';
 import { useSnapshot } from '../hooks/useSnapshot.js';
 import { ROUTES } from '../lib/routes.js';
@@ -45,47 +46,45 @@ function buildTickerItems(assets) {
     });
 }
 
-const COVERAGE_STATS = [
-  { num: String(countByGroup('equities')), label: 'Global Equities' },
-  { num: String(countByGroup('br-mercado')), label: 'B3 Assets' },
-  { num: String(countByGroup('currencies')), label: 'FX Pairs' },
-  { num: String(countByGroup('indices')), label: 'Indices' },
-  { num: String(countByGroup('commodities')), label: 'Commodities' },
-  { num: String(countByGroup('digital-assets')), label: 'Crypto' },
+// Copy lives in public/locales/{en,pt}/translation.json (landing.*) — these
+// builders run inside the component so the arrays re-resolve on language change.
+const buildCoverageStats = (t) => [
+  { num: String(countByGroup('equities')), label: t('landing.tile_equities') },
+  { num: String(countByGroup('br-mercado')), label: t('landing.tile_b3') },
+  { num: String(countByGroup('currencies')), label: t('landing.tile_fx') },
+  { num: String(countByGroup('indices')), label: t('landing.tile_indices') },
+  { num: String(countByGroup('commodities')), label: t('landing.tile_commodities') },
+  { num: String(countByGroup('digital-assets')), label: t('landing.tile_crypto') },
 ];
 
-const FEATURE_TAGS = [
-  { tag: 'REAL-TIME', name: 'Live Dashboard' },
-  { tag: 'VISUALIZATION', name: 'Market Heatmap' },
-  { tag: 'BRAZIL', name: 'Brazil Terminal' },
-  { tag: 'STRUCTURE', name: '3-Tier Taxonomy' },
-  { tag: 'RESEARCH', name: 'Analyst Ratings' },
-  { tag: 'FUNDAMENTALS', name: 'Fundamentals Lab' },
-];
+const buildFeatureTags = (t) => [1, 2, 3, 4, 5, 6].map((i) => ({
+  tag: t(`landing.feat_tag_${i}`),
+  name: t(`landing.feat_name_${i}`),
+}));
 
-const WHY_GMT_PILLS = [
-  'Real-Time Data', 'Multi-Source Resilience', 'Institutional Taxonomy',
-  'Brazil Coverage', 'Quota Management', 'Dark Terminal Aesthetic', 'Free to Start',
-];
+const buildWhyPills = (t) => [1, 2, 3, 4, 5, 6, 7].map((i) => t(`landing.why_pill_${i}`));
 
-const WHY_GMT_CELLS = [
-  { title: 'Live Auto-Refresh', body: `Continuous refresh cycles across all ${TOTAL_ASSETS} assets. Color-coded gain/loss, collapsible group views.` },
-  { title: `${SOURCE_COUNT} Data Sources`, body: 'No single API outage takes down the terminal. Automatic fallback built in.' },
-  { title: 'GICS Taxonomy', body: 'Group → Subgroup → Asset hierarchy mirrors MSCI GICS — intuitive for any finance professional.' },
-  { title: 'Brazil First', body: 'Full B3 coverage via BRAPI plus BCB macro — SELIC, IPCA, CDI — direct from source.' },
-  { title: 'Quota Management', body: 'Intelligent rate-limit handling keeps the terminal fast across every provider quota.' },
-  { title: 'Free to Start', body: 'No Bloomberg price tag. Full terminal access from day one, no credit card required.' },
-];
+const buildWhyCells = (t) => [1, 2, 3, 4, 5, 6].map((i) => ({
+  title: t(`landing.why_${i}_title`, { sources: SOURCE_COUNT }),
+  body: t(`landing.why_${i}_body`, { assets: TOTAL_ASSETS }),
+}));
 
-const DATA_SOURCES = [
-  { name: 'FMP Premium', desc: 'Real-time US equities, ETFs, FX and commodities — plus fundamentals, ratios TTM and analyst data' },
-  { name: 'EODHD All-World', desc: 'Global indices, international equities and historical price series' },
-  { name: 'BRAPI Pro + BCB', desc: 'Brazilian B3 equities, SELIC, IPCA, CDI — direct from Banco Central do Brasil' },
-  { name: 'CoinGecko + FRED + Finnhub', desc: 'Crypto spot prices — US macro series (Fed Funds, CPI, GDP) — live company news' },
+// Provider names are brands; only the descriptions translate.
+const buildDataSources = (t) => [
+  { name: 'FMP Premium', desc: t('landing.source_fmp_desc') },
+  { name: 'EODHD All-World', desc: t('landing.source_eodhd_desc') },
+  { name: 'BRAPI Pro + BCB', desc: t('landing.source_brapi_desc') },
+  { name: 'CoinGecko + FRED + Finnhub', desc: t('landing.source_cgfred_desc') },
 ];
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const COVERAGE_STATS = buildCoverageStats(t);
+  const FEATURE_TAGS = buildFeatureTags(t);
+  const WHY_GMT_PILLS = buildWhyPills(t);
+  const WHY_GMT_CELLS = buildWhyCells(t);
+  const DATA_SOURCES = buildDataSources(t);
   const { isAuthenticated, user } = useAuth();
   const { assets: tickerAssets, snapshotLabel } = useSnapshot();
   const TICKER_ITEMS = buildTickerItems(tickerAssets);
@@ -230,7 +229,7 @@ export default function LandingPage() {
               marginBottom: 24,
               textTransform: 'uppercase',
             }}>
-              INSTITUTIONAL MARKET INTELLIGENCE
+              {t('landing.eyebrow')}
             </div>
 
             <h1 className="hero-text" style={{
@@ -242,7 +241,7 @@ export default function LandingPage() {
               marginBottom: 24,
               marginTop: 0,
             }}>
-              {'One terminal.\nEvery market.'}
+              {t('landing.title')}
             </h1>
 
             <p className="hero-sub" style={{
@@ -255,9 +254,7 @@ export default function LandingPage() {
               marginBottom: 44,
               marginTop: 0,
             }}>
-              GMT aggregates real-time data from {SOURCE_COUNT} professional sources — equities, fixed income,
-              FX, crypto, commodities, and Brazilian markets — into one structured terminal built
-              for serious investors.
+              {t('landing.subline', { sources: SOURCE_COUNT })}
             </p>
 
             <div className="hero-cta" style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
@@ -279,7 +276,7 @@ export default function LandingPage() {
                   transition: 'background 0.15s',
                 }}
               >
-                Launch Terminal
+                {t('landing.cta_launch')}
               </button>
               <button
                 onClick={goRegister}
@@ -303,7 +300,7 @@ export default function LandingPage() {
                   transition: 'border-color 0.15s, color 0.15s',
                 }}
               >
-                Create Free Account
+                {t('common.create_free_account')}
               </button>
             </div>
 
@@ -314,7 +311,7 @@ export default function LandingPage() {
               color: 'rgba(255,255,255,0.25)',
               letterSpacing: '0.08em',
             }}>
-              {TOTAL_ASSETS} assets · {GROUP_COUNT} groups · {SUBGROUP_COUNT} subgroups
+              {t('landing.stat_line', { assets: TOTAL_ASSETS, groups: GROUP_COUNT, subgroups: SUBGROUP_COUNT })}
             </div>
 
             {/* Live hero prices */}
@@ -411,7 +408,7 @@ export default function LandingPage() {
               color: 'var(--c-accent)',
               fontWeight: 600,
             }}>
-              LIVE
+              {t('landing.live_badge')}
             </span>
           </div>
 
@@ -468,7 +465,7 @@ export default function LandingPage() {
           letterSpacing: '0.5px',
           paddingBottom: 8,
         }}>
-          {snapshotLabel} · sign in for live prices
+          {snapshotLabel} · {t('common.snapshot_note')}
         </div>
 
         {/* ── THE PLATFORM ──────────────────────────────────────────────── */}
@@ -492,7 +489,7 @@ export default function LandingPage() {
                 marginBottom: 16,
                 textTransform: 'uppercase',
               }}>
-                THE PLATFORM
+                {t('landing.platform_eyebrow')}
               </div>
 
               <h2 style={{
@@ -505,7 +502,7 @@ export default function LandingPage() {
                 marginBottom: 24,
                 marginTop: 0,
               }}>
-                {'Built for the\nserious investor.'}
+                {t('landing.platform_title')}
               </h2>
 
               <p style={{
@@ -517,10 +514,7 @@ export default function LandingPage() {
                 marginBottom: 40,
                 marginTop: 0,
               }}>
-                GMT is a real-time market intelligence platform that consolidates
-                data from professional sources into a single structured interface.
-                Built for investors, analysts, and finance professionals who need
-                broad market coverage without constant context-switching.
+                {t('landing.platform_body')}
               </p>
 
               {/* Accent divider */}
@@ -541,7 +535,7 @@ export default function LandingPage() {
                 marginBottom: 16,
                 textTransform: 'uppercase',
               }}>
-                OUR PHILOSOPHY
+                {t('landing.philosophy_eyebrow')}
               </div>
 
               <p style={{
@@ -552,10 +546,7 @@ export default function LandingPage() {
                 lineHeight: 1.7,
                 marginTop: 0,
               }}>
-                The serious investor shouldn't need five browser tabs to understand
-                one portfolio. GMT exists to change that — bringing institutional-quality
-                market intelligence to professionals who don't have a Bloomberg terminal
-                subscription.
+                {t('landing.philosophy_body')}
               </p>
             </div>
 
@@ -570,7 +561,7 @@ export default function LandingPage() {
                 marginBottom: 20,
                 textTransform: 'uppercase',
               }}>
-                DATA SOURCES
+                {t('landing.sources_eyebrow')}
               </div>
 
               <p style={{
@@ -582,8 +573,7 @@ export default function LandingPage() {
                 marginBottom: 28,
                 marginTop: 0,
               }}>
-                {SOURCE_COUNT} professional-grade APIs — each selected for reliability,
-                depth, and coverage of the asset classes that matter most.
+                {t('landing.sources_intro', { sources: SOURCE_COUNT })}
               </p>
 
               <div style={{
@@ -637,7 +627,7 @@ export default function LandingPage() {
                 textTransform: 'uppercase',
                 marginBottom: 16,
               }}>
-                WHY GMT
+                {t('landing.why_eyebrow')}
               </div>
               <h2 style={{
                 fontFamily: "'Syne', sans-serif",
@@ -647,7 +637,7 @@ export default function LandingPage() {
                 marginBottom: 0,
                 marginTop: 0,
               }}>
-                What sets it apart.
+                {t('landing.why_title')}
               </h2>
             </div>
 
@@ -737,7 +727,7 @@ export default function LandingPage() {
                 textTransform: 'uppercase',
                 marginBottom: 16,
               }}>
-                COVERAGE
+                {t('landing.cov_eyebrow')}
               </div>
               <h2 style={{
                 fontFamily: "'Syne', sans-serif",
@@ -748,7 +738,7 @@ export default function LandingPage() {
                 marginBottom: 16,
                 marginTop: 0,
               }}>
-                {`${TOTAL_ASSETS} assets.\nSix asset classes.`}
+                {t('landing.cov_title', { assets: TOTAL_ASSETS })}
               </h2>
               <p style={{
                 fontFamily: "'IBM Plex Sans', sans-serif",
@@ -759,9 +749,7 @@ export default function LandingPage() {
                 marginBottom: 32,
                 marginTop: 0,
               }}>
-                From US equities mapped to GICS sectors, to Brazilian B3 stocks,
-                crypto, FX, commodities, and fixed income — every market that
-                matters to a serious portfolio.
+                {t('landing.cov_body')}
               </p>
               <button
                 onClick={() => navigate('/coverage')}
@@ -782,7 +770,7 @@ export default function LandingPage() {
                   transition: 'color 150ms',
                 }}
               >
-                Explore full coverage
+                {t('landing.cov_link')}
                 <span style={{
                   display: 'inline-block',
                   transform: coverageLinkHover ? 'translateX(3px)' : 'translateX(0)',
@@ -892,7 +880,7 @@ export default function LandingPage() {
                 textTransform: 'uppercase',
                 marginBottom: 16,
               }}>
-                FEATURES
+                {t('landing.feat_eyebrow')}
               </div>
               <h2 style={{
                 fontFamily: "'Syne', sans-serif",
@@ -903,7 +891,7 @@ export default function LandingPage() {
                 marginBottom: 16,
                 marginTop: 0,
               }}>
-                {'Six tools.\nOne terminal.'}
+                {t('landing.feat_title')}
               </h2>
               <p style={{
                 fontFamily: "'IBM Plex Sans', sans-serif",
@@ -914,9 +902,7 @@ export default function LandingPage() {
                 marginBottom: 32,
                 marginTop: 0,
               }}>
-                Real-time dashboard, volume-weighted heatmap, Brazil terminal,
-                institutional taxonomy, analyst ratings, and fundamentals —
-                all in one structured interface.
+                {t('landing.feat_body')}
               </p>
               <button
                 onClick={() => navigate(ROUTES.public.terminal)}
@@ -937,7 +923,7 @@ export default function LandingPage() {
                   transition: 'color 150ms',
                 }}
               >
-                Explore Terminal Pro
+                {t('landing.feat_link')}
                 <span style={{
                   display: 'inline-block',
                   transform: featuresLinkHover ? 'translateX(3px)' : 'translateX(0)',
@@ -966,7 +952,7 @@ export default function LandingPage() {
               textTransform: 'uppercase',
               marginBottom: 24,
             }}>
-              START NOW
+              {t('landing.final_eyebrow')}
             </div>
 
             <h2 style={{
@@ -979,7 +965,7 @@ export default function LandingPage() {
               marginBottom: 20,
               marginTop: 0,
             }}>
-              {'Intelligence without\nthe Bloomberg price tag.'}
+              {t('landing.final_title')}
             </h2>
 
             <p style={{
@@ -990,7 +976,7 @@ export default function LandingPage() {
               marginBottom: 48,
               marginTop: 0,
             }}>
-              Free to start. No credit card. Full terminal access.
+              {t('landing.final_sub')}
             </p>
 
             <button
@@ -1011,7 +997,7 @@ export default function LandingPage() {
                 transition: 'background 0.15s',
               }}
             >
-              Create Free Account
+              {t('common.create_free_account')}
             </button>
 
             <button
@@ -1032,7 +1018,7 @@ export default function LandingPage() {
                 transition: 'color 0.15s',
               }}
             >
-              Already have an account? Sign in →
+              {t('common.already_have_account')} {t('common.sign_in_arrow')}
             </button>
           </div>
         </section>

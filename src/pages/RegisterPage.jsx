@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/useAuth.js';
 import { ROUTES } from '../lib/routes.js';
 import { TOTAL_ASSETS, GROUP_COUNT, SOURCE_COUNT } from '../lib/publicStats.js';
@@ -47,15 +48,16 @@ function MiniGlobe() {
   );
 }
 
-// ── Password requirements ───────────────────────────────────────────────────
+// ── Password requirements (labels resolve via i18n at render) ───────────────
 const PW_REQS = [
-  { label: 'At least 8 characters', test: pw => pw.length >= 8 },
-  { label: 'One uppercase letter', test: pw => /[A-Z]/.test(pw) },
-  { label: 'One number', test: pw => /[0-9]/.test(pw) },
-  { label: 'One special character', test: pw => SPECIAL_RE.test(pw) },
+  { key: 'auth.req_length', test: pw => pw.length >= 8 },
+  { key: 'auth.req_upper', test: pw => /[A-Z]/.test(pw) },
+  { key: 'auth.req_number', test: pw => /[0-9]/.test(pw) },
+  { key: 'auth.req_special', test: pw => SPECIAL_RE.test(pw) },
 ];
 
 export default function RegisterPage() {
+  const { t } = useTranslation();
   const { register, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const [name, setName] = useState('');
@@ -82,13 +84,13 @@ export default function RegisterPage() {
 
   function validate() {
     const errs = {};
-    if (!name.trim() || name.trim().length < 2) errs.name = 'Name must be at least 2 characters.';
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs.email = 'Enter a valid email address.';
-    if (!password || password.length < 8) errs.password = 'Password must be at least 8 characters.';
-    else if (!/[A-Z]/.test(password)) errs.password = 'Password needs at least one uppercase letter.';
-    else if (!/[0-9]/.test(password)) errs.password = 'Password needs at least one number.';
-    else if (!SPECIAL_RE.test(password)) errs.password = 'Password needs at least one special character.';
-    if (password !== confirmPassword) errs.confirmPassword = 'Passwords do not match.';
+    if (!name.trim() || name.trim().length < 2) errs.name = t('auth.err_name');
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs.email = t('auth.err_email');
+    if (!password || password.length < 8) errs.password = t('auth.err_password_length');
+    else if (!/[A-Z]/.test(password)) errs.password = t('auth.err_password_upper');
+    else if (!/[0-9]/.test(password)) errs.password = t('auth.err_password_number');
+    else if (!SPECIAL_RE.test(password)) errs.password = t('auth.err_password_special');
+    if (password !== confirmPassword) errs.confirmPassword = t('auth.err_password_match');
     return errs;
   }
 
@@ -106,11 +108,11 @@ export default function RegisterPage() {
       } else {
         const err = result.error;
         if (err?.error === 'EMAIL_TAKEN') {
-          setError('This email is already registered. Try logging in.');
+          setError(t('auth.err_email_taken'));
         } else if (err?.error === 'TOO_MANY_REQUESTS') {
-          setError('Too many attempts. Please wait 15 minutes.');
+          setError(t('auth.err_rate_limit'));
         } else {
-          setError(err?.message || 'Something went wrong. Please try again.');
+          setError(err?.message || t('auth.err_generic'));
         }
       }
     } finally {
@@ -217,7 +219,7 @@ export default function RegisterPage() {
             whiteSpace: 'pre-line',
             marginTop: 8,
           }}>
-            {'Join the terminal.\nBuilt for professionals.'}
+            {t('auth.register_tagline')}
           </div>
           <div style={{
             position: 'absolute',
@@ -226,9 +228,9 @@ export default function RegisterPage() {
             gap: 24,
           }}>
             {[
-              { num: String(TOTAL_ASSETS), label: 'ASSETS' },
-              { num: String(GROUP_COUNT), label: 'GROUPS' },
-              { num: String(SOURCE_COUNT), label: 'SOURCES' },
+              { num: String(TOTAL_ASSETS), label: t('auth.stat_assets') },
+              { num: String(GROUP_COUNT), label: t('auth.stat_groups') },
+              { num: String(SOURCE_COUNT), label: t('auth.stat_sources') },
             ].map((s, i) => (
               <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <span style={{
@@ -268,7 +270,7 @@ export default function RegisterPage() {
               marginBottom: 8,
               marginTop: 0,
             }}>
-              Create your account.
+              {t('auth.register_title')}
             </h1>
             <p style={{
               fontFamily: "'IBM Plex Sans', sans-serif",
@@ -278,7 +280,7 @@ export default function RegisterPage() {
               marginBottom: 40,
               marginTop: 0,
             }}>
-              Free access. No credit card required.
+              {t('auth.register_sub')}
             </p>
 
             {error && (
@@ -299,7 +301,7 @@ export default function RegisterPage() {
             <form onSubmit={handleSubmit}>
               {/* Name */}
               <div style={{ marginBottom: 20 }}>
-                <label style={labelBase}>FULL NAME</label>
+                <label style={labelBase}>{t('auth.name_label')}</label>
                 <input
                   type="text"
                   value={name}
@@ -315,7 +317,7 @@ export default function RegisterPage() {
 
               {/* Email */}
               <div style={{ marginBottom: 20 }}>
-                <label style={labelBase}>EMAIL ADDRESS</label>
+                <label style={labelBase}>{t('auth.email_label')}</label>
                 <input
                   type="email"
                   value={email}
@@ -330,7 +332,7 @@ export default function RegisterPage() {
 
               {/* Password */}
               <div style={{ marginBottom: 20 }}>
-                <label style={labelBase}>PASSWORD</label>
+                <label style={labelBase}>{t('auth.password_label')}</label>
                 <div style={{ position: 'relative' }}>
                   <input
                     type={showPassword ? 'text' : 'password'}
@@ -344,7 +346,7 @@ export default function RegisterPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(v => !v)}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? t('auth.hide_password') : t('auth.show_password')}
                     style={eyeBtn}
                     onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.6)'}
                     onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.25)'}
@@ -379,7 +381,7 @@ export default function RegisterPage() {
                       textTransform: 'uppercase',
                       marginTop: 4,
                     }}>
-                      {STRENGTH_LABELS[strength]}
+                      {strength > 0 ? t(`auth.strength_${strength}`) : ''}
                     </div>
                   </>
                 )}
@@ -407,7 +409,7 @@ export default function RegisterPage() {
                             border: met ? 'none' : '1px solid rgba(255,255,255,0.25)',
                             flexShrink: 0,
                           }} />
-                          {req.label}
+                          {t(req.key)}
                         </div>
                       );
                     })}
@@ -419,7 +421,7 @@ export default function RegisterPage() {
 
               {/* Confirm Password */}
               <div style={{ marginBottom: 20 }}>
-                <label style={labelBase}>CONFIRM PASSWORD</label>
+                <label style={labelBase}>{t('auth.confirm_label')}</label>
                 <div style={{ position: 'relative' }}>
                   <input
                     type={showConfirm ? 'text' : 'password'}
@@ -433,7 +435,7 @@ export default function RegisterPage() {
                   <button
                     type="button"
                     onClick={() => setShowConfirm(v => !v)}
-                    aria-label={showConfirm ? 'Hide password' : 'Show password'}
+                    aria-label={showConfirm ? t('auth.hide_password') : t('auth.show_password')}
                     style={eyeBtn}
                     onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.6)'}
                     onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.25)'}
@@ -471,7 +473,7 @@ export default function RegisterPage() {
                   transition: 'background 150ms',
                 }}
               >
-                {submitting ? 'Creating account…' : 'Create Account'}
+                {submitting ? t('auth.creating') : t('common.create_account')}
               </button>
             </form>
 
@@ -482,7 +484,7 @@ export default function RegisterPage() {
               fontSize: 12,
               color: 'rgba(255,255,255,0.2)',
             }}>
-              Already have an account?{' '}
+              {t('common.already_have_account')}{' '}
               <button
                 onClick={() => navigate(ROUTES.auth.login)}
                 style={{
@@ -498,7 +500,7 @@ export default function RegisterPage() {
                 onMouseEnter={e => e.currentTarget.style.color = 'var(--c-accent-hover)'}
                 onMouseLeave={e => e.currentTarget.style.color = 'var(--c-accent)'}
               >
-                Sign in →
+                {t('common.sign_in_arrow')}
               </button>
             </div>
           </div>

@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ROUTES } from '../lib/routes.js';
 
 /**
@@ -11,6 +12,7 @@ import { ROUTES } from '../lib/routes.js';
  */
 export default function PricingPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   return (
     <div style={{
@@ -28,22 +30,21 @@ export default function PricingPage() {
         <div style={{
           fontSize: 10, fontWeight: 600, letterSpacing: '0.25em',
           color: 'var(--c-accent)', textTransform: 'uppercase', marginBottom: 16,
-        }}>PRICING</div>
+        }}>{t('pricing.eyebrow')}</div>
 
         <h1 style={{
           fontFamily: "'Syne', sans-serif", fontWeight: 800,
           fontSize: 'clamp(32px, 4.5vw, 52px)', lineHeight: 1.1,
           color: 'rgba(255,255,255,0.92)', marginTop: 0, marginBottom: 20,
         }}>
-          Pricing coming soon.
+          {t('pricing.title')}
         </h1>
 
         <p style={{
           fontSize: 15, fontWeight: 300, color: 'rgba(255,255,255,0.5)',
           lineHeight: 1.7, marginTop: 0, marginBottom: 40,
         }}>
-          We're finalizing GMT's plans. In the meantime, the terminal is
-          available with a free account.
+          {t('pricing.body')}
         </p>
 
         <button
@@ -58,7 +59,7 @@ export default function PricingPage() {
           onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--c-accent-hover)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--c-accent)'; }}
         >
-          Create Free Account
+          {t('common.create_free_account')}
         </button>
       </div>
     </div>

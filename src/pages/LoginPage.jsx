@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/useAuth.js';
 import { ROUTES } from '../lib/routes.js';
 import { TOTAL_ASSETS, GROUP_COUNT, SOURCE_COUNT } from '../lib/publicStats.js';
@@ -34,6 +35,7 @@ function MiniGlobe() {
 }
 
 export default function LoginPage() {
+  const { t } = useTranslation();
   const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -59,7 +61,7 @@ export default function LoginPage() {
       const role = data?.user?.app_metadata?.role || 'user';
       navigate(getRedirectForRole(role), { replace: true });
     } catch (err) {
-      setError(err?.message || 'Invalid credentials');
+      setError(err?.message || t('auth.invalid_credentials'));
     } finally {
       setLoading(false);
     }
@@ -137,7 +139,7 @@ export default function LoginPage() {
             whiteSpace: 'pre-line',
             marginTop: 8,
           }}>
-            {'Institutional market intelligence\nfor serious investors.'}
+            {t('auth.login_tagline')}
           </div>
           <div style={{
             position: 'absolute',
@@ -146,9 +148,9 @@ export default function LoginPage() {
             gap: 24,
           }}>
             {[
-              { num: String(TOTAL_ASSETS), label: 'ASSETS' },
-              { num: String(GROUP_COUNT), label: 'GROUPS' },
-              { num: String(SOURCE_COUNT), label: 'SOURCES' },
+              { num: String(TOTAL_ASSETS), label: t('auth.stat_assets') },
+              { num: String(GROUP_COUNT), label: t('auth.stat_groups') },
+              { num: String(SOURCE_COUNT), label: t('auth.stat_sources') },
             ].map((s, i) => (
               <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <span style={{
@@ -188,7 +190,7 @@ export default function LoginPage() {
               marginBottom: 8,
               marginTop: 0,
             }}>
-              Welcome back.
+              {t('auth.login_title')}
             </h1>
             <p style={{
               fontFamily: "'IBM Plex Sans', sans-serif",
@@ -198,7 +200,7 @@ export default function LoginPage() {
               marginBottom: 40,
               marginTop: 0,
             }}>
-              Sign in to your GMT account.
+              {t('auth.login_sub')}
             </p>
 
             {error && (
@@ -219,7 +221,7 @@ export default function LoginPage() {
             <form onSubmit={handleSubmit}>
               {/* Email */}
               <div style={{ marginBottom: 20 }}>
-                <label style={labelBase}>EMAIL ADDRESS</label>
+                <label style={labelBase}>{t('auth.email_label')}</label>
                 <input
                   type="email"
                   value={email}
@@ -242,7 +244,7 @@ export default function LoginPage() {
 
               {/* Password */}
               <div style={{ marginBottom: 20 }}>
-                <label style={labelBase}>PASSWORD</label>
+                <label style={labelBase}>{t('auth.password_label')}</label>
                 <div style={{ position: 'relative' }}>
                   <input
                     type={showPassword ? 'text' : 'password'}
@@ -265,7 +267,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(v => !v)}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? t('auth.hide_password') : t('auth.show_password')}
                     style={{
                       position: 'absolute',
                       right: 12,
@@ -314,7 +316,7 @@ export default function LoginPage() {
                   transition: 'background 150ms',
                 }}
               >
-                {loading ? 'Signing in…' : 'Sign In'}
+                {loading ? t('auth.signing_in') : t('common.sign_in')}
               </button>
             </form>
 
@@ -325,7 +327,7 @@ export default function LoginPage() {
               fontSize: 12,
               color: 'rgba(255,255,255,0.2)',
             }}>
-              Don't have an account?{' '}
+              {t('auth.no_account')}{' '}
               <button
                 onClick={() => navigate('/register')}
                 style={{
@@ -341,7 +343,7 @@ export default function LoginPage() {
                 onMouseEnter={e => e.currentTarget.style.color = 'var(--c-accent-hover)'}
                 onMouseLeave={e => e.currentTarget.style.color = 'var(--c-accent)'}
               >
-                Create one →
+                {t('auth.create_one')}
               </button>
             </div>
           </div>
