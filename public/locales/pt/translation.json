@@ -52,7 +52,10 @@
     "upgrade_desc": "Terminal Pro cobre o universo completo de ativos, research, sinais e watchlist.",
     "upgrade_cta": "Conhecer Terminal Pro →",
     "updated": "Atualizado",
-    "data_sources": "Dados via FMP, EODHD, BRAPI e CoinGecko"
+    "data_sources": "Dados via FMP, EODHD, BRAPI e CoinGecko",
+    "authed_title": "Você já tem acesso completo.",
+    "authed_desc": "Sua conta inclui o terminal completo.",
+    "authed_cta": "Abrir Terminal →"
   },
   "auth_panel": {
     "name_label": "Nome",

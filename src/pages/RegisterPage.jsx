@@ -1,14 +1,12 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/useAuth.js';
 import { ROUTES } from '../lib/routes.js';
-import { TOTAL_ASSETS, GROUP_COUNT, SOURCE_COUNT } from '../lib/publicStats.js';
-
-function getRedirectForRole(role) {
-  if (role === 'admin') return ROUTES.admin;
-  return ROUTES.terminal.global;
-}
+import {
+  resolvePostAuthTarget, inputBase, labelBase,
+  EyeIcon, AuthStyles, AuthLeftPanel,
+} from './authShared.jsx';
 
 // ── Password strength ───────────────────────────────────────────────────────
 const SPECIAL_RE = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/;
@@ -22,31 +20,6 @@ function getStrength(pw) {
 }
 
 const STRENGTH_COLORS = ['', 'var(--c-error)', '#fb923c', 'var(--c-accent)', '#00E676'];
-const STRENGTH_LABELS = ['', 'WEAK', 'FAIR', 'GOOD', 'STRONG'];
-
-// ── Small decorative globe ──────────────────────────────────────────────────
-function MiniGlobe() {
-  return (
-    <svg viewBox="0 0 200 200" width={160} height={160} style={{ opacity: 0.35 }}>
-      <circle cx={100} cy={100} r={80} stroke="var(--c-accent)" strokeWidth={1} fill="none" opacity={0.6} />
-      <ellipse cx={100} cy={55}  rx={80} ry={20} fill="none" stroke="var(--c-accent)" strokeWidth={0.6} opacity={0.3} />
-      <ellipse cx={100} cy={72}  rx={80} ry={45} fill="none" stroke="var(--c-accent)" strokeWidth={0.6} opacity={0.3} />
-      <ellipse cx={100} cy={100} rx={80} ry={80} fill="none" stroke="var(--c-accent)" strokeWidth={0.6} opacity={0.3} />
-      <ellipse cx={100} cy={128} rx={80} ry={45} fill="none" stroke="var(--c-accent)" strokeWidth={0.6} opacity={0.3} />
-      <ellipse cx={100} cy={145} rx={80} ry={20} fill="none" stroke="var(--c-accent)" strokeWidth={0.6} opacity={0.3} />
-      {[0, 30, 60, 90, 120, 150].map(deg => (
-        <ellipse key={deg} cx={100} cy={100} rx={80} ry={80}
-          fill="none" stroke="var(--c-accent)" strokeWidth={0.5} opacity={0.2}
-          transform={`rotate(${deg}, 100, 100)`} />
-      ))}
-      {[
-        [100, 20], [100, 180], [20, 100], [180, 100], [65, 57], [135, 57],
-      ].map(([cx, cy], i) => (
-        <circle key={i} cx={cx} cy={cy} r={2} fill="var(--c-accent)" opacity={0.5} />
-      ))}
-    </svg>
-  );
-}
 
 // ── Password requirements (labels resolve via i18n at render) ───────────────
 const PW_REQS = [
@@ -60,6 +33,7 @@ export default function RegisterPage() {
   const { t } = useTranslation();
   const { register, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -75,12 +49,16 @@ export default function RegisterPage() {
   const [confirmFocused, setConfirmFocused] = useState(false);
   const [submitHover, setSubmitHover] = useState(false);
 
-  useEffect(() => {
-    if (isAuthenticated) navigate(getRedirectForRole(user?.role), { replace: true });
-  }, [isAuthenticated, navigate]);
+  // Where the visitor was headed before ProtectedRoute sent them into auth.
+  const from = location.state?.from;
 
   const strength = getStrength(password);
   const canSubmit = name && email && password && confirmPassword && !submitting;
+
+  // Already signed in — skip the form entirely (render-time, no flash).
+  if (isAuthenticated) {
+    return <Navigate to={resolvePostAuthTarget(from, user?.role)} replace />;
+  }
 
   function validate() {
     const errs = {};
@@ -104,7 +82,7 @@ export default function RegisterPage() {
     try {
       const result = await register(name, email, password, confirmPassword);
       if (result.success) {
-        navigate(ROUTES.terminal.global, { replace: true });
+        navigate(resolvePostAuthTarget(from, 'user'), { replace: true });
       } else {
         const err = result.error;
         if (err?.error === 'EMAIL_TAKEN') {
@@ -119,30 +97,6 @@ export default function RegisterPage() {
       setSubmitting(false);
     }
   }
-
-  const inputBase = {
-    width: '100%',
-    boxSizing: 'border-box',
-    background: 'rgba(255,255,255,0.03)',
-    borderRadius: 4,
-    color: 'rgba(255,255,255,0.85)',
-    fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 13,
-    padding: '11px 14px',
-    outline: 'none',
-    transition: 'border-color 150ms',
-  };
-
-  const labelBase = {
-    display: 'block',
-    fontFamily: "'IBM Plex Sans', sans-serif",
-    fontSize: 10,
-    fontWeight: 600,
-    letterSpacing: '0.12em',
-    color: 'rgba(255,255,255,0.35)',
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  };
 
   const fieldErrorStyle = {
     fontFamily: "'IBM Plex Sans', sans-serif",
@@ -173,84 +127,13 @@ export default function RegisterPage() {
 
   return (
     <>
-      <style>{`
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(12px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        .gmt-form-panel { animation: fadeInUp 280ms ease both; }
-      `}</style>
-      <div style={{
+      <AuthStyles />
+      <div className="gmt-auth-grid" style={{
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
         minHeight: 'calc(100vh - 52px - 138px)', // viewport minus fixed header (52, reserved by PublicLayout) and footer (~138)
       }}>
-        {/* LEFT PANEL */}
-        <div style={{
-          background: '#040810',
-          borderRight: '1px solid rgba(255,255,255,0.04)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '60px 48px',
-          position: 'relative',
-          overflow: 'hidden',
-        }}>
-          <MiniGlobe />
-          <div style={{
-            fontFamily: "'Syne', sans-serif",
-            fontWeight: 800,
-            fontSize: 18,
-            letterSpacing: '0.2em',
-            color: 'rgba(255,255,255,0.25)',
-            marginTop: 24,
-            textAlign: 'center',
-          }}>
-            GMT
-          </div>
-          <div style={{
-            fontFamily: "'IBM Plex Sans', sans-serif",
-            fontSize: 13,
-            fontWeight: 300,
-            color: 'rgba(255,255,255,0.2)',
-            textAlign: 'center',
-            lineHeight: 1.6,
-            whiteSpace: 'pre-line',
-            marginTop: 8,
-          }}>
-            {t('auth.register_tagline')}
-          </div>
-          <div style={{
-            position: 'absolute',
-            bottom: 40,
-            display: 'flex',
-            gap: 24,
-          }}>
-            {[
-              { num: String(TOTAL_ASSETS), label: t('auth.stat_assets') },
-              { num: String(GROUP_COUNT), label: t('auth.stat_groups') },
-              { num: String(SOURCE_COUNT), label: t('auth.stat_sources') },
-            ].map((s, i) => (
-              <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <span style={{
-                  fontFamily: "'JetBrains Mono', monospace",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: 'rgba(59,130,246,0.5)',
-                }}>{s.num}</span>
-                <span style={{
-                  fontFamily: "'IBM Plex Sans', sans-serif",
-                  fontSize: 9,
-                  color: 'rgba(255,255,255,0.2)',
-                  letterSpacing: '0.12em',
-                  textTransform: 'uppercase',
-                  marginTop: 4,
-                }}>{s.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <AuthLeftPanel taglineKey="auth.register_tagline" />
 
         {/* RIGHT PANEL */}
         <div style={{
@@ -308,7 +191,8 @@ export default function RegisterPage() {
                   onChange={e => { setName(e.target.value); setFieldErrors(p => ({ ...p, name: '' })); }}
                   onFocus={() => setNameFocused(true)}
                   onBlur={() => setNameFocused(false)}
-                  autoFocus
+                  // no autoFocus: the browser scrolls the focused input into
+                  // view on load, jumping past the page heading
                   autoComplete="name"
                   style={{ ...inputBase, border: getBorder(fieldErrors.name, nameFocused) }}
                 />
@@ -351,10 +235,7 @@ export default function RegisterPage() {
                     onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.6)'}
                     onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.25)'}
                   >
-                    {showPassword
-                      ? <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                      : <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                    }
+                    <EyeIcon open={showPassword} />
                   </button>
                 </div>
 
@@ -440,10 +321,7 @@ export default function RegisterPage() {
                     onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.6)'}
                     onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.25)'}
                   >
-                    {showConfirm
-                      ? <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                      : <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                    }
+                    <EyeIcon open={showConfirm} />
                   </button>
                 </div>
                 {fieldErrors.confirmPassword && <div style={fieldErrorStyle}>{fieldErrors.confirmPassword}</div>}
@@ -486,7 +364,7 @@ export default function RegisterPage() {
             }}>
               {t('common.already_have_account')}{' '}
               <button
-                onClick={() => navigate(ROUTES.auth.login)}
+                onClick={() => navigate(ROUTES.auth.login, { state: { from } })}
                 style={{
                   fontFamily: "'IBM Plex Sans', sans-serif",
                   fontSize: 12,

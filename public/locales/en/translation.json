@@ -52,7 +52,10 @@
     "upgrade_desc": "Terminal Pro covers the full asset universe, research, signals and watchlist.",
     "upgrade_cta": "Discover Terminal Pro →",
     "updated": "Updated",
-    "data_sources": "Data via FMP, EODHD, BRAPI and CoinGecko"
+    "data_sources": "Data via FMP, EODHD, BRAPI and CoinGecko",
+    "authed_title": "You already have full access.",
+    "authed_desc": "Your account includes the complete terminal.",
+    "authed_cta": "Open Terminal →"
   },
   "auth_panel": {
     "name_label": "Name",
