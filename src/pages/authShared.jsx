@@ -19,9 +19,11 @@ export function getRedirectForRole(role) {
  * Where to land after successful auth: the location the visitor was
  * originally headed to (set by ProtectedRoute via state.from — query and
  * hash preserved, so ?symbol= deep links survive), else the role default.
+ * Only in-app paths are honored — history state is client-writable, so an
+ * absolute URL smuggled into state.from must never become a redirect.
  */
 export function resolvePostAuthTarget(from, role) {
-  if (from?.pathname) {
+  if (from?.pathname?.startsWith('/')) {
     return `${from.pathname}${from.search || ''}${from.hash || ''}`;
   }
   return getRedirectForRole(role);
