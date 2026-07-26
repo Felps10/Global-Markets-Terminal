@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import MiniHeader from '../components/MiniHeader.jsx';
 import { MINI_ASSETS, MINI_GLOBAL_ASSETS, MINI_BRASIL_ASSETS } from '../data/miniAssets.js';
 import { useSnapshot } from '../hooks/useSnapshot.js';
 import { trackEvent } from '../services/analytics.js';
@@ -118,9 +117,8 @@ function injectMiniStyles() {
 // ─── Main component ──────────────────────────────────────────────────────────
 export default function TerminalMiniPage() {
   const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [mode, setMode] = useState('global');
-  const [lang, setLang] = useState(i18n.language?.startsWith('en') ? 'en' : 'pt');
 
   const { assets: snapshotAssets, snapshotLabel } = useSnapshot();
 
@@ -140,11 +138,6 @@ export default function TerminalMiniPage() {
     ])
   );
 
-  function handleLangChange(newLang) {
-    setLang(newLang);
-    i18n.changeLanguage(newLang);
-  }
-
   useEffect(() => { injectMiniStyles(); }, []);
 
   // Analytics
@@ -155,11 +148,32 @@ export default function TerminalMiniPage() {
   const assets = mode === 'brasil' ? MINI_BRASIL_ASSETS : MINI_GLOBAL_ASSETS;
 
   return (
-    <div style={{ minHeight: '100vh', background: '#080f1a', color: '#e2e8f0', display: 'flex', flexDirection: 'column' }}>
-      <MiniHeader lang={lang} onLangChange={handleLangChange} />
+    <div style={{ minHeight: 'calc(100vh - 52px)', background: '#080f1a', color: '#e2e8f0', display: 'flex', flexDirection: 'column' }}>
+      {/* Title bar — chrome comes from PublicLayout; this identifies the demo */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '16px 24px 0',
+      }}>
+        <span style={{
+          fontFamily: "'IBM Plex Sans', sans-serif",
+          fontSize: 13,
+          fontWeight: 500,
+          color: '#e2e8f0',
+        }}>
+          {t('mini.header_label')}
+        </span>
+        <span style={{
+          width: 6, height: 6, borderRadius: '50%',
+          background: '#4ade80',
+          boxShadow: '0 0 6px rgba(74,222,128,0.6)',
+          flexShrink: 0,
+        }} />
+      </div>
 
       {/* Mode toggle */}
-      <div style={{ textAlign: 'center', padding: '20px 24px 16px' }}>
+      <div style={{ textAlign: 'center', padding: '4px 24px 16px' }}>
         <div style={{
           display: 'inline-flex',
           border: '0.5px solid rgba(255,255,255,0.12)',

@@ -12,7 +12,7 @@
  * Exports:
  *   default  GMTHeader        — authenticated header (terminal + admin modes)
  *
- * GMTPublicHeader and GMTHomepageHeader have been extracted to their own files.
+ * GMTPublicHeader (the public-route header) lives in its own file.
  */
 
 import { useState, useEffect, useRef, useMemo } from 'react';

@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ROUTES } from '../lib/routes.js';
 import { injectStyles, GmtLogo, PRODUCTS_ITEMS } from './gmtHeaderShared.jsx';
 
@@ -23,7 +24,48 @@ const PUBLIC_NAV_AFTER_PRODUCTS = [
   { label: 'Community', path: '/community' },
 ];
 
-export default function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) {
+// PT/EN segment toggle. i18next persists the choice to localStorage
+// ('gmt-lang' via the language detector), so it sticks across visits.
+// Only /terminal and /mini render translated copy today — the remaining
+// public pages are keyed out in the i18n pass (PR 4 of the redesign).
+function LangToggle({ compact = false }) {
+  const { i18n } = useTranslation();
+  const current = i18n.language?.startsWith('pt') ? 'pt' : 'en';
+
+  return (
+    <div style={{
+      display: 'inline-flex',
+      border: '1px solid rgba(255,255,255,0.12)',
+      borderRadius: 6,
+      overflow: 'hidden',
+      flexShrink: 0,
+    }}>
+      {['pt', 'en'].map((lng) => (
+        <button
+          key={lng}
+          onClick={() => i18n.changeLanguage(lng)}
+          style={{
+            padding: compact ? '8px 16px' : '5px 9px',
+            background: current === lng ? 'rgba(255,255,255,0.1)' : 'transparent',
+            border: 'none',
+            color: current === lng ? '#fff' : 'rgba(255,255,255,0.35)',
+            cursor: 'pointer',
+            fontFamily: "'IBM Plex Sans', sans-serif",
+            fontSize: compact ? 13 : 11,
+            fontWeight: current === lng ? 600 : 400,
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
+            transition: 'all 0.15s',
+          }}
+        >
+          {lng}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export default function GMTPublicHeader({ isHome = false }) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [productsOpen, setProductsOpen] = useState(false);
@@ -61,8 +103,8 @@ export default function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) 
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
   const isActive = (path) => location.pathname === path;
-  const handleSignIn = onSignIn || (() => navigate(ROUTES.auth.login));
-  const handleSignUp = onSignUp || (() => navigate(ROUTES.auth.register));
+  const handleSignIn = () => navigate(ROUTES.auth.login);
+  const handleSignUp = () => navigate(ROUTES.auth.register);
 
   return (
     <>
@@ -215,8 +257,9 @@ export default function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) 
 
           <div style={{ flex: 1 }} />
 
-          {/* RIGHT — Desktop auth buttons */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {/* RIGHT — Desktop language toggle + auth buttons */}
+          <div className="gmt-pub-right" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <LangToggle />
             <button
               onClick={handleSignIn}
               style={{
@@ -301,7 +344,11 @@ export default function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) 
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'center',
+            // flex-start + scroll, not center: centered flex clips the top
+            // item when the menu is taller than the viewport
+            justifyContent: 'flex-start',
+            overflowY: 'auto',
+            padding: '76px 0 40px',
             gap: 32,
           }}
         >
@@ -382,7 +429,8 @@ export default function GMTPublicHeader({ onSignIn, onSignUp, isHome = false }) 
             </button>
           ))}
 
-          <div style={{ height: 24 }} />
+          <div style={{ height: 8 }} />
+          <LangToggle compact />
           <button
             onClick={() => { setMobileOpen(false); handleSignIn(); }}
             style={{

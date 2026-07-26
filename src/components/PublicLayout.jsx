@@ -9,7 +9,10 @@ export default function PublicLayout({ children }) {
   return (
     <div data-theme="dark" style={{ minHeight: '100vh', background: '#080f1a', display: 'flex', flexDirection: 'column' }}>
       <GMTPublicHeader isHome={isHome} />
-      <main style={{ flex: 1 }}>
+      {/* Header is position:fixed (52px) and occupies no flow height — reserve
+          it here on every page except home, whose hero is designed to sit
+          under the transparent header. */}
+      <main style={{ flex: 1, paddingTop: isHome ? 0 : 52 }}>
         {children}
       </main>
       <PublicFooter />

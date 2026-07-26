@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/useAuth.js';
 import { ROUTES } from '../lib/routes.js';
-import GMTHomepageHeader from '../components/GMTHomepageHeader.jsx';
 import { useSnapshot } from '../hooks/useSnapshot.js';
 import { TOTAL_ASSETS } from '../lib/publicStats.js';
 import { MINI_ASSETS } from '../data/miniAssets.js';
@@ -58,15 +57,9 @@ function buildMockAssets(snapshotAssets) {
 export default function TerminalProLandingPage() {
   const navigate = useNavigate();
   const { isAuthenticated, loading } = useAuth();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { assets: snapshotAssets } = useSnapshot();
   const mockAssets = buildMockAssets(snapshotAssets);
-  const [lang, setLang] = useState(i18n.language?.startsWith('en') ? 'en' : 'pt');
-
-  function handleLangChange(newLang) {
-    setLang(newLang);
-    i18n.changeLanguage(newLang);
-  }
 
   useEffect(() => {
     if (!loading && isAuthenticated) {
@@ -96,14 +89,8 @@ export default function TerminalProLandingPage() {
   ];
 
   return (
-    <div style={{ minHeight: '100vh', background: '#080f1a', color: '#e2e8f0', fontFamily: "'IBM Plex Sans', sans-serif" }}>
+    <div style={{ background: '#080f1a', color: '#e2e8f0', fontFamily: "'IBM Plex Sans', sans-serif" }}>
       <ScopedStyles />
-      <GMTHomepageHeader
-        lang={lang}
-        onLangChange={handleLangChange}
-        onSignIn={() => navigate(ROUTES.auth.login)}
-        onSignUp={() => navigate(ROUTES.auth.register)}
-      />
 
       {/* ── Section 1: Hero ──────────────────────────────────────────── */}
       <section style={{ padding: '80px 40px 64px', position: 'relative', overflow: 'hidden', textAlign: 'center' }}>
@@ -331,22 +318,6 @@ export default function TerminalProLandingPage() {
         </div>
       </section>
 
-      {/* ── Footer strip ─────────────────────────────────────────────── */}
-      <div style={{
-        borderTop: '0.5px solid rgba(255,255,255,0.06)',
-        padding: '12px 40px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: 8,
-      }}>
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', fontFamily: "'JetBrains Mono', monospace" }}>
-          {t('terminal_pro.copyright', { year: new Date().getFullYear() })}
-        </span>
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', fontFamily: "'JetBrains Mono', monospace" }}>
-          {t('terminal_pro.disclaimer')}
-        </span>
-      </div>
     </div>
   );
 }
