@@ -2,81 +2,59 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../lib/routes.js';
 import { CLUBE_COLORS } from '../lib/tokens.js';
+import {
+  TOTAL_ASSETS, GROUP_COUNT, SUBGROUP_COUNT, SOURCE_COUNT,
+  countByGroup, subgroupNamesByGroup,
+} from '../lib/publicStats.js';
+import { SECTOR_ORDER } from '../data/b3Sectors.js';
+
+// Counts and subgroup tags come from publicStats (computed from the taxonomy
+// bootstrap) so this page can't drift from the data. Names, descriptions and
+// source attributions are curated — sources must match the actual provider
+// routing in server/lib/providerRouting.js.
+const globalCard = (number, groupId, name, description, source, overrides = {}) => {
+  const subgroups = subgroupNamesByGroup(groupId);
+  return {
+    number,
+    name,
+    count: `${countByGroup(groupId)} ${overrides.unit || 'ASSETS'}`,
+    groups: subgroups.length === 1 ? '1 GROUP' : `${subgroups.length} SUBGROUPS`,
+    description,
+    source,
+    subgroups: overrides.subgroups || subgroups,
+  };
+};
 
 const GLOBAL_COVERAGE = [
-  {
-    number: '01',
-    name: 'US Equities',
-    count: '89 ASSETS',
-    groups: '9 SECTORS',
-    description: 'Technology, Semiconductors, Financials, Healthcare, Consumer, Real Estate, Energy, Aerospace & Defense, Clean Energy. Mapped to GICS sectors.',
-    source: 'Yahoo Finance · Finnhub · FMP',
-    subgroups: [
-      'Technology', 'Semiconductors', 'Financials', 'Health Care',
-      'Consumer', 'Real Estate', 'Oil & Gas', 'Aerospace & Defense',
-      'Clean Energy',
-    ],
-  },
-  {
-    number: '02',
-    name: 'Global Indices',
-    count: '8 ASSETS',
-    groups: '1 GROUP',
-    description: 'S&P 500, NASDAQ, DAX, Nikkei 225, FTSE 100, Hang Seng, IBOVESPA, Emerging Markets. The benchmarks that define global markets.',
-    source: 'Yahoo Finance',
-    subgroups: ['Global Indices'],
-  },
-  {
-    number: '03',
-    name: 'Foreign Exchange',
-    count: '8 PAIRS',
-    groups: '1 GROUP',
-    description: 'USD/BRL, EUR/USD, GBP/USD, JPY/USD, AUD/USD, USD/CAD, USD/CHF, USD/MXN. Major pairs including EM currencies.',
-    source: 'Yahoo Finance · AwesomeAPI',
-    subgroups: ['Foreign Exchange'],
-  },
-  {
-    number: '04',
-    name: 'Digital Assets',
-    count: '3 ASSETS',
-    groups: '1 GROUP',
-    description: 'Bitcoin, Ethereum, and Solana. Live spot prices with 30-second refresh cycles via CoinGecko public API.',
-    source: 'CoinGecko',
-    subgroups: ['Crypto'],
-  },
-  {
-    number: '05',
-    name: 'Commodities',
-    count: '15 ASSETS',
-    groups: '3 SUBGROUPS',
-    description: 'Precious metals (gold, silver, platinum), energy (crude oil WTI, natural gas), and agriculture (corn, wheat, soybean) via ETFs and futures.',
-    source: 'Yahoo Finance',
-    subgroups: ['Precious Metals', 'Energy Commodities', 'Agriculture'],
-  },
-  {
-    number: '06',
-    name: 'Fixed Income',
-    count: '12 ASSETS',
-    groups: '3 SUBGROUPS',
-    description: 'US Treasuries across the full maturity spectrum (SHY, IEF, TLT), investment-grade and high-yield corporate bonds, dividend income ETFs.',
-    source: 'Yahoo Finance',
-    subgroups: ['Treasuries', 'Bonds', 'Dividend Income'],
-  },
+  globalCard('01', 'equities', 'Global Equities',
+    'US-listed equities and ETFs mapped to GICS sectors — technology to staples — plus international ADRs, EM trackers, and B3 headline names.',
+    'FMP · EODHD'),
+  globalCard('02', 'indices', 'Global Indices',
+    'S&P 500, NASDAQ, Dow Jones, FTSE 100, Nikkei 225, IBOVESPA and more. The benchmarks that define global markets.',
+    'EODHD · FMP'),
+  globalCard('03', 'currencies', 'Foreign Exchange',
+    'Major and EM pairs — EUR/USD, GBP/USD, USD/JPY, USD/BRL and more.',
+    'FMP · EODHD', { unit: 'PAIRS' }),
+  globalCard('04', 'digital-assets', 'Digital Assets',
+    'Bitcoin, Ethereum, Solana, XRP, Cardano, Dogecoin, Avalanche, and Polkadot. Live spot prices via the CoinGecko API.',
+    'CoinGecko'),
+  globalCard('05', 'commodities', 'Commodities',
+    'Precious metals, energy, agriculture, and industrial metals — via futures and ETF proxies.',
+    'FMP'),
+  globalCard('06', 'fixed-income', 'Fixed Income',
+    'US Treasuries across the full maturity spectrum, investment-grade and high-yield credit, and dividend income ETFs.',
+    'FMP · EODHD'),
 ];
 
 const BRAZIL_COVERAGE = [
   {
     number: '01',
-    name: 'B3 Equities',
-    count: '96 ASSETS',
-    groups: '12 SUBGROUPS',
-    description: 'Full coverage of the major B3 equities organized by sector: Banks, Oil & Gas, Mining, Agriculture, Retail, Utilities, Transport, Industry, Healthcare, Tech & Telecom, Real Estate, and others.',
+    name: 'B3 Equities & Funds',
+    count: `${countByGroup('br-mercado')} ASSETS`,
+    groups: `${SECTOR_ORDER.length} SECTORS`,
+    description: 'Full coverage of the major B3 names — equities organized by sector, plus FIIs, ETFs, and B3 indices.',
     source: 'BRAPI',
-    subgroups: [
-      'Bancos', 'Petróleo & Gás', 'Mineração', 'Agronegócio',
-      'Varejo & Consumo', 'Utilities', 'Transporte', 'Indústria',
-      'Saúde', 'Tecnologia & Telecom', 'Construção Civil', 'Outros',
-    ],
+    subgroups: [...SECTOR_ORDER],
   },
   {
     number: '02',
@@ -99,10 +77,10 @@ const BRAZIL_COVERAGE = [
 ];
 
 const HERO_STATS = [
-  { num: '269', label: 'Total Assets' },
-  { num: '9', label: 'Groups' },
-  { num: '36', label: 'Subgroups' },
-  { num: '8', label: 'Data Sources' },
+  { num: String(TOTAL_ASSETS), label: 'Total Assets' },
+  { num: String(GROUP_COUNT), label: 'Groups' },
+  { num: String(SUBGROUP_COUNT), label: 'Subgroups' },
+  { num: String(SOURCE_COUNT), label: 'Data Sources' },
 ];
 
 export default function CoveragePage() {
@@ -331,7 +309,7 @@ export default function CoveragePage() {
             marginTop: 0,
             marginBottom: 0,
           }}>
-            269 assets across 9 groups — global equities, Brazil, crypto, FX, commodities, and fixed income.
+            {TOTAL_ASSETS} assets across {GROUP_COUNT} groups — global equities, Brazil, crypto, FX, commodities, and fixed income.
           </p>
 
           {/* Stats row */}
@@ -485,7 +463,7 @@ export default function CoveragePage() {
               marginBottom: 40,
               marginTop: 0,
             }}>
-              Free account. Instant access. All 269 assets from day one.
+              Free account. Instant access. All {TOTAL_ASSETS} assets from day one.
             </p>
             <button
               onClick={() => navigate(ROUTES.auth.register)}

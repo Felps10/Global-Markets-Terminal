@@ -22,8 +22,8 @@
     "pro_badge": "Most popular",
     "pro_label": "Subscription",
     "pro_name": "Terminal Pro",
-    "pro_desc": "The complete professional terminal. 269 assets, deep research, technical signals, watchlist and price alerts.",
-    "pro_f1": "269 real-time assets",
+    "pro_desc": "The complete professional terminal. Full asset universe, deep research, technical signals, watchlist and price alerts.",
+    "pro_f1": "Full real-time asset universe",
     "pro_f2": "Research & fundamentals",
     "pro_f3": "Signal Engine (RSI, MACD)",
     "pro_f4": "Watchlist + email alerts",
@@ -79,18 +79,18 @@
     "termos": "Terms of use",
     "disclaimer_link": "Disclaimer",
     "disclaimer": "© 2026 GMT · For informational purposes only · Not investment advice",
-    "data_sources": "Data via Yahoo Finance, Finnhub, BRAPI, BCB, FRED and others"
+    "data_sources": "Data via FMP, EODHD, BRAPI, BCB, CoinGecko, FRED and Finnhub"
   },
   "terminal_pro": {
     "badge": "Terminal Pro",
     "hero_headline_1": "The professional terminal",
     "hero_headline_2": "for serious investors.",
-    "hero_subline": "269 assets in real time, deep research, technical signals, watchlist and alerts — all in an interface designed for the market.",
+    "hero_subline": "{{assets}} assets in real time, deep research, technical signals, watchlist and alerts — all in an interface designed for the market.",
     "cta_register": "Create free account →",
     "cta_login": "I already have an account",
     "included_label": "WHAT'S INCLUDED",
     "f_global": "Terminal Global",
-    "f_global_desc": "269 assets · equities, FX, crypto, commodities, fixed income",
+    "f_global_desc": "{{assets}} assets · equities, FX, crypto, commodities, fixed income",
     "f_brasil": "Terminal Brasil",
     "f_brasil_desc": "B3, SELIC, IPCA, yield curve, USD/BRL",
     "f_research": "Research",
@@ -121,7 +121,7 @@
     "final_sub": "Create a free account and access Terminal Pro now. No credit card required.",
     "final_cta": "Create free account →",
     "final_link": "Or explore Terminal Mini first",
-    "copyright": "© 2026 GMT",
+    "copyright": "© {{year}} GMT",
     "disclaimer": "For informational purposes only · Not investment advice"
   },
   "clube": {
@@ -172,10 +172,10 @@
     "toggle_brasil": "Brasil",
     "loading": "Loading...",
     "upgrade_title": "Need more?",
-    "upgrade_desc": "Terminal Pro covers 269 assets, research, signals and watchlist.",
+    "upgrade_desc": "Terminal Pro covers the full asset universe, research, signals and watchlist.",
     "upgrade_cta": "Discover Terminal Pro →",
     "updated": "Updated",
-    "data_sources": "Data via Yahoo Finance, BRAPI, CoinGecko"
+    "data_sources": "Data via FMP, EODHD, BRAPI and CoinGecko"
   },
   "locked": {
     "badge": "Terminal Pro",

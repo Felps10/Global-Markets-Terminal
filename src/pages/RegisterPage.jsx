@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 import { ROUTES } from '../lib/routes.js';
+import { TOTAL_ASSETS, GROUP_COUNT, SOURCE_COUNT } from '../lib/publicStats.js';
 
 function getRedirectForRole(role) {
   if (role === 'admin') return ROUTES.admin;
@@ -225,9 +226,9 @@ export default function RegisterPage() {
             gap: 24,
           }}>
             {[
-              { num: '269', label: 'ASSETS' },
-              { num: '8', label: 'SOURCES' },
-              { num: '30s', label: 'REFRESH' },
+              { num: String(TOTAL_ASSETS), label: 'ASSETS' },
+              { num: String(GROUP_COUNT), label: 'GROUPS' },
+              { num: String(SOURCE_COUNT), label: 'SOURCES' },
             ].map((s, i) => (
               <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <span style={{

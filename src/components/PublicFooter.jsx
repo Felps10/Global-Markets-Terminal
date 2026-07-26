@@ -74,7 +74,7 @@ export default function PublicFooter() {
         fontSize: 11,
         color: 'rgba(255,255,255,0.15)',
       }}>
-        © 2025 Global Markets Terminal
+        © {new Date().getFullYear()} Global Markets Terminal
       </div>
     </footer>
   );
